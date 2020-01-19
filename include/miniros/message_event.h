@@ -33,7 +33,7 @@
 #include <functional>
 #include <type_traits>
 
-#include "ros/time.h"
+#include "miniros/time.h"
 #include "datatypes.h"
 
 
@@ -69,6 +69,7 @@ public:
   typedef std::shared_ptr<Message> MessagePtr;
   typedef std::shared_ptr<ConstMessage> ConstMessagePtr;
   typedef std::function<MessagePtr()> CreateFunction;
+  using Time = miniros::Time;
 
   MessageEvent()
   : nonconst_need_copy_(true)
@@ -108,25 +109,25 @@ public:
    */
   MessageEvent(const ConstMessagePtr& message)
   {
-    init(message, std::shared_ptr<M_string>(), ros::Time::now(), true, miniros::DefaultMessageCreator<Message>());
+    init(message, std::shared_ptr<M_string>(), Time::now(), true, miniros::DefaultMessageCreator<Message>());
   }
 
-  MessageEvent(const ConstMessagePtr& message, const std::shared_ptr<M_string>& connection_header, ros::Time receipt_time)
+  MessageEvent(const ConstMessagePtr& message, const std::shared_ptr<M_string>& connection_header, Time receipt_time)
   {
     init(message, connection_header, receipt_time, true, miniros::DefaultMessageCreator<Message>());
   }
 
-  MessageEvent(const ConstMessagePtr& message, ros::Time receipt_time)
+  MessageEvent(const ConstMessagePtr& message, Time receipt_time)
   {
     init(message, std::shared_ptr<M_string>(), receipt_time, true, miniros::DefaultMessageCreator<Message>());
   }
 
-  MessageEvent(const ConstMessagePtr& message, const std::shared_ptr<M_string>& connection_header, ros::Time receipt_time, bool nonconst_need_copy, const CreateFunction& create)
+  MessageEvent(const ConstMessagePtr& message, const std::shared_ptr<M_string>& connection_header, Time receipt_time, bool nonconst_need_copy, const CreateFunction& create)
   {
     init(message, connection_header, receipt_time, nonconst_need_copy, create);
   }
 
-  void init(const ConstMessagePtr& message, const std::shared_ptr<M_string>& connection_header, ros::Time receipt_time, bool nonconst_need_copy, const CreateFunction& create)
+  void init(const ConstMessagePtr& message, const std::shared_ptr<M_string>& connection_header, Time receipt_time, bool nonconst_need_copy, const CreateFunction& create)
   {
     message_ = message;
     connection_header_ = connection_header;
@@ -182,7 +183,7 @@ public:
   /**
    * \brief Returns the time at which this message was received
    */
-  ros::Time getReceiptTime() const { return receipt_time_; }
+  miniros::Time getReceiptTime() const { return receipt_time_; }
 
   bool nonConstWillCopy() const { return nonconst_need_copy_; }
   bool getMessageWillCopy() const { return !std::is_const<M>::value && nonconst_need_copy_; }
@@ -245,7 +246,8 @@ private:
   }
 #endif
 
-  template<typename M2> std::shared_ptr<M> copyMessageIfNecessary() const
+  template<typename M2>
+  typename std::enable_if<!std::is_void<M2>::value, std::shared_ptr<M> >::type copyMessageIfNecessary() const
   {
     if (std::is_const<M>::value || !nonconst_need_copy_)
     {
@@ -264,7 +266,8 @@ private:
     return message_copy_;
   }
 
-  template<> typename std::shared_ptr<M> copyMessageIfNecessary<void>() const
+  template<typename M2>
+  typename std::enable_if<std::is_void<M2>::value, std::shared_ptr<M> >::type copyMessageIfNecessary() const
   {
     return const_cast<Message*>(message_);
   }
@@ -273,7 +276,7 @@ private:
   // Kind of ugly to make this mutable, but it means we can pass a const MessageEvent to a callback and not worry about other things being modified
   mutable MessagePtr message_copy_;
   std::shared_ptr<M_string> connection_header_;
-  ros::Time receipt_time_;
+  Time receipt_time_;
   bool nonconst_need_copy_ = false;
   CreateFunction create_;
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009, Willow Garage, Inc.
+ * Copyright (C) 2008, Willow Garage, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -8,7 +8,7 @@
  *   * Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- *   * Neither the names of Willow Garage, Inc. nor the names of its
+ *   * Neither the names of Stanford University or Willow Garage, Inc. nor the names of its
  *     contributors may be used to endorse or promote products derived from
  *     this software without specific prior written permission.
  *
@@ -26,41 +26,25 @@
  */
 
 #pragma once
-// Make sure that either __GLIBCXX__ or _LIBCPP_VERSION is defined.
-#include <cstddef>
 
-// C++ standard section 17.4.3.1/1 states that forward declarations of STL types
-// that aren't specializations involving user defined types results in undefined
-// behavior. Apparently only libc++ has a problem with this and won't compile it.
-#ifndef _LIBCPP_VERSION
-namespace std
-{
-template<typename T> class allocator;
-}
-#else
-#include <memory>
+#include <miniros/macros.h> // for the DECL's
+
+// Import/export for windows dll's and visibility for gcc shared libraries.
+
+#ifdef ROS_BUILD_SHARED_LIBS // ros is being built around shared libraries
+  #ifdef rosbag_EXPORTS // we are building a shared lib/dll
+    #define ROSBAG_DECL ROS_HELPER_EXPORT
+  #else // we are using shared lib/dll
+    #define ROSBAG_DECL ROS_HELPER_IMPORT
+  #endif
+
+  #ifdef rosbag_storage_EXPORTS // we are building a shared lib/dll
+    #define ROSBAG_STORAGE_DECL ROS_HELPER_EXPORT
+  #else // we are using shared lib/dll
+    #define ROSBAG_STORAGE_DECL ROS_HELPER_IMPORT
+  #endif
+
+#else // ros is being built around static libraries
+  #define ROSBAG_DECL
+  #define ROSBAG_STORAGE_DECL
 #endif
-
-namespace std
-{
-template<typename T> class shared_ptr;
-}
-
-/**
- * \brief Forward-declare a message, including Ptr and ConstPtr types, with an allocator
- *
- * \param msg The "base" message type, i.e., the name of the .msg file
- * \param new_name The name you'd like the message to have
- * \param alloc The allocator to use, e.g. std::allocator
- */
-#define MINIROS_DECLARE_MESSAGE_WITH_ALLOCATOR(msg, new_name, alloc) \
-  template<class Allocator> struct msg##_; \
-  typedef msg##_<alloc<void> > new_name; \
-  typedef std::shared_ptr<new_name> new_name##Ptr; \
-  typedef std::shared_ptr<new_name const> new_name##ConstPtr;
-
-/**
- * \brief Forward-declare a message, including Ptr and ConstPtr types, using std::allocator
- * \param msg The "base" message type, i.e. the name of the .msg file
- */
-#define MINIROS_DECLARE_MESSAGE(msg) MINIROS_DECLARE_MESSAGE_WITH_ALLOCATOR(msg, msg, std::allocator)

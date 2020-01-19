@@ -37,22 +37,7 @@ if(HAVE_GLIBC_BACKTRACE)
 endif(HAVE_GLIBC_BACKTRACE)
 
 #
-SET(cpp17_common_SRC src/debug.cpp src/header.cpp)
-SET(serialization_SRC src/serialization.cpp)
-SET(rostime_SRC
-	src/rostime/duration.cpp
-	src/rostime/rate.cpp
-	src/rostime/time.cpp)
-
-add_library(miniroscpp ${cpp17_common_SRC} ${serialization_SRC} ${rostime_SRC})
-
-set_property(TARGET miniroscpp PROPERTY CXX_STANDARD 17)
-target_link_libraries(miniroscpp ${console_bridge_LIBRARIES})
-
-install(TARGETS miniroscpp
-  ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-  LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-  RUNTIME DESTINATION ${CATKIN_GLOBAL_BIN_DESTINATION})
+add_subdirectory(src)
 
 install(DIRECTORY include/
   DESTINATION ${CATKIN_GLOBAL_INCLUDE_DESTINATION}

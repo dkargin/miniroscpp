@@ -35,10 +35,10 @@
 
 namespace std_msgs
 {
-  ROS_DECLARE_MESSAGE(Header)
+  MINIROS_DECLARE_MESSAGE(Header)
 }
 
-#define ROS_IMPLEMENT_SIMPLE_TOPIC_TRAITS(msg, md5sum, datatype, definition) \
+#define MINIROS_IMPLEMENT_SIMPLE_TOPIC_TRAITS(msg, md5sum, datatype, definition) \
   namespace miniros \
   { \
   namespace message_traits \

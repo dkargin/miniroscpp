@@ -32,7 +32,7 @@
 
 #include <vector>
 #include <map>
-
+#include <cstring>
 
 #include "roscpp_serialization_macros.h"
 
@@ -40,7 +40,7 @@
 #include <miniros/time.h>
 #include <miniros/traits/call_traits.h>
 #include "miniros/traits/builtin_message_traits.h"
-#include "serialized_message.h"
+#include "miniros/serialized_message.h"
 #include "miniros/exception.h"
 #include "miniros/datatypes.h"
 
@@ -70,7 +70,7 @@ inline static void allInOne(Stream& stream, T t)
  *
  * The only guarantee given is that Stream::next(T) is defined.
  */
-#define ROS_DECLARE_ALLINONE_SERIALIZER \
+#define MINIROS_DECLARE_ALLINONE_SERIALIZER \
   template<typename Stream, typename T> \
   inline static void write(Stream& stream, const T& t) \
   { \
@@ -172,7 +172,7 @@ inline uint32_t serializationLength(const T& t)
   return Serializer<T>::serializedLength(t);
 }
 
-#define ROS_CREATE_SIMPLE_SERIALIZER(Type) \
+#define MINIROS_CREATE_SIMPLE_SERIALIZER(Type) \
   template<> struct Serializer<Type> \
   { \
     template<typename Stream> inline static void write(Stream& stream, const Type v) \
@@ -191,16 +191,16 @@ inline uint32_t serializationLength(const T& t)
     } \
 };
 
-ROS_CREATE_SIMPLE_SERIALIZER(uint8_t)
-ROS_CREATE_SIMPLE_SERIALIZER(int8_t)
-ROS_CREATE_SIMPLE_SERIALIZER(uint16_t)
-ROS_CREATE_SIMPLE_SERIALIZER(int16_t)
-ROS_CREATE_SIMPLE_SERIALIZER(uint32_t)
-ROS_CREATE_SIMPLE_SERIALIZER(int32_t)
-ROS_CREATE_SIMPLE_SERIALIZER(uint64_t)
-ROS_CREATE_SIMPLE_SERIALIZER(int64_t)
-ROS_CREATE_SIMPLE_SERIALIZER(float)
-ROS_CREATE_SIMPLE_SERIALIZER(double)
+MINIROS_CREATE_SIMPLE_SERIALIZER(uint8_t)
+MINIROS_CREATE_SIMPLE_SERIALIZER(int8_t)
+MINIROS_CREATE_SIMPLE_SERIALIZER(uint16_t)
+MINIROS_CREATE_SIMPLE_SERIALIZER(int16_t)
+MINIROS_CREATE_SIMPLE_SERIALIZER(uint32_t)
+MINIROS_CREATE_SIMPLE_SERIALIZER(int32_t)
+MINIROS_CREATE_SIMPLE_SERIALIZER(uint64_t)
+MINIROS_CREATE_SIMPLE_SERIALIZER(int64_t)
+MINIROS_CREATE_SIMPLE_SERIALIZER(float)
+MINIROS_CREATE_SIMPLE_SERIALIZER(double)
 
 /**
  * \brief Serializer specialized for bool (serialized as uint8)

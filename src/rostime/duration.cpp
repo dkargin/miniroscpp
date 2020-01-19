@@ -34,6 +34,8 @@
 #include <miniros/duration.h>
 #include <miniros/impl/duration.h>
 
+#include <limits>
+
 namespace miniros {
 
   Duration::Duration(const Rate& rate)
