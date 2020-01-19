@@ -1,0 +1,22 @@
+<package>
+  <name>miniroscpp</name>
+  <version>0.6.13</version>
+  <description>
+    miniroscpp contains C++ code for doing things that are not necessarily ROS
+    related, but are useful for multiple packages. This includes things like
+    the ROS_DEPRECATED and ROS_FORCE_INLINE macros, as well as code for getting
+    backtraces.
+
+    All references to boost were replaced by standard libraries.
+
+  </description>
+  <maintainer email="dmitry.n.kargin@gmail.com">Dmitry Kargin</maintainer>
+  <license>BSD</license>
+
+  <url>Nope</url>
+  <author>John Faust</author>
+  <author>Dmitry Kargin</author>
+  <buildtool_depend>catkin</buildtool_depend>
+  <build_depend>libconsole-bridge-dev</build_depend>
+  <run_depend>libconsole-bridge-dev</run_depend>
+</package>
