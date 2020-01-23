@@ -217,35 +217,6 @@ public:
 
 private:
 
-#ifdef REFERENCE_IMPL
-  // I am not sure why type traits are used. Simple template specialization can do the same.
-  template<typename M2>
-  typename std::disable_if<std::is_void<M2>, std::shared_ptr<M> >::type copyMessageIfNecessary() const
-  {
-    if (std::is_const<M>::value || !nonconst_need_copy_)
-    {
-      return const_cast<Message*>(message_);
-    }
-
-    if (message_copy_)
-    {
-      return message_copy_;
-    }
-
-    assert(create_);
-    message_copy_ = create_();
-    *message_copy_ = *message_;
-
-    return message_copy_;
-  }
-
-  template<typename M2>
-  typename std::enable_if<std::is_void<M2>, std::shared_ptr<M> >::type copyMessageIfNecessary() const
-  {
-    return const_cast<Message*>(message_);
-  }
-#endif
-
   template<typename M2>
   typename std::enable_if<!std::is_void<M2>::value, std::shared_ptr<M> >::type copyMessageIfNecessary() const
   {

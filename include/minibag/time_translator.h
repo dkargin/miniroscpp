@@ -68,5 +68,5 @@ private:
     miniros::Time translated_start_;
 };
 
-} // namespace rosbag
+} // namespace minibag
 

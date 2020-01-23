@@ -35,7 +35,7 @@
 #pragma once
 
 #include <functional>
-#include <boost/iterator/iterator_facade.hpp>
+//#include <boost/iterator/iterator_facade.hpp>
 
 #include <miniros/time.h>
 #include "minibag/message_instance.h"
@@ -58,9 +58,9 @@ public:
      * MessageInstance is destroyed.  You should never store the
      * pointer to this reference.
      */
-    class ROSBAG_STORAGE_DECL iterator : public boost::iterator_facade<iterator,
+    class ROSBAG_STORAGE_DECL iterator /*: public boost::iterator_facade<iterator,
                                                    MessageInstance,
-                                                   boost::forward_traversal_tag>
+                                                   boost::forward_traversal_tag>*/
     {
     public:
         iterator(iterator const& i);
@@ -68,12 +68,47 @@ public:
         iterator();
         ~iterator();
 
+        iterator& operator++()
+        {
+          increment();
+          return *this;
+        }
+
+        MessageInstance& operator*()
+        {
+          return *message_instance_;
+        }
+
+        const MessageInstance& operator*() const
+        {
+          return *message_instance_;
+        }
+
+        MessageInstance* operator->()
+        {
+          return message_instance_;
+        }
+
+        const MessageInstance* operator->() const
+        {
+          return message_instance_;
+        }
+
+        bool operator == (const iterator& other) const
+        {
+          return equal(other);
+        }
+
+        bool operator != (const iterator& other) const
+        {
+          return !equal(other);
+        }
+
     protected:
         iterator(View* view, bool end = false);
 
     private:
         friend class View;
-        friend class boost::iterator_core_access;
 
         void populate();
         void populateSeek(std::multiset<IndexEntry>::const_iterator iter);
