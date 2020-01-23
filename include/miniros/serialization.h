@@ -45,9 +45,6 @@
 #include "miniros/datatypes.h"
 
 
-//#include <boost/array.hpp>
-
-
 
 #include <type_traits>
 
@@ -96,7 +93,6 @@ namespace miniros
 namespace serialization
 {
 namespace mt = message_traits;
-//namespace mpl = boost::mpl;
 
 class ROSCPP_SERIALIZATION_DECL StreamOverrunException : public miniros::Exception
 {
@@ -616,7 +612,7 @@ struct ArraySerializer<T, N, typename std::enable_if<mt::IsFixedSize<T>::value &
 };
 
 /**
- * \brief serialize version for boost::array
+ * \brief serialize version for std::array
  */
 template<typename T, size_t N, typename Stream>
 inline void serialize(Stream& stream, const std::array<T, N>& t)
@@ -625,7 +621,7 @@ inline void serialize(Stream& stream, const std::array<T, N>& t)
 }
 
 /**
- * \brief deserialize version for boost::array
+ * \brief deserialize version for std::array
  */
 template<typename T, size_t N, typename Stream>
 inline void deserialize(Stream& stream, std::array<T, N>& t)
@@ -634,7 +630,7 @@ inline void deserialize(Stream& stream, std::array<T, N>& t)
 }
 
 /**
- * \brief serializationLength version for boost::array
+ * \brief serializationLength version for std::array
  */
 template<typename T, size_t N>
 inline uint32_t serializationLength(const std::array<T, N>& t)

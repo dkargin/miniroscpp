@@ -131,7 +131,7 @@ public:
 private:
   miniros::Time real_time(const miniros::Time &msg_time);
 
-    std::map<std::string, boost::shared_ptr<BagCallback> > cbs_;
+    std::map<std::string, std::shared_ptr<BagCallback> > cbs_;
     miniros::Time bag_start_;
     miniros::Time bag_end_;
     miniros::Time last_message_time_;

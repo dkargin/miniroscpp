@@ -44,6 +44,7 @@
 #include <iomanip>
 #include <limits>
 #include <stdexcept>
+#include <mutex>
 
 // time related includes for macOS
 #if defined(__APPLE__)
@@ -57,7 +58,7 @@
 #include <windows.h>
 #endif
 
-#include <boost/thread/mutex.hpp>
+//#include <boost/thread/mutex.hpp>
 #include <boost/io/ios_state.hpp>
 #include <boost/date_time/posix_time/ptime.hpp>
 
@@ -92,7 +93,7 @@ namespace miniros
 
   // I assume that this is declared here, instead of time.h, to keep users
   // of time.h from including boost/thread/mutex.hpp
-  static boost::mutex g_sim_time_mutex;
+  static std::mutex g_sim_time_mutex;
 
   static bool g_initialized(false);
   static bool g_use_sim_time(true);
@@ -290,7 +291,7 @@ namespace miniros
 
     if (g_use_sim_time)
       {
-        boost::mutex::scoped_lock lock(g_sim_time_mutex);
+        std::scoped_lock<std::mutex> lock(g_sim_time_mutex);
         Time t = g_sim_time;
         return t;
       }
@@ -303,7 +304,7 @@ namespace miniros
 
   void Time::setNow(const Time& new_now)
   {
-    boost::mutex::scoped_lock lock(g_sim_time_mutex);
+    std::scoped_lock<std::mutex> lock(g_sim_time_mutex);
 
     g_sim_time = new_now;
     g_use_sim_time = true;

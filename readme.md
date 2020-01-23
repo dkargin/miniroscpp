@@ -4,11 +4,15 @@ MiniROS is a standalone ROS distribution with minimum external requirements.
 
 # Plan #
 
-1. Get rid of boost::format. It can be replaced by a local implementation.
+1. Get rid of boost::format. It can be replaced by a local implementation.		DONE
 1. Merge console_bridge
 1. Figure out how to run new codegen with packages like sensor_msgs or nav_msgs.
 1. Squash export macro headers, like miniros/macros.h, miniros/roscpp_serialization_macros.h, minibag/macros.h.
 1. Adapt tests from corresponding libraries.
+1. Merge rosbag in.
+1. Check python code.
+1. Adapt CMakeLists.txt to work without catkin.
+1. Check if I can merge whole ROS transport in a library.
 
 # References #
 

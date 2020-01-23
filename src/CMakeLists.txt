@@ -39,6 +39,13 @@ set(lz4_FOUND TRUE)
 include_directories(${BZIP2_INCLUDE_DIR})
 include_directories(${lz4_INCLUDE_DIRS})
 
+set(AES_ENCRYPT_SOURCE "")
+set(AES_ENCRYPT_LIBRARIES "")
+if(NOT WIN32)
+  set(AES_ENCRYPT_SOURCE "rosbag_storage/aes_encryptor.cpp" "rosbag_storage/gpgme_utils.cpp")
+  set(AES_ENCRYPT_LIBRARIES "crypto" "gpgme")
+endif()
+
 add_library(minibag_storage
 	rosbag_storage/bag_player.cpp
 	rosbag_storage/bag.cpp
@@ -52,13 +59,13 @@ add_library(minibag_storage
 	rosbag_storage/uncompressed_stream.cpp
 	rosbag_storage/view.cpp
 	
-	#rosbag_storage/aes_encryptor.cpp
 	rosbag_storage/no_encryptor.cpp
+	${AES_ENCRYPT_SOURCE}
 	)
 #rosbag_storage/gpgme_utils.cpp
 
 set_property(TARGET minibag_storage PROPERTY CXX_STANDARD 17)
-target_link_libraries(minibag_storage roslz4 ${BZIP2_LIBRARIES} ${lz4_LIBRARIES})
+target_link_libraries(minibag_storage roslz4 ${BZIP2_LIBRARIES} ${lz4_LIBRARIES} ${AES_ENCRYPT_LIBRARIES})
 
 add_library(miniroscpp ${cpp_common_SRC} ${serialization_SRC} ${rostime_SRC})
 set_property(TARGET miniroscpp PROPERTY CXX_STANDARD 17)

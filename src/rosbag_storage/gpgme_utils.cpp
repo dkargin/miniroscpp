@@ -32,7 +32,7 @@
 *  POSSIBILITY OF SUCH DAMAGE.
 *********************************************************************/
 #include <string.h>
-#include <boost/format.hpp>
+#include <sstream>
 
 #include "minibag/gpgme_utils.h"
 
@@ -59,7 +59,9 @@ void getGpgKey(gpgme_ctx_t& ctx, std::string const& user, gpgme_key_t& key) {
         err = gpgme_op_keylist_start(ctx, user.c_str(), 0);
     }
     if (err) {
-        throw BagException((boost::format("gpgme_op_keylist_start returned %1%") % gpgme_strerror(err)).str());
+        std::stringstream ss;
+        ss << "gpgme_op_keylist_start returned " << gpgme_strerror(err);
+        throw BagException(ss.str());
     }
     while (true) {
         err = gpgme_op_keylist_next(ctx, &key);
@@ -74,15 +76,21 @@ void getGpgKey(gpgme_ctx_t& ctx, std::string const& user, gpgme_key_t& key) {
                 // This allows rosbag client applications to work without modifying their source code
                 throw BagException("GPG key not found");
             } else {
-                throw BagException((boost::format("GPG key not found for a user %1%") % user.c_str()).str());
+                std::stringstream ss;
+                ss << "GPG key not found for a user " << user;
+                throw BagException(ss.str());
             }
         } else {
-            throw BagException((boost::format("gpgme_op_keylist_next returned %1%") % err).str());
+            std::stringstream ss;
+            ss << "gpgme_op_keylist_next returned " << err;
+            throw BagException(ss.str());
         }
     }
     err = gpgme_op_keylist_end(ctx);
     if (err) {
-        throw BagException((boost::format("gpgme_op_keylist_end returned %1%") % gpgme_strerror(err)).str());
+        std::stringstream ss;
+        ss << "gpgme_op_keylist_end returned " << gpgme_strerror(err);
+        throw BagException(ss.str());
     }
 }
 

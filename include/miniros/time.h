@@ -57,7 +57,6 @@
 #include <cmath>
 #include <miniros/exception.h>
 #include "duration.h"
-//#include <boost/math/special_functions/round.hpp>
 #include "rostime_decl.h"
 
 /*********************************************************************

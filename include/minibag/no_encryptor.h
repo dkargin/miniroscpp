@@ -34,6 +34,7 @@
 
 #pragma once
 
+#include <functional>
 #include "minibag/encryptor.h"
 
 
@@ -45,13 +46,13 @@ public:
     NoEncryptor() { }
     ~NoEncryptor() { }
 
-    void initialize(Bag const&, std::string const&) { }
-    uint32_t encryptChunk(const uint32_t, const uint64_t, ChunkedFile&);
-    void decryptChunk(ChunkHeader const&, Buffer&, ChunkedFile&) const;
-    void addFieldsToFileHeader(miniros::M_string&) const { }
-    void readFieldsFromFileHeader(miniros::M_string const&) { }
-    void writeEncryptedHeader(std::function<void(miniros::M_string const&)>, miniros::M_string const&, ChunkedFile&);
-    bool readEncryptedHeader(std::function<bool(miniros::Header&)>, miniros::Header&, Buffer&, ChunkedFile&);
+    virtual void initialize(Bag const&, std::string const&) override { }
+    uint32_t encryptChunk(const uint32_t, const uint64_t, ChunkedFile&) override;
+    void decryptChunk(ChunkHeader const&, Buffer&, ChunkedFile&) const override;
+    void addFieldsToFileHeader(miniros::M_string&) const override { }
+    void readFieldsFromFileHeader(miniros::M_string const&) override { }
+    void writeEncryptedHeader(std::function<void(miniros::M_string const&)>, miniros::M_string const&, ChunkedFile&) override;
+    bool readEncryptedHeader(std::function<bool(miniros::Header&)>, miniros::Header&, Buffer&, ChunkedFile&) override;
 };
 } // namespace minibag
 

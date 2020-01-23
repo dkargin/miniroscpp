@@ -35,10 +35,11 @@
 #include "minibag/chunked_file.h"
 
 #include <iostream>
+#include <sstream>
 
-#include <boost/format.hpp>
-
+// Why do we need it here?
 //#include <ros/ros.h>
+
 #ifdef _WIN32
 #    ifdef __MINGW32__
 #      define fseeko fseeko64
@@ -51,10 +52,11 @@
 #        define fileno _fileno
 #        define ftruncate _chsize
 #    endif
+#else
+#include <unistd.h>
 #endif
 
 using std::string;
-using boost::format;
 using std::shared_ptr;
 using miniros::Exception;
 
@@ -81,7 +83,11 @@ void ChunkedFile::openRead     (string const& filename) { open(filename, "rb"); 
 void ChunkedFile::open(string const& filename, string const& mode) {
     // Check if file is already open
     if (file_)
-        throw BagIOException((format("File already open: %1%") % filename_.c_str()).str());
+    {
+        std::stringstream ss;
+        ss << "File already open: " << filename_;
+        throw BagIOException(ss.str());
+    }
 
     // Open the file
     if (mode == "r+b") {
@@ -100,7 +106,11 @@ void ChunkedFile::open(string const& filename, string const& mode) {
             #endif
         else {
             if (fclose(file_) != 0)
-              throw BagIOException((format("Error closing file: %1%") % filename.c_str()).str());
+            {
+              std::stringstream ss;
+              ss << "Error closing file: " << filename_;
+              throw BagIOException(ss.str());
+            }
 
             // open existing file for update
             #if defined(_MSC_VER) && (_MSC_VER >= 1400 )
@@ -118,7 +128,11 @@ void ChunkedFile::open(string const& filename, string const& mode) {
         #endif
 
     if (!file_)
-        throw BagIOException((format("Error opening file: %1%") % filename.c_str()).str());
+    {
+        std::stringstream ss;
+        ss << "Error opening file: " << filename_;
+        throw BagIOException(ss.str());
+    }
 
     read_stream_  = std::make_shared<UncompressedStream>(this);
     write_stream_ = std::make_shared<UncompressedStream>(this);
@@ -143,7 +157,11 @@ void ChunkedFile::close() {
     // Close the file
     int success = fclose(file_);
     if (success != 0)
-        throw BagIOException((format("Error closing file: %1%") % filename_.c_str()).str());
+    {
+        std::stringstream ss;
+        ss << "Error closing file: " << filename_;
+        throw BagIOException(ss.str());
+    }
 
     file_ = NULL;
     filename_.clear();
@@ -228,7 +246,6 @@ void ChunkedFile::clearUnused() {
 
 void ChunkedFile::swap(ChunkedFile& other) {
     using std::swap;
-    using boost::swap;
     swap(filename_, other.filename_);
     swap(file_, other.file_);
     swap(offset_, other.offset_);
