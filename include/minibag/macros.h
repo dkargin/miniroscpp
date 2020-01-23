@@ -31,17 +31,17 @@
 
 // Import/export for windows dll's and visibility for gcc shared libraries.
 
-#ifdef ROS_BUILD_SHARED_LIBS // ros is being built around shared libraries
+#ifdef MINIROS_BUILD_SHARED_LIBS // ros is being built around shared libraries
   #ifdef rosbag_EXPORTS // we are building a shared lib/dll
-    #define ROSBAG_DECL ROS_HELPER_EXPORT
+    #define ROSBAG_DECL MINIROS_HELPER_EXPORT
   #else // we are using shared lib/dll
-    #define ROSBAG_DECL ROS_HELPER_IMPORT
+    #define ROSBAG_DECL MINIROS_HELPER_IMPORT
   #endif
 
   #ifdef rosbag_storage_EXPORTS // we are building a shared lib/dll
-    #define ROSBAG_STORAGE_DECL ROS_HELPER_EXPORT
+    #define ROSBAG_STORAGE_DECL MINIROS_HELPER_EXPORT
   #else // we are using shared lib/dll
-    #define ROSBAG_STORAGE_DECL ROS_HELPER_IMPORT
+    #define ROSBAG_STORAGE_DECL MINIROS_HELPER_IMPORT
   #endif
 
 #else // ros is being built around static libraries

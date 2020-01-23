@@ -145,7 +145,6 @@ public:
     void            setChunkThreshold(uint32_t chunk_threshold);  //!< Set the threshold for creating new chunks
     uint32_t        getChunkThreshold() const;                    //!< Get the threshold for creating new chunks
 
-#ifdef MINIBAG_ENCRYPTOR_PLUGIN
     //! Set encryptor of the bag file
     /*!
      * \param plugin_name The name of the encryptor plugin
@@ -155,7 +154,7 @@ public:
      * reading or appending a bag file: The encryptor is read from the bag file header.
      */
     void setEncryptorPlugin(const std::string& plugin_name, const std::string& plugin_param = std::string());
-#endif
+
     //! Write a message into the bag file
     /*!
      * \param topic The topic name

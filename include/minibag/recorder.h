@@ -49,7 +49,7 @@
 
 #include <condition_variable>
 #include <mutex>
-//#include <boost/regex.hpp>
+#include <regex>
 
 #include <ros/ros.h>
 #include <miniros/time.h>
@@ -62,12 +62,12 @@
 #include "minibag/stream.h"
 #include "minibag/macros.h"
 
-namespace rosbag {
+namespace minibag {
 
 class ROSBAG_DECL OutgoingMessage
 {
 public:
-    OutgoingMessage(std::string const& _topic, topic_tools::ShapeShifter::ConstPtr _msg, boost::shared_ptr<ros::M_string> _connection_header, ros::Time _time);
+    OutgoingMessage(std::string const& _topic, topic_tools::ShapeShifter::ConstPtr _msg, std::shared_ptr<miniros::M_string> _connection_header, miniros::Time _time);
 
     std::string                         topic;
     topic_tools::ShapeShifter::ConstPtr msg;
@@ -78,11 +78,11 @@ public:
 class ROSBAG_DECL OutgoingQueue
 {
 public:
-    OutgoingQueue(std::string const& _filename, std::queue<OutgoingMessage>* _queue, ros::Time _time);
+    OutgoingQueue(std::string const& _filename, std::queue<OutgoingMessage>* _queue, miniros::Time _time);
 
     std::string                  filename;
     std::queue<OutgoingMessage>* queue;
-    ros::Time                    time;
+    miniros::Time                    time;
 };
 
 struct ROSBAG_DECL RecorderOptions
@@ -101,7 +101,7 @@ struct ROSBAG_DECL RecorderOptions
     CompressionType compression;
     std::string     prefix;
     std::string     name;
-    boost::regex    exclude_regex;
+    std::regex    exclude_regex;
     uint32_t        buffer_size;
     uint32_t        chunk_size;
     uint32_t        limit;
@@ -126,7 +126,7 @@ public:
 
     bool isSubscribed(std::string const& topic) const;
 
-    boost::shared_ptr<ros::Subscriber> subscribe(std::string const& topic);
+    std::shared_ptr<ros::Subscriber> subscribe(std::string const& topic);
 
     int run();
 
@@ -143,18 +143,22 @@ private:
 
     void snapshotTrigger(std_msgs::Empty::ConstPtr trigger);
     //    void doQueue(topic_tools::ShapeShifter::ConstPtr msg, std::string const& topic, boost::shared_ptr<ros::Subscriber> subscriber, boost::shared_ptr<int> count);
-    void doQueue(const ros::MessageEvent<topic_tools::ShapeShifter const>& msg_event, std::string const& topic, boost::shared_ptr<ros::Subscriber> subscriber, boost::shared_ptr<int> count);
+    void doQueue(
+        const miniros::MessageEvent<topic_tools::ShapeShifter const>& msg_event,
+        std::string const& topic,
+        std::shared_ptr<ros::Subscriber> subscriber,
+        std::shared_ptr<int> count);
     void doRecord();
     void checkNumSplits();
     bool checkSize();
-    bool checkDuration(const ros::Time&);
+    bool checkDuration(const miniros::Time&);
     void doRecordSnapshotter();
     void doCheckMaster(ros::TimerEvent const& e, ros::NodeHandle& node_handle);
 
     bool shouldSubscribeToTopic(std::string const& topic, bool from_node = false);
 
     template<class T>
-    static std::string timeToStr(T ros_t);
+    static std::string timeToStr(T MINIROS_t);
 
 private:
     RecorderOptions               options_;
@@ -192,6 +196,6 @@ private:
     miniros::Publisher                pub_begin_write;
 };
 
-} // namespace rosbag
+} // namespace minibag
 
 #endif

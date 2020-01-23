@@ -42,10 +42,10 @@
 #include <cassert>
 #include <string_view>
 
-#define SROS_SERIALIZE_PRIMITIVE(ptr, data) { memcpy(ptr, &data, sizeof(data)); ptr += sizeof(data); }
-#define SROS_SERIALIZE_BUFFER(ptr, data, data_size) { if (data_size > 0) { memcpy(ptr, data, data_size); ptr += data_size; } }
-#define SROS_DESERIALIZE_PRIMITIVE(ptr, data) { memcpy(&data, ptr, sizeof(data)); ptr += sizeof(data); }
-#define SROS_DESERIALIZE_BUFFER(ptr, data, data_size) { if (data_size > 0) { memcpy(data, ptr, data_size); ptr += data_size; } }
+#define SMINIROS_SERIALIZE_PRIMITIVE(ptr, data) { memcpy(ptr, &data, sizeof(data)); ptr += sizeof(data); }
+#define SMINIROS_SERIALIZE_BUFFER(ptr, data, data_size) { if (data_size > 0) { memcpy(ptr, data, data_size); ptr += data_size; } }
+#define SMINIROS_DESERIALIZE_PRIMITIVE(ptr, data) { memcpy(&data, ptr, sizeof(data)); ptr += sizeof(data); }
+#define SMINIROS_DESERIALIZE_BUFFER(ptr, data, data_size) { if (data_size > 0) { memcpy(data, ptr, data_size); ptr += data_size; } }
 
 // Remove this when no longer supporting platforms with libconsole-bridge-dev < 0.3.0,
 // in particular Debian Jessie: https://packages.debian.org/jessie/libconsole-bridge-dev
@@ -82,7 +82,7 @@ bool Header::parse(uint8_t* buffer, uint32_t size, std::string& error_msg)
   while (buf < buffer + size)
   {
     uint32_t len;
-    SROS_DESERIALIZE_PRIMITIVE(buf, len);
+    SMINIROS_DESERIALIZE_PRIMITIVE(buf, len);
 
     if (len > 1000000)
     {
@@ -167,11 +167,11 @@ void Header::write(const M_string& key_vals, shared_array_uint8_t& buffer, uint3
       const std::string& value = it->second;
 
       uint32_t len = key.length() + value.length() + 1;
-      SROS_SERIALIZE_PRIMITIVE(ptr, len);
-      SROS_SERIALIZE_BUFFER(ptr, key.data(), key.length());
+      SMINIROS_SERIALIZE_PRIMITIVE(ptr, len);
+      SMINIROS_SERIALIZE_BUFFER(ptr, key.data(), key.length());
       static const char equals = '=';
-      SROS_SERIALIZE_PRIMITIVE(ptr, equals);
-      SROS_SERIALIZE_BUFFER(ptr, value.data(), value.length());
+      SMINIROS_SERIALIZE_PRIMITIVE(ptr, equals);
+      SMINIROS_SERIALIZE_BUFFER(ptr, value.data(), value.length());
     }
   }
 

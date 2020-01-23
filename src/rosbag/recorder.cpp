@@ -32,7 +32,7 @@
 *  POSSIBILITY OF SUCH DAMAGE.
 ********************************************************************/
 
-#include "rosbag/recorder.h"
+#include "minibag/recorder.h"
 
 #include <sys/stat.h>
 #include <boost/filesystem.hpp>
@@ -47,10 +47,10 @@
 #include <set>
 #include <sstream>
 #include <string>
+#include <memory>
 
 #include <boost/lexical_cast.hpp>
 #include <boost/regex.hpp>
-#include <boost/thread.hpp>
 #include <boost/thread/xtime.hpp>
 #include <boost/date_time/local_time/local_time.hpp>
 
@@ -66,14 +66,14 @@ using std::endl;
 using std::set;
 using std::string;
 using std::vector;
-using boost::shared_ptr;
+using std::shared_ptr;
 using ros::Time;
 
-namespace rosbag {
+namespace minibag {
 
 // OutgoingMessage
 
-OutgoingMessage::OutgoingMessage(string const& _topic, topic_tools::ShapeShifter::ConstPtr _msg, boost::shared_ptr<ros::M_string> _connection_header, Time _time) :
+OutgoingMessage::OutgoingMessage(string const& _topic, topic_tools::ShapeShifter::ConstPtr _msg, shared_ptr<miniros::M_string> _connection_header, Time _time) :
     topic(_topic), msg(_msg), connection_header(_connection_header), time(_time)
 {
 }
@@ -165,7 +165,7 @@ int Recorder::run() {
     }
 
     if (!ros::Time::waitForValid(ros::WallDuration(2.0)))
-      ROS_WARN("/use_sim_time set to true and no clock published.  Still waiting for valid time...");
+      MINIROS_WARN("/use_sim_time set to true and no clock published.  Still waiting for valid time...");
 
     ros::Time::waitForValid();
 
@@ -210,7 +210,7 @@ int Recorder::run() {
 }
 
 shared_ptr<ros::Subscriber> Recorder::subscribe(string const& topic) {
-    ROS_INFO("Subscribing to %s", topic.c_str());
+    MINIROS_INFO("Subscribing to %s", topic.c_str());
 
     ros::NodeHandle nh;
     shared_ptr<int> count(boost::make_shared<int>(options_.limit));
@@ -268,9 +268,9 @@ bool Recorder::shouldSubscribeToTopic(std::string const& topic, bool from_node) 
 }
 
 template<class T>
-std::string Recorder::timeToStr(T ros_t)
+std::string Recorder::timeToStr(T MINIROS_t)
 {
-    (void)ros_t;
+    (void)MINIROS_t;
     std::stringstream msg;
     const boost::posix_time::ptime now=
         boost::posix_time::second_clock::local_time();
@@ -306,7 +306,7 @@ void Recorder::doQueue(const ros::MessageEvent<topic_tools::ShapeShifter const>&
             if (!options_.snapshot) {
                 Time now = Time::now();
                 if (now > last_buffer_warn_ + ros::Duration(5.0)) {
-                    ROS_WARN("rosbag record buffer exceeded.  Dropping oldest queued message.");
+                    MINIROS_WARN("rosbag record buffer exceeded.  Dropping oldest queued message.");
                     last_buffer_warn_ = now;
                 }
             }
@@ -366,7 +366,7 @@ void Recorder::snapshotTrigger(std_msgs::Empty::ConstPtr trigger) {
     (void)trigger;
     updateFilenames();
     
-    ROS_INFO("Triggered snapshot recording with name %s.", target_filename_.c_str());
+    MINIROS_INFO("Triggered snapshot recording with name %s.", target_filename_.c_str());
     
     {
         boost::mutex::scoped_lock lock(queue_mutex_);
@@ -387,11 +387,11 @@ void Recorder::startWriting() {
         bag_.open(write_filename_, bagmode::Write);
     }
     catch (rosbag::BagException e) {
-        ROS_ERROR("Error writing: %s", e.what());
+        MINIROS_ERROR("Error writing: %s", e.what());
         exit_code_ = 1;
         ros::shutdown();
     }
-    ROS_INFO("Recording to %s.", target_filename_.c_str());
+    MINIROS_INFO("Recording to %s.", target_filename_.c_str());
 
     if (options_.publish)
     {
@@ -402,7 +402,7 @@ void Recorder::startWriting() {
 }
 
 void Recorder::stopWriting() {
-    ROS_INFO("Closing %s.", target_filename_.c_str());
+    MINIROS_INFO("Closing %s.", target_filename_.c_str());
     bag_.close();
     rename(write_filename_.c_str(), target_filename_.c_str());
 }
@@ -417,7 +417,7 @@ void Recorder::checkNumSplits()
             int err = unlink(current_files_.front().c_str());
             if(err != 0)
             {
-                ROS_ERROR("Unable to remove %s: %s", current_files_.front().c_str(), strerror(errno));
+                MINIROS_ERROR("Unable to remove %s: %s", current_files_.front().c_str(), strerror(errno));
             }
             current_files_.pop_front();
         }
@@ -485,7 +485,7 @@ void Recorder::doRecord() {
     }
     catch (rosbag::BagException &ex)
     {
-        ROS_ERROR_STREAM(ex.what());
+        MINIROS_ERROR_STREAM(ex.what());
         exit_code_ = 1;
         stopWriting();
         return;
@@ -543,7 +543,7 @@ void Recorder::doRecord() {
         }
         catch (rosbag::BagException &ex)
         {
-            ROS_ERROR_STREAM(ex.what());
+            MINIROS_ERROR_STREAM(ex.what());
             exit_code_ = 1;
             break;
         }
@@ -575,7 +575,7 @@ void Recorder::doRecordSnapshotter() {
             bag_.open(write_filename, bagmode::Write);
         }
         catch (rosbag::BagException ex) {
-            ROS_ERROR("Error writing: %s", ex.what());
+            MINIROS_ERROR("Error writing: %s", ex.what());
             return;
         }
 
@@ -617,7 +617,7 @@ void Recorder::doCheckMaster(ros::TimerEvent const& e, ros::NodeHandle& node_han
 
         if (!ros::network::splitURI(static_cast<std::string>(resp[2]), peer_host, peer_port))
         {
-          ROS_ERROR("Bad xml-rpc URI trying to inspect node at: [%s]", static_cast<std::string>(resp[2]).c_str());
+          MINIROS_ERROR("Bad xml-rpc URI trying to inspect node at: [%s]", static_cast<std::string>(resp[2]).c_str());
         } else {
 
           XmlRpc::XmlRpcClient c(peer_host.c_str(), peer_port, "/");
@@ -634,7 +634,7 @@ void Recorder::doCheckMaster(ros::TimerEvent const& e, ros::NodeHandle& node_han
                 subscribe(resp2[2][i][0]);
             }
           } else {
-            ROS_ERROR("Node at: [%s] failed to return subscriptions.", static_cast<std::string>(resp[2]).c_str());
+            MINIROS_ERROR("Node at: [%s] failed to return subscriptions.", static_cast<std::string>(resp[2]).c_str());
           }
         }
       }
@@ -665,20 +665,20 @@ bool Recorder::checkDisk() {
     struct statvfs fiData;
     if ((statvfs(bag_.getFileName().c_str(), &fiData)) < 0)
     {
-        ROS_WARN("Failed to check filesystem stats.");
+        MINIROS_WARN("Failed to check filesystem stats.");
         return true;
     }
     unsigned long long free_space = 0;
     free_space = (unsigned long long) (fiData.f_bsize) * (unsigned long long) (fiData.f_bavail);
     if (free_space < options_.min_space)
     {
-        ROS_ERROR("Less than %s of space free on disk with %s.  Disabling recording.", options_.min_space_str.c_str(), bag_.getFileName().c_str());
+        MINIROS_ERROR("Less than %s of space free on disk with %s.  Disabling recording.", options_.min_space_str.c_str(), bag_.getFileName().c_str());
         writing_enabled_ = false;
         return false;
     }
     else if (free_space < 5 * options_.min_space)
     {
-        ROS_WARN("Less than 5 x %s of space free on disk with %s.", options_.min_space_str.c_str(), bag_.getFileName().c_str());
+        MINIROS_WARN("Less than 5 x %s of space free on disk with %s.", options_.min_space_str.c_str(), bag_.getFileName().c_str());
     }
     else
     {
@@ -694,7 +694,7 @@ bool Recorder::checkDisk() {
     }
     catch (boost::filesystem::filesystem_error &e) 
     { 
-        ROS_WARN("Failed to check filesystem stats [%s].", e.what());
+        MINIROS_WARN("Failed to check filesystem stats [%s].", e.what());
         writing_enabled_ = false;
         return false;
     }
@@ -705,7 +705,7 @@ bool Recorder::checkDisk() {
     }
     else if (info.available < 5 * options_.min_space)
     {
-        ROS_WARN("Less than 5 x %s of space free on disk with %s.", options_.min_space_str.c_str(), bag_.getFileName().c_str());
+        MINIROS_WARN("Less than 5 x %s of space free on disk with %s.", options_.min_space_str.c_str(), bag_.getFileName().c_str());
         writing_enabled_ = true;
     }
     else
@@ -723,7 +723,7 @@ bool Recorder::checkLogging() {
     ros::WallTime now = ros::WallTime::now();
     if (now >= warn_next_) {
         warn_next_ = now + ros::WallDuration().fromSec(5.0);
-        ROS_WARN("Not logging message because logging disabled.  Most likely cause is a full disk.");
+        MINIROS_WARN("Not logging message because logging disabled.  Most likely cause is a full disk.");
     }
     return false;
 }

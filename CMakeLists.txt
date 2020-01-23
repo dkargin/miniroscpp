@@ -1,23 +1,20 @@
 cmake_minimum_required(VERSION 3.10)
 project(miniroscpp)
 
-#find_package(Boost REQUIRED COMPONENTS system thread)
-
-# TODO: Get rid of console_bridge
-find_package(console_bridge REQUIRED)
-
 find_package(catkin REQUIRED)
 
+if(catkin_FOUND)
 catkin_package(
   DEPENDS console_bridge
   INCLUDE_DIRS include
   LIBRARIES ${PROJECT_NAME})
+endif(catkin_FOUND)
 
 include(CheckIncludeFile)
 include(CheckFunctionExists)
 include(CheckCXXSourceCompiles)
 
-include_directories(include ${console_bridge_INCLUDE_DIRS})
+include_directories(include)
 
 # execinfo.h is needed for backtrace on glibc systems
 CHECK_INCLUDE_FILE(execinfo.h HAVE_EXECINFO_H)

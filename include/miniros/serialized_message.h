@@ -27,14 +27,14 @@
 
 #pragma once
 
-#include "roscpp_serialization_macros.h"
+#include "miniros/macros.h"
 
 #include <memory>
 
 namespace miniros
 {
 
-class ROSCPP_SERIALIZATION_DECL SerializedMessage
+class MINIROS_DECL SerializedMessage
 {
 public:
   using shared_array_uint8_t = std::shared_ptr<uint8_t>;

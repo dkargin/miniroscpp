@@ -123,7 +123,7 @@ rosbag::RecorderOptions parseOptions(int argc, char** argv) {
       int S = vm["split"].as<int>();
       if (S != 0)
       {
-        ROS_WARN("Use of \"--split <MAX_SIZE>\" has been deprecated.  Please use --split --size <MAX_SIZE> or --split --duration <MAX_DURATION>");
+        MINIROS_WARN("Use of \"--split <MAX_SIZE>\" has been deprecated.  Please use --split --size <MAX_SIZE> or --split --duration <MAX_DURATION>");
         if (S < 0)
           throw ros::Exception("Split size must be 0 or positive");
         opts.max_size = 1048576 * static_cast<uint64_t>(S);
@@ -133,7 +133,7 @@ rosbag::RecorderOptions parseOptions(int argc, char** argv) {
     {
         if(!opts.split)
         {
-            ROS_WARN("--max-splits is ignored without --split");
+            MINIROS_WARN("--max-splits is ignored without --split");
         }
         else
         {
@@ -186,7 +186,7 @@ rosbag::RecorderOptions parseOptions(int argc, char** argv) {
                     break;
             }
         }
-        ROS_DEBUG("Rosbag using minimum space of %lld bytes, or %s", opts.min_space, opts.min_space_str.c_str());
+        MINIROS_DEBUG("Rosbag using minimum space of %lld bytes, or %s", opts.min_space, opts.min_space_str.c_str());
     }
     if (vm.count("bz2") && vm.count("lz4"))
     {
@@ -285,11 +285,11 @@ int main(int argc, char** argv) {
         opts = parseOptions(argc, argv);
     }
     catch (ros::Exception const& ex) {
-        ROS_ERROR("Error reading options: %s", ex.what());
+        MINIROS_ERROR("Error reading options: %s", ex.what());
         return 1;
     }
     catch(boost::regex_error const& ex) {
-        ROS_ERROR("Error reading options: %s\n", ex.what());
+        MINIROS_ERROR("Error reading options: %s\n", ex.what());
         return 1;
     }
 

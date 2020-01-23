@@ -28,14 +28,14 @@
 #pragma once
 
 #if defined(__GNUC__)
-#define ROS_DEPRECATED __attribute__((deprecated))
-#define ROS_FORCE_INLINE __attribute__((always_inline))
+#define MINIROS_DEPRECATED __attribute__((deprecated))
+#define MINIROS_FORCE_INLINE __attribute__((always_inline))
 #elif defined(_MSC_VER)
-#define ROS_DEPRECATED
-#define ROS_FORCE_INLINE __forceinline
+#define MINIROS_DEPRECATED
+#define MINIROS_FORCE_INLINE __forceinline
 #else
-#define ROS_DEPRECATED
-#define ROS_FORCE_INLINE inline
+#define MINIROS_DEPRECATED
+#define MINIROS_FORCE_INLINE inline
 #endif
 
 /*
@@ -43,23 +43,33 @@
   macros.
  */
 #if defined(_MSC_VER)
-    #define ROS_HELPER_IMPORT __declspec(dllimport)
-    #define ROS_HELPER_EXPORT __declspec(dllexport)
-    #define ROS_HELPER_LOCAL
+    #define MINIROS_HELPER_IMPORT __declspec(dllimport)
+    #define MINIROS_HELPER_EXPORT __declspec(dllexport)
+    #define MINIROS_HELPER_LOCAL
 #elif __GNUC__ >= 4
-    #define ROS_HELPER_IMPORT __attribute__ ((visibility("default")))
-    #define ROS_HELPER_EXPORT __attribute__ ((visibility("default")))
-    #define ROS_HELPER_LOCAL  __attribute__ ((visibility("hidden")))
+    #define MINIROS_HELPER_IMPORT __attribute__ ((visibility("default")))
+    #define MINIROS_HELPER_EXPORT __attribute__ ((visibility("default")))
+    #define MINIROS_HELPER_LOCAL  __attribute__ ((visibility("hidden")))
 #else
-    #define ROS_HELPER_IMPORT
-    #define ROS_HELPER_EXPORT
-    #define ROS_HELPER_LOCAL
+    #define MINIROS_HELPER_IMPORT
+    #define MINIROS_HELPER_EXPORT
+    #define MINIROS_HELPER_LOCAL
 #endif
 
 // Ignore warnings about import/exports when deriving from std classes.
 #ifdef _MSC_VER
   #pragma warning(disable: 4251)
   #pragma warning(disable: 4275)
+#endif
+
+#ifdef MINIROS_BUILD_SHARED_LIBS // ros is being built around shared libraries
+  #ifdef miniros_EXPORTS      // we are building a shared lib/dll
+    #define MINIROS_DECL MINIROS_HELPER_EXPORT
+  #else // we are using shared lib/dll
+    #define MINIROS_DECL MINIROS_HELPER_IMPORT
+  #endif
+#else // ros is being built around static libraries
+  #define MINIROS_DECL
 #endif
 
 

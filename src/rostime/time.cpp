@@ -102,7 +102,7 @@ namespace miniros
   /*********************************************************************
    ** Cross Platform Functions
    *********************************************************************/
-  void ros_walltime(uint32_t& sec, uint32_t& nsec)
+  void MINIROS_walltime(uint32_t& sec, uint32_t& nsec)
   {
 #if !defined(_WIN32)
 #if HAS_CLOCK_GETTIME
@@ -181,7 +181,7 @@ namespace miniros
 #endif
   }
 
-  void ros_steadytime(uint32_t& sec, uint32_t& nsec)
+  void MINIROS_steadytime(uint32_t& sec, uint32_t& nsec)
   {
 #if !defined(_WIN32)
     timespec start;
@@ -232,7 +232,7 @@ namespace miniros
   /**
    * @brief Simple representation of the rt library nanosleep function.
    */
-  int ros_nanosleep(const uint32_t &sec, const uint32_t &nsec)
+  int MINIROS_nanosleep(const uint32_t &sec, const uint32_t &nsec)
   {
 #if defined(_WIN32)
     std::this_thread::sleep_for(std::chrono::nanoseconds(static_cast<int64_t>(sec * 1e9 + nsec)));
@@ -248,10 +248,10 @@ namespace miniros
    *
    * @todo Fully implement the win32 parts, currently just like a regular sleep.
    */
-  bool ros_wallsleep(uint32_t sec, uint32_t nsec)
+  bool MINIROS_wallsleep(uint32_t sec, uint32_t nsec)
   {
 #if defined(_WIN32)
-    ros_nanosleep(sec,nsec);
+    MINIROS_nanosleep(sec,nsec);
 #else
     timespec req = { sec, nsec };
     timespec rem = {0, 0};
@@ -297,7 +297,7 @@ namespace miniros
       }
 
     Time t;
-    ros_walltime(t.sec, t.nsec);
+    MINIROS_walltime(t.sec, t.nsec);
 
     return t;
   }
@@ -413,7 +413,7 @@ namespace miniros
         Time start = Time::now();
         while (!g_stopped && (Time::now() < end))
           {
-            ros_nanosleep(0,1000000);
+            MINIROS_nanosleep(0,1000000);
             if (Time::now() < start)
               {
                 return false;
@@ -450,7 +450,7 @@ namespace miniros
   {
     if (Time::useSystemTime())
       {
-        return ros_wallsleep(sec, nsec);
+        return MINIROS_wallsleep(sec, nsec);
       }
     else
       {
@@ -464,7 +464,7 @@ namespace miniros
         bool rc = false;
         while (!g_stopped && (Time::now() < end))
           {
-            ros_wallsleep(0, 1000000);
+            MINIROS_wallsleep(0, 1000000);
             rc = true;
 
             // If we started at time 0 wait for the first actual time to arrive before starting the timer on
@@ -503,7 +503,7 @@ namespace miniros
   WallTime WallTime::now()
   {
     WallTime t;
-    ros_walltime(t.sec, t.nsec);
+    MINIROS_walltime(t.sec, t.nsec);
 
     return t;
   }
@@ -511,7 +511,7 @@ namespace miniros
   SteadyTime SteadyTime::now()
   {
     SteadyTime t;
-    ros_steadytime(t.sec, t.nsec);
+    MINIROS_steadytime(t.sec, t.nsec);
 
     return t;
   }
@@ -532,7 +532,7 @@ namespace miniros
 
   bool WallDuration::sleep() const
   {
-    return ros_wallsleep(sec, nsec);
+    return MINIROS_wallsleep(sec, nsec);
   }
 
   void normalizeSecNSec(uint64_t& sec, uint64_t& nsec)

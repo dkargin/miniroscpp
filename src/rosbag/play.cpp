@@ -32,13 +32,14 @@
 *  POSSIBILITY OF SUCH DAMAGE.
 ********************************************************************/
 
-#include "rosbag/player.h"
+#include "minibag/player.h"
+#include "miniros/console.h"
 #include "boost/program_options.hpp"
 
 namespace po = boost::program_options;
 
-rosbag::PlayerOptions parseOptions(int argc, char** argv) {
-    rosbag::PlayerOptions opts;
+minibag::PlayerOptions parseOptions(int argc, char** argv) {
+  minibag::PlayerOptions opts;
 
     po::options_description desc("Allowed options");
 
@@ -77,10 +78,10 @@ rosbag::PlayerOptions parseOptions(int argc, char** argv) {
       po::store(po::command_line_parser(argc, argv).options(desc).positional(p).run(), vm);
     } catch (boost::program_options::invalid_command_line_syntax& e)
     {
-      throw ros::Exception(e.what());
+      throw miniros::Exception(e.what());
     }  catch (boost::program_options::unknown_option& e)
     {
-      throw ros::Exception(e.what());
+      throw miniros::Exception(e.what());
     }
 
     if (vm.count("help")) {
@@ -170,22 +171,22 @@ int main(int argc, char** argv) {
     ros::init(argc, argv, "play", ros::init_options::AnonymousName);
 
     // Parse the command-line options
-    rosbag::PlayerOptions opts;
+    minibag::PlayerOptions opts;
     try {
         opts = parseOptions(argc, argv);
     }
-    catch (ros::Exception const& ex) {
-        ROS_ERROR("Error reading options: %s", ex.what());
+    catch (miniros::Exception const& ex) {
+        MINIROS_ERROR("Error reading options: %s", ex.what());
         return 1;
     }
 
-    rosbag::Player player(opts);
+    minibag::Player player(opts);
 
     try {
       player.publish();
     }
     catch (std::runtime_error& e) {
-      ROS_FATAL("%s", e.what());
+      MINIROS_FATAL("%s", e.what());
       return 1;
     }
     

@@ -32,9 +32,9 @@
 *  POSSIBILITY OF SUCH DAMAGE.
 ********************************************************************/
 
-#include "rosbag/player.h"
-#include "rosbag/message_instance.h"
-#include "rosbag/view.h"
+#include "minibag/player.h"
+#include "minibag/message_instance.h"
+#include "minibag/view.h"
 
 #if !defined(_MSC_VER)
   #include <sys/select.h>
@@ -53,7 +53,7 @@ using std::vector;
 using boost::shared_ptr;
 using ros::Exception;
 
-namespace rosbag {
+namespace minibag {
 
 bool isLatching(const ConnectionInfo* c)
 {
@@ -133,7 +133,7 @@ void Player::publish() {
 
     // Open all the bag files
     for (string const& filename : options_.bags) {
-        ROS_INFO("Opening %s", filename.c_str());
+        MINIROS_INFO("Opening %s", filename.c_str());
 
         try
         {
@@ -154,7 +154,7 @@ void Player::publish() {
 
     if (!options_.prefix.empty())
     {
-      ROS_INFO_STREAM("Using prefix '" << options_.prefix << "'' for topics ");
+      MINIROS_INFO_STREAM("Using prefix '" << options_.prefix << "'' for topics ");
     }
 
     if (!options_.quiet)
@@ -278,7 +278,7 @@ void Player::publish() {
 
             if (last_message != latch_view.end()) {
                 const auto publisher = publishers_.find(callerid + topic);
-                ROS_ASSERT(publisher != publishers_.end());
+                MINIROS_ASSERT(publisher != publishers_.end());
 
                 publisher->second.publish(*last_message);
             }
@@ -487,7 +487,7 @@ void Player::doPublish(MessageInstance const& m) {
     string callerid_topic = callerid + topic;
 
     map<string, ros::Publisher>::iterator pub_iter = publishers_.find(callerid_topic);
-    ROS_ASSERT(pub_iter != publishers_.end());
+    MINIROS_ASSERT(pub_iter != publishers_.end());
 
     // Update subscribers.
     ros::spinOnce();

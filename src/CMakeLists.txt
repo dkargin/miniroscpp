@@ -7,7 +7,7 @@ endif (NOT WIN32)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-SET(cpp_common_SRC debug.cpp header.cpp)
+SET(cpp_common_SRC debug.cpp header.cpp console.cpp)
 SET(serialization_SRC serialization.cpp)
 SET(rostime_SRC
 	rostime/duration.cpp
@@ -64,8 +64,18 @@ add_library(minibag_storage
 	)
 #rosbag_storage/gpgme_utils.cpp
 
+set(minibag_SRC
+	rosbag/encrypt.cpp
+	rosbag/play.cpp
+	rosbag/player.cpp
+	rosbag/record.cpp
+	rosbag/recorder.cpp
+	rosbag/time_translator.cpp)
+
 set_property(TARGET minibag_storage PROPERTY CXX_STANDARD 17)
 target_link_libraries(minibag_storage roslz4 ${BZIP2_LIBRARIES} ${lz4_LIBRARIES} ${AES_ENCRYPT_LIBRARIES})
+
+#target_link_libraries(minibag minibag_storage)
 
 add_library(miniroscpp ${cpp_common_SRC} ${serialization_SRC} ${rostime_SRC})
 set_property(TARGET miniroscpp PROPERTY CXX_STANDARD 17)

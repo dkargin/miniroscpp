@@ -250,15 +250,17 @@ void Bag::setCompression(CompressionType compression) {
     compression_ = compression;
 }
 
-#ifdef MINIBAG_ENCRYPTOR_PLUGIN
+
 void Bag::setEncryptorPlugin(std::string const& plugin_name, std::string const& plugin_param) {
     if (!chunks_.empty()) {
         throw BagException("Cannot set encryption plugin after chunks are written");
     }
+#ifdef MINIBAG_ENCRYPTOR_PLUGIN
     encryptor_ = encryptor_loader_.createInstance(plugin_name);
     encryptor_->initialize(*this, plugin_param);
-}
 #endif
+}
+
 
 // Version
 

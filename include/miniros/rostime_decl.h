@@ -42,11 +42,11 @@
 
 #include <miniros/macros.h>
 
-#ifdef ROS_BUILD_SHARED_LIBS // ros is being built around shared libraries
+#ifdef MINIROS_BUILD_SHARED_LIBS // ros is being built around shared libraries
   #ifdef rostime_EXPORTS // we are building a shared lib/dll
-    #define ROSTIME_DECL ROS_HELPER_EXPORT
+    #define ROSTIME_DECL MINIROS_HELPER_EXPORT
   #else // we are using shared lib/dll
-    #define ROSTIME_DECL ROS_HELPER_IMPORT
+    #define ROSTIME_DECL MINIROS_HELPER_IMPORT
   #endif
 #else // ros is being built around static libraries
   #define ROSTIME_DECL

@@ -38,7 +38,7 @@
 
 #include "datatypes.h"
 
-#include "miniros/cpp_common_decl.h"
+#include "miniros/macros.h"
 
 namespace miniros
 {
@@ -46,7 +46,7 @@ namespace miniros
 /**
  * \brief Provides functionality to parse a connection header and retrieve values from it
  */
-class CPP_COMMON_DECL Header
+class MINIROS_DECL Header
 {
 public:
   using shared_array_uint8_t = std::shared_ptr<uint8_t>;

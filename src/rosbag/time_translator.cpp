@@ -32,12 +32,12 @@
 *  POSSIBILITY OF SUCH DAMAGE.
 *********************************************************************/
 
-#include "rosbag/time_translator.h"
+#include "minibag/time_translator.h"
 
-namespace rosbag {
+namespace minibag {
 
 TimeTranslator::TimeTranslator()
-    : time_scale_(1.0), real_start_(ros::TIME_MIN), translated_start_(ros::TIME_MIN)
+    : time_scale_(1.0), real_start_(miniros::TIME_MIN), translated_start_(miniros::TIME_MIN)
 {
 }
 
@@ -45,19 +45,19 @@ void TimeTranslator::setTimeScale(double const& s) {
     time_scale_ = s;
 }
 
-void TimeTranslator::setRealStartTime(ros::Time const& t) {
+void TimeTranslator::setRealStartTime(miniros::Time const& t) {
     real_start_ = t;
 }
 
-void TimeTranslator::setTranslatedStartTime(ros::Time const& t) {
+void TimeTranslator::setTranslatedStartTime(miniros::Time const& t) {
     translated_start_ = t;
 }
 
-void TimeTranslator::shift(ros::Duration const& d) {
+void TimeTranslator::shift(miniros::Duration const& d) {
     translated_start_ += d;
 }
 
-ros::Time TimeTranslator::translate(ros::Time const& t) {
+miniros::Time TimeTranslator::translate(miniros::Time const& t) {
     return translated_start_ + (t - real_start_) * (1.0 / time_scale_);
 }
 

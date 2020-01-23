@@ -34,7 +34,7 @@
 #include <map>
 #include <cstring>
 
-#include "roscpp_serialization_macros.h"
+#include "miniros/macros.h"
 
 #include <miniros/types.h>
 #include <miniros/time.h>
@@ -48,7 +48,7 @@
 
 #include <type_traits>
 
-#define ROS_NEW_SERIALIZATION_API 1
+#define MINIROS_NEW_SERIALIZATION_API 1
 
 /**
  * \brief Declare your serializer to use an allInOne member instead of requiring 3 different serialization
@@ -94,7 +94,7 @@ namespace serialization
 {
 namespace mt = message_traits;
 
-class ROSCPP_SERIALIZATION_DECL StreamOverrunException : public miniros::Exception
+class MINIROS_DECL StreamOverrunException : public miniros::Exception
 {
 public:
   StreamOverrunException(const std::string& what)
@@ -102,7 +102,7 @@ public:
   {}
 };
 
-ROSCPP_SERIALIZATION_DECL void throwStreamOverrun();
+MINIROS_DECL void throwStreamOverrun();
 
 /**
  * \brief Templated serialization class.  Default implementation provides backwards compatibility with
@@ -655,7 +655,7 @@ typedef stream_types::StreamType StreamType;
 /**
  * \brief Stream base-class, provides common functionality for IStream and OStream
  */
-struct ROSCPP_SERIALIZATION_DECL Stream
+struct MINIROS_DECL Stream
 {
   /*
    * \brief Returns a pointer to the current position of the stream
@@ -666,7 +666,7 @@ struct ROSCPP_SERIALIZATION_DECL Stream
    * was advanced.
    * \throws StreamOverrunException if len would take this stream past the end of its buffer
    */
-  ROS_FORCE_INLINE uint8_t* advance(uint32_t len)
+  MINIROS_FORCE_INLINE uint8_t* advance(uint32_t len)
   {
     uint8_t* old_data = data_;
     data_ += len;
@@ -698,7 +698,7 @@ private:
 /**
  * \brief Input stream
  */
-struct ROSCPP_SERIALIZATION_DECL IStream : public Stream
+struct MINIROS_DECL IStream : public Stream
 {
   static const StreamType stream_type = stream_types::Input;
 
@@ -710,13 +710,13 @@ struct ROSCPP_SERIALIZATION_DECL IStream : public Stream
    * \brief Deserialize an item from this input stream
    */
   template<typename T>
-  ROS_FORCE_INLINE void next(T& t)
+  MINIROS_FORCE_INLINE void next(T& t)
   {
     deserialize(*this, t);
   }
 
   template<typename T>
-  ROS_FORCE_INLINE IStream& operator>>(T& t)
+  MINIROS_FORCE_INLINE IStream& operator>>(T& t)
   {
     deserialize(*this, t);
     return *this;
@@ -726,7 +726,7 @@ struct ROSCPP_SERIALIZATION_DECL IStream : public Stream
 /**
  * \brief Output stream
  */
-struct ROSCPP_SERIALIZATION_DECL OStream : public Stream
+struct MINIROS_DECL OStream : public Stream
 {
   static const StreamType stream_type = stream_types::Output;
 
@@ -738,13 +738,13 @@ struct ROSCPP_SERIALIZATION_DECL OStream : public Stream
    * \brief Serialize an item to this output stream
    */
   template<typename T>
-  ROS_FORCE_INLINE void next(const T& t)
+  MINIROS_FORCE_INLINE void next(const T& t)
   {
     serialize(*this, t);
   }
 
   template<typename T>
-  ROS_FORCE_INLINE OStream& operator<<(const T& t)
+  MINIROS_FORCE_INLINE OStream& operator<<(const T& t)
   {
     serialize(*this, t);
     return *this;
@@ -758,7 +758,7 @@ struct ROSCPP_SERIALIZATION_DECL OStream : public Stream
  * LStream is not what you would normally think of as a stream, but it is used in order to support
  * allinone serializers.
  */
-struct ROSCPP_SERIALIZATION_DECL LStream
+struct MINIROS_DECL LStream
 {
   static const StreamType stream_type = stream_types::Length;
 
@@ -770,7 +770,7 @@ struct ROSCPP_SERIALIZATION_DECL LStream
    * \brief Add the length of an item to this length stream
    */
   template<typename T>
-  ROS_FORCE_INLINE void next(const T& t)
+  MINIROS_FORCE_INLINE void next(const T& t)
   {
     count_ += serializationLength(t);
   }
@@ -778,7 +778,7 @@ struct ROSCPP_SERIALIZATION_DECL LStream
   /**
    * \brief increment the length by len
    */
-  ROS_FORCE_INLINE uint32_t advance(uint32_t len)
+  MINIROS_FORCE_INLINE uint32_t advance(uint32_t len)
   {
     uint32_t old = count_;
     count_ += len;
