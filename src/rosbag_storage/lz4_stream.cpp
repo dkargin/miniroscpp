@@ -33,6 +33,7 @@
 ********************************************************************/
 
 #include "minibag/chunked_file.h"
+#include "minibag/stream.h"
 
 #include <iostream>
 #include <cstring>
@@ -226,4 +227,4 @@ void LZ4Stream::decompress(uint8_t* dest, unsigned int dest_len, uint8_t* source
     }
 }
 
-} // namespace rosbag
+} // namespace minibag

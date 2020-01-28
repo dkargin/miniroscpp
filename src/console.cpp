@@ -167,8 +167,10 @@ miniros_console_bridge::OutputHandlerFile::OutputHandlerFile(const char *filenam
 miniros_console_bridge::OutputHandlerFile::~OutputHandlerFile(void)
 {
     if (file_)
+    {
         if (fclose(file_) != 0)
             std::cerr << "Error closing logfile" << std::endl;
+    }
 }
 
 void miniros_console_bridge::OutputHandlerFile::log(const std::string &text, LogLevel level, const char *filename, int line)

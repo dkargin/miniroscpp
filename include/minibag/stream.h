@@ -166,7 +166,7 @@ private:
 };
 #endif
 
-#ifdef MINIBAG_HAZ_LZ4
+#ifdef MINIBAG_HAS_LZ4
 // LZ4Stream reads/writes compressed datat in the LZ4 format
 // https://code.google.com/p/lz4/
 class ROSBAG_STORAGE_DECL LZ4Stream : public Stream

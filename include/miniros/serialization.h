@@ -326,7 +326,7 @@ struct VectorSerializer
  * \brief Vector serializer, specialized for non-fixed-size, non-simple types
  */
 template<typename T, class ContainerAllocator>
-struct VectorSerializer<T, ContainerAllocator, typename std::enable_if<!mt::IsFixedSize<T>::value, T>::type >
+struct VectorSerializer<T, ContainerAllocator, typename std::enable_if_t<!mt::IsFixedSize<T>::value> >
 {
   typedef std::vector<T, typename ContainerAllocator::template rebind<T>::other> VecType;
   typedef typename VecType::iterator IteratorType;
@@ -376,7 +376,7 @@ struct VectorSerializer<T, ContainerAllocator, typename std::enable_if<!mt::IsFi
  * \brief Vector serializer, specialized for fixed-size simple types
  */
 template<typename T, class ContainerAllocator>
-struct VectorSerializer<T, ContainerAllocator, typename std::enable_if<mt::IsSimple<T>::value, T>::type >
+struct VectorSerializer<T, ContainerAllocator, typename std::enable_if_t<mt::IsSimple<T>::value>>
 {
   typedef std::vector<T, typename ContainerAllocator::template rebind<T>::other> VecType;
   typedef typename VecType::iterator IteratorType;
@@ -418,7 +418,7 @@ struct VectorSerializer<T, ContainerAllocator, typename std::enable_if<mt::IsSim
  * \brief Vector serializer, specialized for fixed-size non-simple types
  */
 template<typename T, class ContainerAllocator>
-struct VectorSerializer<T, ContainerAllocator, typename std::enable_if<mt::IsFixedSize<T>::value && !mt::IsSimple<T>::value, T>::type >
+struct VectorSerializer<T, ContainerAllocator, typename std::enable_if_t<mt::IsFixedSize<T>::value && !mt::IsSimple<T>::value> >
 {
   typedef std::vector<T, typename ContainerAllocator::template rebind<T>::other> VecType;
   typedef typename VecType::iterator IteratorType;
@@ -501,7 +501,7 @@ struct ArraySerializer
  * \brief Array serializer, specialized for non-fixed-size, non-simple types
  */
 template<typename T, size_t N>
-struct ArraySerializer<T, N, typename std::enable_if<!mt::IsFixedSize<T>::value, T>::type>
+struct ArraySerializer<T, N, typename std::enable_if_t<!mt::IsFixedSize<T>::value>>
 {
   typedef std::array<T, N > ArrayType;
   typedef typename ArrayType::iterator IteratorType;
@@ -547,7 +547,7 @@ struct ArraySerializer<T, N, typename std::enable_if<!mt::IsFixedSize<T>::value,
  * \brief Array serializer, specialized for fixed-size, simple types
  */
 template<typename T, size_t N>
-struct ArraySerializer<T, N, typename std::enable_if<mt::IsSimple<T>::value, T>::type>
+struct ArraySerializer<T, N, typename std::enable_if_t<mt::IsSimple<T>::value>>
 {
   typedef std::array<T, N > ArrayType;
   typedef typename ArrayType::iterator IteratorType;

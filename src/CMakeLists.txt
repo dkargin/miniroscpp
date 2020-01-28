@@ -7,7 +7,9 @@ endif (NOT WIN32)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-SET(cpp_common_SRC debug.cpp header.cpp console.cpp)
+#SET(cpp_common_SRC debug.cpp header.cpp console.cpp)
+add_library(cpp_common debug.cpp header.cpp console.cpp)
+
 SET(serialization_SRC serialization.cpp)
 SET(rostime_SRC
 	rostime/duration.cpp
@@ -24,6 +26,8 @@ if(BZIP2_FOUND)
 	include_directories(${BZIP2_INCLUDE_DIR})
 	list(APPEND rosbag_SRC rosbag_storage/bz2_stream.cpp)
 	list(APPEND rosbag_LIBS ${BZIP2_LIBRARIES})
+	
+	add_definitions(-DMINIBAG_HAS_BZIP2)
 endif(BZIP2_FOUND)
 
 # Finding LZ4
@@ -44,11 +48,14 @@ else()
 	add_library(roslz4
 		roslz4/lz4s.c
 		roslz4/xxhash.c)
+		
+	target_link_libraries(roslz4 ${lz4_LIBRARIES})
 
 	set_source_files_properties(src/lz4s.c src/xxhash.c
 		PROPERTIES COMPILE_DEFINITIONS "XXH_NAMESPACE=ROSLZ4_")
 
-	list(APPEND rosbag_LIBS ${lz4_LIBRARIES} roslz4)	
+	list(APPEND rosbag_LIBS roslz4)
+	add_definitions(-DMINIBAG_HAS_LZ4)
 endif()
 
 
@@ -85,13 +92,13 @@ set(minibag_SRC
 	rosbag/time_translator.cpp)
 
 set_property(TARGET minibag_storage PROPERTY CXX_STANDARD 17)
-target_link_libraries(minibag_storage ${AES_ENCRYPT_LIBRARIES} ${rosbag_LIBS})
+target_link_libraries(minibag_storage ${AES_ENCRYPT_LIBRARIES} ${rosbag_LIBS} cpp_common)
 
 #target_link_libraries(minibag minibag_storage)
 
-add_library(miniroscpp ${cpp_common_SRC} ${serialization_SRC} ${rostime_SRC})
+add_library(miniroscpp ${serialization_SRC} ${rostime_SRC})
 set_property(TARGET miniroscpp PROPERTY CXX_STANDARD 17)
-target_link_libraries(miniroscpp ${console_bridge_LIBRARIES} minibag_storage)
+target_link_libraries(miniroscpp ${console_bridge_LIBRARIES} minibag_storage cpp_common)
 
 if (catkin_FOUND)
 install(TARGETS miniroscpp minibag_storage
