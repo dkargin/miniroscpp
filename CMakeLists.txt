@@ -5,7 +5,7 @@ find_package(catkin REQUIRED)
 
 if(catkin_FOUND)
 catkin_package(
-  DEPENDS console_bridge
+  DEPENDS
   INCLUDE_DIRS include
   LIBRARIES ${PROJECT_NAME})
 endif(catkin_FOUND)
@@ -15,6 +15,7 @@ include(CheckFunctionExists)
 include(CheckCXXSourceCompiles)
 
 include_directories(include)
+include_directories(include/generated)
 
 # execinfo.h is needed for backtrace on glibc systems
 CHECK_INCLUDE_FILE(execinfo.h HAVE_EXECINFO_H)
@@ -35,6 +36,9 @@ endif(HAVE_GLIBC_BACKTRACE)
 
 #
 add_subdirectory(src)
+
+#add_executable(bag_read_test test/bag_read_test.cpp)
+#target_link_libraries(bag_read_test minibag_storage)
 
 install(DIRECTORY include/
   DESTINATION ${CATKIN_GLOBAL_INCLUDE_DESTINATION}
