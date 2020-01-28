@@ -34,7 +34,7 @@
 
 #include "miniros/header.h"
 
-#include "console_bridge/console.h"
+#include "miniros/console.h"
 
 #include <sstream>
 #include <cstring>

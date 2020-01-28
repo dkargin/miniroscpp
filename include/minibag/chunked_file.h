@@ -39,7 +39,7 @@
 #include <string>
 #include "macros.h"
 
-#include <bzlib.h>
+//#include <bzlib.h>
 
 #include "minibag/stream.h"
 

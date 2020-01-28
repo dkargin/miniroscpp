@@ -42,7 +42,7 @@
 #include <assert.h>
 #include <iomanip>
 
-#include "console_bridge/console.h"
+#include "miniros/console.h"
 
 #ifndef MINIBAG_ENCRYPTOR_PLUGIN
 #include "minibag/no_encryptor.h"

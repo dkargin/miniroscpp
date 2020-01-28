@@ -1,13 +1,15 @@
 cmake_minimum_required(VERSION 3.10)
 project(miniroscpp)
 
-find_package(catkin REQUIRED)
+find_package(catkin QUIET)
 
 if(catkin_FOUND)
 catkin_package(
   DEPENDS console_bridge
   INCLUDE_DIRS include
   LIBRARIES ${PROJECT_NAME})
+else(catkin_FOUND)
+
 endif(catkin_FOUND)
 
 include(CheckIncludeFile)
@@ -36,6 +38,8 @@ endif(HAVE_GLIBC_BACKTRACE)
 #
 add_subdirectory(src)
 
+if(catkin_FOUND)
 install(DIRECTORY include/
   DESTINATION ${CATKIN_GLOBAL_INCLUDE_DESTINATION}
   FILES_MATCHING PATTERN "*.h")
+endif(catkin_FOUND)

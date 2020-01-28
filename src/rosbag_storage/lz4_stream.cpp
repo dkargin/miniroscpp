@@ -36,7 +36,7 @@
 
 #include <iostream>
 #include <cstring>
-#include "console_bridge/console.h"
+#include "miniros/console.h"
 
 using std::string;
 
