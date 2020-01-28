@@ -64,7 +64,7 @@
 #include <pluginlib/class_loader.hpp>
 #endif
 
-#include "console_bridge/console.h"
+#include "miniros/console.h"
 
 #if defined logDebug
 # undef logDebug

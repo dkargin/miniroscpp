@@ -44,10 +44,15 @@ namespace minibag {
 // StreamFactory
 
 StreamFactory::StreamFactory(ChunkedFile* file) :
-    uncompressed_stream_(new UncompressedStream(file)),
-    bz2_stream_         (new BZ2Stream(file)),
-    lz4_stream_         (new LZ4Stream(file))
+    uncompressed_stream_(new UncompressedStream(file))
 {
+#ifdef MINIBAG_HAS_BZIP2
+	bz2_stream_ = new BZ2Stream(file);
+#endif
+
+#ifdef MINIBAG_HAS_LZ4
+	lz4_stream_ = new LZ4Stream(file);
+#endif
 }
 
 shared_ptr<Stream> StreamFactory::getStream(CompressionType type) const {

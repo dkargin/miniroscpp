@@ -67,8 +67,6 @@ namespace miniros
 namespace message_traits
 {
 
-// TODO: Reimplement it in a compatible with std::enable_if form
-
 /**
  * \brief A simple datatype is one that can be memcpy'd directly in array form, i.e. it's a POD, fixed-size type and
  * sizeof(M) == sum(serializationLength(M:a...))

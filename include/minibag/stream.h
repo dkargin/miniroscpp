@@ -39,9 +39,13 @@
 #include <string>
 #include <memory>
 
+#ifdef MINIBAG_HAS_BZIP2
 #include <bzlib.h>
+#endif
 
+#ifdef MINIBAG_HAS_LZ4
 #include <miniros/lz4s.h>
+#endif
 
 #include "minibag/exceptions.h"
 #include "minibag/macros.h"
@@ -131,6 +135,7 @@ public:
     void decompress(uint8_t* dest, unsigned int dest_len, uint8_t* source, unsigned int source_len);
 };
 
+#ifdef MINIBAG_HAS_BZIP2
 /*!
  * BZ2Stream uses libbzip2 (http://www.bzip.org) for reading/writing compressed data in the BZ2 format.
  */
@@ -159,7 +164,9 @@ private:
     BZFILE* bzfile_;           //!< bzlib compressed file stream
     int     bzerror_;          //!< last error from bzlib
 };
+#endif
 
+#ifdef MINIBAG_HAZ_LZ4
 // LZ4Stream reads/writes compressed datat in the LZ4 format
 // https://code.google.com/p/lz4/
 class ROSBAG_STORAGE_DECL LZ4Stream : public Stream
@@ -190,5 +197,6 @@ private:
     int block_size_id_;
     roslz4_stream lz4s_;
 };
+#endif
 
 } // namespace minibag

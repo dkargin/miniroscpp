@@ -45,6 +45,7 @@
 #include <limits>
 #include <stdexcept>
 #include <mutex>
+#include <cmath>
 
 // time related includes for macOS
 #if defined(__APPLE__)
@@ -58,9 +59,9 @@
 #include <windows.h>
 #endif
 
-//#include <boost/thread/mutex.hpp>
-#include <boost/io/ios_state.hpp>
+#ifdef USE_BOOST_TIME
 #include <boost/date_time/posix_time/ptime.hpp>
+#endif
 
 /*********************************************************************
  ** Preprocessor
@@ -168,7 +169,7 @@ namespace miniros
     // also, think about clock wraparound. seems extremely unlikey, but possible
     double d_delta_cpu_time = delta_cpu_time.QuadPart / (double) cpu_freq.QuadPart;
     uint32_t delta_sec = (uint32_t) floor(d_delta_cpu_time);
-    uint32_t delta_nsec = (uint32_t) boost::math::round((d_delta_cpu_time-delta_sec) * 1e9);
+    uint32_t delta_nsec = (uint32_t) std::round((d_delta_cpu_time-delta_sec) * 1e9);
 
     int64_t sec_sum  = (int64_t)start_sec  + (int64_t)delta_sec;
     int64_t nsec_sum = (int64_t)start_nsec + (int64_t)delta_nsec;
@@ -214,7 +215,7 @@ namespace miniros
     QueryPerformanceCounter(&performance_count);
     double steady_time = performance_count.QuadPart / (double) cpu_frequency.QuadPart;
     int64_t steady_sec = floor(steady_time);
-    int64_t steady_nsec = boost::math::round((steady_time - steady_sec) * 1e9);
+    int64_t steady_nsec = std::round((steady_time - steady_sec) * 1e9);
 
     // Throws an exception if we go out of 32-bit range
     normalizeSecNSecUnsigned(steady_sec, steady_nsec);
@@ -262,6 +263,24 @@ namespace miniros
 #endif
     return !g_stopped;
   }
+
+  // It helps saving and restoring IO flags of output stream.
+  class IosFlagSaver
+  {
+  public:
+	  explicit IosFlagSaver(std::ostream& _ios) : ios(_ios), f(_ios.flags()) { }
+	  ~IosFlagSaver()
+	  {
+		  ios.flags(f);
+	  }
+
+	  IosFlagSaver(const IosFlagSaver &rhs) = delete;
+	  IosFlagSaver& operator= (const IosFlagSaver& rhs) = delete;
+
+  private:
+	  std::ostream& ios;
+	  std::ios::fmtflags f;
+  };
 
   /*********************************************************************
    ** Class Methods
@@ -353,7 +372,7 @@ namespace miniros
     return true;
   }
 
-  /*
+#ifdef USE_BOOST_TIME
   Time Time::fromBoost(const boost::posix_time::ptime& t)
   {
    boost::posix_time::time_duration diff = t - boost::posix_time::from_time_t(0);
@@ -373,18 +392,19 @@ namespace miniros
     t.nsec = d.fractional_seconds()*1000;
 #endif
     return t;
-  }*/
+  }
+#endif
 
   std::ostream& operator<<(std::ostream& os, const Time &rhs)
   {
-    boost::io::ios_all_saver s(os);
+	IosFlagSaver s(os);
     os << rhs.sec << "." << std::setw(9) << std::setfill('0') << rhs.nsec;
     return os;
   }
 
   std::ostream& operator<<(std::ostream& os, const Duration& rhs)
   {
-    boost::io::ios_all_saver s(os);
+	IosFlagSaver s(os);
     if (rhs.sec >= 0 || rhs.nsec == 0)
     {
       os << rhs.sec << "." << std::setw(9) << std::setfill('0') << rhs.nsec;
@@ -488,14 +508,14 @@ namespace miniros
 
   std::ostream &operator<<(std::ostream& os, const WallTime &rhs)
   {
-    boost::io::ios_all_saver s(os);
+	IosFlagSaver s(os);
     os << rhs.sec << "." << std::setw(9) << std::setfill('0') << rhs.nsec;
     return os;
   }
 
   std::ostream &operator<<(std::ostream& os, const SteadyTime &rhs)
   {
-    boost::io::ios_all_saver s(os);
+	IosFlagSaver s(os);
     os << rhs.sec << "." << std::setw(9) << std::setfill('0') << rhs.nsec;
     return os;
   }
@@ -518,7 +538,7 @@ namespace miniros
 
   std::ostream &operator<<(std::ostream& os, const WallDuration& rhs)
   {
-    boost::io::ios_all_saver s(os);
+	IosFlagSaver s(os);
     if (rhs.sec >= 0 || rhs.nsec == 0)
     {
       os << rhs.sec << "." << std::setw(9) << std::setfill('0') << rhs.nsec;
