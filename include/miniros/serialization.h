@@ -33,6 +33,7 @@
 #include <vector>
 #include <map>
 #include <cstring>
+#include <array>
 
 #include "miniros/macros.h"
 

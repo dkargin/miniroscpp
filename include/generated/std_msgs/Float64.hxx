@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <array>
 
 #include <miniros/types.h>
 #include <miniros/serialization.h>
