@@ -2,13 +2,8 @@
   <name>miniroscpp</name>
   <version>0.1.0</version>
   <description>
-    miniroscpp contains C++ code for doing things that are not necessarily ROS
-    related, but are useful for multiple packages. This includes things like
-    the MINIROS_DEPRECATED and MINIROS_FORCE_INLINE macros, as well as code for getting
-    backtraces.
-
-    All references to boost were replaced by standard libraries.
-
+    miniroscpp contains a stripped version of ROS C++ code.
+    It should become a standalone ROS client without complex external dependencies.
   </description>
   <maintainer email="dmitry.n.kargin@gmail.com">Dmitry Kargin</maintainer>
   <license>BSD</license>
