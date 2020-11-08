@@ -20,7 +20,10 @@ set(rosbag_SRC "")
 set(rosbag_LIBS "")
 
 # Finding BZip2
-find_package(BZip2 QUIET)
+if (MINIROS_USE_SYSTEM_BZIP2)
+	find_package(BZip2 QUIET)
+endif(MINIROS_USE_SYSTEM_BZIP2)
+
 if(BZIP2_FOUND)
 	add_definitions(${BZIP2_DEFINITIONS})
 	include_directories(${BZIP2_INCLUDE_DIR})
@@ -28,20 +31,30 @@ if(BZIP2_FOUND)
 	list(APPEND rosbag_LIBS ${BZIP2_LIBRARIES})
 	
 	add_definitions(-DMINIBAG_HAS_BZIP2)
+else(BZIP2_FOUND)
+	message(STATUS "No bzip2 was found. Bzip2 support is disabled.")
 endif(BZIP2_FOUND)
 
 # Finding LZ4
-find_path(lz4_INCLUDE_DIRS NAMES lz4.h)
-find_library(lz4_LIBRARIES NAMES lz4 liblz4)
+if (MINIROS_USE_SYSTEM_LZ4)
+	find_path(lz4_INCLUDE_DIRS NAMES lz4.h)
+	find_library(lz4_LIBRARIES NAMES lz4 liblz4)
+	
+	if (NOT lz4_INCLUDE_DIRS OR NOT lz4_LIBRARIES)
+		if (NOT lz4_INCLUDE_DIRS)
+	    	message(WARNING "lz4 includes not found")
+		endif()
+		if (NOT lz4_LIBRARIES)
+			message(WARNING "lz4 library not found")
+		endif()
+	else()
+		
+	endif()
+else ()
+	set(lz4_LIBRARIES lz4)
+endif (MINIROS_USE_SYSTEM_LZ4)
 
-if (NOT lz4_INCLUDE_DIRS OR NOT lz4_LIBRARIES)
-	if (NOT lz4_INCLUDE_DIRS)
-    	message(WARNING "lz4 includes not found")
-	endif()
-	if (NOT lz4_LIBRARIES)
-		message(WARNING "lz4 library not found")
-	endif()
-else()
+if (lz4_LIBRARIES)
 	include_directories(${lz4_INCLUDE_DIRS})
 	list(APPEND rosbag_SRC rosbag_storage/lz4_stream.cpp)
 
