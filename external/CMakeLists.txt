@@ -1,11 +1,11 @@
-# Setting a policy to properly override 'option' variables. 
-# We need it to enforce flags to bzip2
-set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 
 if (NOT MINIROS_USE_SYSTEM_BZIP)
 	if (EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/bzip2)
 		# Disabling bzip2 application.
-		#set(ENABLE_APP OFF)
+		set(ENABLE_LIB_ONLY ON)
+		# Dirty hack to make Python3 fail to find. bzip2 will not build tests without Python3.
+		# And it will not fail configure tests with ENABLE_LIB_ONLY=ON
+		set(Python3_EXECUTABLE "/nowhere/to/found")
 		# We will build bzip2 as a static library.
 		set(ENABLE_SHARED_LIB OFF)
 		set(ENABLE_STATIC_LIB ON)

@@ -1,4 +1,9 @@
-cmake_minimum_required(VERSION 3.10)
+# We need support for https://cmake.org/cmake/help/git-stage/policy/CMP0077.htmlm which was introduced in 3.13
+cmake_minimum_required(VERSION 3.13)
+# Setting a policy to properly override 'option' variables. 
+# We need it to enforce flags to bzip2
+cmake_policy(SET CMP0077 NEW)
+
 project(miniroscpp)
 
 find_package(catkin QUIET)
@@ -16,6 +21,11 @@ include(CheckIncludeFile)
 include(CheckFunctionExists)
 include(CheckCXXSourceCompiles)
 
+set(MINIROS_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/include
+	CACHE PATH "Path to MiniROS include dirs")
+set(MINIROS_INCLUDE_GENERATED_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/include/generated
+	CACHE PATH "Path to MiniROS generated messages")
+
 include_directories(include)
 include_directories(include/generated)
 
@@ -27,10 +37,13 @@ else()
   set(MINIROS_SUBMODULE FALSE)
 endif()
 
+set(MINIROS_ADDITIONAL_COMPONENTS $<NOT:${MINIROS_SUBMODULE}>)
+
 option(MINIROS_USE_SYSTEM_BZIP2 "Use bzip2 from system" OFF)
 option(MINIROS_USE_SYSTEM_LZ4 "Use lz4 from system" OFF)
 
-option(MINIROS_BUILD_TESTS "Build tests" OFF)
+option(MINIROS_BUILD_EXAMPLES "Build examples" ${MINIROS_ADDITIONAL_COMPONENTS})
+option(MINIROS_BUILD_TESTS "Build tests" ${MINIROS_ADDITIONAL_COMPONENTS})
 
 # execinfo.h is needed for backtrace on glibc systems
 CHECK_INCLUDE_FILE(execinfo.h HAVE_EXECINFO_H)
@@ -51,8 +64,11 @@ endif(HAVE_GLIBC_BACKTRACE)
 
 # Processing external modules like bzip2 or lz4
 add_subdirectory(external)
-
 add_subdirectory(src)
+
+if (MINIROS_BUILD_EXAMPLES)
+	add_subdirectory(examples)
+endif ()
 
 if (MINIROS_BUILD_TESTS)
 	find_package(GTEST QUIET)

@@ -51,7 +51,6 @@ if (MINIROS_USE_SYSTEM_LZ4)
 endif (MINIROS_USE_SYSTEM_LZ4)
 
 if (lz4_LIBRARIES)
-	include_directories(${lz4_INCLUDE_DIRS})
 	list(APPEND rosbag_SRC rosbag_storage/lz4_stream.cpp)
 
 	add_library(roslz4
@@ -59,6 +58,7 @@ if (lz4_LIBRARIES)
 		roslz4/xxhash.c)
 		
 	target_link_libraries(roslz4 ${lz4_LIBRARIES})
+	target_include_directories(roslz4 PRIVATE ${lz4_INCLUDE_DIRS})
 
 	set_source_files_properties(src/lz4s.c src/xxhash.c
 		PROPERTIES COMPILE_DEFINITIONS "XXH_NAMESPACE=ROSLZ4_")
@@ -103,11 +103,12 @@ set(minibag_SRC
 set_property(TARGET minibag_storage PROPERTY CXX_STANDARD 17)
 target_link_libraries(minibag_storage ${AES_ENCRYPT_LIBRARIES} ${rosbag_LIBS} cpp_common)
 
-#target_link_libraries(minibag minibag_storage)
-
 add_library(miniroscpp ${serialization_SRC} ${rostime_SRC})
 set_property(TARGET miniroscpp PROPERTY CXX_STANDARD 17)
 target_link_libraries(miniroscpp ${console_bridge_LIBRARIES} minibag_storage cpp_common)
+target_include_directories(miniroscpp PUBLIC "${MINIROS_INCLUDE_DIRS}")
+
+set(MINIROS_LIBRARY miniroscpp CACHE STRING "MiniROS C++ library name")
 
 if (catkin_FOUND)
 install(TARGETS miniroscpp minibag_storage

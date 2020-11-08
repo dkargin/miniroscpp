@@ -9,7 +9,7 @@ Contents:
 1. rostime. It is still not tested.
 1. include/generated contains generated code for std_msgs and common_msg
 
-# Building #
+# Building standalone library #
 
 This project has reduced number of external dependencies and can be built using any c++14 compiler.
 
@@ -28,6 +28,44 @@ make
 It generates `libminiroscpp.so` library, that contains all the code inside.
 
 You can force miniros use system version of **bzip** by setting CMake option `MINIROS_USE_SYSTEM_BZIP2=ON`. `MINIROS_USE_SYSTEM_LZ4` does the same for **lz4**.
+
+TODO: test install scripts
+
+# Using miniros/rosbag as a submodule #
+
+You can build miniros alongside with your project sources. The project can have the following structure:
+
+```
+some_project
+  |- thirdparty
+  |   \ miniroscpp
+  | ...
+  \- CMakeLists.txt
+```
+
+Somewhere in a root CMakeLists.txt:
+
+```
+# Adding miniros to the project.
+add_subdirectory(thirdparty/miniroscpp)
+```
+
+
+Adding **miniros** to a target:
+
+```
+add_executable(some_executable main.cpp)
+
+# Linking miniros using a direct name.
+# All necessary includes will be added to target `some_executable` automatically
+target_link_libraries(some_executable miniroscpp)
+
+# Linking miniros using exported variable.
+target_link_libraries(some_executable ${MINIROS_LIBRARY})
+
+# Adding paths to pregenerated headers.
+target_include_directories(some_executable PRIVATE ${MINIROS_INCLUDE_GENERATED_DIRS})
+```
 
 # Plan #
 
