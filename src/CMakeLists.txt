@@ -46,12 +46,8 @@ if (MINIROS_USE_SYSTEM_LZ4)
 		endif()
 		if (NOT lz4_LIBRARIES)
 			message(WARNING "lz4 library not found")
-		endif()
-	else()
-		
+		endif()		
 	endif()
-else ()
-	set(lz4_LIBRARIES lz4)
 endif (MINIROS_USE_SYSTEM_LZ4)
 
 if (lz4_LIBRARIES)
