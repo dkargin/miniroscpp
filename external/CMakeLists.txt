@@ -1,0 +1,35 @@
+# Setting a policy to properly override 'option' variables. 
+# We need it to enforce flags to bzip2
+set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
+
+if (NOT MINIROS_USE_SYSTEM_BZIP)
+	if (EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/bzip2)
+		# Disabling bzip2 application.
+		#set(ENABLE_APP OFF)
+		# We will build bzip2 as a static library.
+		set(ENABLE_SHARED_LIB OFF)
+		set(ENABLE_STATIC_LIB ON)
+		add_subdirectory(bzip2)
+		set(BZIP2_FOUND TRUE PARENT_SCOPE)
+		set(BZIP2_LIBRARIES bz2_static PARENT_SCOPE)
+		set(BZIP2_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/bzip2 PARENT_SCOPE)
+		target_include_directories(bz2_static INTERFACE ${BZIP2_INCLUDE_DIR})
+	else()
+		message(SEND_ERROR "Missing directory \"${CMAKE_CURRENT_SOURCE_DIR}/bzip2\"")
+		message(SEND_ERROR "Please run \"git submodule init --update\" to update submodules")
+	endif()
+endif()
+
+if (NOT MINIROS_USE_SYSTEM_LZ4)
+	if (EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/lz4)
+		set (LZ4_BUILD_CLI OFF)
+		set (LZ4_BUILD_LEGACY_LZ4C OFF)
+		add_subdirectory(lz4/build/cmake)
+		set(lz4_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/lz4/lib PARENT_SCOPE)
+		set(lz4_LIBRARIES lz4_static PARENT_SCOPE)
+		target_include_directories(lz4_static INTERFACE ${lz4_INCLUDE_DIRS})
+	else()
+		message(SEND_ERROR "Missing directory \"${CMAKE_CURRENT_SOURCE_DIR}/lz4\"")
+		message(SEND_ERROR "Please run \"git submodule init --update\" to update submodules")
+	endif()
+endif()

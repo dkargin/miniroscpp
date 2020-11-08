@@ -19,6 +19,19 @@ include(CheckCXXSourceCompiles)
 include_directories(include)
 include_directories(include/generated)
 
+get_directory_property(hasParent PARENT_DIRECTORY)
+if(hasParent)
+  message(STATUS "miniroscpp was added as a submodule.")
+  set(MINIROS_SUBMODULE TRUE)
+else()
+  set(MINIROS_SUBMODULE FALSE)
+endif()
+
+option(MINIROS_USE_SYSTEM_BZIP2 "Use bzip2 from system" OFF)
+option(MINIROS_USE_SYSTEM_LZ4 "Use lz4 from system" OFF)
+
+option(MINIROS_BUILD_TESTS "Build tests" OFF)
+
 # execinfo.h is needed for backtrace on glibc systems
 CHECK_INCLUDE_FILE(execinfo.h HAVE_EXECINFO_H)
 if(HAVE_EXECINFO_H)
@@ -36,8 +49,19 @@ if(HAVE_GLIBC_BACKTRACE)
   add_definitions(-DHAVE_GLIBC_BACKTRACE)
 endif(HAVE_GLIBC_BACKTRACE)
 
+# Processing external modules like bzip2 or lz4
+add_subdirectory(external)
+
 add_subdirectory(src)
-add_subdirectory(test)
+
+if (MINIROS_BUILD_TESTS)
+	find_package(GTEST QUIET)
+	if (GTEST_FOUND)
+		add_subdirectory(test)
+	else()
+		message(STATUS "Failed to find gtest. No tests will be built")
+	endif()
+endif()
 
 if(catkin_FOUND)
 install(DIRECTORY include/
