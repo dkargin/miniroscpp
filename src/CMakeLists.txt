@@ -4,10 +4,11 @@ else (NOT WIN32)
 	#
 endif (NOT WIN32)
 
+include_directories(${MINIROS_INCLUDE_DIRS})
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-#SET(cpp_common_SRC debug.cpp header.cpp console.cpp)
 add_library(cpp_common debug.cpp header.cpp console.cpp)
 
 SET(serialization_SRC serialization.cpp)
@@ -102,6 +103,8 @@ set(minibag_SRC
 
 set_property(TARGET minibag_storage PROPERTY CXX_STANDARD 17)
 target_link_libraries(minibag_storage ${AES_ENCRYPT_LIBRARIES} ${rosbag_LIBS} cpp_common)
+target_include_directories(minibag_storage PUBLIC "${MINIROS_INCLUDE_DIRS}")
+
 
 add_library(miniroscpp ${serialization_SRC} ${rostime_SRC})
 set_property(TARGET miniroscpp PROPERTY CXX_STANDARD 17)

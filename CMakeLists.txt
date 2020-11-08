@@ -26,9 +26,6 @@ set(MINIROS_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/include
 set(MINIROS_INCLUDE_GENERATED_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/include/generated
 	CACHE PATH "Path to MiniROS generated messages")
 
-include_directories(include)
-include_directories(include/generated)
-
 get_directory_property(hasParent PARENT_DIRECTORY)
 if(hasParent)
   message(STATUS "miniroscpp was added as a submodule.")

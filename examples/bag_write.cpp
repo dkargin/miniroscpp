@@ -15,16 +15,17 @@ int main(int argc, char* argv[])
   }
   catch(minibag::BagException &ex)
   {
-    std::cerr << "Failed to open bag " << path.c_str() << ": " << ex.what() << std::end;
+    std::cerr << "Failed to open bag " << path.c_str() << ": " << ex.what() << std::endl;
     return -1;
   }
 
+  int maxRecords = 100;
   for (int i = 0; i < maxRecords; i++)
   {
       nav_msgs::Odometry odometry;
       odometry.header.frame_id = "odom";
-      odometry.header.stamp = {i*0.1};
-      bag.write("odom", odometry);
+      odometry.header.stamp = miniros::Time(i*0.1 + 0.1);
+      bag.write("odom", odometry.header.stamp, odometry);
   }
 
   bag.close();

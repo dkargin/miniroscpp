@@ -20,55 +20,39 @@ int main(int argc, char* argv[])
 
   std::vector<std::string> topics = {"scan", "odom"};
 
-  int frames_publish = -1;
-
-  int maxScans = 100;
   /// Number of parsed messages
   int numScans = 0, numOdoms = 0;
 
-  minibag::View view(bag, minibag::TopicQuery(topics));
+  minibag::TopicQuery query(topics);
+  minibag::View view(bag, query);
   int totalMsgs = view.size();
-  int msgs;
-
-  int frame = 0;
+  std::cout << "Bag \"" << path.c_str() << " has " << totalMsgs << " messages" << std::endl;
 
   for(minibag::MessageInstance const m: view)
   {
-    if(frames_publish > 0 && frame >= frames_publish)
-    {
-      frame = 0;
-      //test.publishMap();
-      //test.publishTrajectory();
-    }
-
     do
     {
-      auto scan = m.instantiate<sensor_msgs::LaserScan>();
-      if (scan != nullptr)
+      if (auto scan = m.instantiate<sensor_msgs::LaserScan>())
       {
-        //test.onScan(*scan);
+        std::cout
+          << "Got scan time=" << scan->header.stamp.toSec()
+          << " frame_id=" << scan->header.frame_id.c_str() << std::endl;
         numScans++;
-        frame++;
         break;
       }
-      auto odom = m.instantiate<nav_msgs::Odometry>();
-      if (odom != nullptr)
+
+      if (auto odom = m.instantiate<nav_msgs::Odometry>())
       {
-        //test.onScan(*scan);
+        std::cout
+            << "Got odometry time=" << odom->header.stamp.toSec()
+            << " frame_id=" << odom->header.frame_id.c_str() << std::endl;
         numOdoms++;
-        frame++;
         break;
       }
     }while(false);
-
-    if(numScans >= maxScans && maxScans > 0)
-    {
-      printf("Hit max scans = %d\n", numScans);
-      break;
-    }
   }
 
-  //ROS_INFO("Processed %d scan and %d odometry readings", numScans, numOdoms);
+  std::cout << "Processed " << numScans << " scan and " << numOdoms << " odometry readings" << std::endl;
   bag.close();
   return 0;
 }

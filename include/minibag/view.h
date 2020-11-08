@@ -76,22 +76,22 @@ public:
 
         MessageInstance& operator*()
         {
-          return *message_instance_;
+          return dereference();
         }
 
         const MessageInstance& operator*() const
         {
-          return *message_instance_;
+          return dereference();
         }
 
         MessageInstance* operator->()
         {
-          return message_instance_;
+          return &dereference();
         }
 
         const MessageInstance* operator->() const
         {
-          return message_instance_;
+          return &dereference();
         }
 
         bool operator == (const iterator& other) const
