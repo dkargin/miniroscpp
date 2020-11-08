@@ -1,3 +1,7 @@
+# Setting a policy to properly override 'option' variables. 
+# We need it to enforce flags to bzip2
+set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
+
 if (NOT MINIROS_USE_SYSTEM_BZIP)
 	if (EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/bzip2)
 		# Disabling bzip2 application.
