@@ -32,6 +32,7 @@
 *  POSSIBILITY OF SUCH DAMAGE.
 ********************************************************************/
 
+#include <lz4.h>
 #include "miniros/lz4s.h"
 
 #include "xxhash.h"

@@ -34,7 +34,6 @@
 
 #pragma once
 
-#include <lz4.h>
 #include "macros.h"
 
 // Import/export for windows dll's and visibility for gcc shared libraries.
