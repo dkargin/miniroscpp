@@ -7,10 +7,10 @@
 TEST(ConsoleTest, MacroExpansionTest_ItShouldCompile)
 {
   if (true)
-    CONSOLE_BRIDGE_logDebug("Testing Log");
+    MINIROS_CONSOLE_BRIDGE_logDebug("Testing Log");
 
   if (true)
-    CONSOLE_BRIDGE_logDebug("Testing Log");
+    MINIROS_CONSOLE_BRIDGE_logDebug("Testing Log");
   else
   {
       assert(true);
@@ -18,10 +18,10 @@ TEST(ConsoleTest, MacroExpansionTest_ItShouldCompile)
 
   if (true)
   {
-    CONSOLE_BRIDGE_logDebug("Testing Log");
+    MINIROS_CONSOLE_BRIDGE_logDebug("Testing Log");
   }
   else
   {
-    CONSOLE_BRIDGE_logDebug("Testing Log");
+    MINIROS_CONSOLE_BRIDGE_logDebug("Testing Log");
   }
 }

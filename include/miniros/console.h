@@ -62,16 +62,16 @@
 
     \}
 */
-#define CONSOLE_BRIDGE_logError(fmt, ...)  \
+#define MINIROS_CONSOLE_BRIDGE_logError(fmt, ...)  \
   miniros_console_bridge::log(__FILE__, __LINE__, miniros_console_bridge::CONSOLE_BRIDGE_LOG_ERROR, fmt, ##__VA_ARGS__)
 
-#define CONSOLE_BRIDGE_logWarn(fmt, ...)   \
+#define MINIROS_CONSOLE_BRIDGE_logWarn(fmt, ...)   \
   miniros_console_bridge::log(__FILE__, __LINE__, miniros_console_bridge::CONSOLE_BRIDGE_LOG_WARN,  fmt, ##__VA_ARGS__)
 
-#define CONSOLE_BRIDGE_logInform(fmt, ...) \
+#define MINIROS_CONSOLE_BRIDGE_logInform(fmt, ...) \
   miniros_console_bridge::log(__FILE__, __LINE__, miniros_console_bridge::CONSOLE_BRIDGE_LOG_INFO,  fmt, ##__VA_ARGS__)
 
-#define CONSOLE_BRIDGE_logDebug(fmt, ...)  \
+#define MINIROS_CONSOLE_BRIDGE_logDebug(fmt, ...)  \
   miniros_console_bridge::log(__FILE__, __LINE__, miniros_console_bridge::CONSOLE_BRIDGE_LOG_DEBUG, fmt, ##__VA_ARGS__)
 
 

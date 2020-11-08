@@ -36,7 +36,7 @@
 
 #include <iostream>
 #include <cstring>
-#include "console_bridge/console.h"
+#include "miniros/console.h"
 
 using std::string;
 
@@ -127,7 +127,7 @@ void BZ2Stream::read(void* ptr, size_t size) {
     case BZ_OK: return;
     case BZ_STREAM_END:
         if (getUnused() || getUnusedLength() > 0) {
-            CONSOLE_BRIDGE_logError("unused data already available");
+            MINIROS_CONSOLE_BRIDGE_logError("unused data already available");
 	} else {
             char* unused;
             int nUnused;
