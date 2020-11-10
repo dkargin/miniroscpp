@@ -1,8 +1,11 @@
 # We need support for https://cmake.org/cmake/help/git-stage/policy/CMP0077.htmlm which was introduced in 3.13
 cmake_minimum_required(VERSION 3.13)
+
 # Setting a policy to properly override 'option' variables. 
 # We need it to enforce flags to bzip2
+set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 cmake_policy(SET CMP0077 NEW)
+
 
 project(miniroscpp)
 
