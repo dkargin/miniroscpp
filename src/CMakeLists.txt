@@ -114,7 +114,7 @@ target_include_directories(miniroscpp PUBLIC "${MINIROS_INCLUDE_DIRS}")
 set(MINIROS_LIBRARY miniroscpp CACHE STRING "MiniROS C++ library name")
 
 if (catkin_FOUND)
-install(TARGETS miniroscpp minibag_storage
+install(TARGETS miniroscpp minibag_storage cpp_common
   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   RUNTIME DESTINATION ${CATKIN_GLOBAL_BIN_DESTINATION})
