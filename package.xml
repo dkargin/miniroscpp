@@ -1,9 +1,9 @@
 <package>
-  <name>miniroscpp</name>
+  <name>roscxx</name>
   <version>0.1.0</version>
   <description>
-    miniroscpp contains a stripped version of ROS C++ code.
-    It should become a standalone ROS client without complex external dependencies.
+    ROS CXX contains a stripped version of ROS C++ code.
+    It should become a standalone ROS client without any complex external dependencies.
   </description>
   <maintainer email="dmitry.n.kargin@gmail.com">Dmitry Kargin</maintainer>
   <license>BSD</license>

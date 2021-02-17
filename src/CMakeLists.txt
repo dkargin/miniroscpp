@@ -5,6 +5,7 @@ else (NOT WIN32)
 endif (NOT WIN32)
 
 include_directories(${MINIROS_INCLUDE_DIRS})
+#include_directories(${EXTERNAL_INCLUDE})
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -103,19 +104,27 @@ set(minibag_SRC
 
 set_property(TARGET minibag_storage PROPERTY CXX_STANDARD 17)
 target_link_libraries(minibag_storage ${AES_ENCRYPT_LIBRARIES} ${rosbag_LIBS} cpp_common)
-target_include_directories(minibag_storage PUBLIC "${MINIROS_INCLUDE_DIRS}")
 
 
 add_library(miniroscpp ${serialization_SRC} ${rostime_SRC})
 set_property(TARGET miniroscpp PROPERTY CXX_STANDARD 17)
 target_link_libraries(miniroscpp ${console_bridge_LIBRARIES} minibag_storage cpp_common)
-target_include_directories(miniroscpp PUBLIC "${MINIROS_INCLUDE_DIRS}")
+
 
 set(MINIROS_LIBRARY miniroscpp CACHE STRING "MiniROS C++ library name")
+set(MINIROS_EXPORT miniroscpp minibag_storage cpp_common ${rosbag_LIBS} PARENT_SCOPE)
 
 if (catkin_FOUND)
-install(TARGETS miniroscpp minibag_storage cpp_common
-  ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-  LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-  RUNTIME DESTINATION ${CATKIN_GLOBAL_BIN_DESTINATION})
+	install(TARGETS ${MINIROS_EXPORT}
+		EXPORT MiniROSTargets
+		ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+		LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+		RUNTIME DESTINATION ${CATKIN_GLOBAL_BIN_DESTINATION})
+else()
+	install(TARGETS ${MINIROS_EXPORT}
+		EXPORT MiniROSTargets
+		LIBRARY DESTINATION lib
+        ARCHIVE DESTINATION lib
+        RUNTIME DESTINATION bin
+        INCLUDES DESTINATION include)
 endif()

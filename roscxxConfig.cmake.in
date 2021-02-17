@@ -1,0 +1,24 @@
+@PACKAGE_INIT@
+
+# This was the part of automatic config generator #
+#include("${CMAKE_CURRENT_LIST_DIR}/roscxxTargets.cmake")
+
+# This will work only with proper generated targets from roscxxTargets
+#check_required_components(roscxx)
+
+# Manual configuration #
+
+# Config for ROS CXX package
+# roscxx_FOUND - automatically filled in by find_package(roscxx)
+# roscxx_INCLUDE_DIRS
+# roscxx_LIBRARIES
+# roscxx_DEFINITIONS - empty
+
+# Include directories
+get_filename_component(roscxx_CMAKE_DIR "${CMAKE_CURRENT_LIST_FILE}" PATH)
+set(roscxx_INCLUDE_DIRS
+	"@CONF_INCLUDE_DIRS@../../../include"
+	"@CONF_INCLUDE_DIRS@../../../include/generated")
+
+# It will contain all necessary libraries for ROS CXX
+set(roscxx_LIBRARIES @MINIROS_EXPORT@)
