@@ -5,7 +5,6 @@ else (NOT WIN32)
 endif (NOT WIN32)
 
 include_directories(${MINIROS_INCLUDE_DIRS})
-#include_directories(${EXTERNAL_INCLUDE})
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -26,11 +25,16 @@ if (MINIROS_USE_SYSTEM_BZIP2)
 	find_package(BZip2 QUIET)
 endif(MINIROS_USE_SYSTEM_BZIP2)
 
-if(BZIP2_FOUND)
+if (BZIP2_FOUND)
 	add_definitions(${BZIP2_DEFINITIONS})
-	include_directories(${BZIP2_INCLUDE_DIR})
+	list(APPEND MINIROS_INCLUDE_DIRS ${BZIP2_INCLUDE_DIR})
 	list(APPEND rosbag_SRC rosbag_storage/bz2_stream.cpp)
-	list(APPEND rosbag_LIBS ${BZIP2_LIBRARIES})
+
+	if (NOT MINIROS_USE_SYSTEM_BZIP)
+		list(APPEND rosbag_LIBS bz2_import)
+	else ()
+		list(APPEND rosbag_LIBS ${BZIP2_LIBRARIES})
+	endif ()
 	
 	add_definitions(-DMINIBAG_HAS_BZIP2)
 else(BZIP2_FOUND)
@@ -66,6 +70,10 @@ if (lz4_LIBRARIES)
 		PROPERTIES COMPILE_DEFINITIONS "XXH_NAMESPACE=ROSLZ4_")
 
 	list(APPEND rosbag_LIBS roslz4)
+	if (NOT MINIROS_USE_SYSTEM_LZ4)
+		# We need to install lz4.lib as well
+		list(APPEND rosbag_LIBS ${lz4_LIBRARIES})
+	endif()
 	add_definitions(-DMINIBAG_HAS_LZ4)
 endif()
 
@@ -102,29 +110,23 @@ set(minibag_SRC
 	rosbag/recorder.cpp
 	rosbag/time_translator.cpp)
 
+target_include_directories(minibag_storage PRIVATE ${MINIROS_INCLUDE_DIRS})
 set_property(TARGET minibag_storage PROPERTY CXX_STANDARD 17)
 target_link_libraries(minibag_storage ${AES_ENCRYPT_LIBRARIES} ${rosbag_LIBS} cpp_common)
 
 
-add_library(miniroscpp ${serialization_SRC} ${rostime_SRC})
-set_property(TARGET miniroscpp PROPERTY CXX_STANDARD 17)
-target_link_libraries(miniroscpp ${console_bridge_LIBRARIES} minibag_storage cpp_common)
+add_library(roscxx ${serialization_SRC} ${rostime_SRC})
+set_property(TARGET roscxx PROPERTY CXX_STANDARD 17)
+target_link_libraries(roscxx ${console_bridge_LIBRARIES} minibag_storage cpp_common)
 
-
-set(MINIROS_LIBRARY miniroscpp CACHE STRING "MiniROS C++ library name")
-set(MINIROS_EXPORT miniroscpp minibag_storage cpp_common ${rosbag_LIBS} PARENT_SCOPE)
+set(MINIROS_LIBRARY roscxx CACHE STRING "MiniROS C++ library name")
+set(MINIROS_EXPORT roscxx minibag_storage cpp_common ${rosbag_LIBS} PARENT_SCOPE)
 
 if (catkin_FOUND)
 	install(TARGETS ${MINIROS_EXPORT}
-		EXPORT MiniROSTargets
 		ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
 		LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-		RUNTIME DESTINATION ${CATKIN_GLOBAL_BIN_DESTINATION})
-else()
-	install(TARGETS ${MINIROS_EXPORT}
-		EXPORT MiniROSTargets
-		LIBRARY DESTINATION lib
-        ARCHIVE DESTINATION lib
-        RUNTIME DESTINATION bin
-        INCLUDES DESTINATION include)
+		RUNTIME DESTINATION ${CATKIN_GLOBAL_BIN_DESTINATION}
+		EXPORT MiniROSTargets2
+	)
 endif()

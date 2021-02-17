@@ -15,9 +15,16 @@ if (NOT MINIROS_USE_SYSTEM_BZIP)
 		set(BZIP2_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/bzip2 PARENT_SCOPE)
 
 		set(EXTERNAL_INCLUDE ${EXTERNAL_INCLUDE} ${BZIP2_INCLUDE_DIR} PARENT_SCOPE)
-		#target_include_directories(bz2_static PRIVATE ${BZIP2_INCLUDE_DIR})
-		# bz2_static is already set for installation.
-		#install(TARGETS bz2_static EXPORT MiniROSTargets DESTINATION lib)
+		
+		# Adding replacement library for bz2. It does not have any "Interface" headers and we
+		# can install it without these headers
+		get_directory_property(BZ2_SOURCES DIRECTORY bzip2 DEFINITION BZ2_SOURCES)
+		#get_target_property(BZ2_SOURCES bz2_static SOURCES)
+		list(TRANSFORM BZ2_SOURCES PREPEND "bzip2/")
+		add_library(bz2_import STATIC ${BZ2_SOURCES})
+		target_include_directories(bz2_import PRIVATE
+			bzip2
+			${CMAKE_CURRENT_BINARY_DIR}/bzip2)		
 	else()
 		message(SEND_ERROR "Missing directory \"${CMAKE_CURRENT_SOURCE_DIR}/bzip2\"")
 		message(SEND_ERROR "Please run \"git submodule init --update\" to update submodules")
@@ -33,7 +40,7 @@ if (NOT MINIROS_USE_SYSTEM_LZ4)
 		set(lz4_LIBRARIES lz4_static PARENT_SCOPE)
 		#target_include_directories(lz4_static PRIVATE ${lz4_INCLUDE_DIRS})
 		set(EXTERNAL_INCLUDE ${EXTERNAL_INCLUDE} ${lz4_static} PARENT_SCOPE)
-		install(TARGETS lz4_static EXPORT MiniROSTargets DESTINATION lib)
+		#install(TARGETS lz4_static EXPORT MiniROSTargets DESTINATION lib)
 	else()
 		message(SEND_ERROR "Missing directory \"${CMAKE_CURRENT_SOURCE_DIR}/lz4\"")
 		message(SEND_ERROR "Please run \"git submodule init --update\" to update submodules")

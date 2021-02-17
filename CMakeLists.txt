@@ -90,15 +90,24 @@ if(catkin_FOUND)
     FILES_MATCHING PATTERN "*.h")
 else()
   # Some workaround for adding include directores from different folders
-  target_include_directories(minibag_storage PUBLIC include)
-  target_include_directories(miniroscpp PUBLIC include)
+
+  target_include_directories(minibag_storage PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+  )
+  target_include_directories(roscxx PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+  )
 
   # ... for the build tree
   set(CONF_INCLUDE_DIRS "${PROJECT_SOURCE_DIR}" "${PROJECT_BINARY_DIR}")
+  set(GENERATED_INCLUDE "generated")
   configure_file(roscxxConfig.cmake.in "${PROJECT_BINARY_DIR}/roscxxConfig.cmake" @ONLY)
 
   # ... for the install tree
   set(CONF_INCLUDE_DIRS "\${roscxx_CMAKE_DIR}/${REL_INCLUDE_DIR}")
+  set(GENERATED_INCLUDE "${PROJECT_NAME}/generated")
   configure_file(roscxxConfig.cmake.in
     "${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/roscxxConfig.cmake" @ONLY)
 
@@ -111,10 +120,10 @@ else()
   )
   
   # Installing regular headers
-  install(DIRECTORY include DESTINATION include FILES_MATCHING PATTERN "*.h")
+  install(DIRECTORY include/ DESTINATION include FILES_MATCHING PATTERN "*.h")
 
   # Installing generated headers for message types
-  install(DIRECTORY include/generated DESTINATION include FILES_MATCHING PATTERN "*.hxx")
+  install(DIRECTORY include/generated DESTINATION include/${PROJECT_NAME} FILES_MATCHING PATTERN "*.hxx")
 
   install(FILES
     "${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/roscxxConfig.cmake"
@@ -122,11 +131,19 @@ else()
     DESTINATION lib/cmake/roscxx
   )
 
+  install(TARGETS ${MINIROS_EXPORT} EXPORT ${PROJECT_NAME}
+    LIBRARY DESTINATION lib
+        ARCHIVE DESTINATION lib
+        RUNTIME DESTINATION bin
+        INCLUDES DESTINATION include
+  )
+  # This is local export file, which references files from local build tree.
   #export(EXPORT MiniROSTargets FILE "${CMAKE_CURRENT_BINARY_DIR}/cmake/roscxxTargets.cmake")
-  # TODO: Install generated targets
-  #install(EXPORT MiniROSTargets
-  #  FILE roscxxTargets.cmake
-  #  NAMESPACE roscxx::
-  #  DESTINATION lib/cmake/roscxx
-  #)
+  
+  # This export file will be generated and installed to CMAKE_INSTALL_PREFIX
+  install(EXPORT ${PROJECT_NAME}
+    FILE roscxxTargets.cmake
+    NAMESPACE roscxx::
+    DESTINATION lib/cmake/roscxx
+  )
 endif(catkin_FOUND)
