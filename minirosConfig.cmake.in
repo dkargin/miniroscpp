@@ -1,0 +1,26 @@
+@PACKAGE_INIT@
+
+# This was the part of automatic config generator #
+include("${CMAKE_CURRENT_LIST_DIR}/@PROJECT_NAME@Targets.cmake")
+
+# This will work only with proper generated targets from @PROJECT_NAME@Targets
+#check_required_components(@PROJECT_NAME@)
+
+# Manual configuration #
+
+# Config for ROS CXX package
+# MINIROS_FOUND - automatically filled in by find_package(@PROJECT_NAME@)
+# MINIROS_INCLUDE_DIRS
+# MINIROS_LIBRARIES
+# MINIROS_GENERATED_INCLUDE_DIRS
+
+# Include directories
+get_filename_component(roscxx_CMAKE_DIR "${CMAKE_CURRENT_LIST_FILE}" PATH)
+set(MINIROS_INCLUDE_DIRS
+	"@CONF_INCLUDE_DIRS@../../../include")
+
+set(MINIROS_GENERATED_INCLUDE_DIRS
+	"@CONF_INCLUDE_DIRS@../../../include/@GENERATED_INCLUDE@")
+
+# It will contain all necessary libraries for @PROJECT_NAME@
+set(MINIROS_LIBRARIES @MINIROS_EXPORT@)

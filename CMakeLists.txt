@@ -6,7 +6,7 @@ cmake_minimum_required(VERSION 3.13)
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 cmake_policy(SET CMP0077 NEW)
 
-project(roscxx VERSION 0.1.0)
+project(miniros VERSION 0.2.0)
 
 
 include(CheckIncludeFile)
@@ -103,18 +103,18 @@ else()
   # ... for the build tree
   set(CONF_INCLUDE_DIRS "${PROJECT_SOURCE_DIR}" "${PROJECT_BINARY_DIR}")
   set(GENERATED_INCLUDE "generated")
-  configure_file(roscxxConfig.cmake.in "${PROJECT_BINARY_DIR}/roscxxConfig.cmake" @ONLY)
+  configure_file(${PROJECT_NAME}Config.cmake.in "${PROJECT_BINARY_DIR}/${PROJECT_NAME}Config.cmake" @ONLY)
 
   # ... for the install tree
   set(CONF_INCLUDE_DIRS "\${roscxx_CMAKE_DIR}/${REL_INCLUDE_DIR}")
   set(GENERATED_INCLUDE "${PROJECT_NAME}/generated")
-  configure_file(roscxxConfig.cmake.in
-    "${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/roscxxConfig.cmake" @ONLY)
+  configure_file(${PROJECT_NAME}Config.cmake.in
+    "${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/${PROJECT_NAME}Config.cmake" @ONLY)
 
   # set_property(TARGET MiniROSTargets PROPERTY VERSION ${PROJECT_VERSION})  
   # generate the version file for the config file
   write_basic_package_version_file(
-    "${CMAKE_CURRENT_BINARY_DIR}/roscxxConfigVersion.cmake"
+    "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake"
     VERSION "${PROJECT_VERSION}"
     COMPATIBILITY AnyNewerVersion
   )
@@ -126,9 +126,9 @@ else()
   install(DIRECTORY include/generated DESTINATION include/${PROJECT_NAME} FILES_MATCHING PATTERN "*.hxx")
 
   install(FILES
-    "${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/roscxxConfig.cmake"
-    "${CMAKE_CURRENT_BINARY_DIR}/roscxxConfigVersion.cmake"
-    DESTINATION lib/cmake/roscxx
+    "${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/${PROJECT_NAME}Config.cmake"
+    "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake"
+    DESTINATION lib/cmake/${PROJECT_NAME}
   )
 
   install(TARGETS ${MINIROS_EXPORT} EXPORT ${PROJECT_NAME}
@@ -137,13 +137,14 @@ else()
         RUNTIME DESTINATION bin
         INCLUDES DESTINATION include
   )
+
   # This is local export file, which references files from local build tree.
   #export(EXPORT MiniROSTargets FILE "${CMAKE_CURRENT_BINARY_DIR}/cmake/roscxxTargets.cmake")
   
   # This export file will be generated and installed to CMAKE_INSTALL_PREFIX
   install(EXPORT ${PROJECT_NAME}
-    FILE roscxxTargets.cmake
-    NAMESPACE roscxx::
-    DESTINATION lib/cmake/roscxx
+    FILE ${PROJECT_NAME}Targets.cmake
+    NAMESPACE ${PROJECT_NAME}::
+    DESTINATION lib/cmake/${PROJECT_NAME}
   )
 endif(catkin_FOUND)
