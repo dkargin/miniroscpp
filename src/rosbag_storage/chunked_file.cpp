@@ -211,7 +211,7 @@ void ChunkedFile::seek(uint64_t offset, int origin) {
 }
 
 uint64_t ChunkedFile::getOffset()            const { return offset_;        }
-uint32_t ChunkedFile::getCompressedBytesIn() const { return compressed_in_; }
+uint32_t ChunkedFile::getCompressedBytesIn() const { return (uint32_t)compressed_in_; }
 
 void ChunkedFile::write(string const& s)        { write((void*) s.c_str(), s.size()); }
 void ChunkedFile::write(void* ptr, size_t size) { write_stream_->write(ptr, size);    }
@@ -219,7 +219,7 @@ void ChunkedFile::read(void* ptr, size_t size)  { read_stream_->read(ptr, size);
 
 bool ChunkedFile::truncate(uint64_t length) {
     int fd = fileno(file_);
-    return ftruncate(fd, length) == 0;
+    return ftruncate(fd, (off_t)length) == 0;
 }
 
 //! \todo add error handling

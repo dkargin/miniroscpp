@@ -282,7 +282,7 @@ void Bag::readVersion() {
     char logtypename[100];
     int version_major, version_minor;
 #if defined(_MSC_VER)
-    if (sscanf_s(version_line.c_str(), "#ROS%s V%d.%d", logtypename, sizeof(logtypename), &version_major, &version_minor) != 3)
+    if (sscanf_s(version_line.c_str(), "#ROS%s V%d.%d", logtypename, (int)sizeof(logtypename), &version_major, &version_minor) != 3)
 #else
     if (sscanf(version_line.c_str(), "#ROS%99s V%d.%d", logtypename, &version_major, &version_minor) != 3)
 #endif
@@ -359,7 +359,7 @@ void Bag::startReadingVersion102() {
         // Read the file header record, which points to the start of the topic indexes
         readFileHeaderRecord();
     }
-    catch (BagFormatException& ex) {
+    catch (BagFormatException&) {
         throw BagUnindexedException();
     }
 
@@ -390,8 +390,8 @@ void Bag::startReadingVersion102() {
 // File header record
 
 void Bag::writeFileHeaderRecord() {
-    connection_count_ = connections_.size();
-    chunk_count_      = chunks_.size();
+    connection_count_ = (uint32_t)connections_.size();
+    chunk_count_      = (uint32_t)chunks_.size();
 
     MINIROS_CONSOLE_BRIDGE_logDebug("Writing FILE_HEADER [%llu]: index_pos=%llu connection_count=%d chunk_count=%d",
               (unsigned long long) file_.getOffset(), (unsigned long long) index_data_pos_, connection_count_, chunk_count_);
@@ -571,7 +571,7 @@ void Bag::writeIndexRecords() {
         multiset<IndexEntry> const& index         = i->second;
 
         // Write the index record header
-        uint32_t index_size = index.size();
+        uint32_t index_size = (uint32_t)index.size();
         M_string header;
         header[OP_FIELD_NAME]         = toHeaderString(&OP_INDEX_DATA);
         header[CONNECTION_FIELD_NAME] = toHeaderString(&connection_id);
@@ -623,7 +623,7 @@ void Bag::readTopicIndexRecord102() {
     uint32_t connection_id;
     map<string, uint32_t>::const_iterator topic_conn_id_iter = topic_connection_ids_.find(topic);
     if (topic_conn_id_iter == topic_connection_ids_.end()) {
-    	connection_id = connections_.size();
+    	connection_id = (uint32_t)connections_.size();
 
     	MINIROS_CONSOLE_BRIDGE_logDebug("Creating connection: id=%d topic=%s", connection_id, topic.c_str());
         ConnectionInfo* connection_info = new ConnectionInfo();
@@ -819,7 +819,7 @@ void Bag::readMessageDefinitionRecord102() {
 
     map<string, uint32_t>::const_iterator topic_conn_id_iter = topic_connection_ids_.find(topic);
     if (topic_conn_id_iter == topic_connection_ids_.end()) {
-        uint32_t id = connections_.size();
+        uint32_t id = (uint32_t)connections_.size();
 
         MINIROS_CONSOLE_BRIDGE_logDebug("Creating connection: topic=%s md5sum=%s datatype=%s", topic.c_str(), md5sum.c_str(), datatype.c_str());
         connection_info = new ConnectionInfo();
@@ -991,7 +991,7 @@ void Bag::writeChunkInfoRecords() {
     for (ChunkInfo const& chunk_info : chunks_) {
         // Write the chunk info header
         M_string header;
-        uint32_t chunk_connection_count = chunk_info.connection_counts.size();
+        uint32_t chunk_connection_count = (uint32_t)chunk_info.connection_counts.size();
         header[OP_FIELD_NAME]         = toHeaderString(&OP_CHUNK_INFO);
         header[VER_FIELD_NAME]        = toHeaderString(&CHUNK_INFO_VERSION);
         header[CHUNK_POS_FIELD_NAME]  = toHeaderString(&chunk_info.pos);

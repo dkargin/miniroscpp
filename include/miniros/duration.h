@@ -55,12 +55,6 @@
 #include <stdint.h>
 #include "rostime_decl.h"
 
-/*
-namespace boost {
-  namespace posix_time {
-    class time_duration;
-  }
-}*/
 
 namespace miniros
 {

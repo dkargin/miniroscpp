@@ -71,6 +71,11 @@ set(EXTERNAL_INCLUDE "")
 
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/include/miniros/config.h.in" "miniros/config.h")
 
+if (WIN32)
+  # We have a lot of unix code here, and MSVC is always angry with these methods
+  add_definitions(-D_CRT_SECURE_NO_WARNINGS)
+endif()
+
 add_subdirectory(external)
 add_subdirectory(src)
 

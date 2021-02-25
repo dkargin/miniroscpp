@@ -142,8 +142,8 @@ void Header::write(const M_string& key_vals, shared_array_uint8_t& buffer, uint3
       const std::string& key = it->first;
       const std::string& value = it->second;
 
-      size += key.length();
-      size += value.length();
+      size += (uint32_t)key.length();
+      size += (uint32_t)value.length();
       size += 1; // = sign
       size += 4; // 4-byte length
     }
