@@ -24,26 +24,29 @@ if(catkin_FOUND)
     LIBRARIES ${PROJECT_NAME})
 endif(catkin_FOUND)
 
+set(MINIROS_INCLUDE_DIRS include;${CMAKE_CURRENT_BINARY_DIR})
 
-set(MINIROS_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/include
-	CACHE PATH "Path to MiniROS include dirs")
-set(MINIROS_INCLUDE_GENERATED_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/include/generated
+set(MINIROS_INCLUDE_GENERATED_DIRS
+  ${CMAKE_CURRENT_SOURCE_DIR}/include/generated
 	CACHE PATH "Path to MiniROS generated messages")
 
+# Checking if miniros is added as a submodule
 get_directory_property(hasParent PARENT_DIRECTORY)
 if(hasParent)
   message(STATUS "miniroscpp was added as a submodule.")
-  set(ROSCXX_SUBMODULE TRUE)
+  set(MINIROS_SUBMODULE TRUE)
 else()
-  set(ROSCXX_SUBMODULE FALSE)
+  set(MINIROS_SUBMODULE FALSE)
+  set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 endif()
 
-set(MINIROS_ADDITIONAL_COMPONENTS $<NOT:${ROSCXX_SUBMODULE}>)
+set(MINIROS_ADDITIONAL_COMPONENTS $<NOT:${MINIROS_SUBMODULE}>)
 
-option(ROSCXX_USE_SYSTEM_BZIP2 "Use bzip2 from system" OFF)
-option(ROSCXX_USE_SYSTEM_LZ4 "Use lz4 from system" OFF)
-option(ROSCXX_BUILD_EXAMPLES "Build examples" ${MINIROS_ADDITIONAL_COMPONENTS})
-option(ROSCXX_BUILD_TESTS "Build tests" ${MINIROS_ADDITIONAL_COMPONENTS})
+option(MINIROS_USE_SYSTEM_BZIP2 "Use bzip2 from system" OFF)
+option(MINIROS_USE_SYSTEM_LZ4 "Use lz4 from system" OFF)
+option(MINIROS_BUILD_EXAMPLES "Build examples" ${MINIROS_ADDITIONAL_COMPONENTS})
+option(MINIROS_BUILD_TESTS "Build tests" ${MINIROS_ADDITIONAL_COMPONENTS})
+option(MINIROS_BUILD_SHARED_LIBS "Build shared version of miniros" ON)
 
 # execinfo.h is needed for backtrace on glibc systems
 CHECK_INCLUDE_FILE(execinfo.h HAVE_EXECINFO_H)
@@ -66,12 +69,11 @@ endif(HAVE_GLIBC_BACKTRACE)
 # Processing external modules like bzip2 or lz4
 set(EXTERNAL_INCLUDE "")
 
+configure_file("${CMAKE_CURRENT_SOURCE_DIR}/include/miniros/config.h.in" "miniros/config.h")
+
 add_subdirectory(external)
 add_subdirectory(src)
 
-if (MINIROS_BUILD_EXAMPLES)
-	add_subdirectory(examples)
-endif ()
 
 if (MINIROS_BUILD_TESTS)
 	find_package(GTEST QUIET)
@@ -90,16 +92,15 @@ if(catkin_FOUND)
     FILES_MATCHING PATTERN "*.h")
 else()
   # Some workaround for adding include directores from different folders
-
-  target_include_directories(minibag_storage PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  target_include_directories(bag_storage PUBLIC 
+    $<BUILD_INTERFACE:${MINIROS_INCLUDE_DIRS}>
     $<INSTALL_INTERFACE:include>
   )
+
   target_include_directories(roscxx PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<BUILD_INTERFACE:${MINIROS_INCLUDE_DIRS}>
     $<INSTALL_INTERFACE:include>
   )
-
   # ... for the build tree
   set(CONF_INCLUDE_DIRS "${PROJECT_SOURCE_DIR}" "${PROJECT_BINARY_DIR}")
   set(GENERATED_INCLUDE "generated")
@@ -121,6 +122,9 @@ else()
   
   # Installing regular headers
   install(DIRECTORY include/ DESTINATION include FILES_MATCHING PATTERN "*.h")
+  install(FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/miniros/config.h 
+    DESTINATION include/miniros/)
 
   # Installing generated headers for message types
   install(DIRECTORY include/generated DESTINATION include/${PROJECT_NAME} FILES_MATCHING PATTERN "*.hxx")
@@ -139,7 +143,7 @@ else()
   )
 
   # This is local export file, which references files from local build tree.
-  #export(EXPORT MiniROSTargets FILE "${CMAKE_CURRENT_BINARY_DIR}/cmake/roscxxTargets.cmake")
+  #export(EXPORT MiniROSTargets FILE "${CMAKE_CURRENT_BINARY_DIR}/cmake/${PROJECT_NAME}Targets.cmake")
   
   # This export file will be generated and installed to CMAKE_INSTALL_PREFIX
   install(EXPORT ${PROJECT_NAME}
@@ -148,3 +152,7 @@ else()
     DESTINATION lib/cmake/${PROJECT_NAME}
   )
 endif(catkin_FOUND)
+
+if (MINIROS_BUILD_EXAMPLES)
+  add_subdirectory(examples)
+endif ()

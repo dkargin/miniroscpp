@@ -1,24 +1,22 @@
-if (NOT WIN32)
-	#
-else (NOT WIN32)
-	#
-endif (NOT WIN32)
-
-include_directories(${MINIROS_INCLUDE_DIRS})
-
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-add_library(cpp_common debug.cpp header.cpp console.cpp)
+#include_directories(${MINIROS_INCLUDE_DIRS})
 
-SET(serialization_SRC serialization.cpp)
 SET(rostime_SRC
 	rostime/duration.cpp
 	rostime/rate.cpp
 	rostime/time.cpp)
 
+set(cpp_common_SRC
+	debug.cpp
+	header.cpp
+	console.cpp
+	serialization.cpp)
+
 set(rosbag_SRC "")
 set(rosbag_LIBS "")
+set(rosbag_INCLUDE "")
 
 # Finding BZip2
 if (MINIROS_USE_SYSTEM_BZIP2)
@@ -27,7 +25,7 @@ endif(MINIROS_USE_SYSTEM_BZIP2)
 
 if (BZIP2_FOUND)
 	add_definitions(${BZIP2_DEFINITIONS})
-	list(APPEND MINIROS_INCLUDE_DIRS ${BZIP2_INCLUDE_DIR})
+	list(APPEND rosbag_INCLUDE ${BZIP2_INCLUDE_DIR})
 	list(APPEND rosbag_SRC rosbag_storage/bz2_stream.cpp)
 
 	if (NOT MINIROS_USE_SYSTEM_BZIP)
@@ -57,24 +55,18 @@ if (MINIROS_USE_SYSTEM_LZ4)
 endif (MINIROS_USE_SYSTEM_LZ4)
 
 if (lz4_LIBRARIES)
-	list(APPEND rosbag_SRC rosbag_storage/lz4_stream.cpp)
-
-	add_library(roslz4
+	list(APPEND rosbag_SRC
+		rosbag_storage/lz4_stream.cpp
 		roslz4/lz4s.c
 		roslz4/xxhash.c)
-		
-	target_link_libraries(roslz4 ${lz4_LIBRARIES})
-	target_include_directories(roslz4 PRIVATE ${lz4_INCLUDE_DIRS})
-
+	
+	list(APPEND rosbag_LIBS ${lz4_LIBRARIES})
+	list(APPEND rosbag_INCLUDE ${lz4_INCLUDE_DIRS})
+	
 	set_source_files_properties(src/lz4s.c src/xxhash.c
 		PROPERTIES COMPILE_DEFINITIONS "XXH_NAMESPACE=ROSLZ4_")
-
-	list(APPEND rosbag_LIBS roslz4)
-	if (NOT MINIROS_USE_SYSTEM_LZ4)
-		# We need to install lz4.lib as well
-		list(APPEND rosbag_LIBS ${lz4_LIBRARIES})
-	endif()
 	add_definitions(-DMINIBAG_HAS_LZ4)
+	add_definitions()
 endif()
 
 
@@ -85,7 +77,18 @@ if(NOT WIN32)
   set(AES_ENCRYPT_LIBRARIES "crypto" "gpgme")
 endif()
 
-add_library(minibag_storage
+
+if (MINIROS_BUILD_SHARED_LIBS)
+  add_library(roscxx SHARED ${rostime_SRC} ${cpp_common_SRC})
+else()
+  add_library(roscxx ${rostime_SRC} ${cpp_common_SRC})
+endif()
+
+set_property(TARGET roscxx PROPERTY CXX_STANDARD 17)
+target_link_libraries(roscxx ${console_bridge_LIBRARIES})
+target_compile_definitions(roscxx PRIVATE rostime_EXPORTS miniros_EXPORTS)
+
+set(bag_storage_SRC
 	rosbag_storage/bag_player.cpp
 	rosbag_storage/bag.cpp
 	rosbag_storage/buffer.cpp
@@ -99,8 +102,19 @@ add_library(minibag_storage
 	${rosbag_SRC}
 	rosbag_storage/no_encryptor.cpp
 	${AES_ENCRYPT_SOURCE}
-	)
-#rosbag_storage/gpgme_utils.cpp
+)
+
+if (MINIROS_BUILD_SHARED_LIBS)
+	add_library(bag_storage SHARED ${bag_storage_SRC})
+else ()
+	add_library(bag_storage ${bag_storage_SRC})
+endif()
+
+target_include_directories(bag_storage PRIVATE ${MINIROS_INCLUDE_DIRS} ${rosbag_INCLUDE})
+target_compile_definitions(bag_storage PRIVATE rosbag_EXPORTS rosbag_storage_EXPORTS roslz4_EXPORTS)
+
+set_property(TARGET bag_storage PROPERTY CXX_STANDARD 17)
+target_link_libraries(bag_storage ${AES_ENCRYPT_LIBRARIES} ${rosbag_LIBS} roscxx)
 
 set(minibag_SRC
 	rosbag/encrypt.cpp
@@ -110,17 +124,9 @@ set(minibag_SRC
 	rosbag/recorder.cpp
 	rosbag/time_translator.cpp)
 
-target_include_directories(minibag_storage PRIVATE ${MINIROS_INCLUDE_DIRS})
-set_property(TARGET minibag_storage PROPERTY CXX_STANDARD 17)
-target_link_libraries(minibag_storage ${AES_ENCRYPT_LIBRARIES} ${rosbag_LIBS} cpp_common)
 
-
-add_library(roscxx ${serialization_SRC} ${rostime_SRC})
-set_property(TARGET roscxx PROPERTY CXX_STANDARD 17)
-target_link_libraries(roscxx ${console_bridge_LIBRARIES} minibag_storage cpp_common)
-
-set(MINIROS_LIBRARY roscxx CACHE STRING "MiniROS C++ library name")
-set(MINIROS_EXPORT roscxx minibag_storage cpp_common ${rosbag_LIBS} PARENT_SCOPE)
+set(MINIROS_LIBRARY roscxx PARENT_SCOPE)
+set(MINIROS_EXPORT roscxx bag_storage ${rosbag_LIBS} PARENT_SCOPE)
 
 if (catkin_FOUND)
 	install(TARGETS ${MINIROS_EXPORT}
