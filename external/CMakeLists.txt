@@ -26,6 +26,7 @@ if (NOT MINIROS_USE_SYSTEM_BZIP)
 			bzip2
 			${CMAKE_CURRENT_BINARY_DIR}/bzip2)		
 		set_target_properties (bz2_import PROPERTIES FOLDER "Dependencies")
+		set_property(TARGET bz2_import PROPERTY POSITION_INDEPENDENT_CODE ON)
 	else()
 		message(SEND_ERROR "Missing directory \"${CMAKE_CURRENT_SOURCE_DIR}/bzip2\"")
 		message(SEND_ERROR "Please run \"git submodule init --update\" to update submodules")

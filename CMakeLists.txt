@@ -24,7 +24,8 @@ if(catkin_FOUND)
     LIBRARIES ${PROJECT_NAME})
 endif(catkin_FOUND)
 
-set(MINIROS_INCLUDE_DIRS include;${CMAKE_CURRENT_BINARY_DIR})
+include_directories(include)
+set(MINIROS_INCLUDE_DIRS ${CMAKE_CURRENT_BINARY_DIR})
 
 set(MINIROS_INCLUDE_GENERATED_DIRS
   ${CMAKE_CURRENT_SOURCE_DIR}/include/generated
@@ -95,6 +96,11 @@ if(catkin_FOUND)
   install(DIRECTORY include/
     DESTINATION ${CATKIN_GLOBAL_INCLUDE_DESTINATION}
     FILES_MATCHING PATTERN "*.h")
+  install(TARGETS ${MINIROS_EXPORT} EXPORT ${PROJECT_NAME}
+    ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+    LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+    RUNTIME DESTINATION ${CATKIN_GLOBAL_BIN_DESTINATION}
+  )
 else()
   # Some workaround for adding include directores from different folders
   target_include_directories(bag_storage PUBLIC 

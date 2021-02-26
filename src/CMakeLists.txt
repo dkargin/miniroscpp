@@ -87,6 +87,7 @@ endif()
 set_property(TARGET roscxx PROPERTY CXX_STANDARD 17)
 target_link_libraries(roscxx ${console_bridge_LIBRARIES})
 target_compile_definitions(roscxx PRIVATE rostime_EXPORTS miniros_EXPORTS)
+target_include_directories(roscxx PRIVATE ${MINIROS_INCLUDE_DIRS})
 
 set(bag_storage_SRC
 	rosbag_storage/bag_player.cpp
@@ -127,12 +128,3 @@ set(minibag_SRC
 
 set(MINIROS_LIBRARY roscxx PARENT_SCOPE)
 set(MINIROS_EXPORT roscxx bag_storage ${rosbag_LIBS} PARENT_SCOPE)
-
-if (catkin_FOUND)
-	install(TARGETS ${MINIROS_EXPORT}
-		ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-		LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-		RUNTIME DESTINATION ${CATKIN_GLOBAL_BIN_DESTINATION}
-		EXPORT MiniROSTargets2
-	)
-endif()
