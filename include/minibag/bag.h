@@ -555,7 +555,7 @@ void Bag::doWrite(std::string const& topic, miniros::Time const& time, T const& 
 
         std::map<std::string, uint32_t>::iterator topic_connection_ids_iter = topic_connection_ids_.find(topic);
         if (topic_connection_ids_iter == topic_connection_ids_.end()) {
-            conn_id = connections_.size();
+            conn_id = (uint32_t)connections_.size();
             topic_connection_ids_[topic] = conn_id;
         }
         else {
@@ -575,7 +575,7 @@ void Bag::doWrite(std::string const& topic, miniros::Time const& time, T const& 
 
         std::map<miniros::M_string, uint32_t>::iterator header_connection_ids_iter = header_connection_ids_.find(connection_header_copy);
         if (header_connection_ids_iter == header_connection_ids_.end()) {
-            conn_id = connections_.size();
+            conn_id = (uint32_t)connections_.size();
             header_connection_ids_[connection_header_copy] = conn_id;
         }
         else {

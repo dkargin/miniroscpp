@@ -74,7 +74,7 @@ void BZ2Stream::write(void* ptr, size_t size) {
         throw BagException("cannot write to unopened bzfile");
     }
 
-    BZ2_bzWrite(&bzerror_, bzfile_, ptr, size);
+    BZ2_bzWrite(&bzerror_, bzfile_, ptr, (int)size);
 
     switch (bzerror_) {
     case BZ_IO_ERROR: throw BagException("BZ_IO_ERROR: error writing the compressed file");
@@ -119,7 +119,7 @@ void BZ2Stream::read(void* ptr, size_t size) {
         throw BagException("cannot read from unopened bzfile");
     }
 
-    BZ2_bzRead(&bzerror_, bzfile_, ptr, size);
+    BZ2_bzRead(&bzerror_, bzfile_, ptr, (int)size);
 
     advanceOffset(size);
 

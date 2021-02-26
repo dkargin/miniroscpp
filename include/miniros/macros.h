@@ -27,6 +27,8 @@
 
 #pragma once
 
+#include "miniros/config.h"
+
 #if defined(__GNUC__)
 #define MINIROS_DEPRECATED __attribute__((deprecated))
 #define MINIROS_FORCE_INLINE __attribute__((always_inline))
@@ -71,5 +73,3 @@
 #else // ros is being built around static libraries
   #define MINIROS_DECL
 #endif
-
-

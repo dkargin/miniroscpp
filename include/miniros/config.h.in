@@ -1,0 +1,1 @@
+#cmakedefine MINIROS_BUILD_SHARED_LIBS
