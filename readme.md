@@ -79,7 +79,7 @@ target_include_directories(some_executable PRIVATE ${MINIROS_INCLUDE_GENERATED_D
 1. Check python code.
 1. ~~Adapt CMakeLists.txt to work without catkin.~~ DONE
 1. Check if I can merge whole ROS transport in a library.
-1. Provide a proper install and configuration scripts for CMake.
+1. ~~Provide a proper install and configuration scripts for CMake.~~ DONE
 1. Test library on android.
 
 # ROS References #

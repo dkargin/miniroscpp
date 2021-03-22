@@ -69,12 +69,24 @@ if (lz4_LIBRARIES)
 	add_definitions()
 endif()
 
+set(ENCRYPT_SOURCE "")
+set(ENCRYPT_LIBRARIES "")
 
-set(AES_ENCRYPT_SOURCE "")
-set(AES_ENCRYPT_LIBRARIES "")
-if(NOT WIN32)
-  set(AES_ENCRYPT_SOURCE "rosbag_storage/aes_encryptor.cpp" "rosbag_storage/gpgme_utils.cpp")
-  set(AES_ENCRYPT_LIBRARIES "crypto" "gpgme")
+# AES encryption plugin
+find_package(OpenSSL QUIET)
+if (OpenSSL_FOUND)
+	list(APPEND ENCRYPT_SOURCE "rosbag_storage/aes_encryptor.cpp")
+	list(APPEND ENCRYPT_LIBRARIES OpenSSL::Crypto)
+else ()
+	message(STATUS "No OpenSSL was found. Rosbag will not support AES encryption.")
+endif()
+
+
+option(MINIROS_ROSBAG_USE_GPGME_ENCRYPTION "Use GPGME encryption support" OFF)
+
+if(MINIROS_ROSBAG_USE_GPGME_ENCRYPTION)
+	list(APPEND ENCRYPT_SOURCE "rosbag_storage/gpgme_utils.cpp")
+	list(APPEND ENCRYPT_LIBRARIES gpgme)
 endif()
 
 
@@ -102,7 +114,7 @@ set(bag_storage_SRC
 	
 	${rosbag_SRC}
 	rosbag_storage/no_encryptor.cpp
-	${AES_ENCRYPT_SOURCE}
+	${ENCRYPT_SOURCE}
 )
 
 if (MINIROS_BUILD_SHARED_LIBS)
@@ -124,7 +136,6 @@ set(minibag_SRC
 	rosbag/record.cpp
 	rosbag/recorder.cpp
 	rosbag/time_translator.cpp)
-
 
 set(MINIROS_LIBRARY roscxx PARENT_SCOPE)
 set(MINIROS_EXPORT roscxx bag_storage ${rosbag_LIBS} PARENT_SCOPE)
