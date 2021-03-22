@@ -6,14 +6,13 @@ cmake_minimum_required(VERSION 3.13)
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 cmake_policy(SET CMP0077 NEW)
 
-project(miniros VERSION 0.2.0)
+project(miniros VERSION 0.2.1)
 
 
 include(CheckIncludeFile)
 include(CheckFunctionExists)
 include(CheckCXXSourceCompiles)
 include(CMakePackageConfigHelpers)
-
 
 find_package(catkin QUIET)
 
