@@ -6,7 +6,7 @@ cmake_minimum_required(VERSION 3.13)
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 cmake_policy(SET CMP0077 NEW)
 
-project(miniros VERSION 0.2.1)
+project(miniros VERSION 0.2.2)
 
 
 include(CheckIncludeFile)
@@ -47,6 +47,8 @@ option(MINIROS_USE_SYSTEM_LZ4 "Use lz4 from system" OFF)
 option(MINIROS_BUILD_EXAMPLES "Build examples" ${MINIROS_ADDITIONAL_COMPONENTS})
 option(MINIROS_BUILD_TESTS "Build tests" ${MINIROS_ADDITIONAL_COMPONENTS})
 option(MINIROS_BUILD_SHARED_LIBS "Build shared version of miniros" ON)
+option(MINIROS_ROSBAG_USE_GPGME_ENCRYPTION "Use GPGME encryption support" OFF)
+option(MINIROS_ROSBAG_USE_OPENSSL_ENCRYPTION "Use openssl encryption for rosbag" OFF)
 
 # execinfo.h is needed for backtrace on glibc systems
 CHECK_INCLUDE_FILE(execinfo.h HAVE_EXECINFO_H)

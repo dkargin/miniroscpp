@@ -73,16 +73,17 @@ set(ENCRYPT_SOURCE "")
 set(ENCRYPT_LIBRARIES "")
 
 # AES encryption plugin
-find_package(OpenSSL QUIET)
-if (OpenSSL_FOUND)
-	list(APPEND ENCRYPT_SOURCE "rosbag_storage/aes_encryptor.cpp")
-	list(APPEND ENCRYPT_LIBRARIES OpenSSL::Crypto)
-else ()
-	message(STATUS "No OpenSSL was found. Rosbag will not support AES encryption.")
+if (MINIROS_ROSBAG_USE_OPENSSL_ENCRYPTION)
+	find_package(OpenSSL QUIET)
+	if (OpenSSL_FOUND)
+		message(STATUS "Found OpenSSL include=${OPENSSL_INCLUDE_DIR}")
+		list(APPEND ENCRYPT_SOURCE "rosbag_storage/aes_encryptor.cpp")
+		list(APPEND ENCRYPT_LIBRARIES OpenSSL::Crypto)
+	else ()
+		message(STATUS "No OpenSSL was found. Rosbag will not support AES encryption.")
+	endif()
 endif()
 
-
-option(MINIROS_ROSBAG_USE_GPGME_ENCRYPTION "Use GPGME encryption support" OFF)
 
 if(MINIROS_ROSBAG_USE_GPGME_ENCRYPTION)
 	list(APPEND ENCRYPT_SOURCE "rosbag_storage/gpgme_utils.cpp")
@@ -127,7 +128,7 @@ target_include_directories(bag_storage PRIVATE ${MINIROS_INCLUDE_DIRS} ${rosbag_
 target_compile_definitions(bag_storage PRIVATE rosbag_EXPORTS rosbag_storage_EXPORTS roslz4_EXPORTS)
 
 set_property(TARGET bag_storage PROPERTY CXX_STANDARD 17)
-target_link_libraries(bag_storage ${AES_ENCRYPT_LIBRARIES} ${rosbag_LIBS} roscxx)
+target_link_libraries(bag_storage ${ENCRYPT_LIBRARIES} ${rosbag_LIBS} roscxx)
 
 set(minibag_SRC
 	rosbag/encrypt.cpp
