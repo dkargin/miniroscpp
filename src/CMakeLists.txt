@@ -73,17 +73,17 @@ set(ENCRYPT_SOURCE "")
 set(ENCRYPT_LIBRARIES "")
 
 # AES encryption plugin
-find_package(OpenSSL QUIET)
-if (OpenSSL_FOUND)
-	message(STATUS "Found OpenSSL include=${OPENSSL_INCLUDE_DIR}")
-	list(APPEND ENCRYPT_SOURCE "rosbag_storage/aes_encryptor.cpp")
-	list(APPEND ENCRYPT_LIBRARIES OpenSSL::Crypto)
-else ()
-	message(STATUS "No OpenSSL was found. Rosbag will not support AES encryption.")
+if (MINIROS_ROSBAG_USE_OPENSSL_ENCRYPTION)
+	find_package(OpenSSL QUIET)
+	if (OpenSSL_FOUND)
+		message(STATUS "Found OpenSSL include=${OPENSSL_INCLUDE_DIR}")
+		list(APPEND ENCRYPT_SOURCE "rosbag_storage/aes_encryptor.cpp")
+		list(APPEND ENCRYPT_LIBRARIES OpenSSL::Crypto)
+	else ()
+		message(STATUS "No OpenSSL was found. Rosbag will not support AES encryption.")
+	endif()
 endif()
 
-
-option(MINIROS_ROSBAG_USE_GPGME_ENCRYPTION "Use GPGME encryption support" OFF)
 
 if(MINIROS_ROSBAG_USE_GPGME_ENCRYPTION)
 	list(APPEND ENCRYPT_SOURCE "rosbag_storage/gpgme_utils.cpp")
