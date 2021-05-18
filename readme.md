@@ -58,10 +58,7 @@ add_executable(some_executable main.cpp)
 
 # Linking miniros using a direct name.
 # All necessary includes will be added to target `some_executable` automatically
-target_link_libraries(some_executable miniroscpp)
-
-# Linking miniros using exported variable.
-target_link_libraries(some_executable ${MINIROS_LIBRARY})
+target_link_libraries(some_executable miniros::roscxx miniros::bag_storage)
 
 # Adding paths to pregenerated headers.
 target_include_directories(some_executable PRIVATE ${MINIROS_INCLUDE_GENERATED_DIRS})
