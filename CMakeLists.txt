@@ -163,6 +163,10 @@ else()
     NAMESPACE ${PROJECT_NAME}::
     DESTINATION lib/cmake/${PROJECT_NAME}
   )
+
+  # Adding manual aliases, which match exported names.
+  add_library(${PROJECT_NAME}::roscxx ALIAS roscxx)
+  add_library(${PROJECT_NAME}::bag_storage ALIAS bag_storage)
 endif(catkin_FOUND)
 
 if (MINIROS_BUILD_EXAMPLES)
