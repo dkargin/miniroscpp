@@ -8,7 +8,6 @@ cmake_policy(SET CMP0077 NEW)
 
 project(miniros VERSION 0.2.2)
 
-
 include(CheckIncludeFile)
 include(CheckFunctionExists)
 include(CheckCXXSourceCompiles)
