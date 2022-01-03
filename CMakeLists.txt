@@ -29,6 +29,9 @@ set(MINIROS_INCLUDE_GENERATED_DIRS
   ${CMAKE_CURRENT_SOURCE_DIR}/include/generated
 	CACHE PATH "Path to MiniROS generated messages")
 
+# Root include path for helper libraries like xmlrpc
+set(MINIROS_INCLUDE_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/include/miniros)
+
 # Checking if miniros is added as a submodule
 get_directory_property(hasParent PARENT_DIRECTORY)
 if(hasParent)

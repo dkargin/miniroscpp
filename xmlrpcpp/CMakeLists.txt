@@ -16,7 +16,8 @@ endif()
 #)
 
 include_directories(
-  include
+  # This thing can ocasionly override local paths
+  #${MINIROS_INCLUDE_ROOT}
   libb64/include
 #  ${catkin_INCLUDE_DIRS}
 )
@@ -41,7 +42,7 @@ add_library(xmlrpcpp
 )
 
 # Allows access to generated header miniros/config.h
-target_include_directories(xmlrpcpp PRIVATE ${MINIROS_INCLUDE_DIRS})
+target_include_directories(xmlrpcpp PRIVATE AFTER ${MINIROS_INCLUDE_DIRS} ${MINIROS_INCLUDE_ROOT})
 
 #target_link_libraries(xmlrpcpp ${catkin_LIBRARIES})
 if(WIN32)

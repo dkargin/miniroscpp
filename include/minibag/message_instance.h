@@ -36,8 +36,7 @@
 
 #include <miniros/traits/message_traits.h>
 #include <miniros/serialization.h>
-//#include <ros/ros.h>
-#include <miniros/time.h>
+#include <miniros/rostime.h>
 
 #include "minibag/structures.h"
 #include "minibag/macros.h"

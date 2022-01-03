@@ -35,7 +35,8 @@
 /**
  * It is a former part of rostime
  */
-#pragma once
+#ifndef MINIROS_TIME_H
+#define MINIROS_TIME_H
 
 /*********************************************************************
  ** Pragmas
@@ -294,3 +295,4 @@ namespace miniros
   MINIROS_DECL std::ostream &operator <<(std::ostream &os, const SteadyTime &rhs);
 } // namespace miniros
 
+#endif // MINIROS_TIME_H

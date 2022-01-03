@@ -44,7 +44,7 @@
 #include "minibag/structures.h"
 
 #include "miniros/header.h"
-#include "miniros/time.h"
+#include "miniros/rostime.h"
 #include "miniros/traits/message_traits.h"
 #include "miniros/message_event.h"
 #include "miniros/serialization.h"

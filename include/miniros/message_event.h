@@ -28,13 +28,13 @@
 
 #pragma once
 
-#include <miniros/traits/message_traits.h>
 #include <memory>
 #include <functional>
 #include <type_traits>
 
-#include "miniros/time.h"
-#include "datatypes.h"
+#include <miniros/traits/message_traits.h>
+#include <miniros/rostime.h>
+#include <miniros/datatypes.h>
 
 
 namespace miniros

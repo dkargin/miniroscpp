@@ -37,7 +37,7 @@
 #include <functional>
 //#include <boost/iterator/iterator_facade.hpp>
 
-#include <miniros/time.h>
+#include <miniros/rostime.h>
 #include "minibag/message_instance.h"
 #include "minibag/query.h"
 #include "minibag/macros.h"

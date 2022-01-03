@@ -31,7 +31,6 @@
 #include "minibag/view.h"
 
 #include <miniros/types.h>
-#include <miniros/time.h>
 
 #if defined(_MSC_VER)
   #include <stdint.h> // only on v2010 and later -> is this enough for msvc and linux?

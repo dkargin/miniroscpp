@@ -3,7 +3,7 @@
 #include "xmlrpcpp/XmlRpcSource.h"
 #include "xmlrpcpp/XmlRpcUtil.h"
 
-#include "miniros/time.h"
+#include "miniros/rostime.h"
 
 #include <math.h>
 #include <errno.h>

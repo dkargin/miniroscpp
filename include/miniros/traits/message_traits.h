@@ -27,10 +27,10 @@
 
 #pragma once
 
-#include <miniros/time.h>
-
 #include <string>
 #include <type_traits>
+
+#include <miniros/rostime.h>
 #include <miniros/message_forward.h>
 
 namespace std_msgs

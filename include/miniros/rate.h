@@ -38,9 +38,10 @@
 /**
  * It is a former part of rostime
  */
-#pragma once
+#ifndef MINIROS_RATE_H
+#define MINIROS_RATE_H
 
-#include "miniros/time.h"
+#include "miniros/rostime.h"
 
 namespace miniros
 {
@@ -130,3 +131,4 @@ private:
 
 } // namespace miniros
 
+#endif //MINIROS_RATE_H

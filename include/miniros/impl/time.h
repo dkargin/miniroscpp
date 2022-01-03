@@ -42,7 +42,7 @@
 
 #include <miniros/platform.h>
 #include <miniros/exception.h>
-#include <miniros/time.h>
+#include <miniros/rostime.h>
 
 //#include <boost/date_time/posix_time/posix_time.hpp>
 
