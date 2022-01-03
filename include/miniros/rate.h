@@ -41,7 +41,6 @@
 #pragma once
 
 #include "miniros/time.h"
-#include "miniros/rostime_decl.h"
 
 namespace miniros
 {
@@ -51,7 +50,7 @@ class Duration;
  * @class Rate
  * @brief Class to help run loops at a desired frequency
  */
-class ROSTIME_DECL Rate
+class MINIROS_DECL Rate
 {
 public:
   /**
@@ -92,7 +91,7 @@ private:
  * @class WallRate
  * @brief Class to help run loops at a desired frequency.  This version always uses wall-clock time.
  */
-class ROSTIME_DECL WallRate
+class MINIROS_DECL WallRate
 {
 public:
   /**

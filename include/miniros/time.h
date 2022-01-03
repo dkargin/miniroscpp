@@ -57,7 +57,7 @@
 #include <cmath>
 #include <miniros/exception.h>
 #include "duration.h"
-#include "rostime_decl.h"
+#include "macros.h"
 
 /*********************************************************************
  ** Cross Platform Headers
@@ -87,7 +87,7 @@ namespace miniros
   /**
    * @brief Thrown if the ros subsystem hasn't been initialised before use.
    */
-  class ROSTIME_DECL TimeNotInitializedException : public Exception
+  class MINIROS_DECL TimeNotInitializedException : public Exception
   {
   public:
     TimeNotInitializedException()
@@ -101,7 +101,7 @@ namespace miniros
    *
    * @sa getWallTime
    */
-  class ROSTIME_DECL NoHighPerformanceTimersException : public Exception
+  class MINIROS_DECL NoHighPerformanceTimersException : public Exception
   {
   public:
     NoHighPerformanceTimersException()
@@ -114,11 +114,14 @@ namespace miniros
    ** Functions
    *********************************************************************/
 
-  ROSTIME_DECL void normalizeSecNSec(uint64_t& sec, uint64_t& nsec);
-  ROSTIME_DECL void normalizeSecNSec(uint32_t& sec, uint32_t& nsec);
-  ROSTIME_DECL void normalizeSecNSecUnsigned(int64_t& sec, int64_t& nsec);
-  ROSTIME_DECL void MINIROS_walltime(uint32_t& sec, uint32_t& nsec);
-  ROSTIME_DECL void MINIROS_steadytime(uint32_t& sec, uint32_t& nsec);
+  MINIROS_DECL void normalizeSecNSec(uint64_t& sec, uint64_t& nsec);
+  MINIROS_DECL void normalizeSecNSec(uint32_t& sec, uint32_t& nsec);
+  MINIROS_DECL void normalizeSecNSecUnsigned(int64_t& sec, int64_t& nsec);
+
+  namespace clock {
+    MINIROS_DECL void walltime(uint32_t& sec, uint32_t& nsec);
+    MINIROS_DECL void steadytime(uint32_t& sec, uint32_t& nsec);
+  }
 
   /*********************************************************************
    ** Time Classes
@@ -168,7 +171,7 @@ namespace miniros
    *
    * ros::TimeBase provides most of its functionality.
    */
-  class ROSTIME_DECL Time : public TimeBase<Time, Duration>
+  class MINIROS_DECL Time : public TimeBase<Time, Duration>
   {
   public:
     Time()
@@ -217,15 +220,15 @@ namespace miniros
     */
   };
 
-  extern ROSTIME_DECL const Time TIME_MAX;
-  extern ROSTIME_DECL const Time TIME_MIN;
+  extern MINIROS_DECL const Time TIME_MAX;
+  extern MINIROS_DECL const Time TIME_MIN;
 
   /**
    * \brief Time representation.  Always wall-clock time.
    *
    * ros::TimeBase provides most of its functionality.
    */
-  class ROSTIME_DECL WallTime : public TimeBase<WallTime, WallDuration>
+  class MINIROS_DECL WallTime : public TimeBase<WallTime, WallDuration>
   {
   public:
     WallTime()
@@ -259,7 +262,7 @@ namespace miniros
    *
    * ros::TimeBase provides most of its functionality.
    */
-  class ROSTIME_DECL SteadyTime : public TimeBase<SteadyTime, WallDuration>
+  class MINIROS_DECL SteadyTime : public TimeBase<SteadyTime, WallDuration>
   {
     public:
       SteadyTime()
@@ -286,8 +289,8 @@ namespace miniros
       static bool isSystemTime() { return true; }
   };
 
-  ROSTIME_DECL std::ostream &operator <<(std::ostream &os, const Time &rhs);
-  ROSTIME_DECL std::ostream &operator <<(std::ostream &os, const WallTime &rhs);
-  ROSTIME_DECL std::ostream &operator <<(std::ostream &os, const SteadyTime &rhs);
+  MINIROS_DECL std::ostream &operator <<(std::ostream &os, const Time &rhs);
+  MINIROS_DECL std::ostream &operator <<(std::ostream &os, const WallTime &rhs);
+  MINIROS_DECL std::ostream &operator <<(std::ostream &os, const SteadyTime &rhs);
 } // namespace miniros
 
