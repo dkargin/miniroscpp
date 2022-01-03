@@ -78,6 +78,7 @@ if (WIN32)
 endif()
 
 add_subdirectory(external)
+add_subdirectory(xmlrpcpp)
 add_subdirectory(src)
 
 
