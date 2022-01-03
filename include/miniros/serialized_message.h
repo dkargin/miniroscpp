@@ -37,7 +37,7 @@ namespace miniros
 class MINIROS_DECL SerializedMessage
 {
 public:
-  using shared_array_uint8_t = std::shared_ptr<uint8_t>;
+  using shared_array_uint8_t = std::shared_ptr<uint8_t[]>;
   shared_array_uint8_t buf;
   size_t num_bytes;
   uint8_t* message_start;

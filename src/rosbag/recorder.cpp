@@ -213,15 +213,15 @@ shared_ptr<ros::Subscriber> Recorder::subscribe(string const& topic) {
     MINIROS_INFO("Subscribing to %s", topic.c_str());
 
     ros::NodeHandle nh;
-    shared_ptr<int> count(boost::make_shared<int>(options_.limit));
-    shared_ptr<ros::Subscriber> sub(boost::make_shared<ros::Subscriber>());
+    shared_ptr<int> count(std::make_shared<int>(options_.limit));
+    shared_ptr<ros::Subscriber> sub(std::make_shared<ros::Subscriber>());
 
     ros::SubscribeOptions ops;
     ops.topic = topic;
     ops.queue_size = 100;
     ops.md5sum = ros::message_traits::md5sum<topic_tools::ShapeShifter>();
     ops.datatype = ros::message_traits::datatype<topic_tools::ShapeShifter>();
-    ops.helper = boost::make_shared<ros::SubscriptionCallbackHelperT<
+    ops.helper = std::make_shared<ros::SubscriptionCallbackHelperT<
         const ros::MessageEvent<topic_tools::ShapeShifter const> &> >(
             boost::bind(&Recorder::doQueue, this, _1, topic, sub, count));
     ops.transport_hints = options_.transport_hints;
@@ -292,7 +292,7 @@ void Recorder::doQueue(const ros::MessageEvent<topic_tools::ShapeShifter const>&
     OutgoingMessage out(topic, msg_event.getMessage(), msg_event.getConnectionHeaderPtr(), rectime);
     
     {
-        boost::mutex::scoped_lock lock(queue_mutex_);
+        std::scoped_lock<std::mutex> lock(queue_mutex_);
 
         queue_->push(out);
         queue_size_ += out.msg->size();
@@ -369,7 +369,7 @@ void Recorder::snapshotTrigger(std_msgs::Empty::ConstPtr trigger) {
     MINIROS_INFO("Triggered snapshot recording with name %s.", target_filename_.c_str());
     
     {
-        boost::mutex::scoped_lock lock(queue_mutex_);
+        std::scoped_lock<std::mutex> lock(queue_mutex_);
         queue_queue_.push(OutgoingQueue(target_filename_, queue_, Time::now()));
         queue_      = new std::queue<OutgoingMessage>;
         queue_size_ = 0;
@@ -498,7 +498,7 @@ void Recorder::doRecord() {
     // it shouldn't be in contention.
     ros::NodeHandle nh;
     while (nh.ok() || !queue_->empty()) {
-        boost::unique_lock<boost::mutex> lock(queue_mutex_);
+        boost::unique_lock<std::mutex> lock(queue_mutex_);
 
         bool finished = false;
         while (queue_->empty()) {
@@ -556,7 +556,7 @@ void Recorder::doRecordSnapshotter() {
     ros::NodeHandle nh;
   
     while (nh.ok() || !queue_queue_.empty()) {
-        boost::unique_lock<boost::mutex> lock(queue_mutex_);
+        boost::unique_lock<std::mutex> lock(queue_mutex_);
         while (queue_queue_.empty()) {
             if (!nh.ok())
                 return;
@@ -651,7 +651,7 @@ void Recorder::doTrigger() {
 }
 
 bool Recorder::scheduledCheckDisk() {
-    boost::mutex::scoped_lock lock(check_disk_mutex_);
+    std::scoped_lock<std::mutex> lock(check_disk_mutex_);
 
     if (ros::WallTime::now() < check_disk_next_)
         return true;

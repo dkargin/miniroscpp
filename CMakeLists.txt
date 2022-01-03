@@ -9,8 +9,10 @@ cmake_policy(SET CMP0077 NEW)
 project(miniros VERSION 0.2.2)
 
 include(CheckIncludeFile)
+include(CheckIncludeFiles)
 include(CheckFunctionExists)
 include(CheckCXXSourceCompiles)
+include(CheckCXXSymbolExists)
 include(CMakePackageConfigHelpers)
 
 find_package(catkin QUIET)
@@ -31,6 +33,8 @@ set(MINIROS_INCLUDE_GENERATED_DIRS
 
 # Root include path for helper libraries like xmlrpc
 set(MINIROS_INCLUDE_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/include/miniros)
+
+set(MINIROS_INCLUDE_TRANSPORT ${CMAKE_CURRENT_SOURCE_DIR}/include/transport)
 
 # Checking if miniros is added as a submodule
 get_directory_property(hasParent PARENT_DIRECTORY)
@@ -70,10 +74,17 @@ if(HAVE_GLIBC_BACKTRACE)
   add_definitions(-DHAVE_GLIBC_BACKTRACE)
 endif(HAVE_GLIBC_BACKTRACE)
 
-# Processing external modules like bzip2 or lz4
-set(EXTERNAL_INCLUDE "")
+# Not everybody has <ifaddrs.h> (e.g., embedded arm-linux)
+CHECK_INCLUDE_FILES(ifaddrs.h HAVE_IFADDRS_H)
+# Not everybody has trunc (e.g., Windows, embedded arm-linux)
+CHECK_FUNCTION_EXISTS(trunc HAVE_TRUNC)
+# Not everybody has epoll (e.g., Windows, BSD, embedded arm-linux) 
+CHECK_CXX_SYMBOL_EXISTS(epoll_wait "sys/epoll.h" HAVE_EPOLL)
 
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/include/miniros/config.h.in" "miniros/config.h")
+
+# Processing external modules like bzip2 or lz4
+set(EXTERNAL_INCLUDE "")
 
 if (WIN32)
   # We have a lot of unix code here, and MSVC is always angry with these methods

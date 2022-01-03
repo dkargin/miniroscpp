@@ -173,8 +173,62 @@ MINIROS_DECL LogLevel getLogLevel(void);
 MINIROS_DECL void log(const char *file, int line, LogLevel level, const char* m, ...);
 } // namespace miniros_console_bridge
 
+namespace miniros
+{
+namespace console
+{
+
+enum class Level
+{
+  Debug,
+  Info,
+  Warn,
+  Error,
+  Fatal,
+
+  Count
+};
+
+class LogAppender
+{
+public:
+
+  virtual ~LogAppender() {}
+
+  virtual void log(Level level, const char* str, const char* file, const char* function, int line) = 0;
+
+};
+
+MINIROS_DECL void register_appender(LogAppender* appender);
+
+MINIROS_DECL void deregister_appender(LogAppender* appender);
+
+/**
+ * \brief Only exported because the macros need it.  Do not use directly.
+ */
+extern MINIROS_DECL bool g_initialized;
+
+/**
+ * \brief Only exported because the TopicManager need it.  Do not use directly.
+ */
+extern MINIROS_DECL std::string g_last_error_message;
+
+
+}
+} // namespace miniros
+
+// Placeholders for regular logging.
+// TODO: we still need proper logging.
 #define MINIROS_ERROR(...)
 #define MINIROS_INFO(...)
+#define MINIROS_DEBUG(...)
 #define MINIROS_WARN(...)
 #define MINIROS_FATAL(...)
+
+#define ROS_DEBUG_NAMED(...)
+
+#define ROS_WARN_STREAM(...)
+#define ROS_DEBUG_STREAM(...)
+#define ROSCPP_LOG_DEBUG(...)
+#define ROSCPP_CONN_LOG_DEBUG(...)
 
