@@ -36,8 +36,6 @@
 #include "miniros/topic_manager.h"
 #include "miniros/file_log.h"
 
-#include <boost/bind.hpp>
-
 namespace miniros
 {
 
@@ -154,7 +152,7 @@ void TransportSubscriberLink::startMessageWrite(bool immediate_write)
   SerializedMessage m(dummy, (uint32_t)0);
 
   {
-    std::mutex::scoped_lock lock(outbox_mutex_);
+    std::scoped_lock<std::mutex> lock(outbox_mutex_);
     if (writing_message_ || !header_written_)
     {
       return;
@@ -183,7 +181,7 @@ void TransportSubscriberLink::enqueueMessage(const SerializedMessage& m, bool se
   }
 
   {
-    std::mutex::scoped_lock lock(outbox_mutex_);
+    std::scoped_lock<std::mutex> lock(outbox_mutex_);
 
     int max_queue = 0;
     if (PublicationPtr parent = parent_.lock())
@@ -197,7 +195,7 @@ void TransportSubscriberLink::enqueueMessage(const SerializedMessage& m, bool se
     {
       if (!queue_full_)
       {
-        ROS_DEBUG("Outgoing queue full for topic [%s].  "
+        MINIROS_DEBUG("Outgoing queue full for topic [%s].  "
                "Discarding oldest message\n",
                topic_.c_str());
       }

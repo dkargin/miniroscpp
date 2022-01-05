@@ -28,7 +28,7 @@
 
 #include "miniros/message_deserializer.h"
 #include "miniros/subscription_callback_helper.h"
-#include <ros/console.h>
+#include <miniros/console.h>
 
 namespace miniros
 {

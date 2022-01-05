@@ -40,7 +40,7 @@
 #include "miniros/names.h"
 #include "miniros/param.h"
 
-#include <rosgraph_msgs/Log.h>
+#include <rosgraph_msgs/Log.hxx>
 
 namespace miniros
 {
@@ -79,23 +79,23 @@ void ROSOutAppender::log(::miniros::console::Level level, const char* str, const
   rosgraph_msgs::LogPtr msg(std::make_shared<rosgraph_msgs::Log>());
 
   msg->header.stamp = miniros::Time::now();
-  if (level == miniros::console::levels::Debug)
+  if (level == miniros::console::Level::Debug)
   {
     msg->level = rosgraph_msgs::Log::DEBUG;
   }
-  else if (level == miniros::console::levels::Info)
+  else if (level == miniros::console::Level::Info)
   {
     msg->level = rosgraph_msgs::Log::INFO;
   }
-  else if (level == miniros::console::levels::Warn)
+  else if (level == miniros::console::Level::Warn)
   {
     msg->level = rosgraph_msgs::Log::WARN;
   }
-  else if (level == miniros::console::levels::Error)
+  else if (level == miniros::console::Level::Error)
   {
     msg->level = rosgraph_msgs::Log::ERROR;
   }
-  else if (level == miniros::console::levels::Fatal)
+  else if (level == miniros::console::Level::Fatal)
   {
     msg->level = rosgraph_msgs::Log::FATAL;
   }
@@ -113,7 +113,7 @@ void ROSOutAppender::log(::miniros::console::Level level, const char* str, const
     this_node::getAdvertisedTopics(msg->topics);
   }
 
-  if (level == ::miniros::console::levels::Fatal || level == ::miniros::console::levels::Error)
+  if (level == ::miniros::console::Level::Fatal || level == ::miniros::console::Level::Error)
   {
     last_error_ = str;
   }
@@ -130,7 +130,7 @@ void ROSOutAppender::logThread()
     V_Log local_queue;
 
     {
-      std::scoped_lock<std::mutex> lock(queue_mutex_);
+      std::unique_lock<std::mutex> lock(queue_mutex_);
 
       if (shutting_down_)
       {

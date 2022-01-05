@@ -26,6 +26,7 @@
  */
 
 #include <cstdio>
+#include <sstream>
 #include "miniros/this_node.h"
 #include "miniros/names.h"
 #include "miniros/topic_manager.h"

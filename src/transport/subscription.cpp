@@ -386,7 +386,7 @@ bool Subscription::negotiateConnection(const std::string& xmlrpc_uri)
     }
     else
     {
-      ROS_WARN("Unsupported transport type hinted: %s, skipping", it->c_str());
+      MINIROS_WARN("Unsupported transport type hinted: %s, skipping", it->c_str());
     }
   }
   params[0] = this_node::getName();

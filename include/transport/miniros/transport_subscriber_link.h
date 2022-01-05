@@ -31,6 +31,7 @@
 #include "subscriber_link.h"
 
 #include <boost/signals2/connection.hpp>
+#include <mutex>
 
 namespace miniros
 {

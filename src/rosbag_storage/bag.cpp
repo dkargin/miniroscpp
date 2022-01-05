@@ -403,7 +403,7 @@ void Bag::writeFileHeaderRecord() {
     header[CHUNK_COUNT_FIELD_NAME]      = toHeaderString(&chunk_count_);
     encryptor_->addFieldsToFileHeader(header);
 
-    std::shared_ptr<uint8_t> header_buffer;
+    std::shared_ptr<uint8_t[]> header_buffer;
     uint32_t header_len;
     miniros::Header::write(header, header_buffer, header_len);
     uint32_t data_len = 0;
@@ -1076,7 +1076,7 @@ bool Bag::isOp(M_string& fields, uint8_t reqOp) const {
 }
 
 void Bag::writeHeader(M_string const& fields) {
-    std::shared_ptr<uint8_t> header_buffer;
+    std::shared_ptr<uint8_t[]> header_buffer;
     uint32_t header_len;
     miniros::Header::write(fields, header_buffer, header_len);
     write((char*) &header_len, 4);
@@ -1088,7 +1088,7 @@ void Bag::writeDataLength(uint32_t data_len) {
 }
 
 void Bag::appendHeaderToBuffer(Buffer& buf, M_string const& fields) {
-    std::shared_ptr<uint8_t> header_buffer;
+    std::shared_ptr<uint8_t[]> header_buffer;
     uint32_t header_len;
     miniros::Header::write(fields, header_buffer, header_len);
 

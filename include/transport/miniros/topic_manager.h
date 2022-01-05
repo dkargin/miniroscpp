@@ -121,7 +121,7 @@ public:
     using namespace serialization;
 
     SerializedMessage m;
-    publish(topic, [&m](){serializeMessage<M>(m);}, m);
+    publish(topic, [&message](){return serializeMessage<M>(message);}, m);
   }
 
   void publish(const std::string &_topic, const std::function<SerializedMessage(void)>& serfunc, SerializedMessage& m);

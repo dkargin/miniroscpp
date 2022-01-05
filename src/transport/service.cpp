@@ -69,7 +69,7 @@ bool service::exists(const std::string& service_name, bool print_failure_reason)
     {
       if (print_failure_reason)
       {
-        ROS_INFO("waitForService: Service [%s] could not connect to host [%s:%d], waiting...", mapped_name.c_str(), host.c_str(), port);
+        MINIROS_INFO("waitForService: Service [%s] could not connect to host [%s:%d], waiting...", mapped_name.c_str(), host.c_str(), port);
       }
     }
   }
@@ -77,7 +77,7 @@ bool service::exists(const std::string& service_name, bool print_failure_reason)
   {
     if (print_failure_reason)
     {
-      ROS_INFO("waitForService: Service [%s] has not been advertised, waiting...", mapped_name.c_str());
+      MINIROS_INFO("waitForService: Service [%s] has not been advertised, waiting...", mapped_name.c_str());
     }
   }
 
@@ -120,7 +120,7 @@ bool service::waitForService(const std::string& service_name, miniros::Duration 
 
   if (printed && miniros::ok())
   {
-    ROS_INFO("waitForService: Service [%s] is now available.", mapped_name.c_str());
+    MINIROS_INFO("waitForService: Service [%s] is now available.", mapped_name.c_str());
   }
 
   return result;

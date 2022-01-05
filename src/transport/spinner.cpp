@@ -29,8 +29,8 @@
 #include "miniros/ros.h"
 #include "miniros/callback_queue.h"
 
-#include <boost/thread/thread.hpp>
-#include <boost/thread/mutex.hpp>
+#include <thread>
+#include <mutex>
 
 namespace {
 
@@ -56,9 +56,9 @@ struct SpinnerMonitor
   */
   struct Entry
   {
-    Entry(const boost::thread::id &tid) : tid(tid), num(0) {}
+    Entry(const std::thread::id &tid) : tid(tid), num(0) {}
 
-    boost::thread::id tid; // proper thread id of single-threaded spinner
+    std::thread::id tid; // proper thread id of single-threaded spinner
     unsigned int num; // number of (alike) spinners serving this queue
   };
 
@@ -67,9 +67,9 @@ struct SpinnerMonitor
   {
     std::scoped_lock<std::mutex> lock(mutex_);
 
-    boost::thread::id tid; // current thread id for single-threaded spinners, zero for multi-threaded ones
+    std::thread::id tid; // current thread id for single-threaded spinners, zero for multi-threaded ones
     if (single_threaded)
-      tid = boost::this_thread::get_id();
+      tid = std::this_thread::get_id();
 
     std::map<miniros::CallbackQueue*, Entry>::iterator it = spinning_queues_.find(queue);
     bool can_spin = ( it == spinning_queues_.end() || // we will spin on any new queue
@@ -92,16 +92,16 @@ struct SpinnerMonitor
   {
     std::scoped_lock<std::mutex> lock(mutex_);
     std::map<miniros::CallbackQueue*, Entry>::iterator it = spinning_queues_.find(queue);
-    ROS_ASSERT_MSG(it != spinning_queues_.end(), "Call to SpinnerMonitor::remove() without matching call to add().");
+    MINIROS_ASSERT_MSG(it != spinning_queues_.end(), "Call to SpinnerMonitor::remove() without matching call to add().");
 
-    if (it->second.tid != boost::thread::id() && it->second.tid != boost::this_thread::get_id())
+    if (it->second.tid != std::thread::id() && it->second.tid != std::this_thread::get_id())
     {
       // This doesn't harm, but isn't good practice?
       // It was enforced by the previous implementation.
-      ROS_WARN("SpinnerMonitor::remove() called from different thread than add().");
+      MINIROS_WARN("SpinnerMonitor::remove() called from different thread than add().");
     }
 
-    ROS_ASSERT_MSG(it->second.num > 0, "SpinnerMonitor::remove(): Invalid spinner count (0) encountered.");
+    MINIROS_ASSERT_MSG(it->second.num > 0, "SpinnerMonitor::remove(): Invalid spinner count (0) encountered.");
     it->second.num -= 1;
     if (it->second.num == 0)
       spinning_queues_.erase(it); // erase queue entry to allow future queues with same pointer
@@ -170,7 +170,7 @@ private:
   void threadFunc();
 
   std::mutex mutex_;
-  boost::thread_group threads_;
+  std::list<std::thread> threads_;
 
   uint32_t thread_count_;
   CallbackQueue* callback_queue_;
@@ -187,7 +187,7 @@ AsyncSpinnerImpl::AsyncSpinnerImpl(uint32_t thread_count, CallbackQueue* queue)
 {
   if (thread_count == 0)
   {
-    thread_count_ = boost::thread::hardware_concurrency();
+    thread_count_ = std::thread::hardware_concurrency();
 
     if (thread_count_ == 0)
     {
@@ -229,7 +229,7 @@ void AsyncSpinnerImpl::start()
 
   for (uint32_t i = 0; i < thread_count_; ++i)
   {
-    threads_.create_thread(boost::bind(&AsyncSpinnerImpl::threadFunc, this));
+    threads_.emplace_back(&AsyncSpinnerImpl::threadFunc, this);
   }
 }
 
@@ -240,7 +240,8 @@ void AsyncSpinnerImpl::stop()
     return;
 
   continue_ = false;
-  threads_.join_all();
+  for (auto& thread: threads_)
+      thread.join();
 
   spinner_monitor.remove(callback_queue_);
 }

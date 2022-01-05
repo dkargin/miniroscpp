@@ -50,19 +50,23 @@
 #include "miniros/internal_timer_manager.h"
 #include "xmlrpcpp/XmlRpcSocket.h"
 
-#include "roscpp/GetLoggers.h"
-#include "roscpp/SetLoggerLevel.h"
-#include "roscpp/Empty.h"
+// Standard ROS services.
+#include "roscpp/GetLoggers.hxx"
+#include "roscpp/SetLoggerLevel.hxx"
+#include "roscpp/Empty.hxx"
 
-#include <ros/console.h>
-#include <ros/time.h>
-#include <rosgraph_msgs/Clock.h>
+#include <miniros/console.h>
+#include <miniros/rostime.h>
+#include <rosgraph_msgs/Clock.hxx>
 
+#include <atomic>
 #include <algorithm>
 
 #include <signal.h>
 
 #include <cstdlib>
+
+#include <mutex>
 
 namespace miniros
 {
@@ -103,9 +107,9 @@ static std::mutex g_start_mutex;
 static bool g_ok = false;
 static uint32_t g_init_options = 0;
 static bool g_shutdown_requested = false;
-static volatile bool g_shutting_down = false;
+static std::atomic_bool g_shutting_down = false;
 static std::recursive_mutex g_shutting_down_mutex;
-static boost::thread g_internal_queue_thread;
+static std::thread g_internal_queue_thread;
 
 bool isInitialized()
 {
@@ -123,8 +127,8 @@ void checkForShutdown()
   {
     // Since this gets run from within a mutex inside PollManager, we need to prevent ourselves from deadlocking with
     // another thread that's already in the middle of shutdown()
-    std::recursive_mutex::scoped_try_lock lock(g_shutting_down_mutex, boost::defer_lock);
-    while (!lock.try_lock() && !g_shutting_down)
+
+    while (!g_shutting_down)
     {
       miniros::WallDuration(0.001).sleep();
     }
@@ -161,8 +165,8 @@ void shutdownCallback(XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result)
   if (num_params > 1)
   {
     std::string reason = params[1];
-    ROS_WARN("Shutdown request received.");
-    ROS_WARN("Reason given for shutdown: [%s]", reason.c_str());
+    MINIROS_WARN("Shutdown request received.");
+    MINIROS_WARN("Reason given for shutdown: [%s]", reason.c_str());
     requestShutdown();
   }
 
@@ -171,32 +175,32 @@ void shutdownCallback(XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result)
 
 bool getLoggers(roscpp::GetLoggers::Request&, roscpp::GetLoggers::Response& resp)
 {
-  std::map<std::string, miniros::console::levels::Level> loggers;
+  std::map<std::string, miniros::console::Level> loggers;
   bool success = ::miniros::console::get_loggers(loggers);
   if (success)
   {
-    for (std::map<std::string, miniros::console::levels::Level>::const_iterator it = loggers.begin(); it != loggers.end(); it++)
+    for (std::map<std::string, miniros::console::Level>::const_iterator it = loggers.begin(); it != loggers.end(); it++)
     {
       roscpp::Logger logger;
       logger.name = it->first;
-      miniros::console::levels::Level level = it->second;
-      if (level == miniros::console::levels::Debug)
+      miniros::console::Level level = it->second;
+      if (level == miniros::console::Level::Debug)
       {
         logger.level = "debug";
       }
-      else if (level == miniros::console::levels::Info)
+      else if (level == miniros::console::Level::Info)
       {
         logger.level = "info";
       }
-      else if (level == miniros::console::levels::Warn)
+      else if (level == miniros::console::Level::Warn)
       {
         logger.level = "warn";
       }
-      else if (level == miniros::console::levels::Error)
+      else if (level == miniros::console::Level::Error)
       {
         logger.level = "error";
       }
-      else if (level == miniros::console::levels::Fatal)
+      else if (level == miniros::console::Level::Fatal)
       {
         logger.level = "fatal";
       }
@@ -210,26 +214,26 @@ bool setLoggerLevel(roscpp::SetLoggerLevel::Request& req, roscpp::SetLoggerLevel
 {
   std::transform(req.level.begin(), req.level.end(), req.level.begin(), (int(*)(int))std::toupper);
 
-  miniros::console::levels::Level level;
+  miniros::console::Level level;
   if (req.level == "DEBUG")
   {
-    level = miniros::console::levels::Debug;
+    level = miniros::console::Level::Debug;
   }
   else if (req.level == "INFO")
   {
-    level = miniros::console::levels::Info;
+    level = miniros::console::Level::Info;
   }
   else if (req.level == "WARN")
   {
-    level = miniros::console::levels::Warn;
+    level = miniros::console::Level::Warn;
   }
   else if (req.level == "ERROR")
   {
-    level = miniros::console::levels::Error;
+    level = miniros::console::Level::Error;
   }
   else if (req.level == "FATAL")
   {
-    level = miniros::console::levels::Fatal;
+    level = miniros::console::Level::Fatal;
   }
   else
   {
@@ -394,7 +398,7 @@ void start()
 
   if (g_shutting_down) goto end;
 
-  g_internal_queue_thread = boost::thread(internalCallbackQueueThreadFunc);
+  g_internal_queue_thread = std::thread(internalCallbackQueueThreadFunc);
   getGlobalCallbackQueue()->enable();
 
   ROSCPP_LOG_DEBUG("Started node [%s], pid [%d], bound on [%s], xmlrpc port [%d], tcpros port [%d], using [%s] time", 
@@ -450,7 +454,7 @@ void init(const M_string& remappings, const std::string& name, uint32_t options)
     g_init_options = options;
     g_ok = true;
 
-    ROSCONSOLE_AUTOINIT;
+    MINIROSCONSOLE_AUTOINIT;
     // Disable SIGPIPE
 #ifndef WIN32
     signal(SIGPIPE, SIG_IGN);
@@ -591,7 +595,7 @@ void shutdown()
   g_global_queue->disable();
   g_global_queue->clear();
 
-  if (g_internal_queue_thread.get_id() != boost::this_thread::get_id())
+  if (g_internal_queue_thread.get_id() != std::this_thread::get_id())
   {
     g_internal_queue_thread.join();
   }

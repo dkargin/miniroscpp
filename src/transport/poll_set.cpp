@@ -37,9 +37,7 @@
 
 #include "miniros/transport/transport.h"
 
-#include <ros/assert.h>
-
-#include <boost/bind.hpp>
+#include <miniros/rosassert.h>
 
 #include <fcntl.h>
 
@@ -49,11 +47,11 @@ namespace miniros
 PollSet::PollSet()
     : sockets_changed_(false), epfd_(create_socket_watcher())
 {
-	if ( create_signal_pair(signal_pipe_) != 0 ) {
-        ROS_FATAL("create_signal_pair() failed");
-    ROS_BREAK();
+  if ( create_signal_pair(signal_pipe_) != 0 ) {
+    MINIROS_FATAL("create_signal_pair() failed");
+    MINIROS_BREAK();
   }
-  addSocket(signal_pipe_[0], boost::bind(&PollSet::onLocalPipeEvents, this, _1));
+  addSocket(signal_pipe_[0], [this](int events){this->onLocalPipeEvents(events);});
   addEvents(signal_pipe_[0], POLLIN);
 }
 
@@ -170,10 +168,9 @@ bool PollSet::delEvents(int sock, int events)
 
 void PollSet::signal()
 {
-  std::mutex::scoped_try_lock lock(signal_mutex_);
-
-  if (lock.owns_lock())
+  if (signal_mutex_.try_lock())
   {
+    std::lock_guard<std::mutex> lock(signal_mutex_, std::adopt_lock);
     char b = 0;
     if (write_signal(signal_pipe_[1], &b, 1) < 0)
     {

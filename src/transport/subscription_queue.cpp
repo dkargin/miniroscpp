@@ -64,7 +64,7 @@ void SubscriptionQueue::push(const SubscriptionCallbackHelperPtr& helper, const 
 
     if (!full_)
     {
-      ROS_DEBUG("Incoming queue was full for topic \"%s\". Discarded oldest message (current queue size [%d])", topic_.c_str(), (int)queue_.size());
+      MINIROS_DEBUG("Incoming queue was full for topic \"%s\". Discarded oldest message (current queue size [%d])", topic_.c_str(), (int)queue_.size());
     }
 
     full_ = true;
@@ -104,16 +104,18 @@ CallbackInterface::CallResult SubscriptionQueue::call()
   // The callback may result in our own destruction.  Therefore, we may need to keep a reference to ourselves
   // that outlasts the scoped_try_lock
   std::shared_ptr<SubscriptionQueue> self;
-  std::recursive_mutex::scoped_try_lock lock(callback_mutex_, boost::defer_lock);
+  //std::recursive_mutex::scoped_try_lock lock(callback_mutex_, boost::defer_lock);
 
   if (!allow_concurrent_callbacks_)
   {
-    lock.try_lock();
-    if (!lock.owns_lock())
+    //lock.try_lock();
+    if (!callback_mutex_.try_lock())
     {
       return CallbackInterface::TryAgain;
     }
   }
+
+  std::lock_guard<std::recursive_mutex> lock(callback_mutex_, std::adopt_lock);
 
   VoidConstPtr tracker;
   Item i;

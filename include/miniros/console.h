@@ -36,6 +36,7 @@
 
 #pragma once
 
+#include <map>
 #include <string>
 #include "miniros/macros.h"
 //#include "console_bridge_export.h"
@@ -209,6 +210,25 @@ MINIROS_DECL void deregister_appender(LogAppender* appender);
 extern MINIROS_DECL bool g_initialized;
 
 /**
+ * \brief Don't call this directly.  Performs any required initialization/configuration.  Happens automatically when using the macro API.
+ *
+ * If you're going to be using log4cxx or any of the ::ros::console functions, and need the system to be initialized, use the
+ * ROSCONSOLE_AUTOINIT macro.
+ */
+MINIROS_DECL void initialize();
+
+
+MINIROS_DECL void shutdown();
+
+
+extern MINIROS_DECL bool get_loggers(std::map<std::string, Level>& loggers);
+extern MINIROS_DECL bool set_logger_level(const std::string& name, Level level);
+
+MINIROS_DECL void notifyLoggerLevelsChanged();
+
+MINIROS_DECL void setFixedFilterToken(const std::string& key, const std::string& val);
+
+/**
  * \brief Only exported because the TopicManager need it.  Do not use directly.
  */
 extern MINIROS_DECL std::string g_last_error_message;
@@ -216,6 +236,29 @@ extern MINIROS_DECL std::string g_last_error_message;
 
 }
 } // namespace miniros
+
+
+
+#ifdef WIN32
+#define MINIROS_LIKELY(x)       (x)
+#define MINIROS_UNLIKELY(x)     (x)
+#else
+#define MINIROS_LIKELY(x)       __builtin_expect((x),1)
+#define MINIROS_UNLIKELY(x)     __builtin_expect((x),0)
+#endif
+
+/**
+ * \def MINIROSCONSOLE_AUTOINIT
+ * \brief Initializes the rosconsole library.  Usually unnecessary to call directly.
+ */
+#define MINIROSCONSOLE_AUTOINIT \
+  do \
+  { \
+    if (MINIROS_UNLIKELY(!::miniros::console::g_initialized)) \
+    { \
+      ::miniros::console::initialize(); \
+    } \
+  } while(false)
 
 // Placeholders for regular logging.
 // TODO: we still need proper logging.
@@ -227,8 +270,11 @@ extern MINIROS_DECL std::string g_last_error_message;
 
 #define ROS_DEBUG_NAMED(...)
 
+#define ROS_ERROR_STREAM(...)
 #define ROS_WARN_STREAM(...)
 #define ROS_DEBUG_STREAM(...)
+#define ROS_FATAL_STREAM(...)
+
 #define ROSCPP_LOG_DEBUG(...)
 #define ROSCPP_CONN_LOG_DEBUG(...)
 

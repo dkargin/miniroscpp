@@ -26,6 +26,7 @@
  */
 
 #include <cstdio>
+
 #include "miniros/service_manager.h"
 #include "miniros/xmlrpc_manager.h"
 #include "miniros/connection_manager.h"
@@ -44,7 +45,7 @@
 
 #include "xmlrpcpp/XmlRpc.h"
 
-#include <ros/console.h>
+#include <miniros/console.h>
 
 using namespace XmlRpc; // A battle to be fought later
 using namespace std; // sigh

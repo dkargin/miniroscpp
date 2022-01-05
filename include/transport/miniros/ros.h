@@ -35,10 +35,10 @@
 #ifndef ROSCPP_ROS_H
 #define ROSCPP_ROS_H
 
-#include "miniros/time.h"
+#include "miniros/rostime.h"
 #include "miniros/rate.h"
 #include "miniros/console.h"
-#include "miniros/assert.h"
+#include "miniros/rosassert.h"
 
 #include "miniros/common.h"
 #include "miniros/types.h"

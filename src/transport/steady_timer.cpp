@@ -33,14 +33,6 @@
 #include "miniros/steady_timer.h"
 #include "miniros/timer_manager.h"
 
-// check if we have really included the backported boost condition variable
-// just in case someone messes with the include order...
-#if BOOST_VERSION < 106100
-#ifndef USING_BACKPORTED_BOOST_CONDITION_VARIABLE
-#error "steady timer needs boost version >= 1.61 or the backported headers!"
-#endif
-#endif
-
 namespace miniros
 {
 
@@ -54,7 +46,7 @@ void TimerManager<SteadyTime, WallDuration, SteadyTimerEvent>::threadFunc()
   {
     SteadyTime sleep_end;
 
-    std::scoped_lock<std::mutex> lock(timers_mutex_);
+    std::unique_lock<std::mutex> lock(timers_mutex_);
 
     current = SteadyTime::now();
 
@@ -105,7 +97,7 @@ void TimerManager<SteadyTime, WallDuration, SteadyTimerEvent>::threadFunc()
 
       // requires boost 1.61 for wait_until to actually use the steady clock
       // see: https://svn.boost.org/trac/boost/ticket/6377
-      boost::chrono::steady_clock::time_point end_tp(boost::chrono::nanoseconds(sleep_end.toNSec()));
+      std::chrono::steady_clock::time_point end_tp(std::chrono::nanoseconds(sleep_end.toNSec()));
       timers_cond_.wait_until(lock, end_tp);
     }
 
@@ -121,7 +113,7 @@ SteadyTimer::Impl::Impl()
 
 SteadyTimer::Impl::~Impl()
 {
-  ROS_DEBUG("SteadyTimer deregistering callbacks.");
+  MINIROS_DEBUG("SteadyTimer deregistering callbacks.");
   stop();
 }
 
