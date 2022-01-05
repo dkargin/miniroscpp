@@ -47,8 +47,6 @@
 #include "miniros/init.h"
 #include "common.h"
 
-#include <boost/bind.hpp>
-
 namespace XmlRpc
 {
     class XmlRpcValue;
@@ -406,7 +404,8 @@ if (sub)  // Enter if subscriber is valid
                        const TransportHints& transport_hints = TransportHints())
   {
     SubscribeOptions ops;
-    ops.template initByFullCallbackType<M>(topic, queue_size, boost::bind(fp, obj, _1));
+    auto wrapFn = [fp, obj](const M& msg){obj->*(fp)(msg);};
+    ops.template initByFullCallbackType<M>(topic, queue_size, wrapFn);
     ops.transport_hints = transport_hints;
     return subscribe(ops);
   }
@@ -417,7 +416,8 @@ if (sub)  // Enter if subscriber is valid
                        const TransportHints& transport_hints = TransportHints())
   {
     SubscribeOptions ops;
-    ops.template initByFullCallbackType<M>(topic, queue_size, boost::bind(fp, obj, _1));
+    auto wrapFn = [fp, obj](const M& msg){obj->*(fp)(msg);};
+    ops.template initByFullCallbackType<M>(topic, queue_size, wrapFn);
     ops.transport_hints = transport_hints;
     return subscribe(ops);
   }
@@ -470,7 +470,8 @@ if (sub)  // Enter if subscriber is valid
                        const TransportHints& transport_hints = TransportHints())
   {
     SubscribeOptions ops;
-    ops.template init<M>(topic, queue_size, boost::bind(fp, obj, _1));
+    auto wrapFn = [fp, obj](const std::shared_ptr<M const>& msg){obj->*(fp)(msg);};
+    ops.template init<M>(topic, queue_size, wrapFn);
     ops.transport_hints = transport_hints;
     return subscribe(ops);
   }
@@ -480,7 +481,8 @@ if (sub)  // Enter if subscriber is valid
                        const TransportHints& transport_hints = TransportHints())
   {
     SubscribeOptions ops;
-    ops.template init<M>(topic, queue_size, boost::bind(fp, obj, _1));
+    auto wrapFn = [fp, obj](const std::shared_ptr<M const>& msg){obj->*(fp)(msg);};
+    ops.template init<M>(topic, queue_size, wrapFn);
     ops.transport_hints = transport_hints;
     return subscribe(ops);
   }
@@ -533,7 +535,8 @@ if (sub)  // Enter if subscriber is valid
                        const std::shared_ptr<T>& obj, const TransportHints& transport_hints = TransportHints())
   {
     SubscribeOptions ops;
-    ops.template initByFullCallbackType<M>(topic, queue_size, boost::bind(fp, obj.get(), _1));
+    auto wrapFn = [fp, obj](const M& msg){obj->*(fp)(msg);};
+    ops.template initByFullCallbackType<M>(topic, queue_size, wrapFn);
     ops.tracked_object = obj;
     ops.transport_hints = transport_hints;
     return subscribe(ops);
@@ -544,7 +547,8 @@ if (sub)  // Enter if subscriber is valid
                        const std::shared_ptr<T>& obj, const TransportHints& transport_hints = TransportHints())
   {
     SubscribeOptions ops;
-    ops.template initByFullCallbackType<M>(topic, queue_size, boost::bind(fp, obj.get(), _1));
+    auto wrapFn = [fp, obj](const M& msg){obj->*(fp)(msg);};
+    ops.template initByFullCallbackType<M>(topic, queue_size, wrapFn);
     ops.tracked_object = obj;
     ops.transport_hints = transport_hints;
     return subscribe(ops);
@@ -599,7 +603,8 @@ if (sub)  // Enter if subscriber is valid
                        const std::shared_ptr<T>& obj, const TransportHints& transport_hints = TransportHints())
   {
     SubscribeOptions ops;
-    ops.template init<M>(topic, queue_size, boost::bind(fp, obj.get(), _1));
+    auto wrapFn = [fp, obj](const std::shared_ptr<M const>& msg){obj->*(fp)(msg);};
+    ops.template init<M>(topic, queue_size, wrapFn);
     ops.tracked_object = obj;
     ops.transport_hints = transport_hints;
     return subscribe(ops);
@@ -610,7 +615,8 @@ if (sub)  // Enter if subscriber is valid
                        const std::shared_ptr<T>& obj, const TransportHints& transport_hints = TransportHints())
   {
     SubscribeOptions ops;
-    ops.template init<M>(topic, queue_size, boost::bind(fp, obj.get(), _1));
+    auto wrapFn = [fp, obj](const std::shared_ptr<M const>& msg){obj->*(fp)(msg);};
+    ops.template init<M>(topic, queue_size, wrapFn);
     ops.tracked_object = obj;
     ops.transport_hints = transport_hints;
     return subscribe(ops);
@@ -886,7 +892,8 @@ if (service)  // Enter if advertised service is valid
   ServiceServer advertiseService(const std::string& service, bool(T::*srv_func)(MReq &, MRes &), T *obj)
   {
     AdvertiseServiceOptions ops;
-    ops.template init<MReq, MRes>(service, boost::bind(srv_func, obj, _1, _2));
+    auto wrapFn = [obj, srv_func](MReq& req, MRes& res) { return obj->*srv_func(req, res); };
+    ops.template init<MReq, MRes>(service, wrapFn);
     return advertiseService(ops);
   }
 
@@ -931,7 +938,8 @@ if (service)  // Enter if advertised service is valid
   ServiceServer advertiseService(const std::string& service, bool(T::*srv_func)(ServiceEvent<MReq, MRes>&), T *obj)
   {
     AdvertiseServiceOptions ops;
-    ops.template initBySpecType<ServiceEvent<MReq, MRes> >(service, boost::bind(srv_func, obj, _1));
+    auto wrapFn = [obj, srv_func](ServiceEvent<MReq, MRes>& se) { return obj->*srv_func(se); };
+    ops.template initBySpecType<ServiceEvent<MReq, MRes> >(service, wrapFn);
     return advertiseService(ops);
   }
 
@@ -977,7 +985,8 @@ if (service)  // Enter if advertised service is valid
   ServiceServer advertiseService(const std::string& service, bool(T::*srv_func)(MReq &, MRes &), const std::shared_ptr<T>& obj)
   {
     AdvertiseServiceOptions ops;
-    ops.template init<MReq, MRes>(service, boost::bind(srv_func, obj.get(), _1, _2));
+    auto wrapFn = [obj, srv_func](MReq& req, MRes& res) { return obj->*srv_func(req, res); };
+    ops.template init<MReq, MRes>(service, wrapFn);
     ops.tracked_object = obj;
     return advertiseService(ops);
   }
@@ -1024,7 +1033,8 @@ if (service)  // Enter if advertised service is valid
   ServiceServer advertiseService(const std::string& service, bool(T::*srv_func)(ServiceEvent<MReq, MRes>&), const std::shared_ptr<T>& obj)
   {
     AdvertiseServiceOptions ops;
-    ops.template initBySpecType<ServiceEvent<MReq, MRes> >(service, boost::bind(srv_func, obj.get(), _1));
+    auto wrapFn = [obj, srv_func](ServiceEvent<MReq, MRes>& se) { return obj->*srv_func(se); };
+    ops.template initBySpecType<ServiceEvent<MReq, MRes> >(service, wrapFn);
     ops.tracked_object = obj;
     return advertiseService(ops);
   }
@@ -1320,7 +1330,8 @@ if (service)  // Enter if advertised service is valid
   Timer createTimer(Duration period, void(T::*callback)(const TimerEvent&) const, T* obj, 
                     bool oneshot = false, bool autostart = true) const
   {
-    return createTimer(period, boost::bind(callback, obj, _1), oneshot, autostart);
+    auto wrapFn = [obj, callback](const TimerEvent& te) { obj->*callback(te); };
+    return createTimer(period, wrapFn, oneshot, autostart);
   }
 
   /**
@@ -1340,7 +1351,8 @@ if (service)  // Enter if advertised service is valid
   Timer createTimer(Duration period, void(T::*callback)(const TimerEvent&), T* obj, 
                     bool oneshot = false, bool autostart = true) const
   {
-    return createTimer(period, boost::bind(callback, obj, _1), oneshot, autostart);
+    auto wrapFn = [obj, callback](const TimerEvent& te) { obj->*callback(te); };
+    return createTimer(period, wrapFn, oneshot, autostart);
   }
 
   /**
@@ -1362,7 +1374,8 @@ if (service)  // Enter if advertised service is valid
   Timer createTimer(Duration period, void(T::*callback)(const TimerEvent&), const std::shared_ptr<T>& obj, 
                     bool oneshot = false, bool autostart = true) const
   {
-    TimerOptions ops(period, boost::bind(callback, obj.get(), _1), 0);
+    auto wrapFn = [obj, callback](const TimerEvent& te) { obj->*callback(te); };
+    TimerOptions ops(period, wrapFn, 0);
     ops.tracked_object = obj;
     ops.oneshot = oneshot;
     ops.autostart = autostart;
@@ -1417,7 +1430,8 @@ if (service)  // Enter if advertised service is valid
   WallTimer createWallTimer(WallDuration period, void(T::*callback)(const WallTimerEvent&), T* obj, 
                             bool oneshot = false, bool autostart = true) const
   {
-    return createWallTimer(period, boost::bind(callback, obj, _1), oneshot, autostart);
+    auto wrapFn = [obj, callback](const WallTimerEvent& te) { obj->*callback(te); };
+    return createWallTimer(period, wrapFn, oneshot, autostart);
   }
 
   /**
@@ -1440,7 +1454,8 @@ if (service)  // Enter if advertised service is valid
                             const std::shared_ptr<T>& obj, 
                             bool oneshot = false, bool autostart = true) const
   {
-    WallTimerOptions ops(period, boost::bind(callback, obj.get(), _1), 0);
+    auto wrapFn = [obj, callback](const WallTimerEvent& te) { obj->*callback(te); };
+    WallTimerOptions ops(period, wrapFn, 0);
     ops.tracked_object = obj;
     ops.oneshot = oneshot;
     ops.autostart = autostart;
@@ -1496,7 +1511,8 @@ if (service)  // Enter if advertised service is valid
   SteadyTimer createSteadyTimer(WallDuration period, void(T::*callback)(const SteadyTimerEvent&), T* obj,
                                 bool oneshot = false, bool autostart = true) const
   {
-    return createSteadyTimer(period, boost::bind(callback, obj, _1), oneshot, autostart);
+    auto wrapFn = [obj, callback](const SteadyTimerEvent& te) { obj->*callback(te); };
+    return createSteadyTimer(period, wrapFn, oneshot, autostart);
   }
 
   /**
@@ -1519,7 +1535,8 @@ if (service)  // Enter if advertised service is valid
                                 const std::shared_ptr<T>& obj,
                                 bool oneshot = false, bool autostart = true) const
   {
-    SteadyTimerOptions ops(period, boost::bind(callback, obj.get(), _1), 0);
+    auto wrapFn = [obj, callback](const SteadyTimerEvent& te) { obj->*callback(te); };
+    SteadyTimerOptions ops(period, wrapFn, 0);
     ops.tracked_object = obj;
     ops.oneshot = oneshot;
     ops.autostart = autostart;

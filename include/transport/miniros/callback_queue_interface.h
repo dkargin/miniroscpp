@@ -35,7 +35,6 @@
 #ifndef ROSCPP_CALLBACK_QUEUE_INTERFACE_H
 #define ROSCPP_CALLBACK_QUEUE_INTERFACE_H
 
-#include <boost/shared_ptr.hpp>
 #include "common.h"
 #include "miniros/types.h"
 

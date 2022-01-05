@@ -31,8 +31,6 @@
 #include "common.h"
 #include "miniros/forwards.h"
 
-#include <boost/lexical_cast.hpp>
-
 namespace miniros
 {
 
@@ -112,7 +110,7 @@ public:
    */
   TransportHints& maxDatagramSize(int size)
   {
-    options_["max_datagram_size"] = boost::lexical_cast<std::string>(size);
+    options_["max_datagram_size"] = std::to_string(size);
     return *this;
   }
 
@@ -128,7 +126,7 @@ public:
       return 0;
     }
 
-    return boost::lexical_cast<int>(it->second);
+    return std::stoi(it->second);
   }
 
   /**

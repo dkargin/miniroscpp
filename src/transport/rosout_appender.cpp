@@ -48,7 +48,7 @@ namespace miniros
 ROSOutAppender::ROSOutAppender()
 : shutting_down_(false)
 , disable_topics_(false)
-, publish_thread_(boost::bind(&ROSOutAppender::logThread, this))
+, publish_thread_(&ROSOutAppender::logThread, this)
 {
   AdvertiseOptions ops;
   ops.init<rosgraph_msgs::Log>(names::resolve("/rosout"), 0);

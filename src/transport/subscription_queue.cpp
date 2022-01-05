@@ -158,7 +158,7 @@ CallbackInterface::CallResult SubscriptionQueue::call()
     {
       self = shared_from_this();
     }
-    catch (boost::bad_weak_ptr&) // For the tests, where we don't create a shared_ptr
+    catch (std::bad_weak_ptr&) // For the tests, where we don't create a shared_ptr
     {}
 
     SubscriptionCallbackHelperCallParams params;

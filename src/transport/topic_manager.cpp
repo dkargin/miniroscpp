@@ -44,9 +44,9 @@
 #include "xmlrpcpp/XmlRpc.h"
 
 #include <miniros/console.h>
+#include <sstream>
 
 using namespace XmlRpc; // A battle to be fought later
-using namespace std; // sigh
 
 /// \todo Locking can be significantly simplified here once the Node API goes away.
 
@@ -459,7 +459,7 @@ bool TopicManager::unregisterPublisher(const std::string& topic)
   return true;
 }
 
-bool TopicManager::isTopicAdvertised(const string &topic)
+bool TopicManager::isTopicAdvertised(const std::string &topic)
 {
   for (V_Publication::iterator t = advertised_topics_.begin(); t != advertised_topics_.end(); ++t)
   {
@@ -472,7 +472,7 @@ bool TopicManager::isTopicAdvertised(const string &topic)
   return false;
 }
 
-bool TopicManager::registerSubscriber(const SubscriptionPtr& s, const string &datatype)
+bool TopicManager::registerSubscriber(const SubscriptionPtr& s, const std::string &datatype)
 {
   XmlRpcValue args, result, payload;
   args[0] = this_node::getName();
@@ -485,12 +485,12 @@ bool TopicManager::registerSubscriber(const SubscriptionPtr& s, const string &da
     return false;
   }
 
-  vector<string> pub_uris;
+  std::vector<std::string> pub_uris;
   for (int i = 0; i < payload.size(); i++)
   {
     if (payload[i] != xmlrpc_manager_->getServerURI())
     {
-      pub_uris.push_back(string(payload[i]));
+      pub_uris.push_back(std::string(payload[i]));
     }
   }
 
@@ -535,7 +535,7 @@ bool TopicManager::registerSubscriber(const SubscriptionPtr& s, const string &da
   return true;
 }
 
-bool TopicManager::unregisterSubscriber(const string &topic)
+bool TopicManager::unregisterSubscriber(const std::string &topic)
 {
   XmlRpcValue args, result, payload;
   args[0] = this_node::getName();
@@ -547,7 +547,7 @@ bool TopicManager::unregisterSubscriber(const string &topic)
   return true;
 }
 
-bool TopicManager::pubUpdate(const string &topic, const vector<string> &pubs)
+bool TopicManager::pubUpdate(const std::string &topic, const std::vector<std::string> &pubs)
 {
   SubscriptionPtr sub;
   {
@@ -585,7 +585,7 @@ bool TopicManager::pubUpdate(const string &topic, const vector<string> &pubs)
   return false;
 }
 
-bool TopicManager::requestTopic(const string &topic,
+bool TopicManager::requestTopic(const std::string &topic,
                          XmlRpcValue &protos,
                          XmlRpcValue &ret)
 {
@@ -605,19 +605,19 @@ bool TopicManager::requestTopic(const string &topic,
       return false;
     }
 
-    string proto_name = proto[0];
-    if (proto_name == string("TCPROS"))
+    std::string proto_name = proto[0];
+    if (proto_name == std::string("TCPROS"))
     {
       XmlRpcValue tcpros_params;
-      tcpros_params[0] = string("TCPROS");
+      tcpros_params[0] = std::string("TCPROS");
       tcpros_params[1] = network::getHost();
       tcpros_params[2] = int(connection_manager_->getTCPPort());
       ret[0] = int(1);
-      ret[1] = string();
+      ret[1] = std::string();
       ret[2] = tcpros_params;
       return true;
     }
-    else if (proto_name == string("UDPROS"))
+    else if (proto_name == std::string("UDPROS"))
     {
       if (proto.size() != 5 ||
           proto[1].getType() != XmlRpcValue::TypeBase64 ||
@@ -632,7 +632,7 @@ bool TopicManager::requestTopic(const string &topic,
       std::shared_ptr<uint8_t[]> buffer(new uint8_t[header_bytes.size()]);
       memcpy(buffer.get(), &header_bytes[0], header_bytes.size());
       Header h;
-      string err;
+      std::string err;
       if (!h.parse(buffer, header_bytes.size(), err))
       {
       	ROSCPP_LOG_DEBUG("Unable to parse UDPROS connection header: %s", err.c_str());
@@ -668,7 +668,7 @@ bool TopicManager::requestTopic(const string &topic,
       connection_manager_->udprosIncomingConnection(transport, h);
 
       XmlRpcValue udpros_params;
-      udpros_params[0] = string("UDPROS");
+      udpros_params[0] = std::string("UDPROS");
       udpros_params[1] = network::getHost();
       udpros_params[2] = connection_manager_->getUDPServerTransport()->getServerPort();
       udpros_params[3] = conn_id;
@@ -684,7 +684,7 @@ bool TopicManager::requestTopic(const string &topic,
       XmlRpcValue v(msg_def_buffer.get(), len);
       udpros_params[5] = v;
       ret[0] = int(1);
-      ret[1] = string();
+      ret[1] = std::string();
       ret[2] = udpros_params;
       return true;
     }
@@ -779,7 +779,7 @@ bool TopicManager::isLatched(const std::string& topic)
   return false;
 }
 
-PublicationPtr TopicManager::lookupPublicationWithoutLock(const string &topic)
+PublicationPtr TopicManager::lookupPublicationWithoutLock(const std::string &topic)
 {
   PublicationPtr t;
   for (V_Publication::iterator i = advertised_topics_.begin();

@@ -32,15 +32,13 @@
 #include "miniros/serialization.h"
 #include "common.h"
 
-#include <boost/utility.hpp>
-
 namespace miniros
 {
 
 /**
  * \brief Allows publication of a message to a single subscriber. Only available inside subscriber connection callbacks
  */
-class MINIROS_DECL SingleSubscriberPublisher : public boost::noncopyable
+class MINIROS_DECL SingleSubscriberPublisher
 {
 public:
   SingleSubscriberPublisher(const SubscriberLinkPtr& link);
@@ -99,6 +97,11 @@ private:
   void publish(const SerializedMessage& m) const;
 
   SubscriberLinkPtr link_;
+
+private:
+  SingleSubscriberPublisher(const SingleSubscriberPublisher&) = delete;
+  SingleSubscriberPublisher(const SingleSubscriberPublisher&&) = delete;
+  SingleSubscriberPublisher& operator=(const SingleSubscriberPublisher&) = delete;
 };
 
 }

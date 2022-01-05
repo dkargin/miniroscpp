@@ -311,13 +311,13 @@ void start()
   std::string enable_debug_env;
   if ( get_environment_variable(enable_debug_env,"ROSCPP_ENABLE_DEBUG") )
   {
-    try
-    {
-      enable_debug = boost::lexical_cast<bool>(enable_debug_env.c_str());
-    }
-    catch (boost::bad_lexical_cast&)
-    {
-    }
+    // Former boost::lexical_cast treated {1.0, 1, +1, ...} values as true and zeroes as false.
+    // I really do not see a reason to be that complicated. So "0" is false, "1" is true, all other values are ignored.
+    int rawValue = std::stoi(enable_debug_env);
+    if (rawValue == 1)
+        enable_debug = true;
+    else if (rawValue == 0)
+        enable_debug = false;
   }
 
   param::param("/tcp_keepalive", TransportTCP::s_use_keepalive_, TransportTCP::s_use_keepalive_);

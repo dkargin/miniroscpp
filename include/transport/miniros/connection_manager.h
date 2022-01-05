@@ -29,7 +29,8 @@
 #include "connection.h"
 #include "common.h"
 
-#include <boost/thread/mutex.hpp>
+#include <mutex>
+
 #include <boost/signals2/connection.hpp>
 
 namespace miniros

@@ -31,7 +31,7 @@
 #include "miniros/macros.h"
 #include "miniros/types.h"
 
-#include <boost/shared_ptr.hpp>
+#include <memory>
 
 namespace miniros
 {

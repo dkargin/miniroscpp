@@ -31,9 +31,6 @@
 #include "miniros/macros.h"
 #include "miniros/common.h"
 
-#include <boost/thread/mutex.hpp>
-#include <boost/shared_array.hpp>
-#include <boost/enable_shared_from_this.hpp>
 #include <boost/signals2/connection.hpp>
 
 #include <queue>

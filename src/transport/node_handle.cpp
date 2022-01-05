@@ -47,6 +47,7 @@
 #include "xmlrpcpp/XmlRpc.h"
 
 #include <thread>
+#include <sstream>
 
 namespace miniros
 {
