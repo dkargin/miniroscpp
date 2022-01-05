@@ -57,7 +57,7 @@ class MINIROS_DECL CallbackQueue : public CallbackQueueInterface
 {
 public:
   CallbackQueue(bool enabled = true);
-  virtual ~CallbackQueue();
+  ~CallbackQueue() override;
 
   virtual void addCallback(const CallbackInterfacePtr& callback, uint64_t removal_id = 0);
   virtual void removeByID(uint64_t removal_id);
@@ -178,6 +178,7 @@ protected:
     D_CallbackInfo callbacks;
     D_CallbackInfo::iterator cb_it;
   };
+
   boost::thread_specific_ptr<TLS> tls_;
 
   bool enabled_;

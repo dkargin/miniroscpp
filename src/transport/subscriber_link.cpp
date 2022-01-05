@@ -28,8 +28,6 @@
 #include "miniros/subscriber_link.h"
 #include "miniros/publication.h"
 
-#include <boost/bind.hpp>
-
 namespace miniros
 {
 

@@ -190,7 +190,7 @@ void ConnectionManager::tcprosAcceptConnection(const TransportTCPPtr& transport)
   ConnectionPtr conn(std::make_shared<Connection>());
   addConnection(conn);
 
-  conn->initialize(transport, true, boost::bind(&ConnectionManager::onConnectionHeaderReceived, this, _1, _2));
+  conn->initialize(transport, true, [this](const ConnectionPtr& connection, const Header& header) {return this->onConnectionHeaderReceived(connection, header); });
 }
 
 bool ConnectionManager::onConnectionHeaderReceived(const ConnectionPtr& conn, const Header& header)

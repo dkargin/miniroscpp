@@ -496,7 +496,7 @@ int32_t TransportTCP::read(uint8_t* buffer, uint32_t size)
   MINIROS_ASSERT(size > 0);
 
   // never read more than INT_MAX since this is the maximum we can report back with the current return type
-  uint32_t read_size = std::min(size, static_cast<uint32_t>(INT_MAX));
+  uint32_t read_size = std::min<uint32_t>(size, static_cast<uint32_t>(INT_MAX));
   int num_bytes = ::recv(sock_, reinterpret_cast<char*>(buffer), read_size, 0);
   if (num_bytes < 0)
   {
@@ -535,7 +535,7 @@ int32_t TransportTCP::write(uint8_t* buffer, uint32_t size)
   MINIROS_ASSERT(size > 0);
 
   // never write more than INT_MAX since this is the maximum we can report back with the current return type
-  uint32_t writesize = std::min(size, static_cast<uint32_t>(INT_MAX));
+  uint32_t writesize = std::min<uint32_t>(size, static_cast<uint32_t>(INT_MAX));
   int num_bytes = ::send(sock_, reinterpret_cast<const char*>(buffer), writesize, 0);
   if (num_bytes < 0)
   {

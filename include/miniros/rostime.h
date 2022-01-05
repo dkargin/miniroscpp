@@ -221,8 +221,8 @@ namespace miniros
     */
   };
 
-  extern MINIROS_DECL const Time TIME_MAX;
-  extern MINIROS_DECL const Time TIME_MIN;
+  constexpr const Time TIME_MAX(std::numeric_limits<uint32_t>::max(), 999999999);
+  constexpr const Time TIME_MIN(0, 1);
 
   /**
    * \brief Time representation.  Always wall-clock time.

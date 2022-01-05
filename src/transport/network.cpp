@@ -25,8 +25,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-//#include "miniros/config.h"
 
+#include "miniros/config.h"
 #include "miniros/network.h"
 #include "miniros/file_log.h"
 #include "miniros/exceptions.h"
@@ -37,8 +37,6 @@
 #ifdef HAVE_IFADDRS_H
   #include <ifaddrs.h>
 #endif
-
-#include <boost/lexical_cast.hpp>
 
 namespace miniros
 {
@@ -204,13 +202,22 @@ void init(const M_string& remappings)
   it = remappings.find("__tcpros_server_port");
   if (it != remappings.end())
   {
+    bool failed = true;
     try
     {
-      g_tcpros_server_port = boost::lexical_cast<uint16_t>(it->second);
+      auto rawValue = std::stoul(it->second);
+      if (rawValue < 65535)
+      {
+          g_tcpros_server_port = rawValue;
+          failed = false;
+      }
     }
-    catch (boost::bad_lexical_cast&)
+    catch (std::invalid_argument&) {}
+    catch (std::out_of_range&) {}
+
+    if (failed)
     {
-      throw miniros::InvalidPortException("__tcpros_server_port [" + it->second + "] was not specified as a number within the 0-65535 range");
+        throw miniros::InvalidPortException("__tcpros_server_port [" + it->second + "] was not specified as a number within the 0-65535 range");
     }
   }
 

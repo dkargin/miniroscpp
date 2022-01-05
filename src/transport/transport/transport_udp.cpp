@@ -377,7 +377,7 @@ int32_t TransportUDP::read(uint8_t* buffer, uint32_t size)
         from_previous = true;
       }
 
-      copy_bytes = std::min(size - bytes_read, reorder_bytes_);
+      copy_bytes = std::min<decltype(copy_bytes)>(size - bytes_read, reorder_bytes_);
       header = reorder_header_;
       memcpy(buffer + bytes_read, reorder_start_, copy_bytes);
       reorder_bytes_ -= copy_bytes;
@@ -448,7 +448,7 @@ int32_t TransportUDP::read(uint8_t* buffer, uint32_t size)
         from_previous = true;
       }
 
-      copy_bytes = std::min(size - bytes_read, data_filled_);
+      copy_bytes = std::min<decltype(copy_bytes)>(size - bytes_read, data_filled_);
       // Copy from the data buffer, whether it has data left in it from a previous datagram or
       // was just filled by readv()
       memcpy(buffer + bytes_read, data_start_, copy_bytes);
@@ -570,7 +570,7 @@ int32_t TransportUDP::write(uint8_t* buffer, uint32_t size)
 	iov[0].buf = reinterpret_cast<char*>(&header);
 	iov[0].len = sizeof(header);
 	iov[1].buf = reinterpret_cast<char*>(buffer + bytes_sent);
-	iov[1].len = std::min(max_payload_size, size - bytes_sent);
+	iov[1].len = std::min<decltype(max_payload_size)>(max_payload_size, size - bytes_sent);
 	rc = WSASend(sock_, iov, 2, &sent_bytes, flags, NULL, NULL);
 	num_bytes = sent_bytes;
 	if (rc == SOCKET_ERROR) {

@@ -32,9 +32,6 @@
 #include "miniros/names.h"
 
 #include <miniros/console.h>
-
-#include <boost/lexical_cast.hpp>
-
 #include <vector>
 #include <map>
 
@@ -828,14 +825,12 @@ void init(const M_string& remappings)
 
       try
       {
-        int32_t i = boost::lexical_cast<int32_t>(param);
+        auto i = std::stoi(param);
         miniros::param::set(names::resolve(local_name), i);
         success = true;
       }
-      catch (boost::bad_lexical_cast&)
-      {
-
-      }
+      catch (std::invalid_argument&) {}
+      catch (std::out_of_range&) {}
 
       if (success)
       {
@@ -844,14 +839,13 @@ void init(const M_string& remappings)
 
       try
       {
-        double d = boost::lexical_cast<double>(param);
+        double d = std::stod(param);
         miniros::param::set(names::resolve(local_name), d);
         success = true;
       }
-      catch (boost::bad_lexical_cast&)
-      {
+      catch (std::invalid_argument&) {}
+      catch (std::out_of_range&) {}
 
-      }
 
       if (success)
       {
