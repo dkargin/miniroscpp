@@ -25,8 +25,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ROSLIB_EXCEPTION_H
-#define ROSLIB_EXCEPTION_H
+#ifndef MINIROS_EXCEPTION_H
+#define MINIROS_EXCEPTION_H
 
 #include <stdexcept>
 

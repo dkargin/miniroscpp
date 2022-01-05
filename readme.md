@@ -67,7 +67,7 @@ target_include_directories(some_executable PRIVATE ${MINIROS_INCLUDE_GENERATED_D
 # Plan #
 
 1. ~~Get rid of boost::format. It can be replaced by a local implementation.~~ DONE
-1. ~~Merge console_bridge.~~ DONE
+1. ~~Merge console_bridge.~~ Added a placeholder.
 1. ~~Figure out how to run new codegen with packages like sensor_msgs or nav_msgs.~~ DONE
 1. ~~Squash export macro headers, like miniros/macros.h, miniros/roscpp_serialization_macros.h, minibag/macros.h.~~ DONE
 1. Adapt tests from corresponding libraries.
@@ -78,6 +78,17 @@ target_include_directories(some_executable PRIVATE ${MINIROS_INCLUDE_GENERATED_D
 1. Check if I can merge whole ROS transport in a library.
 1. ~~Provide a proper install and configuration scripts for CMake.~~ DONE
 1. Test library on android.
+
+# Future plans #
+
+Since **miniros** is experimental distribution, I am free to improve core API. These are possible directions:
+
+1. Rework global initialization: ros::init should return some sort of a context.
+  All global variables should be moved to this context.
+  `NodeHandle` should use either this context, or parent node in its constructor.
+  This alows implementing nodelet approach without using separate API.
+2. Ticket-based API for ros services: resolve issues with crashing server.
+3. Reduce compilation time by moving exposed class fields to "Impl" section.
 
 # ROS References #
 

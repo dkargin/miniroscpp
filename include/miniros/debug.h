@@ -25,8 +25,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ROSLIB_DEBUG_H
-#define ROSLIB_DEBUG_H
+#ifndef MINIROS_DEBUG_H
+#define MINIROS_DEBUG_H
 
 #include <string>
 #include <vector>
@@ -48,8 +48,8 @@ MINIROS_DECL void translateAddresses(const V_void& addresses, V_string& lines);
 MINIROS_DECL void demangleBacktrace(const V_string& names, V_string& demangled);
 MINIROS_DECL std::string demangleBacktrace(const V_string& names);
 MINIROS_DECL std::string demangleName(const std::string& name);
-}
+} // namespace debug
 
-}
+} // namespace miniros
 
-#endif
+#endif // MINIROS_DEBUG_H

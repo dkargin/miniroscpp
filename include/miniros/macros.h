@@ -64,12 +64,12 @@
   #pragma warning(disable: 4275)
 #endif
 
-#ifdef MINIROS_BUILD_SHARED_LIBS // ros is being built around shared libraries
+#ifdef MINIROS_BUILD_SHARED_LIBS // miniros is being built around shared libraries
   #ifdef miniros_EXPORTS      // we are building a shared lib/dll
     #define MINIROS_DECL MINIROS_HELPER_EXPORT
   #else // we are using shared lib/dll
     #define MINIROS_DECL MINIROS_HELPER_IMPORT
   #endif
-#else // ros is being built around static libraries
+#else // miniros is being built around static libraries
   #define MINIROS_DECL
 #endif

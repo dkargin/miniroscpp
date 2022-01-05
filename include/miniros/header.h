@@ -49,7 +49,7 @@ namespace miniros
 class MINIROS_DECL Header
 {
 public:
-  using shared_array_uint8_t = std::shared_ptr<uint8_t>;
+  using shared_array_uint8_t = std::shared_ptr<uint8_t[]>;
 
   Header();
   ~Header();

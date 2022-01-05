@@ -37,7 +37,7 @@
 #include <map>
 #include <vector>
 
-#include "miniros/time.h"
+#include "miniros/rostime.h"
 #include "miniros/datatypes.h"
 #include "macros.h"
 

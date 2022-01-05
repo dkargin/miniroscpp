@@ -38,10 +38,10 @@
 /**
  * It is a former part of rostime
  */
-#pragma once
+#ifndef MINIROS_RATE_H
+#define MINIROS_RATE_H
 
-#include "miniros/time.h"
-#include "miniros/rostime_decl.h"
+#include "miniros/rostime.h"
 
 namespace miniros
 {
@@ -51,7 +51,7 @@ class Duration;
  * @class Rate
  * @brief Class to help run loops at a desired frequency
  */
-class ROSTIME_DECL Rate
+class MINIROS_DECL Rate
 {
 public:
   /**
@@ -92,7 +92,7 @@ private:
  * @class WallRate
  * @brief Class to help run loops at a desired frequency.  This version always uses wall-clock time.
  */
-class ROSTIME_DECL WallRate
+class MINIROS_DECL WallRate
 {
 public:
   /**
@@ -131,3 +131,4 @@ private:
 
 } // namespace miniros
 
+#endif //MINIROS_RATE_H

@@ -33,23 +33,23 @@
 *  POSSIBILITY OF SUCH DAMAGE.
 *
 *********************************************************************/
-/**
- * It is a former part of rostime
+/*
+ * Cross platform macros.
+ *
  */
-
-#ifndef ROSTIME_DECL_HPP_INCLUDED
-#define ROSTIME_DECL_HPP_INCLUDED
+#ifndef XMLRPCPP_DECL_H_INCLUDED
+#define XMLRPCPP_DECL_H_INCLUDED
 
 #include <miniros/macros.h>
 
 #ifdef MINIROS_BUILD_SHARED_LIBS // ros is being built around shared libraries
-  #ifdef rostime_EXPORTS // we are building a shared lib/dll
-    #define ROSTIME_DECL MINIROS_HELPER_EXPORT
+  #ifdef xmlrpcpp_EXPORTS // we are building a shared lib/dll
+    #define XMLRPCPP_DECL MINIROS_HELPER_EXPORT
   #else // we are using shared lib/dll
-    #define ROSTIME_DECL MINIROS_HELPER_IMPORT
+    #define XMLRPCPP_DECL MINIROS_HELPER_IMPORT
   #endif
 #else // ros is being built around static libraries
-  #define ROSTIME_DECL
+  #define XMLRPCPP_DECL
 #endif
 
-#endif /* ROSTIME_DECL_HPP_INCLUDED */
+#endif /* XMLRPCPP_DECL_H_INCLUDED */

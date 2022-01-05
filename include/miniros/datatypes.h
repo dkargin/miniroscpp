@@ -25,8 +25,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef CPP_CORE_TYPES_H
-#define CPP_CORE_TYPES_H
+#ifndef MINIROS_DATATYPES_H
+#define MINIROS_DATATYPES_H
 
 #include <string>
 #include <vector>
@@ -49,4 +49,4 @@ typedef std::shared_ptr<M_string> M_stringPtr;
 
 }
 
-#endif // CPP_CORE_TYPES_H
+#endif // MINIROS_DATATYPES_H

@@ -38,7 +38,7 @@
 #include "miniros/macros.h"
 
 #include <miniros/types.h>
-#include <miniros/time.h>
+#include <miniros/rostime.h>
 #include <miniros/traits/call_traits.h>
 #include "miniros/traits/builtin_message_traits.h"
 #include "miniros/serialized_message.h"

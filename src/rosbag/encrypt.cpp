@@ -39,7 +39,6 @@
 #include <boost/progress.hpp>
 #include <boost/regex.hpp>
 
-//#include <ros/ros.h>
 #include "miniros/console.h"
 #include "minibag/bag.h"
 #include "minibag/view.h"

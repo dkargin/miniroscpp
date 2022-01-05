@@ -37,7 +37,7 @@
   #endif
 #endif
 
-#include "miniros/time.h"
+#include "miniros/rostime.h"
 #include "miniros/impl/time.h"
 #include <cmath>
 #include <ctime>

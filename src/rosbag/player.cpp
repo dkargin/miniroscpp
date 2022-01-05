@@ -137,7 +137,7 @@ void Player::publish() {
 
         try
         {
-            shared_ptr<Bag> bag(boost::make_shared<Bag>());
+            shared_ptr<Bag> bag(std::make_shared<Bag>());
             bag->open(filename, bagmode::Read);
             bags_.push_back(bag);
         }
@@ -204,13 +204,13 @@ void Player::publish() {
     {
         std::cout << "Creating rate control topic subscriber..." << std::flush;
 
-        boost::shared_ptr<ros::Subscriber> sub(boost::make_shared<ros::Subscriber>());
+        boost::shared_ptr<ros::Subscriber> sub(std::make_shared<ros::Subscriber>());
         ros::SubscribeOptions ops;
         ops.topic = options_.rate_control_topic;
         ops.queue_size = 10;
         ops.md5sum = ros::message_traits::md5sum<topic_tools::ShapeShifter>();
         ops.datatype = ros::message_traits::datatype<topic_tools::ShapeShifter>();
-        ops.helper = boost::make_shared<ros::SubscriptionCallbackHelperT<
+        ops.helper = std::make_shared<ros::SubscriptionCallbackHelperT<
             const ros::MessageEvent<topic_tools::ShapeShifter const> &> >(
                 boost::bind(&Player::updateRateTopicTime, this, _1));
 
