@@ -12,6 +12,7 @@ set(cpp_common_SRC
 	debug.cpp
 	header.cpp
 	console.cpp
+	console_print.cpp
 	serialization.cpp)
 
 set(rosbag_SRC "")
@@ -150,8 +151,11 @@ else()
 endif()
 
 set_property(TARGET roscxx PROPERTY CXX_STANDARD 17)
-target_link_libraries(roscxx ${console_bridge_LIBRARIES})
+
+target_link_libraries(roscxx xmlrpcpp rt stdc++fs ${console_bridge_LIBRARIES})
+
 target_compile_definitions(roscxx PRIVATE rostime_EXPORTS miniros_EXPORTS)
+
 target_include_directories(roscxx PRIVATE
 	${MINIROS_INCLUDE_DIRS}
 	${MINIROS_INCLUDE_TRANSPORT}

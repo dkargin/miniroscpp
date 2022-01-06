@@ -30,16 +30,14 @@
 #include <vector>
 
 #include <gtest/gtest.h>
-#include <ros/rate.h>
-#include <ros/time.h>
+#include <miniros/rate.h>
+#include <miniros/rostime.h>
 
 #if !defined(_WIN32)
 #include <sys/time.h>
 #endif
 
-#include <boost/date_time/posix_time/ptime.hpp>
-
-using namespace ros;
+using namespace miniros;
 
 /// \todo All the tests in here that use randomized values are not unit tests, replace them
 
@@ -57,7 +55,7 @@ void seed_rand()
 #endif
 };
 
-void generate_rand_times(uint32_t range, uint64_t runs, std::vector<ros::Time>& values1, std::vector<ros::Time>& values2)
+void generate_rand_times(uint32_t range, uint64_t runs, std::vector<miniros::Time>& values1, std::vector<miniros::Time>& values2)
 {
   seed_rand();
   values1.clear();
@@ -66,12 +64,12 @@ void generate_rand_times(uint32_t range, uint64_t runs, std::vector<ros::Time>& 
   values2.reserve(runs);
   for ( uint32_t i = 0; i < runs ; i++ )
   {
-    values1.push_back(ros::Time( (rand() * range / RAND_MAX), (rand() * 1000000000ULL/RAND_MAX)));
-    values2.push_back(ros::Time( (rand() * range / RAND_MAX), (rand() * 1000000000ULL/RAND_MAX)));
+    values1.push_back(Time( (rand() * range / RAND_MAX), (rand() * 1000000000ULL/RAND_MAX)));
+    values2.push_back(Time( (rand() * range / RAND_MAX), (rand() * 1000000000ULL/RAND_MAX)));
   }
 }
 
-void generate_rand_durations(uint32_t range, uint64_t runs, std::vector<ros::Duration>& values1, std::vector<ros::Duration>& values2)
+void generate_rand_durations(uint32_t range, uint64_t runs, std::vector<miniros::Duration>& values1, std::vector<miniros::Duration>& values2)
 {
   seed_rand();
   values1.clear();
@@ -81,28 +79,28 @@ void generate_rand_durations(uint32_t range, uint64_t runs, std::vector<ros::Dur
   for ( uint32_t i = 0; i < runs ; i++ )
   {
     // positive durations
-    values1.push_back(ros::Duration(  (rand() * range / RAND_MAX),  (rand() * 1000000000ULL/RAND_MAX)));
-    values2.push_back(ros::Duration(  (rand() * range / RAND_MAX),  (rand() * 1000000000ULL/RAND_MAX)));
-    EXPECT_GE(values1.back(), ros::Duration(0,0));
-    EXPECT_GE(values2.back(), ros::Duration(0,0));
+    values1.push_back(Duration(  (rand() * range / RAND_MAX),  (rand() * 1000000000ULL/RAND_MAX)));
+    values2.push_back(Duration(  (rand() * range / RAND_MAX),  (rand() * 1000000000ULL/RAND_MAX)));
+    EXPECT_GE(values1.back(), Duration(0,0));
+    EXPECT_GE(values2.back(), Duration(0,0));
 
     // negative durations
-    values1.push_back(ros::Duration( -(rand() * range / RAND_MAX), -(rand() * 1000000000ULL/RAND_MAX)));
-    values2.push_back(ros::Duration( -(rand() * range / RAND_MAX), -(rand() * 1000000000ULL/RAND_MAX)));
-    EXPECT_LE(values1.back(), ros::Duration(0,0));
-    EXPECT_LE(values2.back(), ros::Duration(0,0));
+    values1.push_back(Duration( -(rand() * range / RAND_MAX), -(rand() * 1000000000ULL/RAND_MAX)));
+    values2.push_back(Duration( -(rand() * range / RAND_MAX), -(rand() * 1000000000ULL/RAND_MAX)));
+    EXPECT_LE(values1.back(), Duration(0,0));
+    EXPECT_LE(values2.back(), Duration(0,0));
 
     // positive and negative durations
-    values1.push_back(ros::Duration(  (rand() * range / RAND_MAX),  (rand() * 1000000000ULL/RAND_MAX)));
-    values2.push_back(ros::Duration( -(rand() * range / RAND_MAX), -(rand() * 1000000000ULL/RAND_MAX)));
-    EXPECT_GE(values1.back(), ros::Duration(0,0));
-    EXPECT_LE(values2.back(), ros::Duration(0,0));
+    values1.push_back(Duration(  (rand() * range / RAND_MAX),  (rand() * 1000000000ULL/RAND_MAX)));
+    values2.push_back(Duration( -(rand() * range / RAND_MAX), -(rand() * 1000000000ULL/RAND_MAX)));
+    EXPECT_GE(values1.back(), Duration(0,0));
+    EXPECT_LE(values2.back(), Duration(0,0));
 
     // negative and positive durations
-    values1.push_back(ros::Duration( -(rand() * range / RAND_MAX), -(rand() * 1000000000ULL/RAND_MAX)));
-    values2.push_back(ros::Duration(  (rand() * range / RAND_MAX),  (rand() * 1000000000ULL/RAND_MAX)));
-    EXPECT_LE(values1.back(), ros::Duration(0,0));
-    EXPECT_GE(values2.back(), ros::Duration(0,0));
+    values1.push_back(Duration( -(rand() * range / RAND_MAX), -(rand() * 1000000000ULL/RAND_MAX)));
+    values2.push_back(Duration(  (rand() * range / RAND_MAX),  (rand() * 1000000000ULL/RAND_MAX)));
+    EXPECT_LE(values1.back(), Duration(0,0));
+    EXPECT_GE(values2.back(), Duration(0,0));
   }
 }
 
@@ -114,8 +112,8 @@ TEST(Time, size)
 
 TEST(Time, Comparitors)
 {
-  std::vector<ros::Time> v1;
-  std::vector<ros::Time> v2;
+  std::vector<miniros::Time> v1;
+  std::vector<miniros::Time> v2;
   generate_rand_times(100, 1000, v1,v2);
 
   for (uint32_t i = 0; i < v1.size(); i++)
@@ -147,8 +145,8 @@ TEST(Time, Comparitors)
 
 TEST(Time, ToFromDouble)
 {
-  std::vector<ros::Time> v1;
-  std::vector<ros::Time> v2;
+  std::vector<miniros::Time> v1;
+  std::vector<miniros::Time> v2;
   generate_rand_times(100, 1000, v1,v2);
 
   for (uint32_t i = 0; i < v1.size(); i++)
@@ -165,7 +163,7 @@ TEST(Time, RoundingError)
   double t = std::nextafter(someInt, 0); // someint - epsilon
   // t should be 1031.000000
 
-  ros::Time exampleTime;
+  miniros::Time exampleTime;
   exampleTime.fromSec(t);
 
   // if rounded incorrectly, sec may be 1030
@@ -277,6 +275,7 @@ TEST(Time, DontMungeStreamState)
   EXPECT_EQ(oss.fill(), 'N');
 }
 
+#ifdef USE_BOOST
 TEST(Time, ToFromBoost)
 {
   std::vector<ros::Time> v1;
@@ -293,10 +292,11 @@ TEST(Time, ToFromBoost)
     EXPECT_EQ(t, tt);
   }
 }
+#endif
 
 TEST(Time, CastFromDoubleExceptions)
 {
-    ros::Time::init();
+    miniros::Time::init();
 
     Time t1, t2, t3;
     // Valid values to cast, must not throw exceptions
@@ -312,7 +312,7 @@ TEST(Time, CastFromDoubleExceptions)
 
 TEST(Time, OperatorMinusExceptions)
 {
-    ros::Time::init();
+    miniros::Time::init();
 
     Time t1(2147483648, 0);
     Time t2(2147483647, 999999999);
@@ -343,7 +343,7 @@ TEST(Time, OperatorMinusExceptions)
 
 TEST(Time, OperatorPlusExceptions)
 {
-    ros::Time::init();
+    miniros::Time::init();
 
     Time t1(2147483648, 0);
     Time t2(2147483647, 999999999);
@@ -368,8 +368,8 @@ TEST(Time, OperatorPlusExceptions)
 
 TEST(Duration, Comparitors)
 {
-  std::vector<ros::Duration> v1;
-  std::vector<ros::Duration> v2;
+  std::vector<miniros::Duration> v1;
+  std::vector<miniros::Duration> v2;
   generate_rand_durations(100, 1000, v1,v2);
 
   for (uint32_t i = 0; i < v1.size(); i++)
@@ -402,46 +402,46 @@ TEST(Duration, Comparitors)
 
 TEST(Duration, ToFromSec)
 {
-  std::vector<ros::Duration> v1;
-  std::vector<ros::Duration> v2;
+  std::vector<miniros::Duration> v1;
+  std::vector<miniros::Duration> v2;
   generate_rand_durations(100, 1000, v1,v2);
 
   for (uint32_t i = 0; i < v1.size(); i++)
   {
     EXPECT_EQ(v1[i].toSec(), v1[i].fromSec(v1[i].toSec()).toSec());
-    EXPECT_GE(ros::Duration(v1[i].toSec()).nsec, 0);
+    EXPECT_GE(Duration(v1[i].toSec()).nsec, 0);
   }
 
-  EXPECT_EQ(ros::Duration(-0.5), ros::Duration(-1LL, 500000000LL));
-  EXPECT_EQ(ros::Duration(-0.5), ros::Duration(0, -500000000LL));
+  EXPECT_EQ(Duration(-0.5), Duration(-1LL, 500000000LL));
+  EXPECT_EQ(Duration(-0.5), Duration(0, -500000000LL));
 }
 
 TEST(Duration, FromNSec)
 {
-  ros::Duration t;
+  Duration t;
   t.fromNSec(-500000000LL);
-  EXPECT_EQ(ros::Duration(-0.5), t);
+  EXPECT_EQ(Duration(-0.5), t);
 
   t.fromNSec(-1500000000LL);
-  EXPECT_EQ(ros::Duration(-1.5), t);
+  EXPECT_EQ(Duration(-1.5), t);
 
   t.fromNSec(500000000LL);
-  EXPECT_EQ(ros::Duration(0.5), t);
+  EXPECT_EQ(Duration(0.5), t);
 
   t.fromNSec(1500000000LL);
-  EXPECT_EQ(ros::Duration(1.5), t);
+  EXPECT_EQ(Duration(1.5), t);
 }
 
 TEST(Duration, OperatorPlus)
 {
-  std::vector<ros::Duration> v1;
-  std::vector<ros::Duration> v2;
+  std::vector<miniros::Duration> v1;
+  std::vector<miniros::Duration> v2;
   generate_rand_durations(100, 1000, v1,v2);
 
   for (uint32_t i = 0; i < v1.size(); i++)
   {
     EXPECT_NEAR(v1[i].toSec() + v2[i].toSec(), (v1[i] + v2[i]).toSec(), epsilon);
-    ros::Duration temp = v1[i];
+    Duration temp = v1[i];
     EXPECT_NEAR(v1[i].toSec() + v2[i].toSec(), (temp += v2[i]).toSec(), epsilon);
 
   }
@@ -450,43 +450,41 @@ TEST(Duration, OperatorPlus)
 
 TEST(Duration, OperatorMinus)
 {
-  std::vector<ros::Duration> v1;
-  std::vector<ros::Duration> v2;
+  std::vector<miniros::Duration> v1;
+  std::vector<miniros::Duration> v2;
   generate_rand_durations(100, 1000, v1,v2);
 
   for (uint32_t i = 0; i < v1.size(); i++)
   {
     EXPECT_NEAR(v1[i].toSec() - v2[i].toSec(), (v1[i] - v2[i]).toSec(), epsilon);
-    ros::Duration temp = v1[i];
+    Duration temp = v1[i];
     EXPECT_NEAR(v1[i].toSec() - v2[i].toSec(), (temp -= v2[i]).toSec(), epsilon);
 
     EXPECT_NEAR(- v2[i].toSec(), (-v2[i]).toSec(), epsilon);
 
   }
 
-  ros::Time t1(1.1);
-  ros::Time t2(1.3);
-  ros::Duration time_diff = t1 - t2; //=-0.2
+  miniros::Time t1(1.1);
+  miniros::Time t2(1.3);
+  miniros::Duration time_diff = t1 - t2; //=-0.2
 
   EXPECT_NEAR(time_diff.toSec(), -0.2, epsilon);
-  EXPECT_LE(time_diff, ros::Duration(-0.19));
-  EXPECT_GE(time_diff, ros::Duration(-0.21));
+  EXPECT_LE(time_diff, miniros::Duration(-0.19));
+  EXPECT_GE(time_diff, miniros::Duration(-0.21));
 }
 
 TEST(Duration, OperatorTimes)
 {
-  std::vector<ros::Duration> v1;
-  std::vector<ros::Duration> v2;
+  std::vector<miniros::Duration> v1;
+  std::vector<miniros::Duration> v2;
   generate_rand_durations(100, 1000, v1,v2);
 
   for (uint32_t i = 0; i < v1.size(); i++)
   {
     EXPECT_NEAR(v1[i].toSec() * v2[i].toSec(), (v1[i] * v2[i].toSec()).toSec(), epsilon);
-    ros::Duration temp = v1[i];
+    miniros::Duration temp = v1[i];
     EXPECT_NEAR(v1[i].toSec() * v2[i].toSec(), (temp *= v2[i].toSec()).toSec(), epsilon);
-
   }
-
 }
 
 TEST(Duration, OperatorPlusEquals)
@@ -608,6 +606,6 @@ TEST(SteadyTime, sleepUntil){
 
 int main(int argc, char **argv){
   testing::InitGoogleTest(&argc, argv);
-  ros::Time::init();
+  miniros::Time::init();
   return RUN_ALL_TESTS();
 }

@@ -454,7 +454,7 @@ void init(const M_string& remappings, const std::string& name, uint32_t options)
     g_init_options = options;
     g_ok = true;
 
-    MINIROSCONSOLE_AUTOINIT;
+    console::initializeSafe();
     // Disable SIGPIPE
 #ifndef WIN32
     signal(SIGPIPE, SIG_IGN);

@@ -28,14 +28,14 @@
  */
 
 #include <gtest/gtest.h>
-#include <ros/duration.h>
-#include <ros/time.h>
+#include <miniros/duration.h>
+#include <miniros/rostime.h>
 
-using namespace ros;
+using namespace miniros;
 
 TEST(Duration, sleepWithSimTime)
 {
-  ros::Time::init();
+  miniros::Time::init();
 
   Time start = Time::now();
   start -= Duration(2.0);
@@ -50,7 +50,7 @@ TEST(Duration, sleepWithSimTime)
 
 TEST(Duration, castFromDoubleExceptions)
 {
-    ros::Time::init();
+    miniros::Time::init();
 
     Duration d1, d2, d3, d4;
     // Valid values to cast, must not throw exceptions
@@ -68,7 +68,7 @@ TEST(Duration, castFromDoubleExceptions)
 
 TEST(Duration, castFromInt64Exceptions)
 {
-    ros::Time::init();
+    miniros::Time::init();
 
     Duration d1, d2, d3, d4;
     // Valid values to cast, must not throw exceptions
@@ -86,7 +86,7 @@ TEST(Duration, castFromInt64Exceptions)
 
 TEST(Duration, arithmeticExceptions)
 {
-    ros::Time::init();
+    miniros::Time::init();
 
     Duration d1(2147483647, 0);
     Duration d2(2147483647, 999999999);
@@ -106,7 +106,7 @@ TEST(Duration, arithmeticExceptions)
 
 TEST(Duration, negativeSignExceptions)
 {
-    ros::Time::init();
+    miniros::Time::init();
 
     Duration d1(2147483647, 0);
     Duration d2(2147483647, 999999999);
@@ -130,7 +130,7 @@ TEST(Duration, negativeSignExceptions)
 
 TEST(Duration, rounding)
 {
-    ros::Time::init();
+    miniros::Time::init();
 
     Duration d1(49.0000000004);
     EXPECT_EQ(49, d1.sec);

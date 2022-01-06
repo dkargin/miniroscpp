@@ -97,7 +97,7 @@ add_subdirectory(src)
 
 
 if (MINIROS_BUILD_TESTS)
-	find_package(GTEST QUIET)
+	find_package(GTest)
 	if (GTEST_FOUND)
 		add_subdirectory(test)
 	else()
