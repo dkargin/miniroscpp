@@ -26,6 +26,7 @@ endif(catkin_FOUND)
 
 include_directories(include)
 set(MINIROS_INCLUDE_DIRS ${CMAKE_CURRENT_BINARY_DIR})
+set(MINIROS_XMLRPCPP_B64_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/xmlrpcpp/libb64/include")
 
 set(MINIROS_INCLUDE_GENERATED_DIRS
   ${CMAKE_CURRENT_SOURCE_DIR}/include/generated

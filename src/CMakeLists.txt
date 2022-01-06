@@ -143,6 +143,7 @@ set(transport_SRC
   transport/steady_timer.cpp
   )
 
+find_package(Boost REQUIRED COMPONENTS regex system thread)
 
 if (MINIROS_BUILD_SHARED_LIBS)
   add_library(roscxx SHARED ${rostime_SRC} ${cpp_common_SRC} ${transport_SRC})
@@ -152,7 +153,7 @@ endif()
 
 set_property(TARGET roscxx PROPERTY CXX_STANDARD 17)
 
-target_link_libraries(roscxx xmlrpcpp rt stdc++fs ${console_bridge_LIBRARIES})
+target_link_libraries(roscxx xmlrpcpp rt stdc++fs ${console_bridge_LIBRARIES} ${Boost_LIBRARIES})
 
 target_compile_definitions(roscxx PRIVATE rostime_EXPORTS miniros_EXPORTS)
 
