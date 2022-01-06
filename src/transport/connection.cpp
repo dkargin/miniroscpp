@@ -387,7 +387,11 @@ void Connection::writeHeader(const M_string& key_vals, const WriteFinishedFunc& 
   memcpy(full_msg.get() + 4, buffer.get(), len);
   *((uint32_t*)full_msg.get()) = len;
 
-  write(full_msg, msg_len, boost::bind(&Connection::onHeaderWritten, this, _1), false);
+  auto wrapFn = [this](const ConnectionPtr& conn)
+  {
+    this->onHeaderWritten(conn);
+  };
+  write(full_msg, msg_len, wrapFn, false);
 }
 
 void Connection::sendHeaderError(const std::string& error_msg)
@@ -395,7 +399,7 @@ void Connection::sendHeaderError(const std::string& error_msg)
   M_string m;
   m["error"] = error_msg;
 
-  writeHeader(m, boost::bind(&Connection::onErrorHeaderWritten, this, _1));
+  writeHeader(m, [this](const ConnectionPtr& conn){this->onErrorHeaderWritten(conn);});
   sending_header_error_ = true;
 }
 
@@ -419,7 +423,11 @@ void Connection::onHeaderLengthRead(const ConnectionPtr& conn, const std::shared
     conn->drop(HeaderError);
   }
 
-  read(len, boost::bind(&Connection::onHeaderRead, this, _1, _2, _3, _4));
+  auto readFn = [this](const ConnectionPtr& conn, const std::shared_ptr<uint8_t[]>& buffer, uint32_t size, bool success)
+  {
+    this->onHeaderRead(conn, buffer, size, success);
+  };
+  read(len, readFn);
 }
 
 void Connection::onHeaderRead(const ConnectionPtr& conn, const std::shared_ptr<uint8_t[]>& buffer, uint32_t size, bool success)
@@ -474,7 +482,13 @@ void Connection::setHeaderReceivedCallback(const HeaderReceivedFunc& func)
   header_func_ = func;
 
   if (transport_->requiresHeader())
-    read(4, boost::bind(&Connection::onHeaderLengthRead, this, _1, _2, _3, _4));
+  {
+    auto wrapFn = [this](const ConnectionPtr& conn, const std::shared_ptr<uint8_t[]>& buffer, uint32_t size, bool success)
+    {
+      this->onHeaderLengthRead(conn, buffer, size, success);
+    };
+    read(4, wrapFn);
+  }
 }
 
 std::string Connection::getCallerId()

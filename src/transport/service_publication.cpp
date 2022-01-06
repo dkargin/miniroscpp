@@ -37,7 +37,7 @@
 #include "miniros/connection.h"
 #include "miniros/callback_queue_interface.h"
 
-//#include <boost/bind.hpp>
+//
 
 #include <generated/std_msgs/String.hxx>
 

@@ -41,7 +41,6 @@
 #include "miniros/this_node.h"
 #include "miniros/file_log.h"
 
-#include <boost/bind.hpp>
 
 namespace miniros
 {
