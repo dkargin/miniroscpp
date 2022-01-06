@@ -271,18 +271,38 @@ namespace miniros
   class IosFlagSaver
   {
   public:
-	  explicit IosFlagSaver(std::ostream& _ios) : ios(_ios), f(_ios.flags()) { }
+      using stream_t = std::ostream;
+      using char_t = std::ostream::char_type;
+	  explicit IosFlagSaver(stream_t& stream)
+	      :ios(stream)
+	      ,f(stream.flags())
+	      ,width(stream.width())
+	      ,precision(stream.precision())
+	      ,fill(stream.fill())
+	  { }
+
 	  ~IosFlagSaver()
 	  {
-		  ios.flags(f);
+		  restore();
+	  }
+
+	  void restore()
+	  {
+	      ios.fill(fill);
+	      ios.precision(precision);
+	      ios.width(width);
+	      ios.flags(f);
 	  }
 
 	  IosFlagSaver(const IosFlagSaver &rhs) = delete;
 	  IosFlagSaver& operator= (const IosFlagSaver& rhs) = delete;
 
   private:
-	  std::ostream& ios;
-	  std::ios::fmtflags f;
+	  stream_t& ios;
+	  std::ios::fmtflags const f;
+	  std::streamsize const width;
+	  std::streamsize const precision;
+	  char_t fill;
   };
 
   /*********************************************************************
