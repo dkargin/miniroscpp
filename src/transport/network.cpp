@@ -25,6 +25,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <cstring>
 
 #include "miniros/config.h"
 #include "miniros/network.h"

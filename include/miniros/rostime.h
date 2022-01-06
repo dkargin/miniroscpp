@@ -56,6 +56,7 @@
 #include <miniros/platform.h>
 #include <iostream>
 #include <cmath>
+#include <limits>
 #include <miniros/exception.h>
 #include "duration.h"
 #include "macros.h"
@@ -138,12 +139,12 @@ namespace miniros
   public:
     uint32_t sec, nsec;
 
-    TimeBase() : sec(0), nsec(0) { }
-    TimeBase(uint32_t _sec, uint32_t _nsec) : sec(_sec), nsec(_nsec)
+    constexpr TimeBase() : sec(0), nsec(0) { }
+    constexpr TimeBase(uint32_t _sec, uint32_t _nsec) : sec(_sec), nsec(_nsec)
     {
       normalizeSecNSec(sec, nsec);
     }
-    explicit TimeBase(double t) { fromSec(t); }
+    constexpr explicit TimeBase(double t) { fromSec(t); }
     D operator-(const T &rhs) const;
     T operator+(const D &rhs) const;
     T operator-(const D &rhs) const;
@@ -175,15 +176,15 @@ namespace miniros
   class MINIROS_DECL Time : public TimeBase<Time, Duration>
   {
   public:
-    Time()
+    constexpr Time()
       : TimeBase<Time, Duration>()
     {}
 
-    Time(uint32_t _sec, uint32_t _nsec)
+    constexpr Time(uint32_t _sec, uint32_t _nsec)
       : TimeBase<Time, Duration>(_sec, _nsec)
     {}
 
-    explicit Time(double t) { fromSec(t); }
+    constexpr explicit Time(double t) { fromSec(t); }
 
     /**
      * \brief Retrieve the current time.  If ROS clock time is in use, this returns the time according to the
@@ -221,8 +222,8 @@ namespace miniros
     */
   };
 
-  constexpr const Time TIME_MAX(std::numeric_limits<uint32_t>::max(), 999999999);
-  constexpr const Time TIME_MIN(0, 1);
+  extern MINIROS_DECL const Time TIME_MAX;
+  extern MINIROS_DECL const Time TIME_MIN;
 
   /**
    * \brief Time representation.  Always wall-clock time.
