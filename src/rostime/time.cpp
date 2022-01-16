@@ -59,10 +59,6 @@
 #include <windows.h>
 #endif
 
-#ifdef USE_BOOST_TIME
-#include <boost/date_time/posix_time/ptime.hpp>
-#endif
-
 /*********************************************************************
  ** Preprocessor
  *********************************************************************/

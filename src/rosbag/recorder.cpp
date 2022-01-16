@@ -35,12 +35,8 @@
 #include "minibag/recorder.h"
 
 #include <sys/stat.h>
-#include <boost/filesystem.hpp>
-// Boost filesystem v3 is default in 1.46.0 and above
-// Fallback to original posix code (*nix only) if this is not true
-#if BOOST_FILESYSTEM_VERSION < 3
-  #include <sys/statvfs.h>
-#endif
+#include <filesystem>
+
 #include <time.h>
 
 #include <queue>
@@ -49,16 +45,12 @@
 #include <string>
 #include <memory>
 
-#include <boost/lexical_cast.hpp>
-#include <boost/regex.hpp>
-#include <boost/thread/xtime.hpp>
-#include <boost/date_time/local_time/local_time.hpp>
+#include <regex>
 
-#include <ros/ros.h>
 #include <topic_tools/shape_shifter.h>
 
-#include "ros/network.h"
-#include "ros/xmlrpc_manager.h"
+#include "miniros/network.h"
+#include "miniros/xmlrpc_manager.h"
 #include "xmlrpcpp/XmlRpc.h"
 
 using std::cout;
@@ -146,7 +138,7 @@ int Recorder::run() {
         }
     }
 
-    ros::NodeHandle nh;
+    miniros::NodeHandle nh;
     if (!nh.ok())
         return 0;
 
@@ -164,10 +156,10 @@ int Recorder::run() {
             subscribe(topic);
     }
 
-    if (!ros::Time::waitForValid(ros::WallDuration(2.0)))
+    if (!miniros::Time::waitForValid(ros::WallDuration(2.0)))
       MINIROS_WARN("/use_sim_time set to true and no clock published.  Still waiting for valid time...");
 
-    ros::Time::waitForValid();
+    miniros::Time::waitForValid();
 
     start_time_ = ros::Time::now();
 
@@ -175,31 +167,31 @@ int Recorder::run() {
     if (!nh.ok())
         return 0;
 
-    ros::Subscriber trigger_sub;
+    miniros::Subscriber trigger_sub;
 
     // Spin up a thread for writing to the file
-    boost::thread record_thread;
+    std::thread record_thread;
     if (options_.snapshot)
     {
-        record_thread = boost::thread(boost::bind(&Recorder::doRecordSnapshotter, this));
+        record_thread = std::thread(&Recorder::doRecordSnapshotter, this);
 
         // Subscribe to the snapshot trigger
         trigger_sub = nh.subscribe<std_msgs::Empty>("snapshot_trigger", 100, boost::bind(&Recorder::snapshotTrigger, this, _1));
     }
     else
-        record_thread = boost::thread(boost::bind(&Recorder::doRecord, this));
+        record_thread = std::thread(&Recorder::doRecord, this);
 
 
 
-    ros::Timer check_master_timer;
+    miniros::Timer check_master_timer;
     if (options_.record_all || options_.regex || (options_.node != std::string("")))
     {
         // check for master first
-        doCheckMaster(ros::TimerEvent(), nh);
+        doCheckMaster(miniros::TimerEvent(), nh);
         check_master_timer = nh.createTimer(ros::Duration(1.0), boost::bind(&Recorder::doCheckMaster, this, _1, boost::ref(nh)));
     }
 
-    ros::AsyncSpinner s(10);
+    miniros::AsyncSpinner s(10);
     s.start();
 
     record_thread.join();
@@ -212,17 +204,17 @@ int Recorder::run() {
 shared_ptr<ros::Subscriber> Recorder::subscribe(string const& topic) {
     MINIROS_INFO("Subscribing to %s", topic.c_str());
 
-    ros::NodeHandle nh;
+    miniros::NodeHandle nh;
     shared_ptr<int> count(std::make_shared<int>(options_.limit));
     shared_ptr<ros::Subscriber> sub(std::make_shared<ros::Subscriber>());
 
-    ros::SubscribeOptions ops;
+    miniros::SubscribeOptions ops;
     ops.topic = topic;
     ops.queue_size = 100;
-    ops.md5sum = ros::message_traits::md5sum<topic_tools::ShapeShifter>();
-    ops.datatype = ros::message_traits::datatype<topic_tools::ShapeShifter>();
-    ops.helper = std::make_shared<ros::SubscriptionCallbackHelperT<
-        const ros::MessageEvent<topic_tools::ShapeShifter const> &> >(
+    ops.md5sum = miniros::message_traits::md5sum<topic_tools::ShapeShifter>();
+    ops.datatype = miniros::message_traits::datatype<topic_tools::ShapeShifter>();
+    ops.helper = miniros::make_shared<ros::SubscriptionCallbackHelperT<
+        const miniros::MessageEvent<topic_tools::ShapeShifter const> &> >(
             boost::bind(&Recorder::doQueue, this, _1, topic, sub, count));
     ops.transport_hints = options_.transport_hints;
     *sub = nh.subscribe(ops);
@@ -477,7 +469,7 @@ void Recorder::doRecord() {
     startWriting();
 
     // Schedule the disk space check
-    warn_next_ = ros::WallTime();
+    warn_next_ = miniros::WallTime();
 
     try
     {
@@ -498,7 +490,7 @@ void Recorder::doRecord() {
     // it shouldn't be in contention.
     ros::NodeHandle nh;
     while (nh.ok() || !queue_->empty()) {
-        boost::unique_lock<std::mutex> lock(queue_mutex_);
+        std::unique_lock<std::mutex> lock(queue_mutex_);
 
         bool finished = false;
         while (queue_->empty()) {

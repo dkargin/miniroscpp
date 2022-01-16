@@ -35,8 +35,6 @@
 #pragma once
 
 #include <functional>
-//#include <boost/iterator/iterator_facade.hpp>
-
 #include <miniros/rostime.h>
 #include "minibag/message_instance.h"
 #include "minibag/query.h"

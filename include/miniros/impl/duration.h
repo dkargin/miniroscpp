@@ -39,8 +39,6 @@
 #include <miniros/duration.h>
 #include <miniros/rate.h>
 
-//#include <boost/date_time/posix_time/posix_time_types.hpp>
-//#include <boost/math/special_functions/round.hpp>
 
 namespace miniros {
   //

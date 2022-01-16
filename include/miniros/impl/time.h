@@ -44,8 +44,6 @@
 #include <miniros/exception.h>
 #include <miniros/rostime.h>
 
-//#include <boost/date_time/posix_time/posix_time.hpp>
-
 /*********************************************************************
 ** Cross Platform Headers
 *********************************************************************/

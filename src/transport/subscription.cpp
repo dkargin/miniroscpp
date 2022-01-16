@@ -59,8 +59,6 @@
 #include "miniros/transport_hints.h"
 #include "miniros/subscription_callback_helper.h"
 
-#include <boost/make_shared.hpp>
-
 using XmlRpc::XmlRpcValue;
 
 namespace miniros
