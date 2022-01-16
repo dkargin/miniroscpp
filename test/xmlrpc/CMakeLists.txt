@@ -32,6 +32,8 @@ add_library(mock_socket STATIC mock_socket.cpp)
 target_link_libraries(mock_socket ${GTEST_LIBRARIES})
 set_target_properties(mock_socket PROPERTIES EXCLUDE_FROM_ALL TRUE)
 
+# Some tests rely on replacing system calls (like write/read) by a mock versions.
+# But we must include actual sources to make this replacement happen.
 miniros_add_test(test_client test_client.cpp
   ${XMLRPCPP_SRC_ROOT}/src/XmlRpcClient.cpp
   ${XMLRPCPP_SRC_ROOT}/src/XmlRpcValue.cpp
