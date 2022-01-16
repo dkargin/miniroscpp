@@ -19,3 +19,5 @@ miniros_add_test(test_duration rostime/test_duration.cpp)
 miniros_add_test(test_time rostime/test_time.cpp)
 
 add_subdirectory(xmlrpc)
+
+add_subdirectory(roscpp/basic)

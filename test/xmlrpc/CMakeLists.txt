@@ -93,6 +93,7 @@ if(NOT WIN32)
       LINK_FLAGS
       "-Wl,--wrap=accept -Wl,--wrap=bind -Wl,--wrap=close -Wl,--wrap=connect -Wl,--wrap=getaddrinfo -Wl,--wrap=getsockname -Wl,--wrap=listen -Wl,--wrap=read -Wl,--wrap=setsockopt -Wl,--wrap=select -Wl,--wrap=socket -Wl,--wrap=write -Wl,--wrap=fcntl -Wl,--wrap=freeaddrinfo"
     )
+    target_link_libraries(test_socket pthread)
   endif()
   target_link_libraries(test_socket ${GTEST_LIBRARIES})
   add_test(NAME test_socket COMMAND test_socket)

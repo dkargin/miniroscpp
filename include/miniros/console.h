@@ -388,6 +388,7 @@ MINIROS_DECL extern void (*function_print)(void*, console::Level, const char*, c
 #define ROS_DEBUG_NAMED(...)
 
 #define ROS_ERROR_STREAM(...)
+#define ROS_INFO_STREAM(...)
 #define ROS_WARN_STREAM(...)
 #define ROS_DEBUG_STREAM(...)
 #define ROS_FATAL_STREAM(...)
