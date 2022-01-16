@@ -92,6 +92,8 @@ if (WIN32)
   add_definitions(-D_CRT_SECURE_NO_WARNINGS)
 endif()
 
+set(XMLRPCPP_SRC_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/xmlrpcpp)
+
 add_subdirectory(external)
 add_subdirectory(xmlrpcpp)
 add_subdirectory(src)

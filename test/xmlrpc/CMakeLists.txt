@@ -32,8 +32,16 @@ add_library(mock_socket STATIC mock_socket.cpp)
 target_link_libraries(mock_socket ${GTEST_LIBRARIES})
 set_target_properties(mock_socket PROPERTIES EXCLUDE_FROM_ALL TRUE)
 
-miniros_add_test(test_client test_client.cpp)
-target_link_libraries(test_client mock_socket xmlrpcpp)
+miniros_add_test(test_client test_client.cpp
+  ${XMLRPCPP_SRC_ROOT}/src/XmlRpcClient.cpp
+  ${XMLRPCPP_SRC_ROOT}/src/XmlRpcValue.cpp
+  ${XMLRPCPP_SRC_ROOT}/src/XmlRpcUtil.cpp
+  ${XMLRPCPP_SRC_ROOT}/src/XmlRpcDispatch.cpp
+  ${XMLRPCPP_SRC_ROOT}/src/XmlRpcSource.cpp
+  ${XMLRPCPP_SRC_ROOT}/libb64/src/cdecode.c
+  ${XMLRPCPP_SRC_ROOT}/libb64/src/cencode.c)
+
+target_link_libraries(test_client mock_socket)
 if(WIN32)
   target_link_libraries(test_client ws2_32)
 endif()
@@ -43,14 +51,19 @@ if(WIN32)
   set_target_properties(test_client PROPERTIES COMPILE_FLAGS -UROS_BUILD_SHARED_LIBS)
 endif()
 
-miniros_add_test(test_dispatch test_dispatch.cpp)
+miniros_add_test(test_dispatch test_dispatch.cpp
+  ${XMLRPCPP_SRC_ROOT}/src/XmlRpcDispatch.cpp
+  ${XMLRPCPP_SRC_ROOT}/src/XmlRpcSource.cpp
+  ${XMLRPCPP_SRC_ROOT}/src/XmlRpcUtil.cpp
+  ${XMLRPCPP_SRC_ROOT}/libb64/src/cdecode.c
+  ${XMLRPCPP_SRC_ROOT}/libb64/src/cencode.c)
 
 if(WIN32)
   # build everything from source, undefine ROS_BUILD_SHARED_LIBS to eliminate the dllimport/dllexport attributes
   set_target_properties(test_dispatch PROPERTIES COMPILE_FLAGS -UROS_BUILD_SHARED_LIBS)
 endif()
 
-target_link_libraries(test_dispatch mock_socket xmlrpcpp)
+target_link_libraries(test_dispatch mock_socket)
 if(WIN32)
   target_link_libraries(test_dispatch ws2_32)
 endif()
@@ -63,7 +76,10 @@ endif()
 
 
 if(NOT WIN32)
-  miniros_add_test(test_socket test_socket.cpp test_system_mocks.c)
+  add_executable(test_socket test_socket.cpp test_system_mocks.c
+    ${XMLRPCPP_SRC_ROOT}/src/XmlRpcSocket.cpp
+    ${XMLRPCPP_SRC_ROOT}/src/XmlRpcUtil.cpp
+  )
 
   if(APPLE)
     set_target_properties(test_socket PROPERTIES
@@ -76,8 +92,8 @@ if(NOT WIN32)
       "-Wl,--wrap=accept -Wl,--wrap=bind -Wl,--wrap=close -Wl,--wrap=connect -Wl,--wrap=getaddrinfo -Wl,--wrap=getsockname -Wl,--wrap=listen -Wl,--wrap=read -Wl,--wrap=setsockopt -Wl,--wrap=select -Wl,--wrap=socket -Wl,--wrap=write -Wl,--wrap=fcntl -Wl,--wrap=freeaddrinfo"
     )
   endif()
-  
-  target_link_libraries(test_socket xmlrpcpp)
+  target_link_libraries(test_socket ${GTEST_LIBRARIES})
+  add_test(NAME test_socket COMMAND test_socket)
 endif()
 
 miniros_add_test(TestValues TestValues.cpp)
