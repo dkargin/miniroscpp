@@ -509,6 +509,7 @@ TEST_F(Poller, updateWhileAddDel)
   ASSERT_TRUE(sh1.bytes_written_ > 0);
   ASSERT_TRUE(sh2.bytes_read_ > 0);
   ASSERT_TRUE(sh2.bytes_written_ > 0);
+  t.join();
 }
 
 TEST_F(Poller, signal)
@@ -521,6 +522,7 @@ TEST_F(Poller, signal)
 
   // wait for poll_set_.signal_mutex_ to be unlocked after invoking signal()
   std::this_thread::sleep_for(std::chrono::microseconds(50000));
+  t.join();
 }
 
 

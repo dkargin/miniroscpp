@@ -383,7 +383,7 @@ MINIROS_DECL extern void (*function_print)(void*, console::Level, const char*, c
 #define MINIROS_INFO(...)
 #define MINIROS_DEBUG(...)
 #define MINIROS_WARN(...)
-#define MINIROS_FATAL(...)
+#define MINIROS_FATAL(...) do{std::terminate();}while(0);
 
 #define ROS_DEBUG_NAMED(...)
 

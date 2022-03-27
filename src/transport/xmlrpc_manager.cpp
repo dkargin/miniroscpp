@@ -142,7 +142,8 @@ void XMLRPCManager::shutdown()
   }
 
   shutting_down_ = true;
-  server_thread_.join();
+  if (server_thread_.joinable())
+      server_thread_.join();
 
   server_.close();
 

@@ -597,7 +597,8 @@ void shutdown()
 
   if (g_internal_queue_thread.get_id() != std::this_thread::get_id())
   {
-    g_internal_queue_thread.join();
+      if (g_internal_queue_thread.joinable())
+          g_internal_queue_thread.join();
   }
   //miniros::console::deregister_appender(g_rosout_appender);
   delete g_rosout_appender;

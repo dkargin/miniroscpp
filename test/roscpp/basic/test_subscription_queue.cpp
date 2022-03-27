@@ -233,6 +233,7 @@ TEST(SubscriptionQueue, clearWhileThreadIsBlocking)
   queue.clear();
 
   ASSERT_TRUE(done);
+  t.join();
 }
 
 void waitForBarrier(Barrier* bar)

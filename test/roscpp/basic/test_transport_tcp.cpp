@@ -160,7 +160,9 @@ TEST_F(Synchronous, readWhileWriting)
 
     ASSERT_EQ(done_read, true);
     ASSERT_EQ(read_out, (int32_t)msg.length());
+
     ASSERT_STREQ((const char*)read_buf.get(), msg.c_str());
+    t.join();
   }
 }
 
