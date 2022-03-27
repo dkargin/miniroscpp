@@ -78,14 +78,38 @@ void TopicManager::start()
   connection_manager_ = ConnectionManager::instance();
   xmlrpc_manager_ = XMLRPCManager::instance();
 
-  xmlrpc_manager_->bind("publisherUpdate", boost::bind(&TopicManager::pubUpdateCallback, this, _1, _2));
-  xmlrpc_manager_->bind("requestTopic", boost::bind(&TopicManager::requestTopicCallback, this, _1, _2));
-  xmlrpc_manager_->bind("getBusStats", boost::bind(&TopicManager::getBusStatsCallback, this, _1, _2));
-  xmlrpc_manager_->bind("getBusInfo", boost::bind(&TopicManager::getBusInfoCallback, this, _1, _2));
-  xmlrpc_manager_->bind("getSubscriptions", boost::bind(&TopicManager::getSubscriptionsCallback, this, _1, _2));
-  xmlrpc_manager_->bind("getPublications", boost::bind(&TopicManager::getPublicationsCallback, this, _1, _2));
+  xmlrpc_manager_->bind("publisherUpdate",
+    [this](XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result)
+    {
+      this->pubUpdateCallback(params, result);
+    });
+  xmlrpc_manager_->bind("requestTopic",
+    [this](XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result)
+    {
+      this->requestTopicCallback(params, result);
+    });
+  xmlrpc_manager_->bind("getBusStats",
+    [this](XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result)
+    {
+      this->getBusStatsCallback(params, result);
+    });
+  xmlrpc_manager_->bind("getBusInfo",
+    [this](XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result)
+    {
+      this->getBusInfoCallback(params, result);
+    });
+  xmlrpc_manager_->bind("getSubscriptions",
+    [this](XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result)
+    {
+      this->getSubscriptionsCallback(params, result);
+    });
+  xmlrpc_manager_->bind("getPublications",
+    [this](XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result)
+    {
+      this->getPublicationsCallback(params, result);
+    });
 
-  poll_manager_->addPollThreadListener(boost::bind(&TopicManager::processPublishQueues, this));
+  poll_manager_->addPollThreadListener([this]() {this->processPublishQueues();});
 }
 
 void TopicManager::shutdown()

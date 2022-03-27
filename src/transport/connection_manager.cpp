@@ -59,14 +59,20 @@ ConnectionManager::~ConnectionManager()
 void ConnectionManager::start()
 {
   poll_manager_ = PollManager::instance();
-  poll_conn_ = poll_manager_->addPollThreadListener(boost::bind(&ConnectionManager::removeDroppedConnections, 
-								this));
+  poll_conn_ = poll_manager_->addPollThreadListener(
+    [this]()
+    {
+      this->removeDroppedConnections();
+    });
 
   // Bring up the TCP listener socket
   tcpserver_transport_ = std::make_shared<TransportTCP>(&poll_manager_->getPollSet());
-  if (!tcpserver_transport_->listen(network::getTCPROSPort(), 
-				    MAX_TCPROS_CONN_QUEUE, 
-				    boost::bind(&ConnectionManager::tcprosAcceptConnection, this, _1)))
+  bool started = tcpserver_transport_->listen(network::getTCPROSPort(), MAX_TCPROS_CONN_QUEUE,
+    [this](const TransportTCPPtr& transport)
+    {
+      this->tcprosAcceptConnection(transport);
+    });
+  if (!started)
   {
     MINIROS_FATAL("Listen on port [%d] failed", network::getTCPROSPort());
     MINIROS_BREAK();
@@ -142,7 +148,11 @@ void ConnectionManager::addConnection(const ConnectionPtr& conn)
   std::scoped_lock<std::mutex> lock(connections_mutex_);
 
   connections_.insert(conn);
-  conn->addDropListener(boost::bind(&ConnectionManager::onConnectionDropped, this, _1));
+  conn->addDropListener(
+    [this](const ConnectionPtr& conn, Connection::DropReason reason)
+    {
+      this->onConnectionDropped(conn);
+    });
 }
 
 void ConnectionManager::onConnectionDropped(const ConnectionPtr& conn)
@@ -190,7 +200,11 @@ void ConnectionManager::tcprosAcceptConnection(const TransportTCPPtr& transport)
   ConnectionPtr conn(std::make_shared<Connection>());
   addConnection(conn);
 
-  conn->initialize(transport, true, [this](const ConnectionPtr& connection, const Header& header) {return this->onConnectionHeaderReceived(connection, header); });
+  conn->initialize(transport, true,
+    [this](const ConnectionPtr& connection, const Header& header)
+    {
+      return this->onConnectionHeaderReceived(connection, header);
+    });
 }
 
 bool ConnectionManager::onConnectionHeaderReceived(const ConnectionPtr& conn, const Header& header)
@@ -199,8 +213,9 @@ bool ConnectionManager::onConnectionHeaderReceived(const ConnectionPtr& conn, co
   std::string val;
   if (header.getValue("topic", val))
   {
-    ROSCPP_CONN_LOG_DEBUG("Connection: Creating TransportSubscriberLink for topic [%s] connected to [%s]", 
-		     val.c_str(), conn->getRemoteString().c_str());
+    ROSCPP_CONN_LOG_DEBUG(
+     "Connection: Creating TransportSubscriberLink for topic [%s] connected to [%s]",
+     val.c_str(), conn->getRemoteString().c_str());
 
     TransportSubscriberLinkPtr sub_link(std::make_shared<TransportSubscriberLink>());
     sub_link->initialize(conn);
@@ -208,8 +223,9 @@ bool ConnectionManager::onConnectionHeaderReceived(const ConnectionPtr& conn, co
   }
   else if (header.getValue("service", val))
   {
-    ROSCPP_LOG_DEBUG("Connection: Creating ServiceClientLink for service [%s] connected to [%s]", 
-		     val.c_str(), conn->getRemoteString().c_str());
+    ROSCPP_LOG_DEBUG(
+      "Connection: Creating ServiceClientLink for service [%s] connected to [%s]",
+      val.c_str(), conn->getRemoteString().c_str());
 
     ServiceClientLinkPtr link(std::make_shared<ServiceClientLink>());
     link->initialize(conn);
@@ -217,8 +233,9 @@ bool ConnectionManager::onConnectionHeaderReceived(const ConnectionPtr& conn, co
   }
   else
   {
-  	ROSCPP_LOG_DEBUG("Got a connection for a type other than 'topic' or 'service' from [%s].  Fail.", 
-			 conn->getRemoteString().c_str());
+    ROSCPP_LOG_DEBUG(
+      "Got a connection for a type other than 'topic' or 'service' from [%s].  Fail.",
+      conn->getRemoteString().c_str());
     return false;
   }
 

@@ -756,7 +756,6 @@ void Bag::appendConnectionRecordToBuffer(Buffer& buf, ConnectionInfo const* conn
 
 void Bag::readConnectionRecord() {
     miniros::Header header;
-    //if (!encryptor_->readEncryptedHeader(boost::bind(&Bag::readHeader, this, _1), header, header_buffer_, file_))
     if (!encryptor_->readEncryptedHeader(
         [this](miniros::Header& header) -> bool { return readHeader(header);}, header, header_buffer_, file_))
     {
@@ -773,7 +772,6 @@ void Bag::readConnectionRecord() {
     readField(fields, TOPIC_FIELD_NAME,      true, topic);
 
     miniros::Header connection_header;
-    //if (!encryptor_->readEncryptedHeader(boost::bind(&Bag::readHeader, this, _1), connection_header, header_buffer_, file_))
     if (!encryptor_->readEncryptedHeader(
         [this](miniros::Header& header) -> bool { return readHeader(header);}, connection_header, header_buffer_, file_))
     {

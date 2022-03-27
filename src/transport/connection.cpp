@@ -93,7 +93,11 @@ void Connection::initialize(const TransportPtr& transport, bool is_server, const
 
   if (header_func)
   {
-    read(4, boost::bind(&Connection::onHeaderLengthRead, this, _1, _2, _3, _4));
+    read(4,
+      [this](const ConnectionPtr& conn, const std::shared_ptr<uint8_t[]>& buffer, uint32_t size, bool success)
+      {
+        this->onHeaderLengthRead(conn, buffer, size, success);
+      });
   }
 }
 
@@ -485,7 +489,7 @@ void Connection::setHeaderReceivedCallback(const HeaderReceivedFunc& func)
   {
     auto wrapFn = [this](const ConnectionPtr& conn, const std::shared_ptr<uint8_t[]>& buffer, uint32_t size, bool success)
     {
-      this->onHeaderLengthRead(conn, buffer, size, success);
+      return this->onHeaderLengthRead(conn, buffer, size, success);
     };
     read(4, wrapFn);
   }
