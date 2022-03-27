@@ -55,7 +55,8 @@ TransportSubscriberLink::~TransportSubscriberLink()
 bool TransportSubscriberLink::initialize(const ConnectionPtr& connection)
 {
   connection_ = connection;
-  dropped_conn_ = connection_->addDropListener(boost::bind(&TransportSubscriberLink::onConnectionDropped, this, _1));
+  dropped_conn_ = connection_->addDropListener(
+    [this](const ConnectionPtr& conn, Connection::DropReason reason){this->onConnectionDropped(conn);});
 
   return true;
 }
@@ -110,7 +111,7 @@ bool TransportSubscriberLink::handleHeader(const Header& header)
   m["callerid"] = this_node::getName();
   m["latching"] = pt->isLatching() ? "1" : "0";
   m["topic"] = topic_;
-  connection_->writeHeader(m, boost::bind(&TransportSubscriberLink::onHeaderWritten, this, _1));
+  connection_->writeHeader(m, [this](const ConnectionPtr& conn) {this->onHeaderWritten(conn);});
 
   pt->addSubscriberLink(shared_from_this());
 
@@ -168,7 +169,8 @@ void TransportSubscriberLink::startMessageWrite(bool immediate_write)
 
   if (m.num_bytes > 0)
   {
-    connection_->write(m.buf, m.num_bytes, boost::bind(&TransportSubscriberLink::onMessageWritten, this, _1), immediate_write);
+    connection_->write(m.buf, m.num_bytes,
+      [this](const ConnectionPtr& conn){this->onMessageWritten(conn);}, immediate_write);
   }
 }
 

@@ -90,7 +90,11 @@ bool TransportPublisherLink::initialize(const ConnectionPtr& connection)
 
   if (connection_->getTransport()->requiresHeader())
   {
-    connection_->setHeaderReceivedCallback(boost::bind(&TransportPublisherLink::onHeaderReceived, this, _1, _2));
+    connection_->setHeaderReceivedCallback(
+      [this](const ConnectionPtr& conn, const Header& header)
+      {
+        return this->onHeaderReceived(conn, header);
+      });
 
     SubscriptionPtr parent = parent_.lock();
     if (!parent)
@@ -104,11 +108,15 @@ bool TransportPublisherLink::initialize(const ConnectionPtr& connection)
     header["callerid"] = this_node::getName();
     header["type"] = parent->datatype();
     header["tcp_nodelay"] = transport_hints_.getTCPNoDelay() ? "1" : "0";
-    connection_->writeHeader(header, boost::bind(&TransportPublisherLink::onHeaderWritten, this, _1));
+    connection_->writeHeader(header, [this](const ConnectionPtr& conn){this->onHeaderWritten(conn);});
   }
   else
   {
-    connection_->read(4, boost::bind(&TransportPublisherLink::onMessageLength, this, _1, _2, _3, _4));
+    connection_->read(4,
+      [this](const ConnectionPtr& conn, const std::shared_ptr<uint8_t[]>& buffer, uint32_t size, bool success)
+      {
+        this->onMessageLength(conn, buffer, size, success);
+      });
   }
 
   return true;
@@ -148,7 +156,11 @@ bool TransportPublisherLink::onHeaderReceived(const ConnectionPtr& conn, const H
     retry_timer_handle_ = -1;
   }
 
-  connection_->read(4, boost::bind(&TransportPublisherLink::onMessageLength, this, _1, _2, _3, _4));
+  connection_->read(4,
+    [this](const ConnectionPtr& conn, const std::shared_ptr<uint8_t[]>& buffer, uint32_t size, bool success)
+    {
+      this->onMessageLength(conn, buffer, size, success);
+    });
 
   return true;
 }
@@ -165,8 +177,13 @@ void TransportPublisherLink::onMessageLength(const ConnectionPtr& conn, const st
 
   if (!success)
   {
-    if (connection_)
-      connection_->read(4, boost::bind(&TransportPublisherLink::onMessageLength, this, _1, _2, _3, _4));
+    if (connection_) {
+      connection_->read(4,
+        [this](const ConnectionPtr& conn, const std::shared_ptr<uint8_t[]>& buffer, uint32_t size, bool success)
+        {
+          this->onMessageLength(conn, buffer, size, success);
+        });
+    }
     return;
   }
 
@@ -185,7 +202,11 @@ void TransportPublisherLink::onMessageLength(const ConnectionPtr& conn, const st
     return;
   }
 
-  connection_->read(len, boost::bind(&TransportPublisherLink::onMessage, this, _1, _2, _3, _4));
+  connection_->read(len,
+    [this](const ConnectionPtr& conn, const std::shared_ptr<uint8_t[]>& buffer, uint32_t size, bool success)
+    {
+      this->onMessage(conn, buffer, size, success);
+    });
 }
 
 void TransportPublisherLink::onMessage(const ConnectionPtr& conn, const std::shared_ptr<uint8_t[]>& buffer, uint32_t size, bool success)
@@ -202,7 +223,11 @@ void TransportPublisherLink::onMessage(const ConnectionPtr& conn, const std::sha
 
   if (success || !connection_->getTransport()->requiresHeader())
   {
-    connection_->read(4, boost::bind(&TransportPublisherLink::onMessageLength, this, _1, _2, _3, _4));
+    connection_->read(4,
+      [this](const ConnectionPtr& conn, const std::shared_ptr<uint8_t[]>& buffer, uint32_t size, bool success)
+      {
+        this->onMessageLength(conn, buffer, size, success);
+      });
   }
 }
 
@@ -286,8 +311,9 @@ void TransportPublisherLink::onConnectionDropped(const ConnectionPtr& conn, Conn
       // shared_from_this() shared_ptr is used to ensure TransportPublisherLink is not
       // destroyed in the middle of onRetryTimer execution
       retry_timer_handle_ = getInternalTimerManager()->add(WallDuration(retry_period_),
-          boost::bind(&TransportPublisherLink::onRetryTimer, this, _1), getInternalCallbackQueue().get(),
-          shared_from_this(), false);
+        [this](const miniros::SteadyTimerEvent& event){this->onRetryTimer(event);},
+        getInternalCallbackQueue().get(),
+        shared_from_this(), false);
     }
     else
     {
