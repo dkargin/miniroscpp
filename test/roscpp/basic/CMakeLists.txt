@@ -15,11 +15,12 @@ miniros_add_test(miniroscpp-test_callback_queue test_callback_queue.cpp)
 miniros_add_test(miniroscpp-test_names test_names.cpp)
 miniros_add_test(miniroscpp-test_args test_args.cpp)
 
+if(catkin_FOUND AND CATKIN_ENABLE_TESTING)
+  message(STATUS "Trying to find rostest for more complex testing")
+  find_package(rostest REQUIRED)
+endif()
 
 if (CATKIN_FOUND AND ROSTEST_FOUND)
-  if(GTEST_FOUND)
-    add_subdirectory(src)
-  endif()
   # TODO: Revisit these tests and port them to miniros
   add_rostest(launch/real_time_test.xml)
   add_rostest(launch/sim_time_test.xml)
