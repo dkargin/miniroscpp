@@ -26,15 +26,15 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "miniros/transport_subscriber_link.h"
-#include "miniros/publication.h"
+#include "miniros/transport/transport_subscriber_link.h"
+#include "miniros/transport/publication.h"
 #include "miniros/header.h"
-#include "miniros/connection.h"
+#include "miniros/transport/connection.h"
 #include "miniros/transport/transport.h"
 #include "miniros/this_node.h"
-#include "miniros/connection_manager.h"
-#include "miniros/topic_manager.h"
-#include "miniros/file_log.h"
+#include "miniros/transport/connection_manager.h"
+#include "miniros/transport/topic_manager.h"
+#include "miniros/transport/file_log.h"
 
 namespace miniros
 {

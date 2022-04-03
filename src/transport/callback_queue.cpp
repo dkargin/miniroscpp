@@ -37,7 +37,7 @@
 #define BOOST_THREAD_HAS_CONDATTR_SET_CLOCK_MONOTONIC
 #endif
 
-#include "miniros/callback_queue.h"
+#include "miniros/transport/callback_queue.h"
 #include "miniros/rosassert.h"
 
 namespace miniros

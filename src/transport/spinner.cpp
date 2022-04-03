@@ -27,7 +27,7 @@
 
 #include "miniros/spinner.h"
 #include "miniros/ros.h"
-#include "miniros/callback_queue.h"
+#include "miniros/transport/callback_queue.h"
 
 #include <thread>
 #include <mutex>

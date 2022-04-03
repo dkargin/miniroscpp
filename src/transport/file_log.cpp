@@ -26,10 +26,10 @@
  */
 
 #include <cstdio>
-#include "miniros/file_log.h"
+#include "miniros/transport/file_log.h"
 #include "miniros/this_node.h"
 
-#include <miniros/io.h>
+#include <miniros/transport/io.h>
 #include <miniros/console.h>
 
 #include <filesystem>

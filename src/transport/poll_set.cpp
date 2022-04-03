@@ -32,8 +32,8 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "miniros/poll_set.h"
-#include "miniros/file_log.h"
+#include "miniros/transport/poll_set.h"
+#include "miniros/transport/file_log.h"
 
 #include "miniros/transport/transport.h"
 

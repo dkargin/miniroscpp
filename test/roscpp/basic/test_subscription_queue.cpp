@@ -34,10 +34,10 @@
  */
 
 #include <gtest/gtest.h>
-#include "miniros/subscription_queue.h"
-#include "miniros/message_deserializer.h"
-#include "miniros/callback_queue_interface.h"
-#include "miniros/subscription_callback_helper.h"
+#include "miniros/transport/subscription_queue.h"
+#include "miniros/transport/message_deserializer.h"
+#include "miniros/transport/callback_queue_interface.h"
+#include "miniros/transport/subscription_callback_helper.h"
 #include "miniros/init.h"
 
 #include <thread>

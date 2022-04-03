@@ -26,10 +26,10 @@
  */
 
 #include "miniros/master.h"
-#include "miniros/xmlrpc_manager.h"
+#include "miniros/transport/xmlrpc_manager.h"
 #include "miniros/this_node.h"
 #include "miniros/init.h"
-#include "miniros/network.h"
+#include "miniros/transport/network.h"
 
 #include <miniros/console.h>
 #include <miniros/rosassert.h>

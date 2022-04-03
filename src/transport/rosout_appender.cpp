@@ -32,11 +32,11 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "miniros/rosout_appender.h"
+#include "miniros/transport/rosout_appender.h"
 #include "miniros/this_node.h"
 #include "miniros/node_handle.h"
-#include "miniros/topic_manager.h"
-#include "miniros/advertise_options.h"
+#include "miniros/transport/topic_manager.h"
+#include "miniros/transport/advertise_options.h"
 #include "miniros/names.h"
 #include "miniros/param.h"
 

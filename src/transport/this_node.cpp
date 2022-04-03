@@ -29,7 +29,7 @@
 #include <sstream>
 #include "miniros/this_node.h"
 #include "miniros/names.h"
-#include "miniros/topic_manager.h"
+#include "miniros/transport/topic_manager.h"
 #include "miniros/init.h"
 
 namespace miniros

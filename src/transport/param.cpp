@@ -27,7 +27,7 @@
 
 #include "miniros/param.h"
 #include "miniros/master.h"
-#include "miniros/xmlrpc_manager.h"
+#include "miniros/transport/xmlrpc_manager.h"
 #include "miniros/this_node.h"
 #include "miniros/names.h"
 

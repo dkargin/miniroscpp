@@ -26,11 +26,11 @@
  */
 
 #include "miniros/service.h"
-#include "miniros/connection.h"
-#include "miniros/service_server_link.h"
-#include "miniros/service_manager.h"
+#include "miniros/transport/connection.h"
+#include "miniros/transport/service_server_link.h"
+#include "miniros/transport/service_manager.h"
 #include "miniros/transport/transport_tcp.h"
-#include "miniros/poll_manager.h"
+#include "miniros/transport/poll_manager.h"
 #include "miniros/init.h"
 #include "miniros/names.h"
 #include "miniros/this_node.h"

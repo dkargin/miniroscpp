@@ -26,7 +26,7 @@
  */
 
 #include "miniros/wall_timer.h"
-#include "miniros/timer_manager.h"
+#include "miniros/transport/timer_manager.h"
 
 namespace miniros
 {

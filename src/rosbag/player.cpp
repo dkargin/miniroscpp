@@ -204,8 +204,8 @@ void Player::publish() {
     {
         std::cout << "Creating rate control topic subscriber..." << std::flush;
 
-        std::shared_ptr<miniros::Subscriber> sub(std::make_shared<ros::Subscriber>());
-        ros::SubscribeOptions ops;
+        std::shared_ptr<miniros::Subscriber> sub(std::make_shared<miniros::Subscriber>());
+        miniros::SubscribeOptions ops;
         ops.topic = options_.rate_control_topic;
         ops.queue_size = 10;
         ops.md5sum = miniros::message_traits::md5sum<topic_tools::ShapeShifter>();

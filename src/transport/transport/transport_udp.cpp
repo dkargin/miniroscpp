@@ -36,8 +36,8 @@
 
 
 #include "miniros/transport/transport_udp.h"
-#include "miniros/poll_set.h"
-#include "miniros/file_log.h"
+#include "miniros/transport/poll_set.h"
+#include "miniros/transport/file_log.h"
 
 #include <fcntl.h>
 #if defined(__APPLE__)

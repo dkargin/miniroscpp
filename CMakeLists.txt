@@ -52,10 +52,12 @@ set(MINIROS_ADDITIONAL_COMPONENTS $<NOT:${MINIROS_SUBMODULE}>)
 option(MINIROS_USE_SYSTEM_BZIP2 "Use bzip2 from system" OFF)
 option(MINIROS_USE_SYSTEM_LZ4 "Use lz4 from system" OFF)
 option(MINIROS_BUILD_EXAMPLES "Build examples" ${MINIROS_ADDITIONAL_COMPONENTS})
+option(MINIROS_BUILD_ROSBAG_APPS "Build rosbag applications, like rosbag/play and rosbag/record" OFF)
 option(MINIROS_BUILD_TESTS "Build tests" ${MINIROS_ADDITIONAL_COMPONENTS})
 option(MINIROS_BUILD_SHARED_LIBS "Build shared version of miniros" ON)
 option(MINIROS_ROSBAG_USE_GPGME_ENCRYPTION "Use GPGME encryption support" OFF)
 option(MINIROS_ROSBAG_USE_OPENSSL_ENCRYPTION "Use openssl encryption for rosbag" OFF)
+
 
 # execinfo.h is needed for backtrace on glibc systems
 CHECK_INCLUDE_FILE(execinfo.h HAVE_EXECINFO_H)

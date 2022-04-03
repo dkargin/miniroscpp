@@ -32,11 +32,11 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "miniros/io.h"
+#include "miniros/transport/io.h"
 #include "miniros/transport/transport_tcp.h"
-#include "miniros/poll_set.h"
+#include "miniros/transport/poll_set.h"
 #include "miniros/header.h"
-#include "miniros/file_log.h"
+#include "miniros/transport/file_log.h"
 #include <miniros/rosassert.h>
 #include <sstream>
 #include <cstring>

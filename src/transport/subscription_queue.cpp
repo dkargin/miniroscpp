@@ -26,9 +26,9 @@
  */
 
 
-#include "miniros/subscription_queue.h"
-#include "miniros/message_deserializer.h"
-#include "miniros/subscription_callback_helper.h"
+#include "miniros/transport/subscription_queue.h"
+#include "miniros/transport/message_deserializer.h"
+#include "miniros/transport/subscription_callback_helper.h"
 
 namespace miniros
 {

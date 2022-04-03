@@ -25,8 +25,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "miniros/subscriber_link.h"
-#include "miniros/publication.h"
+#include "miniros/transport/subscriber_link.h"
+#include "miniros/transport/publication.h"
 
 namespace miniros
 {

@@ -28,7 +28,7 @@
 #include "miniros/node_handle.h"
 #include "miniros/this_node.h"
 #include "miniros/service.h"
-#include "miniros/callback_queue.h"
+#include "miniros/transport/callback_queue.h"
 
 #include "miniros/rostime.h"
 #include "miniros/rate.h"
@@ -36,9 +36,9 @@
 #include "miniros/wall_timer.h"
 #include "miniros/steady_timer.h"
 
-#include "miniros/xmlrpc_manager.h"
-#include "miniros/topic_manager.h"
-#include "miniros/service_manager.h"
+#include "miniros/transport/xmlrpc_manager.h"
+#include "miniros/transport/topic_manager.h"
+#include "miniros/transport/service_manager.h"
 #include "miniros/master.h"
 #include "miniros/param.h"
 #include "miniros/names.h"

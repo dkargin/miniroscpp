@@ -25,7 +25,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "miniros/statistics.h"
+#include "miniros/transport/statistics.h"
 #include "miniros/node_handle.h"
 #include <generated/rosgraph_msgs/TopicStatistics.hxx>
 #include "miniros/this_node.h"

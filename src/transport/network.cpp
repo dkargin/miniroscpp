@@ -28,10 +28,10 @@
 #include <cstring>
 
 #include "miniros/config.h"
-#include "miniros/network.h"
-#include "miniros/file_log.h"
-#include "miniros/exceptions.h"
-#include "miniros/io.h"     // cross-platform headers needed
+#include "miniros/transport/network.h"
+#include "miniros/transport/file_log.h"
+#include "miniros/internal/exceptions.h"
+#include "miniros/transport/io.h"     // cross-platform headers needed
 #include <miniros/console.h>
 #include <miniros/rosassert.h>
 

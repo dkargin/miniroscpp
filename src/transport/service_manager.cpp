@@ -27,21 +27,21 @@
 
 #include <cstdio>
 
-#include "miniros/service_manager.h"
-#include "miniros/xmlrpc_manager.h"
-#include "miniros/connection_manager.h"
-#include "miniros/poll_manager.h"
-#include "miniros/service_publication.h"
-#include "miniros/service_client_link.h"
-#include "miniros/service_server_link.h"
+#include "miniros/transport/service_manager.h"
+#include "miniros/transport/xmlrpc_manager.h"
+#include "miniros/transport/connection_manager.h"
+#include "miniros/transport/poll_manager.h"
+#include "miniros/transport/service_publication.h"
+#include "miniros/transport/service_client_link.h"
+#include "miniros/transport/service_server_link.h"
 #include "miniros/this_node.h"
-#include "miniros/network.h"
+#include "miniros/transport/network.h"
 #include "miniros/master.h"
 #include "miniros/transport/transport_tcp.h"
 #include "miniros/transport/transport_udp.h"
 #include "miniros/init.h"
-#include "miniros/connection.h"
-#include "miniros/file_log.h"
+#include "miniros/transport/connection.h"
+#include "miniros/transport/file_log.h"
 
 #include "xmlrpcpp/XmlRpc.h"
 

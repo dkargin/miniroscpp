@@ -26,9 +26,9 @@
  */
 
 #include "miniros/service_client.h"
-#include "miniros/service_server_link.h"
-#include "miniros/connection.h"
-#include "miniros/service_manager.h"
+#include "miniros/transport/service_server_link.h"
+#include "miniros/transport/connection.h"
+#include "miniros/transport/service_manager.h"
 #include "miniros/service.h"
 
 namespace miniros

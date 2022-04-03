@@ -32,13 +32,13 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "miniros/service_server_link.h"
+#include "miniros/transport/service_server_link.h"
 #include "miniros/header.h"
-#include "miniros/connection.h"
-#include "miniros/service_manager.h"
+#include "miniros/transport/connection.h"
+#include "miniros/transport/service_manager.h"
 #include "miniros/transport/transport.h"
 #include "miniros/this_node.h"
-#include "miniros/file_log.h"
+#include "miniros/transport/file_log.h"
 
 
 

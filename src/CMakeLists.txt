@@ -192,13 +192,24 @@ target_compile_definitions(bag_storage PRIVATE rosbag_EXPORTS rosbag_storage_EXP
 set_property(TARGET bag_storage PROPERTY CXX_STANDARD 17)
 target_link_libraries(bag_storage ${ENCRYPT_LIBRARIES} ${rosbag_LIBS} roscxx)
 
-set(minibag_SRC
-	rosbag/encrypt.cpp
-	rosbag/play.cpp
-	rosbag/player.cpp
-	rosbag/record.cpp
-	rosbag/recorder.cpp
-	rosbag/time_translator.cpp)
+
+if (MINIROS_BUILD_ROSBAG_APPS)
+	# Common library for rosbag applications.
+	add_library(bag_app 
+		rosbag/player.cpp
+		rosbag/recorder.cpp
+	  rosbag/time_translator.cpp
+	)
+	target_link_libraries(bag_app bag_storage roscxx)
+
+	# ROSBag recorder app
+	add_executable(record rosbag/record.cpp)
+	target_link_libraries(record rosbag)
+
+	# ROSBag player app.
+	add_executable(play rosbag/play.cpp)
+	target_link_libraries(play rosbag)
+endif()
 
 set(MINIROS_LIBRARY roscxx PARENT_SCOPE)
 set(MINIROS_EXPORT roscxx bag_storage ${rosbag_LIBS} PARENT_SCOPE)

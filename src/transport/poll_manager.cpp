@@ -25,8 +25,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "miniros/poll_manager.h"
-#include "miniros/common.h"
+#include "miniros/transport/poll_manager.h"
+#include "miniros/transport/common.h"
 
 #include <mutex>
 #include <signal.h>

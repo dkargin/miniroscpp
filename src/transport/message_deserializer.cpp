@@ -26,8 +26,8 @@
  */
 
 
-#include "miniros/message_deserializer.h"
-#include "miniros/subscription_callback_helper.h"
+#include "miniros/transport/message_deserializer.h"
+#include "miniros/transport/subscription_callback_helper.h"
 #include <miniros/console.h>
 
 namespace miniros

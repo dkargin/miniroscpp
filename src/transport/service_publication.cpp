@@ -32,10 +32,10 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "miniros/service_publication.h"
-#include "miniros/service_client_link.h"
-#include "miniros/connection.h"
-#include "miniros/callback_queue_interface.h"
+#include "miniros/transport/service_publication.h"
+#include "miniros/transport/service_client_link.h"
+#include "miniros/transport/connection.h"
+#include "miniros/transport/callback_queue_interface.h"
 
 //
 

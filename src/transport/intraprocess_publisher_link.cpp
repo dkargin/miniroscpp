@@ -32,15 +32,15 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "miniros/intraprocess_publisher_link.h"
-#include "miniros/intraprocess_subscriber_link.h"
-#include "miniros/subscription.h"
+#include "miniros/transport/intraprocess_publisher_link.h"
+#include "miniros/transport/intraprocess_subscriber_link.h"
+#include "miniros/transport/subscription.h"
 #include "miniros/header.h"
-#include "miniros/connection.h"
+#include "miniros/transport/connection.h"
 #include "miniros/transport/transport.h"
 #include "miniros/this_node.h"
-#include "miniros/connection_manager.h"
-#include "miniros/file_log.h"
+#include "miniros/transport/connection_manager.h"
+#include "miniros/transport/file_log.h"
 
 
 #include <sstream>

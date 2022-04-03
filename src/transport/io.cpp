@@ -35,9 +35,9 @@
 ** Includes
 *****************************************************************************/
 
-#include "miniros/common.h"
+#include "miniros/transport/common.h"
 
-#include <miniros/io.h>
+#include <miniros/transport/io.h>
 #include <miniros/rosassert.h> // don't need if we dont call the pipe functions.
 #include <errno.h> // for EFAULT and co.
 #include <iostream>

@@ -168,7 +168,7 @@ minibag::PlayerOptions parseOptions(int argc, char** argv) {
 }
 
 int main(int argc, char** argv) {
-    ros::init(argc, argv, "play", ros::init_options::AnonymousName);
+    miniros::init(argc, argv, "play", ros::init_options::AnonymousName);
 
     // Parse the command-line options
     minibag::PlayerOptions opts;

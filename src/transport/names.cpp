@@ -27,7 +27,7 @@
 
 #include "miniros/names.h"
 #include "miniros/this_node.h"
-#include "miniros/file_log.h"
+#include "miniros/transport/file_log.h"
 
 #include <miniros/console.h>
 #include <miniros/rosassert.h>

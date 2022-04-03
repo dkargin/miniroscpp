@@ -32,9 +32,9 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "miniros/connection.h"
+#include "miniros/transport/connection.h"
 #include "miniros/transport/transport.h"
-#include "miniros/file_log.h"
+#include "miniros/transport/file_log.h"
 
 #include <miniros/rosassert.h>
 

@@ -25,8 +25,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "miniros/timer_manager.h"
-#include "miniros/internal_timer_manager.h"
+#include "miniros/transport/timer_manager.h"
+#include "miniros/transport/internal_timer_manager.h"
 
 namespace miniros
 {

@@ -34,19 +34,19 @@
 
 #include <miniros/platform.h>  // platform dependendant requirements
 
-#include "miniros/transport_publisher_link.h"
-#include "miniros/subscription.h"
+#include "miniros/transport/transport_publisher_link.h"
+#include "miniros/transport/subscription.h"
 #include "miniros/header.h"
-#include "miniros/connection.h"
+#include "miniros/transport/connection.h"
 #include "miniros/transport/transport.h"
 #include "miniros/this_node.h"
-#include "miniros/connection_manager.h"
-#include "miniros/file_log.h"
-#include "miniros/poll_manager.h"
+#include "miniros/transport/connection_manager.h"
+#include "miniros/transport/file_log.h"
+#include "miniros/transport/poll_manager.h"
 #include "miniros/transport/transport_tcp.h"
-#include "miniros/timer_manager.h"
-#include "miniros/callback_queue.h"
-#include "miniros/internal_timer_manager.h"
+#include "miniros/transport/timer_manager.h"
+#include "miniros/transport/callback_queue.h"
+#include "miniros/transport/internal_timer_manager.h"
 
 
 #include <sstream>

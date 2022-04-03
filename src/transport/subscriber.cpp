@@ -28,7 +28,7 @@
 #include "miniros/console.h"
 #include "miniros/subscriber.h"
 #include "miniros/node_handle.h"
-#include "miniros/topic_manager.h"
+#include "miniros/transport/topic_manager.h"
 
 namespace miniros
 {

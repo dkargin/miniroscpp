@@ -25,21 +25,21 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "miniros/topic_manager.h"
-#include "miniros/xmlrpc_manager.h"
-#include "miniros/connection_manager.h"
-#include "miniros/poll_manager.h"
-#include "miniros/publication.h"
-#include "miniros/subscription.h"
+#include "miniros/transport/topic_manager.h"
+#include "miniros/transport/xmlrpc_manager.h"
+#include "miniros/transport/connection_manager.h"
+#include "miniros/transport/poll_manager.h"
+#include "miniros/transport/publication.h"
+#include "miniros/transport/subscription.h"
 #include "miniros/this_node.h"
-#include "miniros/network.h"
+#include "miniros/transport/network.h"
 #include "miniros/master.h"
 #include "miniros/transport/transport_tcp.h"
 #include "miniros/transport/transport_udp.h"
-#include "miniros/rosout_appender.h"
+#include "miniros/transport/rosout_appender.h"
 #include "miniros/init.h"
-#include "miniros/file_log.h"
-#include "miniros/subscribe_options.h"
+#include "miniros/transport/file_log.h"
+#include "miniros/transport/subscribe_options.h"
 
 #include "xmlrpcpp/XmlRpc.h"
 

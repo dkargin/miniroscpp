@@ -26,9 +26,9 @@
  */
 
 #include "miniros/publisher.h"
-#include "miniros/publication.h"
+#include "miniros/transport/publication.h"
 #include "miniros/node_handle.h"
-#include "miniros/topic_manager.h"
+#include "miniros/transport/topic_manager.h"
 
 namespace miniros
 {

@@ -27,13 +27,12 @@
 
 #include <sstream>
 
-#include "miniros/xmlrpc_manager.h"
-#include "miniros/network.h"
+#include "miniros/transport/xmlrpc_manager.h"
+#include "miniros/transport/network.h"
 #include "miniros/param.h"
 #include "miniros/rosassert.h"
-#include "miniros/common.h"
-#include "miniros/file_log.h"
-#include "miniros/io.h"
+#include "miniros/transport/file_log.h"
+#include "miniros/transport/io.h"
 
 using namespace XmlRpc;
 

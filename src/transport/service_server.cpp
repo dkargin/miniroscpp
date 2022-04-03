@@ -27,7 +27,7 @@
 
 #include "miniros/service_server.h"
 #include "miniros/node_handle.h"
-#include "miniros/service_manager.h"
+#include "miniros/transport/service_manager.h"
 
 namespace miniros
 {
