@@ -68,7 +68,11 @@ ServiceClientLink::~ServiceClientLink()
 bool ServiceClientLink::initialize(const ConnectionPtr& connection)
 {
   connection_ = connection;
-  dropped_conn_ = connection_->addDropListener(boost::bind(&ServiceClientLink::onConnectionDropped, this, _1));
+  dropped_conn_ = connection_->addDropListener(
+      [this](const ConnectionPtr& conn, Connection::DropReason reason)
+      {
+          onConnectionDropped(conn);
+      });
 
   return true;
 }
@@ -151,7 +155,11 @@ bool ServiceClientLink::handleHeader(const Header& header)
     m["type"] = ss->getDataType();
     m["md5sum"] = ss->getMD5Sum();
     m["callerid"] = this_node::getName();
-    connection_->writeHeader(m, boost::bind(&ServiceClientLink::onHeaderWritten, this, _1));
+    connection_->writeHeader(m,
+        [this](const ConnectionPtr& conn)
+        {
+            this->onHeaderWritten(conn);
+        });
 
     ss->addServiceClientLink(shared_from_this());
   }
@@ -173,7 +181,11 @@ void ServiceClientLink::onConnectionDropped(const ConnectionPtr& conn)
 void ServiceClientLink::onHeaderWritten(const ConnectionPtr& conn)
 {
   (void)conn;
-  connection_->read(4, boost::bind(&ServiceClientLink::onRequestLength, this, _1, _2, _3, _4));
+  connection_->read(4,
+      [this](const ConnectionPtr& conn, const std::shared_ptr<uint8_t[]>& buffer, uint32_t size, bool success)
+      {
+          this->onRequestLength(conn, buffer, size, success);
+      });
 }
 
 void ServiceClientLink::onRequestLength(const ConnectionPtr& conn, const std::shared_ptr<uint8_t[]>& buffer, uint32_t size, bool success)
@@ -197,7 +209,11 @@ void ServiceClientLink::onRequestLength(const ConnectionPtr& conn, const std::sh
     return;
   }
 
-  connection_->read(len, boost::bind(&ServiceClientLink::onRequest, this, _1, _2, _3, _4));
+  connection_->read(len,
+      [this](const ConnectionPtr& conn, const std::shared_ptr<uint8_t[]>& buffer, uint32_t size, bool success)
+      {
+          this->onRequest(conn, buffer, size, success);
+      });
 }
 
 void ServiceClientLink::onRequest(const ConnectionPtr& conn, const std::shared_ptr<uint8_t[]>& buffer, uint32_t size, bool success)
@@ -225,7 +241,11 @@ void ServiceClientLink::onResponseWritten(const ConnectionPtr& conn)
 
   if (persistent_)
   {
-    connection_->read(4, boost::bind(&ServiceClientLink::onRequestLength, this, _1, _2, _3, _4));
+    connection_->read(4,
+      [this](const ConnectionPtr& conn, const std::shared_ptr<uint8_t[]>& buffer, uint32_t size, bool success)
+      {
+        this->onRequestLength(conn, buffer, size, success);
+      });
   }
   else
   {
@@ -236,7 +256,11 @@ void ServiceClientLink::onResponseWritten(const ConnectionPtr& conn)
 void ServiceClientLink::processResponse(bool ok, const SerializedMessage& res)
 {
   (void)ok;
-  connection_->write(res.buf, res.num_bytes, boost::bind(&ServiceClientLink::onResponseWritten, this, _1));
+  connection_->write(res.buf, res.num_bytes,
+    [this](const ConnectionPtr& conn)
+    {
+      this->onResponseWritten(conn);
+    });
 }
 
 

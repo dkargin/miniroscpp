@@ -489,7 +489,7 @@ void Connection::setHeaderReceivedCallback(const HeaderReceivedFunc& func)
   {
     auto wrapFn = [this](const ConnectionPtr& conn, const std::shared_ptr<uint8_t[]>& buffer, uint32_t size, bool success)
     {
-      return this->onHeaderLengthRead(conn, buffer, size, success);
+      this->onHeaderLengthRead(conn, buffer, size, success);
     };
     read(4, wrapFn);
   }

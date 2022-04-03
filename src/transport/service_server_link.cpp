@@ -114,8 +114,16 @@ void ServiceServerLink::clearCalls()
 bool ServiceServerLink::initialize(const ConnectionPtr& connection)
 {
   connection_ = connection;
-  connection_->addDropListener(boost::bind(&ServiceServerLink::onConnectionDropped, this, _1));
-  connection_->setHeaderReceivedCallback(boost::bind(&ServiceServerLink::onHeaderReceived, this, _1, _2));
+  connection_->addDropListener(
+      [this](const ConnectionPtr& conn, Connection::DropReason reason)
+      {
+          this->onConnectionDropped(conn);
+      });
+  connection_->setHeaderReceivedCallback(
+      [this](const ConnectionPtr& conn, const Header& header)
+      {
+          return onHeaderReceived(conn, header);
+      });
 
   M_string header;
   header["service"] = service_name_;
@@ -124,7 +132,11 @@ bool ServiceServerLink::initialize(const ConnectionPtr& connection)
   header["persistent"] = persistent_ ? "1" : "0";
   header.insert(extra_outgoing_header_values_.begin(), extra_outgoing_header_values_.end());
 
-  connection_->writeHeader(header, boost::bind(&ServiceServerLink::onHeaderWritten, this, _1));
+  connection_->writeHeader(header,
+      [this](const ConnectionPtr& conn)
+      {
+          this->onHeaderWritten(conn);
+      });
 
   return true;
 }
@@ -181,7 +193,12 @@ void ServiceServerLink::onRequestWritten(const ConnectionPtr& conn)
 {
   (void)conn;
   //miniros::WallDuration(0.1).sleep();
-  connection_->read(5, boost::bind(&ServiceServerLink::onResponseOkAndLength, this, _1, _2, _3, _4));
+  connection_->read(5,
+      [this](const ConnectionPtr& conn, const std::shared_ptr<uint8_t[]>& buffer, uint32_t size, bool success)
+      {
+          this->onResponseOkAndLength(conn, buffer, size, success);
+      }
+  );
 }
 
 void ServiceServerLink::onResponseOkAndLength(const ConnectionPtr& conn, const std::shared_ptr<uint8_t[]>& buffer, uint32_t size, bool success)
@@ -218,7 +235,11 @@ void ServiceServerLink::onResponseOkAndLength(const ConnectionPtr& conn, const s
 
   if (len > 0)
   {
-    connection_->read(len, boost::bind(&ServiceServerLink::onResponse, this, _1, _2, _3, _4));
+    connection_->read(len,
+        [this](const ConnectionPtr& conn, const std::shared_ptr<uint8_t[]>& buffer, uint32_t size, bool success)
+        {
+            this->onResponse(conn, buffer, size, success);
+        });
   }
   else
   {
@@ -322,7 +343,11 @@ void ServiceServerLink::processNextCall()
       request = current_call_->req_;
     }
 
-    connection_->write(request.buf, request.num_bytes, boost::bind(&ServiceServerLink::onRequestWritten, this, _1));
+    connection_->write(request.buf, request.num_bytes,
+        [this](const ConnectionPtr& conn)
+        {
+            this->onRequestWritten(conn);
+        });
   }
 }
 
