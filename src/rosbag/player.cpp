@@ -42,7 +42,7 @@
 
 #include <boost/format.hpp>
 
-#include "rosgraph_msgs/Clock.h"
+#include "rosgraph_msgs/Clock.hxx"
 
 #include <set>
 
@@ -50,7 +50,7 @@ using std::map;
 using std::pair;
 using std::string;
 using std::vector;
-using boost::shared_ptr;
+using std::shared_ptr;
 using ros::Exception;
 
 namespace minibag {
@@ -61,15 +61,15 @@ bool isLatching(const ConnectionInfo* c)
     return (header_iter != c->header->end() && header_iter->second == "1");
 }
 
-ros::AdvertiseOptions createAdvertiseOptions(const ConnectionInfo* c, uint32_t queue_size, const std::string& prefix) {
-    ros::AdvertiseOptions opts(prefix + c->topic, queue_size, c->md5sum, c->datatype, c->msg_def);
+miniros::AdvertiseOptions createAdvertiseOptions(const ConnectionInfo* c, uint32_t queue_size, const std::string& prefix) {
+    miniros::AdvertiseOptions opts(prefix + c->topic, queue_size, c->md5sum, c->datatype, c->msg_def);
     opts.latch = isLatching(c);
     return opts;
 }
 
 
-ros::AdvertiseOptions createAdvertiseOptions(MessageInstance const& m, uint32_t queue_size, const std::string& prefix) {
-    return ros::AdvertiseOptions(prefix + m.getTopic(), queue_size, m.getMD5Sum(), m.getDataType(), m.getMessageDefinition());
+miniros::AdvertiseOptions createAdvertiseOptions(MessageInstance const& m, uint32_t queue_size, const std::string& prefix) {
+    return miniros::AdvertiseOptions(prefix + m.getTopic(), queue_size, m.getMD5Sum(), m.getDataType(), m.getMessageDefinition());
 }
 
 // PlayerOptions
@@ -117,7 +117,7 @@ Player::Player(PlayerOptions const& options) :
     requested_pause_state_(false),
     terminal_modified_(false)
 {
-  ros::NodeHandle private_node_handle("~");
+  miniros::NodeHandle private_node_handle("~");
   pause_service_ = private_node_handle.advertiseService("pause_playback", &Player::pauseCallback, this);
 }
 
@@ -204,15 +204,18 @@ void Player::publish() {
     {
         std::cout << "Creating rate control topic subscriber..." << std::flush;
 
-        boost::shared_ptr<ros::Subscriber> sub(std::make_shared<ros::Subscriber>());
+        std::shared_ptr<miniros::Subscriber> sub(std::make_shared<ros::Subscriber>());
         ros::SubscribeOptions ops;
         ops.topic = options_.rate_control_topic;
         ops.queue_size = 10;
-        ops.md5sum = ros::message_traits::md5sum<topic_tools::ShapeShifter>();
-        ops.datatype = ros::message_traits::datatype<topic_tools::ShapeShifter>();
-        ops.helper = std::make_shared<ros::SubscriptionCallbackHelperT<
-            const ros::MessageEvent<topic_tools::ShapeShifter const> &> >(
-                boost::bind(&Player::updateRateTopicTime, this, _1));
+        ops.md5sum = miniros::message_traits::md5sum<topic_tools::ShapeShifter>();
+        ops.datatype = miniros::message_traits::datatype<topic_tools::ShapeShifter>();
+        using CallbackHelper = miniros::SubscriptionCallbackHelperT<const miniros::MessageEvent<topic_tools::ShapeShifter const> &>;
+        ops.helper = std::make_shared<CallbackHelper>(
+            [this](const miniros::MessageEvent<topic_tools::ShapeShifter const>& msg_event)
+            {
+                this->updateRateTopicTime(msg_event);
+            });
 
         rate_control_sub_ = node_handle_.subscribe(ops);
 
@@ -301,8 +304,8 @@ void Player::publish() {
 
         time_publisher_.setTime(start_time_);
 
-        ros::WallTime now_wt = ros::WallTime::now();
-        time_translator_.setTranslatedStartTime(ros::Time(now_wt.sec, now_wt.nsec));
+        miniros::WallTime now_wt = miniros::WallTime::now();
+        time_translator_.setTranslatedStartTime(miniros::Time(now_wt.sec, now_wt.nsec));
 
 
         time_publisher_.setTimeScale(options_.time_scale);
@@ -335,14 +338,14 @@ void Player::publish() {
         }
     }
 
-    ros::shutdown();
+    miniros::shutdown();
 }
 
-void Player::updateRateTopicTime(const ros::MessageEvent<topic_tools::ShapeShifter const>& msg_event)
+void Player::updateRateTopicTime(const miniros::MessageEvent<topic_tools::ShapeShifter const>& msg_event)
 {
-    boost::shared_ptr<topic_tools::ShapeShifter const> const &ssmsg = msg_event.getConstMessage();
+    std::shared_ptr<topic_tools::ShapeShifter const> const &ssmsg = msg_event.getConstMessage();
     std::string def = ssmsg->getMessageDefinition();
-    size_t length = ros::serialization::serializationLength(*ssmsg);
+    size_t length = miniros::serialization::serializationLength(*ssmsg);
     
     // Check the message definition.
     std::istringstream f(def);
@@ -364,23 +367,23 @@ void Player::updateRateTopicTime(const ros::MessageEvent<topic_tools::ShapeShift
     }
 
     std::vector<uint8_t> buffer(length);
-    ros::serialization::OStream ostream(&buffer[0], length);
-    ros::serialization::Serializer<topic_tools::ShapeShifter>::write(ostream, *ssmsg);
+    miniros::serialization::OStream ostream(&buffer[0], length);
+    miniros::serialization::Serializer<topic_tools::ShapeShifter>::write(ostream, *ssmsg);
 
     // Assuming that the header is the first several bytes of the message.
     //uint32_t header_sequence_id   = buffer[0] | (uint32_t)buffer[1] << 8 | (uint32_t)buffer[2] << 16 | (uint32_t)buffer[3] << 24;
     int32_t header_timestamp_sec  = buffer[4] | (uint32_t)buffer[5] << 8 | (uint32_t)buffer[6] << 16 | (uint32_t)buffer[7] << 24;
     int32_t header_timestamp_nsec = buffer[8] | (uint32_t)buffer[9] << 8 | (uint32_t)buffer[10] << 16 | (uint32_t)buffer[11] << 24;
 
-    last_rate_control_ = ros::Time(header_timestamp_sec, header_timestamp_nsec);
+    last_rate_control_ = miniros::Time(header_timestamp_sec, header_timestamp_nsec);
 }
 
 void Player::printTime()
 {
     if (!options_.quiet) {
 
-        ros::Time current_time = time_publisher_.getTime();
-        ros::Duration d = current_time - start_time_;
+        miniros::Time current_time = time_publisher_.getTime();
+        miniros::Duration d = current_time - start_time_;
 
 
         if (paused_)
@@ -389,7 +392,7 @@ void Player::printTime()
         }
         else if (delayed_)
         {
-            ros::Duration time_since_rate = std::max(ros::Time::now() - last_rate_control_, ros::Duration(0));
+            miniros::Duration time_since_rate = std::max(miniros::Time::now() - last_rate_control_, miniros::Duration(0));
             printf("\r [DELAYED]  Bag Time: %13.6f   Duration: %.6f / %.6f   Delay: %.2f \r", time_publisher_.getTime().toSec(), d.toSec(), bag_length_.toSec(), time_since_rate.toSec());
         }
         else
@@ -419,21 +422,21 @@ bool Player::pauseCallback(std_srvs::SetBool::Request &req, std_srvs::SetBool::R
   return true;
 }
 
-void Player::processPause(const bool paused, ros::WallTime &horizon)
+void Player::processPause(const bool paused, miniros::WallTime &horizon)
 {
   paused_ = paused;
 
   if (paused_)
   {
-    paused_time_ = ros::WallTime::now();
+    paused_time_ = miniros::WallTime::now();
   }
   else
   {
     // Make sure time doesn't shift after leaving pause.
-    ros::WallDuration shift = ros::WallTime::now() - paused_time_;
-    paused_time_ = ros::WallTime::now();
+    miniros::WallDuration shift = miniros::WallTime::now() - paused_time_;
+    paused_time_ = miniros::WallTime::now();
 
-    time_translator_.shift(ros::Duration(shift.sec, shift.nsec));
+    time_translator_.shift(miniros::Duration(shift.sec, shift.nsec));
 
     horizon += shift;
     time_publisher_.setWCHorizon(horizon);
@@ -450,24 +453,24 @@ void Player::waitForSubscribers() const
             [](const PublisherMap::value_type& pub) {
                 return pub.second.getNumSubscribers() > 0;
             });
-        ros::WallDuration(0.1).sleep();
+        miniros::WallDuration(0.1).sleep();
     }
     std::cout << "Finished waiting for subscribers." << std::endl;
 }
 
 void Player::advertise(const ConnectionInfo* c)
 {
-    ros::M_string::const_iterator header_iter = c->header->find("callerid");
+    miniros::M_string::const_iterator header_iter = c->header->find("callerid");
     std::string callerid = (header_iter != c->header->end() ? header_iter->second : string(""));
 
     string callerid_topic = callerid + c->topic;
 
-    map<string, ros::Publisher>::iterator pub_iter = publishers_.find(callerid_topic);
+    map<string, miniros::Publisher>::iterator pub_iter = publishers_.find(callerid_topic);
     if (pub_iter == publishers_.end()) {
-        ros::AdvertiseOptions opts = createAdvertiseOptions(c, options_.queue_size, options_.prefix);
+        miniros::AdvertiseOptions opts = createAdvertiseOptions(c, options_.queue_size, options_.prefix);
 
-        ros::Publisher pub = node_handle_.advertise(opts);
-        publishers_.insert(publishers_.begin(), pair<string, ros::Publisher>(callerid_topic, pub));
+        miniros::Publisher pub = node_handle_.advertise(opts);
+        publishers_.insert(publishers_.begin(), pair<string, miniros::Publisher>(callerid_topic, pub));
 
         pub_iter = publishers_.find(callerid_topic);
     }
@@ -475,18 +478,18 @@ void Player::advertise(const ConnectionInfo* c)
 
 void Player::doPublish(MessageInstance const& m) {
     string const& topic   = m.getTopic();
-    ros::Time const& time = m.getTime();
+    miniros::Time const& time = m.getTime();
     string callerid       = m.getCallerId();
     
-    ros::Time translated = time_translator_.translate(time);
-    ros::WallTime horizon = ros::WallTime(translated.sec, translated.nsec);
+    miniros::Time translated = time_translator_.translate(time);
+    miniros::WallTime horizon = ros::WallTime(translated.sec, translated.nsec);
 
     time_publisher_.setHorizon(time);
     time_publisher_.setWCHorizon(horizon);
 
     string callerid_topic = callerid + topic;
 
-    map<string, ros::Publisher>::iterator pub_iter = publishers_.find(callerid_topic);
+    map<string, miniros::Publisher>::iterator pub_iter = publishers_.find(callerid_topic);
     MINIROS_ASSERT(pub_iter != publishers_.end());
 
     // Update subscribers.
@@ -505,8 +508,8 @@ void Player::doPublish(MessageInstance const& m) {
     {
       time_publisher_.stepClock();
 
-      ros::WallDuration shift = ros::WallTime::now() - horizon ;
-      time_translator_.shift(ros::Duration(shift.sec, shift.nsec));
+      miniros::WallDuration shift = miniros::WallTime::now() - horizon ;
+      time_translator_.shift(miniros::Duration(shift.sec, shift.nsec));
       horizon += shift;
       time_publisher_.setWCHorizon(horizon);
       (pub_iter->second).publish(m);
@@ -523,7 +526,7 @@ void Player::doPublish(MessageInstance const& m) {
             if (topic == *i)
             {
                 paused_ = true;
-                paused_time_ = ros::WallTime::now();
+                paused_time_ = miniros::WallTime::now();
             }
         }
     }
@@ -533,7 +536,7 @@ void Player::doPublish(MessageInstance const& m) {
     if (rate_control_sub_ != NULL) {
         if ((time_publisher_.getTime() - last_rate_control_).toSec() > options_.rate_control_max_delay) {
             delayed_ = true;
-            paused_time_ = ros::WallTime::now();
+            paused_time_ = miniros::WallTime::now();
         }
     }
 
@@ -542,7 +545,7 @@ void Player::doPublish(MessageInstance const& m) {
         bool charsleftorpaused = true;
         while (charsleftorpaused && node_handle_.ok())
         {
-            ros::spinOnce();
+            miniros::spinOnce();
 
             if (pause_change_requested_)
             {
@@ -558,10 +561,10 @@ void Player::doPublish(MessageInstance const& m) {
                 if (paused_) {
                     time_publisher_.stepClock();
 
-                    ros::WallDuration shift = ros::WallTime::now() - horizon ;
-                    paused_time_ = ros::WallTime::now();
+                    miniros::WallDuration shift = miniros::WallTime::now() - horizon ;
+                    paused_time_ = miniros::WallTime::now();
 
-                    time_translator_.shift(ros::Duration(shift.sec, shift.nsec));
+                    time_translator_.shift(miniros::Duration(shift.sec, shift.nsec));
 
                     horizon += shift;
                     time_publisher_.setWCHorizon(horizon);
@@ -579,22 +582,22 @@ void Player::doPublish(MessageInstance const& m) {
                 if (paused_)
                 {
                     printTime();
-                    time_publisher_.runStalledClock(ros::WallDuration(.1));
-                    ros::spinOnce();
+                    time_publisher_.runStalledClock(miniros::WallDuration(.1));
+                    miniros::spinOnce();
                 }
                 else if (delayed_)
                 {
                     printTime();
-                    time_publisher_.runStalledClock(ros::WallDuration(.1));
-                    ros::spinOnce();
+                    time_publisher_.runStalledClock(miniros::WallDuration(.1));
+                    miniros::spinOnce();
                     // You need to check the rate here too.
                     if(rate_control_sub_ == NULL || (time_publisher_.getTime() - last_rate_control_).toSec() <= options_.rate_control_max_delay) {
                         delayed_ = false;
                         // Make sure time doesn't shift after leaving delay.
-                        ros::WallDuration shift = ros::WallTime::now() - paused_time_;
-                        paused_time_ = ros::WallTime::now();
+                        miniros::WallDuration shift = miniros::WallTime::now() - paused_time_;
+                        paused_time_ = miniros::WallTime::now();
          
-                        time_translator_.shift(ros::Duration(shift.sec, shift.nsec));
+                        time_translator_.shift(miniros::Duration(shift.sec, shift.nsec));
 
                         horizon += shift;
                         time_publisher_.setWCHorizon(horizon);
@@ -606,8 +609,8 @@ void Player::doPublish(MessageInstance const& m) {
         }
 
         printTime();
-        time_publisher_.runClock(ros::WallDuration(.1));
-        ros::spinOnce();
+        time_publisher_.runClock(miniros::WallDuration(.1));
+        miniros::spinOnce();
     }
 
     pub_iter->second.publish(m);
@@ -616,10 +619,10 @@ void Player::doPublish(MessageInstance const& m) {
 
 void Player::doKeepAlive() {
     //Keep pushing ourself out in 10-sec increments (avoids fancy math dealing with the end of time)
-    ros::Time const& time = time_publisher_.getTime() + ros::Duration(10.0);
+    miniros::Time const& time = time_publisher_.getTime() + miniros::Duration(10.0);
 
-    ros::Time translated = time_translator_.translate(time);
-    ros::WallTime horizon = ros::WallTime(translated.sec, translated.nsec);
+    miniros::Time translated = time_translator_.translate(time);
+    miniros::WallTime horizon = miniros::WallTime(translated.sec, translated.nsec);
 
     time_publisher_.setHorizon(time);
     time_publisher_.setWCHorizon(horizon);
@@ -640,15 +643,15 @@ void Player::doKeepAlive() {
             case ' ':
                 paused_ = !paused_;
                 if (paused_) {
-                    paused_time_ = ros::WallTime::now();
+                    paused_time_ = miniros::WallTime::now();
                 }
                 else
                 {
                     // Make sure time doesn't shift after leaving pause.
-                    ros::WallDuration shift = ros::WallTime::now() - paused_time_;
-                    paused_time_ = ros::WallTime::now();
+                    miniros::WallDuration shift = miniros::WallTime::now() - paused_time_;
+                    paused_time_ = miniros::WallTime::now();
          
-                    time_translator_.shift(ros::Duration(shift.sec, shift.nsec));
+                    time_translator_.shift(miniros::Duration(shift.sec, shift.nsec));
 
                     horizon += shift;
                     time_publisher_.setWCHorizon(horizon);
@@ -658,8 +661,8 @@ void Player::doKeepAlive() {
                 if (paused_)
                 {
                     printTime();
-                    time_publisher_.runStalledClock(ros::WallDuration(.1));
-                    ros::spinOnce();
+                    time_publisher_.runStalledClock(miniros::WallDuration(.1));
+                    miniros::spinOnce();
                 }
                 else
                     charsleftorpaused = false;
@@ -667,8 +670,8 @@ void Player::doKeepAlive() {
         }
 
         printTime();
-        time_publisher_.runClock(ros::WallDuration(.1));
-        ros::spinOnce();
+        time_publisher_.runClock(miniros::WallDuration(.1));
+        miniros::spinOnce();
     }
 }
 
@@ -787,17 +790,17 @@ void TimePublisher::setTimeScale(double time_scale)
     time_scale_ = time_scale;
 }
 
-void TimePublisher::setHorizon(const ros::Time& horizon)
+void TimePublisher::setHorizon(const miniros::Time& horizon)
 {
     horizon_ = horizon;
 }
 
-void TimePublisher::setWCHorizon(const ros::WallTime& horizon)
+void TimePublisher::setWCHorizon(const miniros::WallTime& horizon)
 {
   wc_horizon_ = horizon;
 }
 
-void TimePublisher::setTime(const ros::Time& time)
+void TimePublisher::setTime(const miniros::Time& time)
 {
     current_ = time;
 }
@@ -807,20 +810,20 @@ ros::Time const& TimePublisher::getTime() const
     return current_;
 }
 
-void TimePublisher::runClock(const ros::WallDuration& duration)
+void TimePublisher::runClock(const miniros::WallDuration& duration)
 {
     if (do_publish_)
     {
         rosgraph_msgs::Clock pub_msg;
 
-        ros::WallTime t = ros::WallTime::now();
-        ros::WallTime done = t + duration;
+        miniros::WallTime t = miniros::WallTime::now();
+        miniros::WallTime done = t + duration;
 
         while (t < done && t < wc_horizon_)
         {
-            ros::WallDuration leftHorizonWC = wc_horizon_ - t;
+            miniros::WallDuration leftHorizonWC = wc_horizon_ - t;
 
-            ros::Duration d(leftHorizonWC.sec, leftHorizonWC.nsec);
+            miniros::Duration d(leftHorizonWC.sec, leftHorizonWC.nsec);
             d *= time_scale_;
 
             current_ = horizon_ - d;
@@ -835,23 +838,23 @@ void TimePublisher::runClock(const ros::WallDuration& duration)
                 next_pub_ = t + wall_step_;
             }
 
-            ros::WallTime target = done;
+            miniros::WallTime target = done;
             if (target > wc_horizon_)
               target = wc_horizon_;
             if (target > next_pub_)
               target = next_pub_;
 
-            ros::WallTime::sleepUntil(target);
+            miniros::WallTime::sleepUntil(target);
 
-            t = ros::WallTime::now();
+            t = miniros::WallTime::now();
         }
     } else {
 
-        ros::WallTime t = ros::WallTime::now();
+        miniros::WallTime t = miniros::WallTime::now();
 
-        ros::WallDuration leftHorizonWC = wc_horizon_ - t;
+        miniros::WallDuration leftHorizonWC = wc_horizon_ - t;
 
-        ros::Duration d(leftHorizonWC.sec, leftHorizonWC.nsec);
+        miniros::Duration d(leftHorizonWC.sec, leftHorizonWC.nsec);
         d *= time_scale_;
 
         current_ = horizon_ - d;
@@ -859,12 +862,12 @@ void TimePublisher::runClock(const ros::WallDuration& duration)
         if (current_ >= horizon_)
             current_ = horizon_;
 
-        ros::WallTime target = ros::WallTime::now() + duration;
+        miniros::WallTime target = miniros::WallTime::now() + duration;
 
         if (target > wc_horizon_)
             target = wc_horizon_;
 
-        ros::WallTime::sleepUntil(target);
+        miniros::WallTime::sleepUntil(target);
     }
 }
 
@@ -879,21 +882,21 @@ void TimePublisher::stepClock()
         pub_msg.clock = current_;
         time_pub_.publish(pub_msg);
 
-        ros::WallTime t = ros::WallTime::now();
+        miniros::WallTime t = miniros::WallTime::now();
         next_pub_ = t + wall_step_;
     } else {
         current_ = horizon_;
     }
 }
 
-void TimePublisher::runStalledClock(const ros::WallDuration& duration)
+void TimePublisher::runStalledClock(const miniros::WallDuration& duration)
 {
     if (do_publish_)
     {
         rosgraph_msgs::Clock pub_msg;
 
-        ros::WallTime t = ros::WallTime::now();
-        ros::WallTime done = t + duration;
+        miniros::WallTime t = miniros::WallTime::now();
+        miniros::WallTime done = t + duration;
 
         while ( t < done )
         {
@@ -904,14 +907,14 @@ void TimePublisher::runStalledClock(const ros::WallDuration& duration)
                 next_pub_ = t + wall_step_;
             }
 
-            ros::WallTime target = done;
+            miniros::WallTime target = done;
 
             if (target > next_pub_)
               target = next_pub_;
 
-            ros::WallTime::sleepUntil(target);
+            miniros::WallTime::sleepUntil(target);
 
-            t = ros::WallTime::now();
+            t = miniros::WallTime::now();
         }
     } else {
         duration.sleep();
@@ -920,7 +923,7 @@ void TimePublisher::runStalledClock(const ros::WallDuration& duration)
 
 bool TimePublisher::horizonReached()
 {
-  return ros::WallTime::now() > wc_horizon_;
+  return miniros::WallTime::now() > wc_horizon_;
 }
 
 } // namespace rosbag
