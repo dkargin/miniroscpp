@@ -18,10 +18,11 @@ include(CMakePackageConfigHelpers)
 find_package(catkin QUIET)
 
 if(catkin_FOUND)
+  message(STATUS "Miniros has been used with catkin")
   catkin_package(
     DEPENDS
     INCLUDE_DIRS include
-    LIBRARIES ${PROJECT_NAME})
+    LIBRARIES roscxx bag_storage)
 endif(catkin_FOUND)
 
 include_directories(include)
@@ -40,7 +41,7 @@ set(MINIROS_INCLUDE_TRANSPORT ${CMAKE_CURRENT_SOURCE_DIR}/include/transport)
 # Checking if miniros is added as a submodule
 get_directory_property(hasParent PARENT_DIRECTORY)
 if(hasParent)
-  message(STATUS "miniroscpp was added as a submodule.")
+  message(STATUS "${PROJECT_NAME} was added as a submodule.")
   set(MINIROS_SUBMODULE TRUE)
 else()
   set(MINIROS_SUBMODULE FALSE)
