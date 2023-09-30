@@ -165,7 +165,6 @@ namespace miniros
 
     inline bool isZero() const { return sec == 0 && nsec == 0; }
     inline bool is_zero() const { return isZero(); }
-    //boost::posix_time::ptime toBoost() const;
   };
 
   /**
@@ -216,10 +215,6 @@ namespace miniros
      * \brief Wait for time source to become valid, with timeout
      */
     static bool waitForValid(const miniros::WallDuration& timeout);
-    /*
-    static Time fromBoost(const boost::posix_time::ptime& t);
-    static Time fromBoost(const boost::posix_time::time_duration& d);
-    */
   };
 
   extern MINIROS_DECL const Time TIME_MAX;

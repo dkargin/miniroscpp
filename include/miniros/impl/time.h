@@ -78,7 +78,6 @@ namespace miniros
         throw std::runtime_error("Time is out of dual 32-bit range");
       sec = static_cast<uint32_t>(sec64);
       nsec = static_cast<uint32_t>(std::round((t-sec) * 1e9));
-      //nsec = static_cast<uint32_t>(boost::math::round((t-sec) * 1e9));
       // avoid rounding errors
       sec += (nsec / 1000000000ul);
       nsec %= 1000000000ul;
@@ -170,21 +169,6 @@ namespace miniros
       return true;
     return false;
   }
-
-  /*
-  template<class T, class D>
-  boost::posix_time::ptime
-  TimeBase<T, D>::toBoost() const
-  {
-    namespace pt = boost::posix_time;
-#if defined(BOOST_DATE_TIME_HAS_NANOSECONDS)
-    return pt::from_time_t(sec) + pt::nanoseconds(nsec);
-#else
-    return pt::from_time_t(sec) + pt::microseconds(nsec/1000);
-#endif
-  }
-  */
-
 
 } // namespace miniros
 
