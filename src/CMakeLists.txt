@@ -141,6 +141,7 @@ set(transport_SRC
   transport/service.cpp
   transport/this_node.cpp
   transport/steady_timer.cpp
+  shape_shifter.cpp
   )
 
 find_package(Boost REQUIRED COMPONENTS regex system thread)
