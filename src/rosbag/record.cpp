@@ -32,8 +32,8 @@
 *  POSSIBILITY OF SUCH DAMAGE.
 ********************************************************************/
 
-#include "rosbag/recorder.h"
-#include "rosbag/exceptions.h"
+#include "minibag/recorder.h"
+#include "minibag/exceptions.h"
 
 #include "boost/program_options.hpp"
 #include <string>
@@ -42,8 +42,8 @@
 namespace po = boost::program_options;
 
 //! Parse the command-line arguments for recorder options
-rosbag::RecorderOptions parseOptions(int argc, char** argv) {
-    rosbag::RecorderOptions opts;
+minibag::RecorderOptions parseOptions(int argc, char** argv) {
+	minibag::RecorderOptions opts;
 
     po::options_description desc("Allowed options");
 
@@ -82,10 +82,10 @@ rosbag::RecorderOptions parseOptions(int argc, char** argv) {
       po::store(po::command_line_parser(argc, argv).options(desc).positional(p).run(), vm);
     } catch (boost::program_options::invalid_command_line_syntax& e)
     {
-      throw ros::Exception(e.what());
+      throw miniros::Exception(e.what());
     }  catch (boost::program_options::unknown_option& e)
     {
-      throw ros::Exception(e.what());
+      throw miniros::Exception(e.what());
     }
 
     if (vm.count("help")) {
@@ -125,7 +125,7 @@ rosbag::RecorderOptions parseOptions(int argc, char** argv) {
       {
         MINIROS_WARN("Use of \"--split <MAX_SIZE>\" has been deprecated.  Please use --split --size <MAX_SIZE> or --split --duration <MAX_DURATION>");
         if (S < 0)
-          throw ros::Exception("Split size must be 0 or positive");
+          throw miniros::Exception("Split size must be 0 or positive");
         opts.max_size = 1048576 * static_cast<uint64_t>(S);
       }
     }
@@ -144,14 +144,14 @@ rosbag::RecorderOptions parseOptions(int argc, char** argv) {
     {
       int m = vm["buffsize"].as<int>();
       if (m < 0)
-        throw ros::Exception("Buffer size must be 0 or positive");
+        throw miniros::Exception("Buffer size must be 0 or positive");
       opts.buffer_size = 1048576 * m;
     }
     if (vm.count("chunksize"))
     {
       int chnk_sz = vm["chunksize"].as<int>();
       if (chnk_sz < 0)
-        throw ros::Exception("Chunk size must be 0 or positive");
+        throw miniros::Exception("Chunk size must be 0 or positive");
       opts.chunk_size = 1024 * chnk_sz;
     }
     if (vm.count("limit"))
@@ -190,15 +190,15 @@ rosbag::RecorderOptions parseOptions(int argc, char** argv) {
     }
     if (vm.count("bz2") && vm.count("lz4"))
     {
-      throw ros::Exception("Can only use one type of compression");
+      throw miniros::Exception("Can only use one type of compression");
     }
     if (vm.count("bz2"))
     {
-      opts.compression = rosbag::compression::BZ2;
+      opts.compression = minibag::compression::BZ2;
     }
     if (vm.count("lz4"))
     {
-      opts.compression = rosbag::compression::LZ4;
+      opts.compression = minibag::compression::LZ4;
     }
     if (vm.count("duration"))
     {
@@ -210,11 +210,11 @@ rosbag::RecorderOptions parseOptions(int argc, char** argv) {
 
       std::istringstream iss(duration_str);
       if ((iss >> duration).fail())
-        throw ros::Exception("Duration must start with a floating point number.");
+        throw miniros::Exception("Duration must start with a floating point number.");
 
       if ( (!iss.eof() && ((iss >> unit).fail())) )
       {
-        throw ros::Exception("Duration unit must be s, m, or h");
+        throw miniros::Exception("Duration unit must be s, m, or h");
       }
       if (unit == std::string(""))
         multiplier = 1.0;
@@ -225,18 +225,18 @@ rosbag::RecorderOptions parseOptions(int argc, char** argv) {
       else if (unit == std::string("h"))
         multiplier = 3600.0;
       else
-        throw ros::Exception("Duration unit must be s, m, or h");
+        throw miniros::Exception("Duration unit must be s, m, or h");
 
       
-      opts.max_duration = ros::Duration(duration * multiplier);
-      if (opts.max_duration <= ros::Duration(0))
-        throw ros::Exception("Duration must be positive.");
+      opts.max_duration = miniros::Duration(duration * multiplier);
+      if (opts.max_duration <= miniros::Duration(0))
+        throw miniros::Exception("Duration must be positive.");
     }
     if (vm.count("size"))
     {
       opts.max_size = vm["size"].as<uint64_t>() * 1048576;
       if (opts.max_size <= 0)
-        throw ros::Exception("Split size must be 0 or positive");
+        throw miniros::Exception("Split size must be 0 or positive");
     }
     if (vm.count("node"))
     {
@@ -266,7 +266,7 @@ rosbag::RecorderOptions parseOptions(int argc, char** argv) {
 
 
     // check that argument combinations make sense
-    if(opts.exclude_regex.size() > 0 &&
+    if(opts.exclude_regex.mark_count() > 0 &&
             !(opts.record_all || opts.regex)) {
         fprintf(stderr, "Warning: Exclusion regex given, but no topics to subscribe to.\n"
                 "Adding implicit 'record all'.");
@@ -277,24 +277,24 @@ rosbag::RecorderOptions parseOptions(int argc, char** argv) {
 }
 
 int main(int argc, char** argv) {
-    ros::init(argc, argv, "record", ros::init_options::AnonymousName);
+    miniros::init(argc, argv, "record", miniros::init_options::AnonymousName);
 
     // Parse the command-line options
-    rosbag::RecorderOptions opts;
+    minibag::RecorderOptions opts;
     try {
         opts = parseOptions(argc, argv);
     }
-    catch (ros::Exception const& ex) {
+    catch (miniros::Exception const& ex) {
         MINIROS_ERROR("Error reading options: %s", ex.what());
         return 1;
-    }
+    }/*
     catch(boost::regex_error const& ex) {
         MINIROS_ERROR("Error reading options: %s\n", ex.what());
         return 1;
-    }
+    }*/
 
     // Run the recorder
-    rosbag::Recorder recorder(opts);
+    minibag::Recorder recorder(opts);
     int result = recorder.run();
     
     return result;

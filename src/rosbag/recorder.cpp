@@ -47,11 +47,11 @@
 
 #include <regex>
 
-#include <topic_tools/shape_shifter.h>
+#include <miniros/topic_tools/shape_shifter.h>
 
-#include "miniros/network.h"
-#include "miniros/xmlrpc_manager.h"
-#include "xmlrpcpp/XmlRpc.h"
+#include "miniros/transport/network.h"
+#include "miniros/transport/xmlrpc_manager.h"
+//#include "xmlrpcpp/XmlRpc.h"
 
 using std::cout;
 using std::endl;
@@ -59,20 +59,20 @@ using std::set;
 using std::string;
 using std::vector;
 using std::shared_ptr;
-using ros::Time;
 
 namespace minibag {
 
 // OutgoingMessage
 
-OutgoingMessage::OutgoingMessage(string const& _topic, topic_tools::ShapeShifter::ConstPtr _msg, shared_ptr<miniros::M_string> _connection_header, Time _time) :
+OutgoingMessage::OutgoingMessage(string const& _topic,
+    miniros::topic_tools::ShapeShifter::ConstPtr _msg, shared_ptr<miniros::M_string> _connection_header, miniros::Time _time) :
     topic(_topic), msg(_msg), connection_header(_connection_header), time(_time)
 {
 }
 
 // OutgoingQueue
 
-OutgoingQueue::OutgoingQueue(string const& _filename, std::queue<OutgoingMessage>* _queue, Time _time) :
+OutgoingQueue::OutgoingQueue(string const& _filename, std::queue<OutgoingMessage>* _queue, miniros::Time _time) :
     filename(_filename), queue(_queue), time(_time)
 {
 }
@@ -127,7 +127,7 @@ int Recorder::run() {
     if (options_.topics.size() == 0) {
         // Make sure limit is not specified with automatic topic subscription
         if (options_.limit > 0) {
-            fprintf(stderr, "Specifing a count is not valid with automatic topic subscription.\n");
+            fprintf(stderr, "Specifying a count is not valid with automatic topic subscription.\n");
             return 1;
         }
 
@@ -147,7 +147,7 @@ int Recorder::run() {
         pub_begin_write = nh.advertise<std_msgs::String>("begin_write", 1, true);
     }
 
-    last_buffer_warn_ = Time();
+    last_buffer_warn_ = miniros::Time();
     queue_ = new std::queue<OutgoingMessage>;
 
     // Subscribe to each topic
@@ -156,12 +156,12 @@ int Recorder::run() {
             subscribe(topic);
     }
 
-    if (!miniros::Time::waitForValid(ros::WallDuration(2.0)))
+    if (!miniros::Time::waitForValid(miniros::WallDuration(2.0)))
       MINIROS_WARN("/use_sim_time set to true and no clock published.  Still waiting for valid time...");
 
     miniros::Time::waitForValid();
 
-    start_time_ = ros::Time::now();
+    start_time_ = miniros::Time::now();
 
     // Don't bother doing anything if we never got a valid time
     if (!nh.ok())
@@ -176,19 +176,26 @@ int Recorder::run() {
         record_thread = std::thread(&Recorder::doRecordSnapshotter, this);
 
         // Subscribe to the snapshot trigger
-        trigger_sub = nh.subscribe<std_msgs::Empty>("snapshot_trigger", 100, boost::bind(&Recorder::snapshotTrigger, this, _1));
+        //trigger_sub = nh.subscribe<std_msgs::Empty>("snapshot_trigger", 100, boost::bind(&Recorder::snapshotTrigger, this, _1));
+        trigger_sub = nh.subscribe<std_msgs::Empty>("snapshot_trigger", 100,
+            [this](std_msgs::Empty::ConstPtr trigger)
+            {
+              this->snapshotTrigger(trigger);
+            });
     }
     else
         record_thread = std::thread(&Recorder::doRecord, this);
-
-
 
     miniros::Timer check_master_timer;
     if (options_.record_all || options_.regex || (options_.node != std::string("")))
     {
         // check for master first
         doCheckMaster(miniros::TimerEvent(), nh);
-        check_master_timer = nh.createTimer(ros::Duration(1.0), boost::bind(&Recorder::doCheckMaster, this, _1, boost::ref(nh)));
+        check_master_timer = nh.createTimer(miniros::Duration(1.0),
+            [this, &nh](miniros::TimerEvent const& e)
+            {
+              this->doCheckMaster(e, nh);
+            });
     }
 
     miniros::AsyncSpinner s(10);
@@ -201,21 +208,23 @@ int Recorder::run() {
     return exit_code_;
 }
 
-shared_ptr<ros::Subscriber> Recorder::subscribe(string const& topic) {
+shared_ptr<miniros::Subscriber> Recorder::subscribe(string const& topic) {
     MINIROS_INFO("Subscribing to %s", topic.c_str());
 
     miniros::NodeHandle nh;
     shared_ptr<int> count(std::make_shared<int>(options_.limit));
-    shared_ptr<ros::Subscriber> sub(std::make_shared<ros::Subscriber>());
+    shared_ptr<miniros::Subscriber> sub(std::make_shared<miniros::Subscriber>());
 
     miniros::SubscribeOptions ops;
     ops.topic = topic;
     ops.queue_size = 100;
-    ops.md5sum = miniros::message_traits::md5sum<topic_tools::ShapeShifter>();
-    ops.datatype = miniros::message_traits::datatype<topic_tools::ShapeShifter>();
-    ops.helper = miniros::make_shared<ros::SubscriptionCallbackHelperT<
-        const miniros::MessageEvent<topic_tools::ShapeShifter const> &> >(
-            boost::bind(&Recorder::doQueue, this, _1, topic, sub, count));
+    ops.md5sum = miniros::message_traits::md5sum<miniros::topic_tools::ShapeShifter>();
+    ops.datatype = miniros::message_traits::datatype<miniros::topic_tools::ShapeShifter>();
+    ops.helper = std::make_shared<miniros::SubscriptionCallbackHelperT<
+        const miniros::MessageEvent<miniros::topic_tools::ShapeShifter const> &> >(
+            [this, topic, sub, count](const miniros::MessageEvent<miniros::topic_tools::ShapeShifter const> & mev) {
+              this->doQueue(mev, topic, sub, count);
+            });
     ops.transport_hints = options_.transport_hints;
     *sub = nh.subscribe(ops);
 
@@ -236,7 +245,7 @@ bool Recorder::shouldSubscribeToTopic(std::string const& topic, bool from_node) 
     }
 
     // subtract exclusion regex, if any
-    if(options_.do_exclude && boost::regex_match(topic, options_.exclude_regex)) {
+    if(options_.do_exclude && std::regex_match(topic, options_.exclude_regex)) {
         return false;
     }
 
@@ -246,12 +255,11 @@ bool Recorder::shouldSubscribeToTopic(std::string const& topic, bool from_node) 
     
     if (options_.regex) {
         // Treat the topics as regular expressions
-	return std::any_of(
+        return std::any_of(
             std::begin(options_.topics), std::end(options_.topics),
             [&topic] (string const& regex_str){
-                boost::regex e(regex_str);
-                boost::smatch what;
-                return boost::regex_match(topic, what, e, boost::match_extra);
+                std::regex re(regex_str);
+                return std::regex_match(topic, re);
             });
     }
 
@@ -264,19 +272,24 @@ std::string Recorder::timeToStr(T MINIROS_t)
 {
     (void)MINIROS_t;
     std::stringstream msg;
+#ifdef USE_SOPHISTICATED_TIME_FORMAT
     const boost::posix_time::ptime now=
         boost::posix_time::second_clock::local_time();
     boost::posix_time::time_facet *const f=
         new boost::posix_time::time_facet("%Y-%m-%d-%H-%M-%S");
     msg.imbue(std::locale(msg.getloc(),f));
+#else
+    const auto now = miniros::Time::now();
+#endif
     msg << now;
     return msg.str();
 }
 
 //! Callback to be invoked to save messages into a queue
-void Recorder::doQueue(const ros::MessageEvent<topic_tools::ShapeShifter const>& msg_event, string const& topic, shared_ptr<ros::Subscriber> subscriber, shared_ptr<int> count) {
-    //void Recorder::doQueue(topic_tools::ShapeShifter::ConstPtr msg, string const& topic, shared_ptr<ros::Subscriber> subscriber, shared_ptr<int> count) {
-    Time rectime = Time::now();
+void Recorder::doQueue(const miniros::MessageEvent<miniros::topic_tools::ShapeShifter const>& msg_event,
+  string const& topic, shared_ptr<miniros::Subscriber> subscriber, shared_ptr<int> count)
+{
+    miniros::Time rectime = miniros::Time::now();
     
     if (options_.verbose)
         cout << "Received message on topic " << subscriber->getTopic() << endl;
@@ -296,8 +309,8 @@ void Recorder::doQueue(const ros::MessageEvent<topic_tools::ShapeShifter const>&
             queue_size_ -= drop.msg->size();
 
             if (!options_.snapshot) {
-                Time now = Time::now();
-                if (now > last_buffer_warn_ + ros::Duration(5.0)) {
+                miniros::Time now = miniros::Time::now();
+                if (now > last_buffer_warn_ + miniros::Duration(5.0)) {
                     MINIROS_WARN("rosbag record buffer exceeded.  Dropping oldest queued message.");
                     last_buffer_warn_ = now;
                 }
@@ -317,7 +330,7 @@ void Recorder::doQueue(const ros::MessageEvent<topic_tools::ShapeShifter const>&
             num_subscribers_--;
 
             if (num_subscribers_ == 0)
-                ros::shutdown();
+                miniros::shutdown();
         }
     }
 }
@@ -336,9 +349,9 @@ void Recorder::updateFilenames() {
     if (prefix.length() > 0)
         parts.push_back(prefix);
     if (options_.append_date)
-        parts.push_back(timeToStr(ros::WallTime::now()));
+        parts.push_back(timeToStr(miniros::WallTime::now()));
     if (options_.split)
-        parts.push_back(boost::lexical_cast<string>(split_count_));
+        parts.push_back(std::to_string(split_count_));
 
     if (parts.size() == 0)
     {
@@ -362,7 +375,7 @@ void Recorder::snapshotTrigger(std_msgs::Empty::ConstPtr trigger) {
     
     {
         std::scoped_lock<std::mutex> lock(queue_mutex_);
-        queue_queue_.push(OutgoingQueue(target_filename_, queue_, Time::now()));
+        queue_queue_.push(OutgoingQueue(target_filename_, queue_, miniros::Time::now()));
         queue_      = new std::queue<OutgoingMessage>;
         queue_size_ = 0;
     }
@@ -378,10 +391,10 @@ void Recorder::startWriting() {
     try {
         bag_.open(write_filename_, bagmode::Write);
     }
-    catch (rosbag::BagException e) {
+    catch (minibag::BagException e) {
         MINIROS_ERROR("Error writing: %s", e.what());
         exit_code_ = 1;
-        ros::shutdown();
+        miniros::shutdown();
     }
     MINIROS_INFO("Recording to %s.", target_filename_.c_str());
 
@@ -429,7 +442,7 @@ bool Recorder::checkSize()
                 checkNumSplits();
                 startWriting();
             } else {
-                ros::shutdown();
+                miniros::shutdown();
                 return true;
             }
         }
@@ -437,9 +450,9 @@ bool Recorder::checkSize()
     return false;
 }
 
-bool Recorder::checkDuration(const ros::Time& t)
+bool Recorder::checkDuration(const miniros::Time& t)
 {
-    if (options_.max_duration > ros::Duration(0))
+    if (options_.max_duration > miniros::Duration(0))
     {
         if (t - start_time_ > options_.max_duration)
         {
@@ -454,7 +467,7 @@ bool Recorder::checkDuration(const ros::Time& t)
                     startWriting();
                 }
             } else {
-                ros::shutdown();
+                miniros::shutdown();
                 return true;
             }
         }
@@ -475,20 +488,20 @@ void Recorder::doRecord() {
     {
         checkDisk();
     }
-    catch (rosbag::BagException &ex)
+    catch (minibag::BagException &ex)
     {
-        MINIROS_ERROR_STREAM(ex.what());
+        MINIROS_ERROR(ex.what());
         exit_code_ = 1;
         stopWriting();
         return;
     }
 
-    check_disk_next_ = ros::WallTime::now() + ros::WallDuration().fromSec(20.0);
+    check_disk_next_ = miniros::WallTime::now() + miniros::WallDuration().fromSec(20.0);
 
     // Technically the queue_mutex_ should be locked while checking empty.
     // Except it should only get checked if the node is not ok, and thus
     // it shouldn't be in contention.
-    ros::NodeHandle nh;
+    miniros::NodeHandle nh;
     while (nh.ok() || !queue_->empty()) {
         std::unique_lock<std::mutex> lock(queue_mutex_);
 
@@ -499,15 +512,9 @@ void Recorder::doRecord() {
                 finished = true;
                 break;
             }
-            boost::xtime xt;
-#if BOOST_VERSION >= 105000
-            boost::xtime_get(&xt, boost::TIME_UTC_);
-#else
-            boost::xtime_get(&xt, boost::TIME_UTC);
-#endif
-            xt.nsec += 250000000;
-            queue_condition_.timed_wait(lock, xt);
-            if (checkDuration(ros::Time::now()))
+            std::chrono::duration dur = std::chrono::milliseconds(250);
+            queue_condition_.wait_for(lock, dur);
+            if (checkDuration(miniros::Time::now()))
             {
                 finished = true;
                 break;
@@ -533,9 +540,9 @@ void Recorder::doRecord() {
             if (scheduledCheckDisk() && checkLogging())
                 bag_.write(out.topic, out.time, *out.msg, out.connection_header);
         }
-        catch (rosbag::BagException &ex)
+        catch (minibag::BagException &ex)
         {
-            MINIROS_ERROR_STREAM(ex.what());
+            MINIROS_ERROR(ex.what());
             exit_code_ = 1;
             break;
         }
@@ -545,10 +552,10 @@ void Recorder::doRecord() {
 }
 
 void Recorder::doRecordSnapshotter() {
-    ros::NodeHandle nh;
+	miniros::NodeHandle nh;
   
     while (nh.ok() || !queue_queue_.empty()) {
-        boost::unique_lock<std::mutex> lock(queue_mutex_);
+        std::unique_lock<std::mutex> lock(queue_mutex_);
         while (queue_queue_.empty()) {
             if (!nh.ok())
                 return;
@@ -566,7 +573,7 @@ void Recorder::doRecordSnapshotter() {
         try {
             bag_.open(write_filename, bagmode::Write);
         }
-        catch (rosbag::BagException ex) {
+        catch (minibag::BagException ex) {
             MINIROS_ERROR("Error writing: %s", ex.what());
             return;
         }
@@ -582,32 +589,32 @@ void Recorder::doRecordSnapshotter() {
     }
 }
 
-void Recorder::doCheckMaster(ros::TimerEvent const& e, ros::NodeHandle& node_handle) {
+void Recorder::doCheckMaster(miniros::TimerEvent const& e, miniros::NodeHandle& node_handle) {
     (void)e;
     (void)node_handle;
-    ros::master::V_TopicInfo topics;
-    if (ros::master::getTopics(topics)) {
-	for (ros::master::TopicInfo const& t : topics) {
-	    if (shouldSubscribeToTopic(t.name))
-	        subscribe(t.name);
-	}
+    miniros::master::V_TopicInfo topics;
+    if (miniros::master::getTopics(topics)) {
+      for (miniros::master::TopicInfo const& t : topics) {
+        if (shouldSubscribeToTopic(t.name))
+          subscribe(t.name);
+      }
     }
     
     if (options_.node != std::string(""))
     {
 
       XmlRpc::XmlRpcValue req;
-      req[0] = ros::this_node::getName();
+      req[0] = miniros::this_node::getName();
       req[1] = options_.node;
       XmlRpc::XmlRpcValue resp;
       XmlRpc::XmlRpcValue payload;
 
-      if (ros::master::execute("lookupNode", req, resp, payload, true))
+      if (miniros::master::execute("lookupNode", req, resp, payload, true))
       {
         std::string peer_host;
         uint32_t peer_port;
 
-        if (!ros::network::splitURI(static_cast<std::string>(resp[2]), peer_host, peer_port))
+        if (!miniros::network::splitURI(static_cast<std::string>(resp[2]), peer_host, peer_port))
         {
           MINIROS_ERROR("Bad xml-rpc URI trying to inspect node at: [%s]", static_cast<std::string>(resp[2]).c_str());
         } else {
@@ -615,7 +622,7 @@ void Recorder::doCheckMaster(ros::TimerEvent const& e, ros::NodeHandle& node_han
           XmlRpc::XmlRpcClient c(peer_host.c_str(), peer_port, "/");
           XmlRpc::XmlRpcValue req2;
           XmlRpc::XmlRpcValue resp2;
-          req2[0] = ros::this_node::getName();
+          req2[0] = miniros::this_node::getName();
           c.execute("getSubscriptions", req2, resp2);
           
           if (!c.isFault() && resp2.valid() && resp2.size() > 0 && static_cast<int>(resp2[0]) == 1)
@@ -634,57 +641,36 @@ void Recorder::doCheckMaster(ros::TimerEvent const& e, ros::NodeHandle& node_han
 }
 
 void Recorder::doTrigger() {
-    ros::NodeHandle nh;
-    ros::Publisher pub = nh.advertise<std_msgs::Empty>("snapshot_trigger", 1, true);
-    pub.publish(std_msgs::Empty());
+  miniros::NodeHandle nh;
+  miniros::Publisher pub = nh.advertise<std_msgs::Empty>("snapshot_trigger", 1, true);
+  pub.publish(std_msgs::Empty());
 
-    ros::Timer terminate_timer = nh.createTimer(ros::Duration(1.0), boost::bind(&ros::shutdown));
-    ros::spin();
+  miniros::Timer terminate_timer = nh.createTimer(miniros::Duration(1.0),
+    [](const miniros::TimerEvent&) {
+      miniros::shutdown();
+    });
+  miniros::spin();
 }
 
 bool Recorder::scheduledCheckDisk() {
     std::scoped_lock<std::mutex> lock(check_disk_mutex_);
 
-    if (ros::WallTime::now() < check_disk_next_)
+    if (miniros::WallTime::now() < check_disk_next_)
         return true;
 
-    check_disk_next_ += ros::WallDuration().fromSec(20.0);
+    check_disk_next_ += miniros::WallDuration().fromSec(20.0);
     return checkDisk();
 }
 
 bool Recorder::checkDisk() {
-#if BOOST_FILESYSTEM_VERSION < 3
-    struct statvfs fiData;
-    if ((statvfs(bag_.getFileName().c_str(), &fiData)) < 0)
-    {
-        MINIROS_WARN("Failed to check filesystem stats.");
-        return true;
-    }
-    unsigned long long free_space = 0;
-    free_space = (unsigned long long) (fiData.f_bsize) * (unsigned long long) (fiData.f_bavail);
-    if (free_space < options_.min_space)
-    {
-        MINIROS_ERROR("Less than %s of space free on disk with %s.  Disabling recording.", options_.min_space_str.c_str(), bag_.getFileName().c_str());
-        writing_enabled_ = false;
-        return false;
-    }
-    else if (free_space < 5 * options_.min_space)
-    {
-        MINIROS_WARN("Less than 5 x %s of space free on disk with %s.", options_.min_space_str.c_str(), bag_.getFileName().c_str());
-    }
-    else
-    {
-        writing_enabled_ = true;
-    }
-#else
-    boost::filesystem::path p(boost::filesystem::system_complete(bag_.getFileName().c_str()));
+    std::filesystem::path p(std::filesystem::absolute(bag_.getFileName().c_str()));
     p = p.parent_path();
-    boost::filesystem::space_info info;
+    std::filesystem::space_info info;
     try
     {
-        info = boost::filesystem::space(p);
+        info = std::filesystem::space(p);
     }
-    catch (boost::filesystem::filesystem_error &e) 
+    catch (std::filesystem::filesystem_error &e)
     { 
         MINIROS_WARN("Failed to check filesystem stats [%s].", e.what());
         writing_enabled_ = false;
@@ -704,7 +690,6 @@ bool Recorder::checkDisk() {
     {
         writing_enabled_ = true;
     }
-#endif
     return true;
 }
 
@@ -712,9 +697,9 @@ bool Recorder::checkLogging() {
     if (writing_enabled_)
         return true;
 
-    ros::WallTime now = ros::WallTime::now();
+    miniros::WallTime now = miniros::WallTime::now();
     if (now >= warn_next_) {
-        warn_next_ = now + ros::WallDuration().fromSec(5.0);
+        warn_next_ = now + miniros::WallDuration().fromSec(5.0);
         MINIROS_WARN("Not logging message because logging disabled.  Most likely cause is a full disk.");
     }
     return false;

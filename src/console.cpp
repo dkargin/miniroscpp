@@ -380,7 +380,7 @@ struct WallTimeToken : public Token
     }
     else
     {
-#ifdef REFERENCE_VERSION
+#ifdef USE_SOPHISTICATED_TIME_FORMAT
       boost::posix_time::time_facet* facet = new boost::posix_time::time_facet();
       facet->format(format_.c_str());
       ss.imbue(std::locale(std::locale::classic(), facet));

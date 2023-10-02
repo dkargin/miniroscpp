@@ -21,7 +21,7 @@ if(catkin_FOUND)
   message(STATUS "Miniros has been used with catkin")
   catkin_package(
     DEPENDS
-    INCLUDE_DIRS include
+    INCLUDE_DIRS include include/generated
     LIBRARIES roscxx bag_storage)
 endif(catkin_FOUND)
 

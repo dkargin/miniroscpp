@@ -202,14 +202,17 @@ if (MINIROS_BUILD_ROSBAG_APPS)
 	  rosbag/time_translator.cpp
 	)
 	target_link_libraries(bag_app bag_storage roscxx)
+	target_include_directories(bag_app PRIVATE ${MINIROS_INCLUDE_DIRS} ${MINIROS_INCLUDE_GENERATED_DIRS})
 
 	# ROSBag recorder app
 	add_executable(record rosbag/record.cpp)
-	target_link_libraries(record rosbag)
+	target_link_libraries(record bag_app)
+	target_include_directories(record PRIVATE ${MINIROS_INCLUDE_DIRS} ${MINIROS_INCLUDE_GENERATED_DIRS})
 
 	# ROSBag player app.
 	add_executable(play rosbag/play.cpp)
-	target_link_libraries(play rosbag)
+	target_link_libraries(play bag_app)
+	target_include_directories(play PRIVATE ${MINIROS_INCLUDE_DIRS} ${MINIROS_INCLUDE_GENERATED_DIRS})
 endif()
 
 set(MINIROS_LIBRARY roscxx PARENT_SCOPE)

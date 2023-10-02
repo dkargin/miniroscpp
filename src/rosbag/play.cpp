@@ -104,7 +104,7 @@ minibag::PlayerOptions parseOptions(int argc, char** argv) {
     if (vm.count("clock"))
       opts.bag_time = true;
     if (vm.count("delay"))
-      opts.advertise_sleep = ros::WallDuration(vm["delay"].as<float>());
+      opts.advertise_sleep = miniros::WallDuration(vm["delay"].as<float>());
     if (vm.count("rate"))
       opts.time_scale = vm["rate"].as<float>();
     if (vm.count("start"))
@@ -118,7 +118,7 @@ minibag::PlayerOptions parseOptions(int argc, char** argv) {
       opts.has_duration = true;
     }
     if (vm.count("skip-empty"))
-      opts.skip_empty = ros::Duration(vm["skip-empty"].as<float>());
+      opts.skip_empty = miniros::Duration(vm["skip-empty"].as<float>());
     if (vm.count("loop"))
       opts.loop = true;
     if (vm.count("keep-alive"))
@@ -159,16 +159,16 @@ minibag::PlayerOptions parseOptions(int argc, char** argv) {
           opts.bags.push_back(*i);
     } else {
       if (vm.count("topics") || vm.count("pause-topics"))
-        throw ros::Exception("When using --topics or --pause-topics, --bags "
+        throw miniros::Exception("When using --topics or --pause-topics, --bags "
           "should be specified to list bags.");
-      throw ros::Exception("You must specify at least one bag to play back.");
+      throw miniros::Exception("You must specify at least one bag to play back.");
     }
             
     return opts;
 }
 
 int main(int argc, char** argv) {
-    miniros::init(argc, argv, "play", ros::init_options::AnonymousName);
+    miniros::init(argc, argv, "play", miniros::init_options::AnonymousName);
 
     // Parse the command-line options
     minibag::PlayerOptions opts;

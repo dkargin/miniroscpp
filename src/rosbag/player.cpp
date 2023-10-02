@@ -40,7 +40,7 @@
   #include <sys/select.h>
 #endif
 
-#include <boost/format.hpp>
+//#include <boost/format.hpp>
 
 #include "rosgraph_msgs/Clock.hxx"
 
@@ -51,13 +51,13 @@ using std::pair;
 using std::string;
 using std::vector;
 using std::shared_ptr;
-using ros::Exception;
+using miniros::Exception;
 
 namespace minibag {
 
 bool isLatching(const ConnectionInfo* c)
 {
-    ros::M_string::const_iterator header_iter = c->header->find("latching");
+    miniros::M_string::const_iterator header_iter = c->header->find("latching");
     return (header_iter != c->header->end() && header_iter->second == "1");
 }
 
@@ -94,7 +94,7 @@ PlayerOptions::PlayerOptions() :
     wait_for_subscribers(false),
     rate_control_topic(""),
     rate_control_max_delay(1.0f),
-    skip_empty(ros::DURATION_MAX)
+    skip_empty(miniros::DURATION_MAX)
 {
 }
 
@@ -154,7 +154,7 @@ void Player::publish() {
 
     if (!options_.prefix.empty())
     {
-      MINIROS_INFO_STREAM("Using prefix '" << options_.prefix << "'' for topics ");
+      MINIROS_INFO("Using prefix '%s' for topics ", options_.prefix.c_str());
     }
 
     if (!options_.quiet)
@@ -167,12 +167,12 @@ void Player::publish() {
 
     const auto full_initial_time = full_view.getBeginTime();
 
-    const auto initial_time = full_initial_time + ros::Duration(options_.time);
+    const auto initial_time = full_initial_time + miniros::Duration(options_.time);
 
-    ros::Time finish_time = ros::TIME_MAX;
+    miniros::Time finish_time = miniros::TIME_MAX;
     if (options_.has_duration)
     {
-      finish_time = initial_time + ros::Duration(options_.duration);
+      finish_time = initial_time + miniros::Duration(options_.duration);
     }
 
     View view;
@@ -190,7 +190,7 @@ void Player::publish() {
     if (view.size() == 0)
     {
       std::cerr << "No messages to play on specified topics.  Exiting." << std::endl;
-      ros::shutdown();
+      miniros::shutdown();
       return;
     }
 
@@ -208,11 +208,11 @@ void Player::publish() {
         miniros::SubscribeOptions ops;
         ops.topic = options_.rate_control_topic;
         ops.queue_size = 10;
-        ops.md5sum = miniros::message_traits::md5sum<topic_tools::ShapeShifter>();
-        ops.datatype = miniros::message_traits::datatype<topic_tools::ShapeShifter>();
-        using CallbackHelper = miniros::SubscriptionCallbackHelperT<const miniros::MessageEvent<topic_tools::ShapeShifter const> &>;
+        ops.md5sum = miniros::message_traits::md5sum<miniros::topic_tools::ShapeShifter>();
+        ops.datatype = miniros::message_traits::datatype<miniros::topic_tools::ShapeShifter>();
+        using CallbackHelper = miniros::SubscriptionCallbackHelperT<const miniros::MessageEvent<miniros::topic_tools::ShapeShifter const> &>;
         ops.helper = std::make_shared<CallbackHelper>(
-            [this](const miniros::MessageEvent<topic_tools::ShapeShifter const>& msg_event)
+            [this](const miniros::MessageEvent<miniros::topic_tools::ShapeShifter const>& msg_event)
             {
                 this->updateRateTopicTime(msg_event);
             });
@@ -221,7 +221,6 @@ void Player::publish() {
 
         std::cout << " done." << std::endl;
     }
-
 
     std::cout << "Waiting " << options_.advertise_sleep.toSec() << " seconds after advertising topics..." << std::flush;
     options_.advertise_sleep.sleep();
@@ -341,9 +340,9 @@ void Player::publish() {
     miniros::shutdown();
 }
 
-void Player::updateRateTopicTime(const miniros::MessageEvent<topic_tools::ShapeShifter const>& msg_event)
+void Player::updateRateTopicTime(const miniros::MessageEvent<miniros::topic_tools::ShapeShifter const>& msg_event)
 {
-    std::shared_ptr<topic_tools::ShapeShifter const> const &ssmsg = msg_event.getConstMessage();
+    std::shared_ptr<miniros::topic_tools::ShapeShifter const> const &ssmsg = msg_event.getConstMessage();
     std::string def = ssmsg->getMessageDefinition();
     size_t length = miniros::serialization::serializationLength(*ssmsg);
     
@@ -368,7 +367,7 @@ void Player::updateRateTopicTime(const miniros::MessageEvent<topic_tools::ShapeS
 
     std::vector<uint8_t> buffer(length);
     miniros::serialization::OStream ostream(&buffer[0], length);
-    miniros::serialization::Serializer<topic_tools::ShapeShifter>::write(ostream, *ssmsg);
+    miniros::serialization::Serializer<miniros::topic_tools::ShapeShifter>::write(ostream, *ssmsg);
 
     // Assuming that the header is the first several bytes of the message.
     //uint32_t header_sequence_id   = buffer[0] | (uint32_t)buffer[1] << 8 | (uint32_t)buffer[2] << 16 | (uint32_t)buffer[3] << 24;
@@ -482,7 +481,7 @@ void Player::doPublish(MessageInstance const& m) {
     string callerid       = m.getCallerId();
     
     miniros::Time translated = time_translator_.translate(time);
-    miniros::WallTime horizon = ros::WallTime(translated.sec, translated.nsec);
+    miniros::WallTime horizon = miniros::WallTime(translated.sec, translated.nsec);
 
     time_publisher_.setHorizon(time);
     time_publisher_.setWCHorizon(horizon);
@@ -493,7 +492,7 @@ void Player::doPublish(MessageInstance const& m) {
     MINIROS_ASSERT(pub_iter != publishers_.end());
 
     // Update subscribers.
-    ros::spinOnce();
+    miniros::spinOnce();
 
     // If immediate specified, play immediately
     if (options_.at_once) {
@@ -805,7 +804,7 @@ void TimePublisher::setTime(const miniros::Time& time)
     current_ = time;
 }
 
-ros::Time const& TimePublisher::getTime() const
+miniros::Time const& TimePublisher::getTime() const
 {
     return current_;
 }

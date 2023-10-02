@@ -52,7 +52,7 @@
 
 #include "minibag/bag.h"
 
-#include <topic_tools/shape_shifter.h>
+#include <miniros/topic_tools/shape_shifter.h>
 
 #include "minibag/time_translator.h"
 #include "minibag/macros.h"
@@ -125,7 +125,7 @@ public:
     void setTime(const miniros::Time& time);
 
     /*! Get the current time */
-    ros::Time const& getTime() const;
+    miniros::Time const& getTime() const;
 
     /*! Run the clock for AT MOST duration
      *
@@ -178,7 +178,7 @@ private:
     void setupTerminal();
     void restoreTerminal();
 
-    void updateRateTopicTime(const miniros::MessageEvent<topic_tools::ShapeShifter const>& msg_event);
+    void updateRateTopicTime(const miniros::MessageEvent<miniros::topic_tools::ShapeShifter const>& msg_event);
 
     void advertise(const ConnectionInfo* c);
 
