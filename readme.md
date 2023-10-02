@@ -70,13 +70,19 @@ target_include_directories(some_executable PRIVATE ${MINIROS_INCLUDE_GENERATED_D
 1. ~~Merge console_bridge.~~ Added a placeholder.
 1. ~~Figure out how to run new codegen with packages like sensor_msgs or nav_msgs.~~ DONE
 1. ~~Squash export macro headers, like miniros/macros.h, miniros/roscpp_serialization_macros.h, minibag/macros.h.~~ DONE
+1. ~~Adapt CMakeLists.txt to work without catkin.~~ DONE
 1. Adapt tests from corresponding libraries.
 1. ~~Merge rosbag_storage inside.~~ DONE
 1. ~~Add local versions of **bzip2** and **lz4**.~~ DONE
-1. Check python code.
-1. ~~Adapt CMakeLists.txt to work without catkin.~~ DONE
-1. Check if I can merge whole ROS transport in a library.
+    - Replace boost::signal
+    - Replace boost::thread_unique_ptr
+1. Check if I can merge whole ROS transport in a library. 
+1. Complete rosbag record and play:
+    - Bring topic_tools::ShapeShifter or expand existing API for minibag record and play utilities
+    - Replace boost::program arguments by a local version.
+1. Complete merge of transport
 1. ~~Provide a proper install and configuration scripts for CMake.~~ DONE
+1. Check python code.
 1. Test library on android.
 
 # Future plans #
