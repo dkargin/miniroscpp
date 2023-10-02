@@ -12,7 +12,7 @@
 # include <string>
 #endif
 
-#include "xmlrpcpp/XmlRpcDecl.h"
+#include "XmlRpcDecl.h"
 
 
 namespace XmlRpc {

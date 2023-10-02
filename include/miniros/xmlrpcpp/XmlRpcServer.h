@@ -20,9 +20,9 @@
 # endif
 #endif
 
-#include "xmlrpcpp/XmlRpcDispatch.h"
-#include "xmlrpcpp/XmlRpcSource.h"
-#include "xmlrpcpp/XmlRpcDecl.h"
+#include "XmlRpcDispatch.h"
+#include "XmlRpcSource.h"
+#include "XmlRpcDecl.h"
 
 namespace XmlRpc {
 

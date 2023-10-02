@@ -11,7 +11,7 @@
 # include <string>
 #endif
 
-#include "xmlrpcpp/XmlRpcDecl.h"
+#include "XmlRpcDecl.h"
 
 #if defined(_MSC_VER)
 # define strcasecmp	  _stricmp

@@ -27,13 +27,21 @@
 # include <string>
 #endif
 
+/*
 #include "xmlrpcpp/XmlRpcClient.h"
 #include "xmlrpcpp/XmlRpcException.h"
 #include "xmlrpcpp/XmlRpcServer.h"
 #include "xmlrpcpp/XmlRpcServerMethod.h"
 #include "xmlrpcpp/XmlRpcValue.h"
 #include "xmlrpcpp/XmlRpcUtil.h"
+*/
 
+#include "XmlRpcClient.h"
+#include "XmlRpcException.h"
+#include "XmlRpcServer.h"
+#include "XmlRpcServerMethod.h"
+#include "XmlRpcValue.h"
+#include "XmlRpcUtil.h"
 #include <stdexcept>
 
 #endif // _XMLRPC_H_
