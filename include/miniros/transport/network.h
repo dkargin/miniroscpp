@@ -28,7 +28,7 @@
 #ifndef ROSCPP_NETWORK_H
 #define ROSCPP_NETWORK_H
 
-#include "internal/forwards.h"
+#include "miniros/internal/forwards.h"
 
 namespace miniros
 {

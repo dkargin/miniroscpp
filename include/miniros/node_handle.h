@@ -889,10 +889,14 @@ if (service)  // Enter if advertised service is valid
    *  \throws InvalidNameException If the service name begins with a tilde, or is an otherwise invalid graph resource name, or is an otherwise invalid graph resource name
    */
   template<class T, class MReq, class MRes>
-  ServiceServer advertiseService(const std::string& service, bool(T::*srv_func)(MReq &, MRes &), T *obj)
+  ServiceServer advertiseService(const std::string& service, bool (T::*srv_func)(MReq &, MRes &), T *obj)
   {
     AdvertiseServiceOptions ops;
-    auto wrapFn = [obj, srv_func](MReq& req, MRes& res) { return obj->*srv_func(req, res); };
+    auto wrapFn =
+      [obj, srv_func](MReq& req, MRes& res)
+      {
+        return (obj->*srv_func)(req, res);
+      };
     ops.template init<MReq, MRes>(service, wrapFn);
     return advertiseService(ops);
   }
