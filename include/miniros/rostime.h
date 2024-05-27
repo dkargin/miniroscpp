@@ -140,11 +140,11 @@ namespace miniros
     uint32_t sec, nsec;
 
     constexpr TimeBase() : sec(0), nsec(0) { }
-    constexpr TimeBase(uint32_t _sec, uint32_t _nsec) : sec(_sec), nsec(_nsec)
+    TimeBase(uint32_t _sec, uint32_t _nsec) : sec(_sec), nsec(_nsec)
     {
       normalizeSecNSec(sec, nsec);
     }
-    constexpr explicit TimeBase(double t) { fromSec(t); }
+    explicit TimeBase(double t) { fromSec(t); }
     D operator-(const T &rhs) const;
     T operator+(const D &rhs) const;
     T operator-(const D &rhs) const;
@@ -179,11 +179,11 @@ namespace miniros
       : TimeBase<Time, Duration>()
     {}
 
-    constexpr Time(uint32_t _sec, uint32_t _nsec)
+    Time(uint32_t _sec, uint32_t _nsec)
       : TimeBase<Time, Duration>(_sec, _nsec)
     {}
 
-    constexpr explicit Time(double t) { fromSec(t); }
+    explicit Time(double t) { fromSec(t); }
 
     /**
      * \brief Retrieve the current time.  If ROS clock time is in use, this returns the time according to the
