@@ -144,7 +144,7 @@ set(transport_SRC
   shape_shifter.cpp
   )
 
-find_package(Boost REQUIRED COMPONENTS regex system thread)
+find_package(Boost REQUIRED COMPONENTS regex program_options system thread)
 
 if (MINIROS_BUILD_SHARED_LIBS)
   add_library(roscxx SHARED ${rostime_SRC} ${cpp_common_SRC} ${transport_SRC})
@@ -154,7 +154,7 @@ endif()
 
 set_property(TARGET roscxx PROPERTY CXX_STANDARD 17)
 
-target_link_libraries(roscxx xmlrpcpp rt stdc++fs ${console_bridge_LIBRARIES} ${Boost_LIBRARIES})
+target_link_libraries(roscxx PRIVATE xmlrpcpp rt stdc++fs ${console_bridge_LIBRARIES} ${Boost_LIBRARIES})
 
 target_compile_definitions(roscxx PRIVATE rostime_EXPORTS miniros_EXPORTS)
 
@@ -206,12 +206,12 @@ if (MINIROS_BUILD_ROSBAG_APPS)
 
 	# ROSBag recorder app
 	add_executable(record rosbag/record.cpp)
-	target_link_libraries(record bag_app)
+	target_link_libraries(record bag_app ${Boost_LIBRARIES})
 	target_include_directories(record PRIVATE ${MINIROS_INCLUDE_DIRS} ${MINIROS_INCLUDE_GENERATED_DIRS})
 
 	# ROSBag player app.
 	add_executable(play rosbag/play.cpp)
-	target_link_libraries(play bag_app)
+	target_link_libraries(play bag_app ${Boost_LIBRARIES})
 	target_include_directories(play PRIVATE ${MINIROS_INCLUDE_DIRS} ${MINIROS_INCLUDE_GENERATED_DIRS})
 endif()
 

@@ -1,19 +1,6 @@
-#cmake_minimum_required(VERSION 2.8.3)
-#project(xmlrpcpp)
-
 if(NOT WIN32)
   set_directory_properties(PROPERTIES COMPILE_OPTIONS "-Wall;-Wextra")
 endif()
-
-#find_package(catkin REQUIRED COMPONENTS cpp_common rostime)
-
-# The CFG_EXTRAS is only for compatibility, to be removed in Lunar.
-#catkin_package(
-#  INCLUDE_DIRS include
-#  LIBRARIES xmlrpcpp
-#  CATKIN_DEPENDS cpp_common rostime
-#  CFG_EXTRAS xmlrpcpp-extras.cmake
-#)
 
 include_directories(
   # This thing can ocasionly override local paths
@@ -21,6 +8,7 @@ include_directories(
   libb64/include
 #  ${catkin_INCLUDE_DIRS}
 )
+
 #link_directories(${catkin_LIBRARY_DIRS})
 
 if(WIN32)
@@ -41,6 +29,8 @@ add_library(xmlrpcpp
   libb64/src/cencode.c
 )
 
+set_target_properties(xmlrpcpp PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
 # Allows access to generated header miniros/config.h
 target_include_directories(xmlrpcpp PRIVATE AFTER ${MINIROS_INCLUDE_DIRS} ${MINIROS_INCLUDE_ROOT})
 
@@ -48,6 +38,7 @@ target_include_directories(xmlrpcpp PRIVATE AFTER ${MINIROS_INCLUDE_DIRS} ${MINI
 if(WIN32)
   target_link_libraries(xmlrpcpp ws2_32)
 endif()
+
 
 #install(DIRECTORY include/${PROJECT_NAME}
 #  DESTINATION ${CATKIN_GLOBAL_INCLUDE_DESTINATION}
