@@ -719,7 +719,7 @@ if (sub)  // Enter if subscriber is valid
   }
 
   /**
-   * \brief Subscribe to a topic, version for arbitrary boost::function object
+   * \brief Subscribe to a topic, version for arbitrary std::function object
    *
    * This method connects to the master to register interest in a given
    * topic.  The node will automatically be connected with publishers on
@@ -727,7 +727,7 @@ if (sub)  // Enter if subscriber is valid
    * to the message received.  This message should \b not be changed in place, as it
    * is shared with any other subscriptions to this topic.
    *
-   * This version of subscribe allows anything bindable to a boost::function object
+   * This version of subscribe allows anything bindable to a std::function object
    *
    * \param M [template] M here is the message type
    * \param topic Topic to subscribe to
@@ -769,7 +769,7 @@ if (sub)  // Enter if subscriber is valid
   }
 
   /**
-   * \brief Subscribe to a topic, version for arbitrary boost::function object
+   * \brief Subscribe to a topic, version for arbitrary std::function object
    *
    * This method connects to the master to register interest in a given
    * topic.  The node will automatically be connected with publishers on
@@ -777,7 +777,7 @@ if (sub)  // Enter if subscriber is valid
    * to the message received.  This message should \b not be changed in place, as it
    * is shared with any other subscriptions to this topic.
    *
-   * This version of subscribe allows anything bindable to a boost::function object
+   * This version of subscribe allows anything bindable to a std::function object
    *
    * \param M [template] the message type
    * \param C [template] the callback parameter type (e.g. const std::shared_ptr<M const>& or const M&)
@@ -1130,13 +1130,10 @@ if (service)  // Enter if advertised service is valid
   }
 
   /**
-   * \brief Advertise a service, version for arbitrary boost::function object
+   * \brief Advertise a service, version for arbitrary std::function object
    *
    * This call connects to the master to publicize that the node will be
    * offering an RPC service with the given name.
-   *
-   * This version of advertiseService allows non-class functions, as well as functor objects and boost::bind (along with anything
-   * else boost::function supports).
    *
    * \param service Service name to advertise on
    * \param callback Callback to call when the service is called
@@ -1173,15 +1170,12 @@ if (service)  // Enter if advertised service is valid
   }
 
   /**
-   * \brief Advertise a service, version for arbitrary boost::function object using miniros::ServiceEvent as the callback parameter type
+   * \brief Advertise a service, version for arbitrary std::function object using miniros::ServiceEvent as the callback parameter type
    *
    * Note that the template parameter S is the full event type, e.g. miniros::ServiceEvent<Req, Res>
    *
    * This call connects to the master to publicize that the node will be
    * offering an RPC service with the given name.
-   *
-   * This version of advertiseService allows non-class functions, as well as functor objects and boost::bind (along with anything
-   * else boost::function supports).
    *
    * \param service Service name to advertise on
    * \param callback Callback to call when the service is called
@@ -1388,7 +1382,7 @@ if (service)  // Enter if advertised service is valid
 
   /**
    * \brief Create a timer which will call a callback at the specified rate.  This variant takes
-   * anything that can be bound to a Boost.Function, including a bare function
+   * anything that can be bound to a std::function.
    *
    * When the Timer (and all copies of it) returned goes out of scope, the timer will automatically
    * be stopped, and the callback will no longer be called.
@@ -1468,8 +1462,7 @@ if (service)  // Enter if advertised service is valid
 
   /**
    * \brief Create a timer which will call a callback at the specified rate, using wall time to determine
-   * when to call the callback instead of ROS time.  This variant takes
-   * anything that can be bound to a Boost.Function, including a bare function
+   * when to call the callback instead of ROS time. 
    *
    * When the Timer (and all copies of it) returned goes out of scope, the timer will automatically
    * be stopped, and the callback will no longer be called.
@@ -1549,8 +1542,7 @@ if (service)  // Enter if advertised service is valid
 
   /**
    * \brief Create a timer which will call a callback at the specified rate, using wall time to determine
-   * when to call the callback instead of ROS time.  This variant takes
-   * anything that can be bound to a Boost.Function, including a bare function
+   * when to call the callback instead of ROS time.
    *
    * When the Timer (and all copies of it) returned goes out of scope, the timer will automatically
    * be stopped, and the callback will no longer be called.
