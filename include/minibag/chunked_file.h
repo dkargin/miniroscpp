@@ -39,8 +39,6 @@
 #include <string>
 #include "macros.h"
 
-//#include <bzlib.h>
-
 #include "minibag/stream.h"
 
 namespace minibag {

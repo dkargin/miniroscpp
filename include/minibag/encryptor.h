@@ -48,6 +48,7 @@
 namespace minibag {
 
 class Bag;
+class ChunkedFile;
 
 class EncryptorBase
 {
