@@ -59,8 +59,8 @@ public:
   CallbackQueue(bool enabled = true);
   ~CallbackQueue() override;
 
-  virtual void addCallback(const CallbackInterfacePtr& callback, uint64_t removal_id = 0);
-  virtual void removeByID(uint64_t removal_id);
+  virtual void addCallback(const CallbackInterfacePtr& callback, uint64_t removal_id = 0) override;
+  virtual void removeByID(uint64_t removal_id) override;
 
   enum CallOneResult
   {
