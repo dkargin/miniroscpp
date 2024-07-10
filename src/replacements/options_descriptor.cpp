@@ -21,23 +21,23 @@ std::basic_string< charT >  tolower_(const std::basic_string< charT >& str)
 
 }  // unnamed namespace
 
-OptionDesc::OptionDesc(const char* names, const value_base* s)
+option_description::option_description(const char* names, const value_base* s)
     : m_value(s)
 {
     this->set_names(names);
 }
 
-OptionDesc::OptionDesc(const char* names, const value_base* s, const char* description)
+option_description::option_description(const char* names, const value_base* s, const char* description)
     : m_description(description), m_value(s)
 {
     this->set_names(names);
 }
 
-OptionDesc::~OptionDesc()
+option_description::~option_description()
 {
 }
 
-OptionDesc::match_result OptionDesc::match(
+option_description::match_result option_description::match(
     const std::string& option,
     bool approx, bool long_ignore_case,
     bool short_ignore_case) const
@@ -83,7 +83,7 @@ OptionDesc::match_result OptionDesc::match(
 }
 
 const std::string&
-OptionDesc::key(const std::string& option) const
+option_description::key(const std::string& option) const
 {
     // We make the arbitrary choise of using the first long
     // name as the key, regardless of anything else
@@ -103,7 +103,7 @@ OptionDesc::key(const std::string& option) const
         return m_short_name;
 }
 
-std::string OptionDesc::canonical_display_name(int prefix_style) const
+std::string option_description::canonical_display_name(int prefix_style) const
 {
     // We prefer the first long name over any others
     if (!m_long_names.empty())
@@ -127,13 +127,13 @@ std::string OptionDesc::canonical_display_name(int prefix_style) const
         return m_short_name;
 }
 
-const std::string& OptionDesc::long_name() const
+const std::string& option_description::long_name() const
 {
     static std::string empty_string("");
     return m_long_names.empty() ? empty_string : *m_long_names.begin();
 }
 
-const std::pair<const std::string*, std::size_t> OptionDesc::long_names() const
+const std::pair<const std::string*, std::size_t> option_description::long_names() const
 {
     // reinterpret_cast is to please msvc 10.
     return (m_long_names.empty())
@@ -141,7 +141,7 @@ const std::pair<const std::string*, std::size_t> OptionDesc::long_names() const
             : std::pair<const std::string*, size_t>( &(*m_long_names.begin()), m_long_names.size());
 }
 
-OptionDesc& OptionDesc::set_names(const char* _names)
+option_description& option_description::set_names(const char* _names)
 {
     m_long_names.clear();
     std::istringstream iss(_names);
@@ -171,17 +171,17 @@ OptionDesc& OptionDesc::set_names(const char* _names)
     return *this;
 }
 
-const std::string& OptionDesc::description() const
+const std::string& option_description::description() const
 {
     return m_description;
 }
 
-std::shared_ptr<const value_base> OptionDesc::semantic() const
+std::shared_ptr<const value_base> option_description::semantic() const
 {
     return m_value;
 }
 
-std::string OptionDesc::format_name() const
+std::string option_description::format_name() const
 {
     if (!m_short_name.empty())
     {
@@ -197,7 +197,7 @@ std::string OptionDesc::format_name() const
     return std::string("--").append(*m_long_names.begin());
 }
 
-std::string OptionDesc::format_parameter() const
+std::string option_description::format_parameter() const
 {
     if (m_value->max_tokens() != 0)
         return m_value->name();
@@ -208,14 +208,14 @@ std::string OptionDesc::format_parameter() const
 ///////////////////////////////////////////////////////////////////////////////////////
 
 OptionBuilder& OptionBuilder::operator()(const char* key, const char* description) {
-    auto option = std::make_shared<OptionDesc>(key, new untyped_value(true), description);
+    auto option = std::make_shared<option_description>(key, new untyped_value(true), description);
     m_root.add(option);
     return *this;
 }
 
 OptionBuilder& OptionBuilder::operator()(const char* key, value_base* tag, const char* description)
 {
-    auto option = std::make_shared<OptionDesc>(key, tag, description);
+    auto option = std::make_shared<option_description>(key, tag, description);
     m_root.add(option);
     return *this;
 }
@@ -261,7 +261,7 @@ options_description& options_description::add(const options_description& desc)
     return *this;
 }
 
-void options_description::add(std::shared_ptr<OptionDesc> desc)
+void options_description::add(std::shared_ptr<option_description> desc)
 {
     m_options.push_back(desc);
     belong_to_group.push_back(false);
@@ -281,15 +281,20 @@ options_description::find(const std::string& name,
     return *d;
 }*/
 
-const std::vector<std::shared_ptr<OptionDesc>>& options_description::options() const
+const std::vector<std::shared_ptr<option_description>>& options_description::options() const
 {
     return m_options;
 }
 
-const OptionDesc* options_description::find_nothrow(const std::string& name,
+OptionBuilder options_description::add_options()
+{
+    return OptionBuilder(*this);
+}
+
+const option_description* options_description::find_nothrow(const std::string& name,
     bool approx, bool long_ignore_case, bool short_ignore_case) const
 {
-    std::shared_ptr<OptionDesc> found;
+    std::shared_ptr<option_description> found;
     bool had_full_match = false;
     std::vector<std::string> approximate_matches;
     std::vector<std::string> full_matches;
@@ -548,7 +553,7 @@ void format_description(std::ostream& os,
     }  // paragraphs
 }
 
-void format_one(std::ostream& os, const OptionDesc& opt,
+void format_one(std::ostream& os, const option_description& opt,
                 unsigned first_column_width, unsigned line_length)
 {
     std::stringstream ss;

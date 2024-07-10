@@ -65,15 +65,40 @@ inline std::string toString(T val) {
     return std::to_string(val);
 }
 
+class base_typed_value : public value_base {
+public:
+    base_typed_value();
+    ~base_typed_value();
+
+    std::string name() const override;
+
+    bool is_required() const override ;
+
+    bool is_composing() const;
+
+    unsigned min_tokens() const;
+
+    unsigned max_tokens() const;
+protected:
+    std::string m_value_name;
+
+    // Default value is stored as std::any and not
+    // as std::optional to avoid unnecessary instantiations.
+    std::any m_default_value;
+    std::string m_default_value_as_text;
+    std::any m_implicit_value;
+    std::string m_implicit_value_as_text;
+    bool m_composing, m_implicit, m_multitoken, m_zero_tokens, m_required;
+    //std::function1<void, const T&> m_notifier;
+};
+
 template <class T>
-class typed_value : public value_base {
+class typed_value : public base_typed_value {
 public:
     /** Ctor. The 'store_to' parameter tells where to store
                 the value when it's known. The parameter can be NULL. */
     typed_value(T* store_to)
-    : m_store_to(store_to), m_composing(false),
-      m_implicit(false), m_multitoken(false),
-      m_zero_tokens(false), m_required(false)
+    : m_store_to(store_to)
     {}
 
     /** Specifies default value, which will be used
@@ -137,39 +162,12 @@ public:
         return *this;
     }
 
-    bool is_required() const override {
-        return m_required;
-    }
-
     bool apply_default(std::any& output) const {
         if (m_default_value.has_value()) {
             output = m_default_value;
             return true;
         }
         return false;
-    }
-
-    std::string name() const override;
-
-    bool is_composing() const { return m_composing; }
-
-    unsigned min_tokens() const
-    {
-        if (m_zero_tokens || m_implicit_value.has_value()) {
-            return 0;
-        } else {
-            return 1;
-        }
-    }
-
-    unsigned max_tokens() const {
-        if (m_multitoken) {
-            return std::numeric_limits<unsigned>::max();
-        } else if (m_zero_tokens) {
-            return 0;
-        } else {
-            return 1;
-        }
     }
 
     /** If 'value_store' is already initialized, or new_tokens
@@ -180,24 +178,7 @@ public:
     void xparse(std::any& value_store, const std::vector<std::string>& new_tokens) const;
 
 protected:
-    /*
-    std::string m_name;
-    bool m_multitoken = false;
-    bool m_required = false;
-    std::optional<T> m_defaultValue;
-    std::string m_defaultValueAsText;*/
-
     T* m_store_to;
-
-            // Default value is stored as boost::any and not
-            // as boost::optional to avoid unnecessary instantiations.
-    std::string m_value_name;
-    std::any m_default_value;
-    std::string m_default_value_as_text;
-    std::any m_implicit_value;
-    std::string m_implicit_value_as_text;
-    bool m_composing, m_implicit, m_multitoken, m_zero_tokens, m_required;
-    //boost::function1<void, const T&> m_notifier;
 };
 
 template <class T>
