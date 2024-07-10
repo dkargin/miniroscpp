@@ -79,22 +79,93 @@ const std::string& positional_options_description::name_for_position(unsigned po
 
 ////////////////////////////////////////////////////////////////////////
 
+abstract_variables_map::abstract_variables_map()
+: m_next(0)
+{}
 
-////////////////////////////////////////////////////////////////////////
+abstract_variables_map::
+abstract_variables_map(const abstract_variables_map* next)
+: m_next(next)
+{}
 
-int variables_map::count(const char* key) const {
-    return m_variables.count(key);
+const variable_value&
+abstract_variables_map::operator[](const std::string& name) const
+{
+    const variable_value& v = get(name);
+    if (v.empty() && m_next)
+        return (*m_next)[name];
+    else if (v.defaulted() && m_next) {
+        const variable_value& v2 = (*m_next)[name];
+        if (!v2.empty() && !v2.defaulted())
+            return v2;
+        else return v;
+    } else {
+        return v;
+    }
 }
 
-const variables_map::Value& variables_map::operator[](const char* key) const {
-    auto it = m_variables.find(key);
-    if (it != m_variables.end())
-        return *it->second;
-    return m_empty;
+void abstract_variables_map::next(abstract_variables_map* next)
+{
+    m_next = next;
 }
 
-size_t variables_map::size() const {
-    return m_variables.size();
+///////////////////////////////////////////////////////////////////////////////////
+variables_map::variables_map()
+{}
+
+variables_map::variables_map(const abstract_variables_map* next)
+: abstract_variables_map(next)
+{}
+
+void variables_map::clear()
+{
+    std::map<std::string, variable_value>::clear();
+    m_final.clear();
+    m_required.clear();
 }
 
+const variable_value& variables_map::get(const std::string& name) const
+{
+    static variable_value empty;
+    const_iterator i = this->find(name);
+    if (i == this->end())
+        return empty;
+    else
+        return i->second;
+}
+
+void variables_map::notify()
+{
+    // This checks if all required options occur
+    for (map<std::string, std::string>::const_iterator r = m_required.begin();
+         r != m_required.end();
+         ++r)
+    {
+        const std::string& opt = r->first;
+        const std::string& display_opt = r->second;
+        std::map<std::string, variable_value>::const_iterator iter = find(opt);
+        if (iter == end() || iter->second.empty())
+        {
+            throw required_option(display_opt);
+        }
+    }
+
+#ifdef SUPPORT_NOTIFY
+    // Lastly, run notify actions.
+    for (std::map<std::string, variable_value>::iterator k = begin();
+         k != end(); ++k)
+    {
+        /* Users might wish to use variables_map to store their own values
+           that are not parsed, and therefore will not have value_semantics
+           defined. Do not crash on such values. In multi-module programs,
+           one module might add custom values, and the 'notify' function
+           will be called after that, so we check that value_sematics is
+           not NULL. See:
+               https://svn.boost.org/trac/boost/ticket/2782
+        */
+        if (k->second.m_value_semantic)
+            k->second.m_value_semantic->notify(k->second.value());
+    }
+#endif
+}
 } // namespace program_options

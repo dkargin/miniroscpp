@@ -24,10 +24,19 @@ command_line_parser& command_line_parser::positional(const positional_options_de
     return *this;
 }
 
-command_line_parser& command_line_parser::run() {
-    return *this;
-}
+parsed_options command_line_parser::run()
+{
+    // save the canonical prefixes which were used by this cmdline parser
+    //    eventually inside the parsed results
+    //    This will be handy to format recognisable options
+    //    for diagnostic messages if everything blows up much later on
+    parsed_options result(m_options_description, get_canonical_option_prefix());
+    result.options = run_impl();
 
+    // Presense of parsed_options -> wparsed_options conversion
+    // does the trick.
+    return result;
+}
 
 using option = basic_option<char>;
 
@@ -149,7 +158,7 @@ std::vector<option> command_line_parser::run_impl()
         if (opt.string_key.empty())
             continue;
 
-        const OptionDesc* xd = nullptr;
+        const option_description* xd = nullptr;
         try
         {
             xd = m_options_description->find_nothrow(opt.string_key,
@@ -263,7 +272,7 @@ void command_line_parser::finish_option(option& opt,
     try
     {
         // First check that the option is valid, and get its description.
-        const OptionDesc* xd = m_options_description->find_nothrow(
+        const option_description* xd = m_options_description->find_nothrow(
             opt.string_key,
             is_style_active(command_line_style::allow_guessing),
             is_style_active(command_line_style::long_case_insensitive),
@@ -278,7 +287,7 @@ void command_line_parser::finish_option(option& opt,
                 throw unknown_option();
             }
         }
-        const OptionDesc& d = *xd;
+        const option_description& d = *xd;
 
         // Canonize the name
         opt.string_key = d.key(opt.string_key);
@@ -326,7 +335,7 @@ void command_line_parser::finish_option(option& opt,
                 if (!followed_option.empty())
                 {
                     original_token_for_exceptions = other_tokens[0];
-                    const OptionDesc* od = m_options_description->find_nothrow(other_tokens[0],
+                    const option_description* od = m_options_description->find_nothrow(other_tokens[0],
                             is_style_active(command_line_style::allow_guessing),
                             is_style_active(command_line_style::long_case_insensitive),
                             is_style_active(command_line_style::short_case_insensitive));
@@ -410,7 +419,7 @@ command_line_parser::parse_short_option(std::vector<std::string>& args)
         // of token is considered to be value, not further grouped
         // option.
         for(;;) {
-            const OptionDesc* d;
+            const option_description* d;
             try
             {
                 d = m_options_description->find_nothrow(name, false, false,
