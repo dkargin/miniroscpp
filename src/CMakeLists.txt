@@ -1,6 +1,8 @@
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+add_subdirectory(replacements)
+
 #include_directories(${MINIROS_INCLUDE_DIRS})
 
 SET(rostime_SRC
@@ -198,10 +200,10 @@ if (MINIROS_BUILD_ROSBAG_APPS)
 	# Common library for rosbag applications.
 	add_library(bag_app 
 		rosbag/player.cpp
-		rosbag/recorder.cpp
-	  rosbag/time_translator.cpp
+                rosbag/recorder.cpp
+          rosbag/time_translator.cpp
 	)
-	target_link_libraries(bag_app bag_storage roscxx)
+        target_link_libraries(bag_app bag_storage roscxx program_options)
 	target_include_directories(bag_app PRIVATE ${MINIROS_INCLUDE_DIRS} ${MINIROS_INCLUDE_GENERATED_DIRS})
 
 	# ROSBag recorder app

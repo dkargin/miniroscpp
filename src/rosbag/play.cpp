@@ -34,9 +34,20 @@
 
 #include "minibag/player.h"
 #include "miniros/console.h"
-#include "boost/program_options.hpp"
 
+#define PO_REPLACE
+
+#ifdef PO_REPLACE
+// po::value<std::string>()->default_value("") -> defaultValue<std::string>("");
+// po::multitoken<std::vector<std::string>>() -> multiple<std::string>()
+
+#include "replacements/program_options/program_options.h"
+
+namespace po = program_options;
+#else
+#include "boost/program_options.hpp"
 namespace po = boost::program_options;
+#endif
 
 minibag::PlayerOptions parseOptions(int argc, char** argv) {
   minibag::PlayerOptions opts;
@@ -75,11 +86,16 @@ minibag::PlayerOptions parseOptions(int argc, char** argv) {
     
     try 
     {
-      po::store(po::command_line_parser(argc, argv).options(desc).positional(p).run(), vm);
-    } catch (boost::program_options::invalid_command_line_syntax& e)
+      po::store(po::command_line_parser(argc, argv)
+                .options(desc)
+                .positional(p)
+                .run(), vm);
+    }
+    catch (po::invalid_command_line_syntax& e)
     {
       throw miniros::Exception(e.what());
-    }  catch (boost::program_options::unknown_option& e)
+    }
+    catch (po::unknown_option& e)
     {
       throw miniros::Exception(e.what());
     }
