@@ -92,6 +92,16 @@ endif()
 set(ENCRYPT_SOURCE "")
 set(ENCRYPT_LIBRARIES "")
 
+if(MINIROS_ROSBAG_USE_GPGME_ENCRYPTION)
+  find_package(Gpgme REQUIRED)
+
+  if (GPGME_FOUND)
+    list(APPEND ENCRYPT_SOURCE "rosbag_storage/gpgme_utils.cpp")
+    list(APPEND rosbag_INCLUDE ${GPGME_INCLUDES})
+    list(APPEND ENCRYPT_LIBRARIES gpgme)
+  endif()
+endif()
+
 # AES encryption plugin
 if (MINIROS_ROSBAG_USE_OPENSSL_ENCRYPTION)
 	find_package(OpenSSL QUIET)
@@ -102,12 +112,6 @@ if (MINIROS_ROSBAG_USE_OPENSSL_ENCRYPTION)
 	else ()
 		message(STATUS "No OpenSSL was found. Rosbag will not support AES encryption.")
 	endif()
-endif()
-
-
-if(MINIROS_ROSBAG_USE_GPGME_ENCRYPTION)
-	list(APPEND ENCRYPT_SOURCE "rosbag_storage/gpgme_utils.cpp")
-	list(APPEND ENCRYPT_LIBRARIES gpgme)
 endif()
 
 

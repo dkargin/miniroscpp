@@ -15,6 +15,8 @@ include(CheckCXXSourceCompiles)
 include(CheckCXXSymbolExists)
 include(CMakePackageConfigHelpers)
 
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+
 find_package(catkin QUIET)
 
 if(catkin_FOUND)
