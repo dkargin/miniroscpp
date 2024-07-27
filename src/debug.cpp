@@ -27,6 +27,8 @@
 
 #include "miniros/debug.h"
 
+#include "internal_config.h"
+
 #if defined(HAVE_EXECINFO_H)
 #include <execinfo.h>
 #endif
@@ -46,7 +48,7 @@ namespace debug
 
 void getBacktrace(V_void& addresses)
 {
-#if HAVE_GLIBC_BACKTRACE
+#ifdef HAVE_GLIBC_BACKTRACE
   void *array[64];
 
   size_t size = backtrace(array, 64);
@@ -59,7 +61,7 @@ void getBacktrace(V_void& addresses)
 
 void translateAddresses(const V_void& addresses, V_string& lines)
 {
-#if HAVE_GLIBC_BACKTRACE
+#ifdef HAVE_GLIBC_BACKTRACE
   if (addresses.empty())
   {
     return;
@@ -79,7 +81,7 @@ void translateAddresses(const V_void& addresses, V_string& lines)
 
 std::string demangleName(const std::string& name)
 {
-#if HAVE_CXXABI_H
+#ifdef HAVE_CXXABI_H
   int status;
   char* demangled = abi::__cxa_demangle(name.c_str(), 0, 0, &status);
   std::string out;
