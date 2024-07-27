@@ -60,32 +60,7 @@ option(MINIROS_BUILD_SHARED_LIBS "Build shared version of miniros" ON)
 option(MINIROS_ROSBAG_USE_GPGME_ENCRYPTION "Use GPGME encryption support" OFF)
 option(MINIROS_ROSBAG_USE_OPENSSL_ENCRYPTION "Use openssl encryption for rosbag" OFF)
 
-
-# execinfo.h is needed for backtrace on glibc systems
-CHECK_INCLUDE_FILE(execinfo.h HAVE_EXECINFO_H)
-if(HAVE_EXECINFO_H)
-  add_definitions(-DHAVE_EXECINFO_H=1)
-endif(HAVE_EXECINFO_H)
-
-# do we have demangle capability?
-# CHECK_INCLUDE_FILE doesn't work here for some reason
-CHECK_CXX_SOURCE_COMPILES("#include<cxxabi.h>\nint main(int argc,char**argv){}" HAVE_CXXABI_H)
-if(HAVE_CXXABI_H)
-  add_definitions(-DHAVE_CXXABI_H=1)
-endif()
-
-CHECK_FUNCTION_EXISTS(backtrace HAVE_GLIBC_BACKTRACE)
-if(HAVE_GLIBC_BACKTRACE)
-  add_definitions(-DHAVE_GLIBC_BACKTRACE)
-endif(HAVE_GLIBC_BACKTRACE)
-
-# Not everybody has <ifaddrs.h> (e.g., embedded arm-linux)
-CHECK_INCLUDE_FILES(ifaddrs.h HAVE_IFADDRS_H)
-# Not everybody has trunc (e.g., Windows, embedded arm-linux)
-CHECK_FUNCTION_EXISTS(trunc HAVE_TRUNC)
-# Not everybody has epoll (e.g., Windows, BSD, embedded arm-linux) 
-CHECK_CXX_SYMBOL_EXISTS(epoll_wait "sys/epoll.h" HAVE_EPOLL)
-
+# Generate external config
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/include/miniros/config.h.in" "miniros/config.h")
 
 # Processing external modules like bzip2 or lz4

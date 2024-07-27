@@ -27,7 +27,8 @@
 
 #include <cstring>
 
-#include "miniros/config.h"
+#include "internal_config.h"
+
 #include "miniros/transport/network.h"
 #include "miniros/transport/file_log.h"
 #include "miniros/internal/exceptions.h"

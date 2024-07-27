@@ -1,0 +1,8 @@
+/// This is an internal config. It should not be shipped anywhere during `make install`
+#cmakedefine HAVE_EXECINFO_H
+#cmakedefine HAVE_CXXABI_H
+#cmakedefine HAVE_GLIBC_BACKTRACE
+
+#cmakedefine HAVE_TRUNC
+#cmakedefine HAVE_IFADDRS_H
+#cmakedefine HAVE_EPOLL

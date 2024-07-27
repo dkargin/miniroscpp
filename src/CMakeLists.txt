@@ -3,19 +3,37 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_subdirectory(replacements)
 
-#include_directories(${MINIROS_INCLUDE_DIRS})
+# Injecting flags for debug.
+
+# execinfo.h is needed for backtrace on glibc systems
+CHECK_INCLUDE_FILE(execinfo.h HAVE_EXECINFO_H)
+# do we have demangle capability?
+# CHECK_INCLUDE_FILE doesn't work here for some reason
+CHECK_CXX_SOURCE_COMPILES("#include<cxxabi.h>\nint main(int argc,char**argv){}" HAVE_CXXABI_H)
+CHECK_FUNCTION_EXISTS(backtrace HAVE_GLIBC_BACKTRACE)
+
+# Not everybody has <ifaddrs.h> (e.g., embedded arm-linux)
+CHECK_INCLUDE_FILES(ifaddrs.h HAVE_IFADDRS_H)
+# Not everybody has trunc (e.g., Windows, embedded arm-linux)
+CHECK_FUNCTION_EXISTS(trunc HAVE_TRUNC)
+# Not everybody has epoll (e.g., Windows, BSD, embedded arm-linux) 
+CHECK_CXX_SYMBOL_EXISTS(epoll_wait "sys/epoll.h" HAVE_EPOLL)
+
+configure_file("${CMAKE_CURRENT_SOURCE_DIR}/internal_config.h.in" internal_config.h)
+
+include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
 SET(rostime_SRC
-	rostime/duration.cpp
-	rostime/rate.cpp
-	rostime/time.cpp)
+    rostime/duration.cpp
+    rostime/rate.cpp
+    rostime/time.cpp)
 
 set(cpp_common_SRC
-	debug.cpp
-	header.cpp
-	console.cpp
-	console_print.cpp
-	serialization.cpp)
+    debug.cpp
+    header.cpp
+    console.cpp
+    console_print.cpp
+    serialization.cpp)
 
 set(rosbag_SRC "")
 set(rosbag_LIBS "")
@@ -23,23 +41,23 @@ set(rosbag_INCLUDE "")
 
 # Finding BZip2
 if (MINIROS_USE_SYSTEM_BZIP2)
-	find_package(BZip2 QUIET)
+    find_package(BZip2 QUIET)
 endif(MINIROS_USE_SYSTEM_BZIP2)
 
 if (BZIP2_FOUND)
-	add_definitions(${BZIP2_DEFINITIONS})
-	list(APPEND rosbag_INCLUDE ${BZIP2_INCLUDE_DIR})
-	list(APPEND rosbag_SRC rosbag_storage/bz2_stream.cpp)
+    add_definitions(${BZIP2_DEFINITIONS})
+    list(APPEND rosbag_INCLUDE ${BZIP2_INCLUDE_DIR})
+    list(APPEND rosbag_SRC rosbag_storage/bz2_stream.cpp)
 
-	if (NOT MINIROS_USE_SYSTEM_BZIP)
-		list(APPEND rosbag_LIBS bz2_import)
-	else ()
-		list(APPEND rosbag_LIBS ${BZIP2_LIBRARIES})
-	endif ()
-	
-	add_definitions(-DMINIBAG_HAS_BZIP2)
+    if (NOT MINIROS_USE_SYSTEM_BZIP)
+            list(APPEND rosbag_LIBS bz2_import)
+    else ()
+            list(APPEND rosbag_LIBS ${BZIP2_LIBRARIES})
+    endif ()
+
+    add_definitions(-DMINIBAG_HAS_BZIP2)
 else(BZIP2_FOUND)
-	message(STATUS "No bzip2 was found. Bzip2 support is disabled.")
+    message(STATUS "No bzip2 was found. Bzip2 support is disabled.")
 endif(BZIP2_FOUND)
 
 # Finding LZ4
@@ -68,8 +86,7 @@ if (lz4_LIBRARIES)
 	
 	set_source_files_properties(src/lz4s.c src/xxhash.c
 		PROPERTIES COMPILE_DEFINITIONS "XXH_NAMESPACE=ROSLZ4_")
-	add_definitions(-DMINIBAG_HAS_LZ4)
-	add_definitions()
+        add_definitions(-DMINIBAG_HAS_LZ4)
 endif()
 
 set(ENCRYPT_SOURCE "")
@@ -169,26 +186,26 @@ target_link_libraries(roscxx PRIVATE xmlrpcpp rt stdc++fs ${console_bridge_LIBRA
 target_compile_definitions(roscxx PRIVATE rostime_EXPORTS miniros_EXPORTS)
 
 target_include_directories(roscxx PRIVATE
-	${MINIROS_INCLUDE_DIRS}
-	${MINIROS_INCLUDE_TRANSPORT}
-	${MINIROS_INCLUDE_ROOT}
-	${MINIROS_INCLUDE_GENERATED_DIRS}
+    ${MINIROS_INCLUDE_DIRS}
+    ${MINIROS_INCLUDE_TRANSPORT}
+    ${MINIROS_INCLUDE_ROOT}
+    ${MINIROS_INCLUDE_GENERATED_DIRS}
 )
 
 set(bag_storage_SRC
-	rosbag_storage/bag_player.cpp
-	rosbag_storage/bag.cpp
-	rosbag_storage/buffer.cpp
-	rosbag_storage/chunked_file.cpp
-	rosbag_storage/message_instance.cpp
-	rosbag_storage/query.cpp
-	rosbag_storage/stream.cpp
-	rosbag_storage/uncompressed_stream.cpp
-	rosbag_storage/view.cpp
-	
-	${rosbag_SRC}
-	rosbag_storage/no_encryptor.cpp
-	${ENCRYPT_SOURCE}
+    rosbag_storage/bag_player.cpp
+    rosbag_storage/bag.cpp
+    rosbag_storage/buffer.cpp
+    rosbag_storage/chunked_file.cpp
+    rosbag_storage/message_instance.cpp
+    rosbag_storage/query.cpp
+    rosbag_storage/stream.cpp
+    rosbag_storage/uncompressed_stream.cpp
+    rosbag_storage/view.cpp
+
+    ${rosbag_SRC}
+    rosbag_storage/no_encryptor.cpp
+    ${ENCRYPT_SOURCE}
 )
 
 if (MINIROS_BUILD_SHARED_LIBS)
