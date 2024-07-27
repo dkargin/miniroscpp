@@ -35,12 +35,12 @@
 #include <sstream>
 
 /// This define is injected in replacements/CMakeLists.txt
-#ifdef USE_BOOST_PROGRAM_OPTIONS
-#include "boost/program_options.hpp"
-namespace po = boost::program_options;
-#else
+#ifdef USE_LOCAL_PROGRAM_OPTIONS
 #include "program_options/program_options.h"
 namespace po = program_options;
+#else
+#include "boost/program_options.hpp"
+namespace po = boost::program_options;
 #endif
 
 #include "minibag/recorder.h"
