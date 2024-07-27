@@ -35,13 +35,12 @@
 #include "minibag/stream.h"
 #include "minibag/chunked_file.h"
 
-//#include <ros/ros.h>
+#include "minibag/lz4_stream.h"
+#include "minibag/bz2_stream.h"
 
 using std::shared_ptr;
 
 namespace minibag {
-
-// StreamFactory
 
 StreamFactory::StreamFactory(ChunkedFile* file) :
     uncompressed_stream_(new UncompressedStream(file))

@@ -27,7 +27,8 @@
 /*
  * Some common cross platform utilities.
  */
-#pragma once
+#ifndef MINIROS_PLATFORM_H
+#define MINIROS_PLATFORM_H
 /******************************************************************************
 * Cross Platform Functions
 ******************************************************************************/
@@ -61,3 +62,6 @@ inline bool get_environment_variable(std::string &str, const char* environment_v
 }
 
 } // namespace miniros
+
+#endif // MINIROS_PLATFORM_H
+

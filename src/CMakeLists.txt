@@ -1,6 +1,8 @@
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+add_subdirectory(replacements)
+
 #include_directories(${MINIROS_INCLUDE_DIRS})
 
 SET(rostime_SRC
@@ -12,6 +14,7 @@ set(cpp_common_SRC
 	debug.cpp
 	header.cpp
 	console.cpp
+	console_print.cpp
 	serialization.cpp)
 
 set(rosbag_SRC "")
@@ -91,16 +94,86 @@ if(MINIROS_ROSBAG_USE_GPGME_ENCRYPTION)
 endif()
 
 
+set(transport_SRC
+  transport/master.cpp
+  transport/network.cpp
+  transport/subscriber.cpp
+  transport/common.cpp
+  transport/publisher_link.cpp
+  transport/service_publication.cpp
+  transport/connection.cpp
+  transport/single_subscriber_publisher.cpp
+  transport/param.cpp
+  transport/service_server.cpp
+  transport/wall_timer.cpp
+  transport/xmlrpc_manager.cpp
+  transport/publisher.cpp
+  transport/timer.cpp
+  transport/io.cpp
+  transport/names.cpp
+  transport/topic.cpp
+  transport/topic_manager.cpp
+  transport/poll_manager.cpp
+  transport/publication.cpp
+  transport/statistics.cpp
+  transport/intraprocess_subscriber_link.cpp
+  transport/intraprocess_publisher_link.cpp
+  transport/callback_queue.cpp
+  transport/service_server_link.cpp
+  transport/service_client.cpp
+  transport/node_handle.cpp
+  transport/connection_manager.cpp
+  transport/file_log.cpp
+  transport/transport/transport.cpp
+  transport/transport/transport_udp.cpp
+  transport/transport/transport_tcp.cpp
+  transport/subscriber_link.cpp
+  transport/service_client_link.cpp
+  transport/transport_publisher_link.cpp
+  transport/transport_subscriber_link.cpp
+  transport/service_manager.cpp
+  transport/rosout_appender.cpp
+  transport/init.cpp
+  transport/subscription.cpp
+  transport/subscription_queue.cpp
+  transport/spinner.cpp
+  transport/internal_timer_manager.cpp
+  transport/message_deserializer.cpp
+  transport/poll_set.cpp
+  transport/service.cpp
+  transport/this_node.cpp
+  transport/steady_timer.cpp
+  shape_shifter.cpp
+  )
+
+set(BOOST_COMPONENTS system thread)
+if (MINIROS_USE_SYSTEM_PROGRAM_OPTIONS)
+    list(APPEND BOOST_COMPONENTS program_options)
+endif()
+
+find_package(Boost REQUIRED COMPONENTS ${BOOST_COMPONENTS})
+if (MINIROS_USE_SYSTEM_PROGRAM_OPTIONS)
+    add_library(impl::program_options ALIAS Boost::program_options)
+endif ()
+
 if (MINIROS_BUILD_SHARED_LIBS)
-  add_library(roscxx SHARED ${rostime_SRC} ${cpp_common_SRC})
+  add_library(roscxx SHARED ${rostime_SRC} ${cpp_common_SRC} ${transport_SRC})
 else()
-  add_library(roscxx ${rostime_SRC} ${cpp_common_SRC})
+  add_library(roscxx ${rostime_SRC} ${cpp_common_SRC} ${transport_SRC})
 endif()
 
 set_property(TARGET roscxx PROPERTY CXX_STANDARD 17)
-target_link_libraries(roscxx ${console_bridge_LIBRARIES})
+
+target_link_libraries(roscxx PRIVATE xmlrpcpp rt stdc++fs ${console_bridge_LIBRARIES} ${Boost_LIBRARIES})
+
 target_compile_definitions(roscxx PRIVATE rostime_EXPORTS miniros_EXPORTS)
-target_include_directories(roscxx PRIVATE ${MINIROS_INCLUDE_DIRS})
+
+target_include_directories(roscxx PRIVATE
+	${MINIROS_INCLUDE_DIRS}
+	${MINIROS_INCLUDE_TRANSPORT}
+	${MINIROS_INCLUDE_ROOT}
+	${MINIROS_INCLUDE_GENERATED_DIRS}
+)
 
 set(bag_storage_SRC
 	rosbag_storage/bag_player.cpp
@@ -130,13 +203,27 @@ target_compile_definitions(bag_storage PRIVATE rosbag_EXPORTS rosbag_storage_EXP
 set_property(TARGET bag_storage PROPERTY CXX_STANDARD 17)
 target_link_libraries(bag_storage ${ENCRYPT_LIBRARIES} ${rosbag_LIBS} roscxx)
 
-set(minibag_SRC
-	rosbag/encrypt.cpp
-	rosbag/play.cpp
-	rosbag/player.cpp
-	rosbag/record.cpp
-	rosbag/recorder.cpp
-	rosbag/time_translator.cpp)
+
+if (MINIROS_BUILD_ROSBAG_APPS)
+    # Common library for rosbag applications.
+    add_library(bag_app
+        rosbag/player.cpp
+        rosbag/recorder.cpp
+        rosbag/time_translator.cpp
+    )
+    target_link_libraries(bag_app bag_storage roscxx)
+    target_include_directories(bag_app PRIVATE ${MINIROS_INCLUDE_DIRS} ${MINIROS_INCLUDE_GENERATED_DIRS})
+
+    # ROSBag recorder app
+    add_executable(record rosbag/record.cpp)
+    target_link_libraries(record bag_app impl::program_options)
+    target_include_directories(record PRIVATE ${MINIROS_INCLUDE_DIRS} ${MINIROS_INCLUDE_GENERATED_DIRS})
+
+    # ROSBag player app.
+    add_executable(play rosbag/play.cpp)
+    target_link_libraries(play bag_app impl::program_options)
+    target_include_directories(play PRIVATE ${MINIROS_INCLUDE_DIRS} ${MINIROS_INCLUDE_GENERATED_DIRS})
+endif()
 
 set(MINIROS_LIBRARY roscxx PARENT_SCOPE)
 set(MINIROS_EXPORT roscxx bag_storage ${rosbag_LIBS} PARENT_SCOPE)

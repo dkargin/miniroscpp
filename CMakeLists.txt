@@ -9,30 +9,39 @@ cmake_policy(SET CMP0077 NEW)
 project(miniros VERSION 0.2.2)
 
 include(CheckIncludeFile)
+include(CheckIncludeFiles)
 include(CheckFunctionExists)
 include(CheckCXXSourceCompiles)
+include(CheckCXXSymbolExists)
 include(CMakePackageConfigHelpers)
 
 find_package(catkin QUIET)
 
 if(catkin_FOUND)
+  message(STATUS "Miniros has been used with catkin")
   catkin_package(
     DEPENDS
-    INCLUDE_DIRS include
-    LIBRARIES ${PROJECT_NAME})
+    INCLUDE_DIRS include include/generated
+    LIBRARIES roscxx bag_storage)
 endif(catkin_FOUND)
 
 include_directories(include)
 set(MINIROS_INCLUDE_DIRS ${CMAKE_CURRENT_BINARY_DIR})
+set(MINIROS_XMLRPCPP_B64_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/xmlrpcpp/libb64/include")
 
 set(MINIROS_INCLUDE_GENERATED_DIRS
-  ${CMAKE_CURRENT_SOURCE_DIR}/include/generated
-	CACHE PATH "Path to MiniROS generated messages")
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/generated
+    CACHE PATH "Path to MiniROS generated messages")
+
+# Root include path for helper libraries like xmlrpc
+set(MINIROS_INCLUDE_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/include/miniros)
+
+set(MINIROS_INCLUDE_TRANSPORT ${CMAKE_CURRENT_SOURCE_DIR}/include/transport)
 
 # Checking if miniros is added as a submodule
 get_directory_property(hasParent PARENT_DIRECTORY)
 if(hasParent)
-  message(STATUS "miniroscpp was added as a submodule.")
+  message(STATUS "${PROJECT_NAME} was added as a submodule.")
   set(MINIROS_SUBMODULE TRUE)
 else()
   set(MINIROS_SUBMODULE FALSE)
@@ -43,11 +52,14 @@ set(MINIROS_ADDITIONAL_COMPONENTS $<NOT:${MINIROS_SUBMODULE}>)
 
 option(MINIROS_USE_SYSTEM_BZIP2 "Use bzip2 from system" OFF)
 option(MINIROS_USE_SYSTEM_LZ4 "Use lz4 from system" OFF)
+option(MINIROS_USE_SYSTEM_PROGRAM_OPTIONS "Use boost::program_options instead of local implementation" OFF)
 option(MINIROS_BUILD_EXAMPLES "Build examples" ${MINIROS_ADDITIONAL_COMPONENTS})
+option(MINIROS_BUILD_ROSBAG_APPS "Build rosbag applications, like rosbag/play and rosbag/record" OFF)
 option(MINIROS_BUILD_TESTS "Build tests" ${MINIROS_ADDITIONAL_COMPONENTS})
 option(MINIROS_BUILD_SHARED_LIBS "Build shared version of miniros" ON)
 option(MINIROS_ROSBAG_USE_GPGME_ENCRYPTION "Use GPGME encryption support" OFF)
 option(MINIROS_ROSBAG_USE_OPENSSL_ENCRYPTION "Use openssl encryption for rosbag" OFF)
+
 
 # execinfo.h is needed for backtrace on glibc systems
 CHECK_INCLUDE_FILE(execinfo.h HAVE_EXECINFO_H)
@@ -67,22 +79,32 @@ if(HAVE_GLIBC_BACKTRACE)
   add_definitions(-DHAVE_GLIBC_BACKTRACE)
 endif(HAVE_GLIBC_BACKTRACE)
 
-# Processing external modules like bzip2 or lz4
-set(EXTERNAL_INCLUDE "")
+# Not everybody has <ifaddrs.h> (e.g., embedded arm-linux)
+CHECK_INCLUDE_FILES(ifaddrs.h HAVE_IFADDRS_H)
+# Not everybody has trunc (e.g., Windows, embedded arm-linux)
+CHECK_FUNCTION_EXISTS(trunc HAVE_TRUNC)
+# Not everybody has epoll (e.g., Windows, BSD, embedded arm-linux) 
+CHECK_CXX_SYMBOL_EXISTS(epoll_wait "sys/epoll.h" HAVE_EPOLL)
 
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/include/miniros/config.h.in" "miniros/config.h")
+
+# Processing external modules like bzip2 or lz4
+set(EXTERNAL_INCLUDE "")
 
 if (WIN32)
   # We have a lot of unix code here, and MSVC is always angry with these methods
   add_definitions(-D_CRT_SECURE_NO_WARNINGS)
 endif()
 
+set(XMLRPCPP_SRC_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/xmlrpcpp)
+
 add_subdirectory(external)
+add_subdirectory(xmlrpcpp)
 add_subdirectory(src)
 
 
 if (MINIROS_BUILD_TESTS)
-	find_package(GTEST QUIET)
+	find_package(GTest)
 	if (GTEST_FOUND)
 		add_subdirectory(test)
 	else()

@@ -34,7 +34,7 @@
 
 #pragma once
 
-#include "miniros/time.h"
+#include "miniros/impl/time.h"
 #include "minibag/macros.h"
 
 namespace minibag {

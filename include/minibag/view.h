@@ -35,9 +35,7 @@
 #pragma once
 
 #include <functional>
-//#include <boost/iterator/iterator_facade.hpp>
-
-#include <miniros/time.h>
+#include <miniros/rostime.h>
 #include "minibag/message_instance.h"
 #include "minibag/query.h"
 #include "minibag/macros.h"
@@ -58,9 +56,7 @@ public:
      * MessageInstance is destroyed.  You should never store the
      * pointer to this reference.
      */
-    class ROSBAG_STORAGE_DECL iterator /*: public boost::iterator_facade<iterator,
-                                                   MessageInstance,
-                                                   boost::forward_traversal_tag>*/
+    class ROSBAG_STORAGE_DECL iterator
     {
     public:
         iterator(iterator const& i);

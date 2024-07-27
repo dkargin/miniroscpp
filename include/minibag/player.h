@@ -46,14 +46,13 @@
 #include <queue>
 #include <string>
 
-#include <ros/ros.h>
-
-#include <miniros/time.h>
-#include <std_srvs/SetBool.h>
+#include <miniros/ros.h>
+#include <miniros/rostime.h>
+#include <std_srvs/SetBool.hxx>
 
 #include "minibag/bag.h"
 
-#include <topic_tools/shape_shifter.h>
+#include <miniros/topic_tools/shape_shifter.h>
 
 #include "minibag/time_translator.h"
 #include "minibag/macros.h"
@@ -66,9 +65,9 @@ namespace minibag {
  *  param queue_size  The size of the outgoing queue
  *  param prefix      An optional prefix for all output topics
  */
-ros::AdvertiseOptions createAdvertiseOptions(MessageInstance const& msg, uint32_t queue_size, const std::string& prefix = "");
+miniros::AdvertiseOptions createAdvertiseOptions(MessageInstance const& msg, uint32_t queue_size, const std::string& prefix = "");
 
-ROSBAG_DECL ros::AdvertiseOptions createAdvertiseOptions(const ConnectionInfo* c, uint32_t queue_size, const std::string& prefix = "");
+ROSBAG_DECL miniros::AdvertiseOptions createAdvertiseOptions(const ConnectionInfo* c, uint32_t queue_size, const std::string& prefix = "");
 
 
 struct ROSBAG_DECL PlayerOptions
@@ -96,7 +95,7 @@ struct ROSBAG_DECL PlayerOptions
     bool     wait_for_subscribers;
     std::string rate_control_topic;
     float    rate_control_max_delay;
-    ros::Duration skip_empty;
+    miniros::Duration skip_empty;
 
     std::vector<std::string> bags;
     std::vector<std::string> topics;
@@ -126,7 +125,7 @@ public:
     void setTime(const miniros::Time& time);
 
     /*! Get the current time */
-    ros::Time const& getTime() const;
+    miniros::Time const& getTime() const;
 
     /*! Run the clock for AT MOST duration
      *
@@ -148,8 +147,8 @@ private:
     double publish_frequency_;
     double time_scale_;
     
-    ros::NodeHandle node_handle_;
-    ros::Publisher time_pub_;
+    miniros::NodeHandle node_handle_;
+    miniros::Publisher time_pub_;
     
     miniros::WallDuration wall_step_;
     
@@ -179,7 +178,7 @@ private:
     void setupTerminal();
     void restoreTerminal();
 
-    void updateRateTopicTime(const miniros::MessageEvent<topic_tools::ShapeShifter const>& msg_event);
+    void updateRateTopicTime(const miniros::MessageEvent<miniros::topic_tools::ShapeShifter const>& msg_event);
 
     void advertise(const ConnectionInfo* c);
 
@@ -196,13 +195,13 @@ private:
     void waitForSubscribers() const;
 
 private:
-    typedef std::map<std::string, ros::Publisher> PublisherMap;
+    typedef std::map<std::string, miniros::Publisher> PublisherMap;
 
     PlayerOptions options_;
 
-    ros::NodeHandle node_handle_;
+    miniros::NodeHandle node_handle_;
 
-    ros::ServiceServer pause_service_;
+    miniros::ServiceServer pause_service_;
 
     bool paused_;
     bool delayed_;
@@ -213,7 +212,7 @@ private:
 
     bool requested_pause_state_;
 
-    ros::Subscriber rate_control_sub_;
+    miniros::Subscriber rate_control_sub_;
     miniros::Time last_rate_control_;
 
     miniros::WallTime paused_time_;

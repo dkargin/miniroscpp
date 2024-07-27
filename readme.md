@@ -50,7 +50,6 @@ Somewhere in a root CMakeLists.txt:
 add_subdirectory(thirdparty/miniroscpp)
 ```
 
-
 Adding **miniros** to a target:
 
 ```
@@ -64,20 +63,32 @@ target_link_libraries(some_executable miniros::roscxx miniros::bag_storage)
 target_include_directories(some_executable PRIVATE ${MINIROS_INCLUDE_GENERATED_DIRS})
 ```
 
-# Plan #
+# Current status #
 
-1. ~~Get rid of boost::format. It can be replaced by a local implementation.~~ DONE
-1. ~~Merge console_bridge.~~ DONE
-1. ~~Figure out how to run new codegen with packages like sensor_msgs or nav_msgs.~~ DONE
-1. ~~Squash export macro headers, like miniros/macros.h, miniros/roscpp_serialization_macros.h, minibag/macros.h.~~ DONE
-1. Adapt tests from corresponding libraries.
-1. ~~Merge rosbag_storage inside.~~ DONE
-1. ~~Add local versions of **bzip2** and **lz4**.~~ DONE
-1. Check python code.
-1. ~~Adapt CMakeLists.txt to work without catkin.~~ DONE
-1. Check if I can merge whole ROS transport in a library.
-1. ~~Provide a proper install and configuration scripts for CMake.~~ DONE
-1. Test library on android.
+1. ROSBag C++ client is complete. It is an independent library. No boost or big external libraries are required.
+1. Ported ROS C++ client code. It still uses boost::signals2 and boost::thread_unique_ptr internally, but they are not leaked to user code (hopefully).
+1. Ported rosbag play and record utilities.
+1. Added some tests from original ros_comm package. Though they do not work without some external rosmaster.
+
+Missing things:
+
+1. This is not a complete ROS distribution. You still need regular ROS tools, like roslaunch, rostopic or rosmaster somewhere else. This is just a portable C++ client, which helps connecting ROS system from the projects, where using regular ROS is not the best idea.
+1. ROS logging is probably broken right now.
+1. Full testing from ros_comm is also missing.
+
+# Future plans #
+
+Since **miniros** is experimental distribution, I am free to improve core API. These are possible directions:
+
+1. Replace boost::signal2 and boost::thread_unique_ptr by a local version.
+1. Rework global initialization: ros::init should return some sort of a context.
+  All global variables should be moved to this context.
+  `NodeHandle` should use either this context, or parent node in its constructor.
+  This alows implementing nodelet approach without using separate API.
+1. Ticket-based API for ros services: resolve issues with crashing server.
+1. Reduce compilation time by moving some exposed class fields to "Impl" section.
+1. Test everything on android.
+1. Test everything on windows.
 
 # ROS References #
 
@@ -97,6 +108,9 @@ Current codebase is an adaptation of the following ROS packages:
  
 ** console_bridge** (http://wiki.ros.org/console_bridge)
 
+** topic_tools**
+  - ShapeShifter - it was ported here for rosbag app.
+
 # Additional packages used #
 
 ## Bzip2 ##
@@ -111,4 +125,3 @@ I am using official [lz4](https://github.com/lz4/lz4.git)
 
 This code is licenced under BSD-3 license.
 Original code was licenced under BSD-3 license as well.
- 

@@ -53,13 +53,13 @@
 #include <stdexcept>
 #include <climits>
 #include <stdint.h>
-#include "rostime_decl.h"
+#include "macros.h"
 
 
 namespace miniros
 {
-ROSTIME_DECL void normalizeSecNSecSigned(int64_t& sec, int64_t& nsec);
-ROSTIME_DECL void normalizeSecNSecSigned(int32_t& sec, int32_t& nsec);
+MINIROS_DECL void normalizeSecNSecSigned(int64_t& sec, int64_t& nsec);
+MINIROS_DECL void normalizeSecNSecSigned(int32_t& sec, int32_t& nsec);
 
 /**
  * \brief Base class for Duration implementations.  Provides storage, common functions and operator overloads.
@@ -92,9 +92,6 @@ public:
   T& fromSec(double t);
   T& fromNSec(int64_t t);
   bool isZero() const;
-/*
-  boost::posix_time::time_duration toBoost() const;
-*/
 };
 
 class Rate;
@@ -104,7 +101,7 @@ class Rate;
  *
  * ros::DurationBase provides most of its functionality.
  */
-class ROSTIME_DECL Duration : public DurationBase<Duration>
+class MINIROS_DECL Duration : public DurationBase<Duration>
 {
 public:
   Duration()
@@ -124,15 +121,15 @@ public:
   bool sleep() const;
 };
 
-extern ROSTIME_DECL const Duration DURATION_MAX;
-extern ROSTIME_DECL const Duration DURATION_MIN;
+extern MINIROS_DECL const Duration DURATION_MAX;
+extern MINIROS_DECL const Duration DURATION_MIN;
 
 /**
  * \brief Duration representation for use with the WallTime class.
  *
  * ros::DurationBase provides most of its functionality.
  */
-class ROSTIME_DECL WallDuration : public DurationBase<WallDuration>
+class MINIROS_DECL WallDuration : public DurationBase<WallDuration>
 {
 public:
   WallDuration()
@@ -152,8 +149,8 @@ public:
   bool sleep() const;
 };
 
-ROSTIME_DECL std::ostream &operator <<(std::ostream &os, const Duration &rhs);
-ROSTIME_DECL std::ostream &operator <<(std::ostream &os, const WallDuration &rhs);
+MINIROS_DECL std::ostream &operator <<(std::ostream &os, const Duration &rhs);
+MINIROS_DECL std::ostream &operator <<(std::ostream &os, const WallDuration &rhs);
 
 } // namespace miniros
 

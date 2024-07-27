@@ -39,8 +39,6 @@
 #include <miniros/duration.h>
 #include <miniros/rate.h>
 
-//#include <boost/date_time/posix_time/posix_time_types.hpp>
-//#include <boost/math/special_functions/round.hpp>
 
 namespace miniros {
   //
@@ -61,7 +59,6 @@ namespace miniros {
       throw std::runtime_error("Duration is out of dual 32-bit range");
     sec = static_cast<int32_t>(sec64);
     nsec = static_cast<int32_t>(std::round((d - sec) * 1e9));
-    //nsec = static_cast<int32_t>(boost::math::round((d - sec) * 1e9));
     int32_t rollover = nsec / 1000000000ul;
     sec += rollover;
     nsec %= 1000000000ul;
@@ -181,18 +178,4 @@ namespace miniros {
   {
     return sec == 0 && nsec == 0;
   }
-
-  /*
-  template <class T>
-  boost::posix_time::time_duration
-  DurationBase<T>::toBoost() const
-  {
-    namespace bt = boost::posix_time;
-#if defined(BOOST_DATE_TIME_HAS_NANOSECONDS)
-    return bt::seconds(sec) + bt::nanoseconds(nsec);
-#else
-    return bt::seconds(sec) + bt::microseconds(nsec/1000);
-#endif
-  }
-  */
 } // namespace miniros

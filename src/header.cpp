@@ -93,7 +93,6 @@ bool Header::parse(uint8_t* buffer, uint32_t size, std::string& error_msg)
     }
     // TODO: It can be done using plain old C.
     std::string_view line((char*)buf, len);
-    //boost::string_ref line((char*)buf, len);
 
     buf += len;
 

@@ -37,7 +37,7 @@
   #endif
 #endif
 
-#include "miniros/time.h"
+#include "miniros/rostime.h"
 #include "miniros/impl/time.h"
 #include <cmath>
 #include <ctime>
@@ -57,10 +57,6 @@
 #include <chrono>
 #include <thread>
 #include <windows.h>
-#endif
-
-#ifdef USE_BOOST_TIME
-#include <boost/date_time/posix_time/ptime.hpp>
 #endif
 
 /*********************************************************************
@@ -103,7 +99,9 @@ namespace miniros
   /*********************************************************************
    ** Cross Platform Functions
    *********************************************************************/
-  void MINIROS_walltime(uint32_t& sec, uint32_t& nsec)
+  namespace clock
+  {
+  void walltime(uint32_t& sec, uint32_t& nsec)
   {
 #if !defined(_WIN32)
 #if HAS_CLOCK_GETTIME
@@ -182,7 +180,7 @@ namespace miniros
 #endif
   }
 
-  void MINIROS_steadytime(uint32_t& sec, uint32_t& nsec)
+  void steadytime(uint32_t& sec, uint32_t& nsec)
   {
 #if !defined(_WIN32)
     timespec start;
@@ -223,6 +221,7 @@ namespace miniros
     sec = steady_sec;
     nsec = steady_nsec;
 #endif
+  }
   }
 
   /*
@@ -268,18 +267,38 @@ namespace miniros
   class IosFlagSaver
   {
   public:
-	  explicit IosFlagSaver(std::ostream& _ios) : ios(_ios), f(_ios.flags()) { }
+      using stream_t = std::ostream;
+      using char_t = std::ostream::char_type;
+	  explicit IosFlagSaver(stream_t& stream)
+	      :ios(stream)
+	      ,f(stream.flags())
+	      ,width(stream.width())
+	      ,precision(stream.precision())
+	      ,fill(stream.fill())
+	  { }
+
 	  ~IosFlagSaver()
 	  {
-		  ios.flags(f);
+		  restore();
+	  }
+
+	  void restore()
+	  {
+	      ios.fill(fill);
+	      ios.precision(precision);
+	      ios.width(width);
+	      ios.flags(f);
 	  }
 
 	  IosFlagSaver(const IosFlagSaver &rhs) = delete;
 	  IosFlagSaver& operator= (const IosFlagSaver& rhs) = delete;
 
   private:
-	  std::ostream& ios;
-	  std::ios::fmtflags f;
+	  stream_t& ios;
+	  std::ios::fmtflags const f;
+	  std::streamsize const width;
+	  std::streamsize const precision;
+	  char_t fill;
   };
 
   /*********************************************************************
@@ -316,7 +335,7 @@ namespace miniros
       }
 
     Time t;
-    MINIROS_walltime(t.sec, t.nsec);
+    clock::walltime(t.sec, t.nsec);
 
     return t;
   }
@@ -523,7 +542,7 @@ namespace miniros
   WallTime WallTime::now()
   {
     WallTime t;
-    MINIROS_walltime(t.sec, t.nsec);
+    clock::walltime(t.sec, t.nsec);
 
     return t;
   }
@@ -531,7 +550,7 @@ namespace miniros
   SteadyTime SteadyTime::now()
   {
     SteadyTime t;
-    MINIROS_steadytime(t.sec, t.nsec);
+    clock::steadytime(t.sec, t.nsec);
 
     return t;
   }

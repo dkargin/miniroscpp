@@ -31,7 +31,6 @@
 #include "minibag/view.h"
 
 #include <miniros/types.h>
-#include <miniros/time.h>
 
 #if defined(_MSC_VER)
   #include <stdint.h> // only on v2010 and later -> is this enough for msvc and linux?
@@ -404,7 +403,7 @@ void Bag::writeFileHeaderRecord() {
     header[CHUNK_COUNT_FIELD_NAME]      = toHeaderString(&chunk_count_);
     encryptor_->addFieldsToFileHeader(header);
 
-    std::shared_ptr<uint8_t> header_buffer;
+    std::shared_ptr<uint8_t[]> header_buffer;
     uint32_t header_len;
     miniros::Header::write(header, header_buffer, header_len);
     uint32_t data_len = 0;
@@ -757,7 +756,6 @@ void Bag::appendConnectionRecordToBuffer(Buffer& buf, ConnectionInfo const* conn
 
 void Bag::readConnectionRecord() {
     miniros::Header header;
-    //if (!encryptor_->readEncryptedHeader(boost::bind(&Bag::readHeader, this, _1), header, header_buffer_, file_))
     if (!encryptor_->readEncryptedHeader(
         [this](miniros::Header& header) -> bool { return readHeader(header);}, header, header_buffer_, file_))
     {
@@ -774,7 +772,6 @@ void Bag::readConnectionRecord() {
     readField(fields, TOPIC_FIELD_NAME,      true, topic);
 
     miniros::Header connection_header;
-    //if (!encryptor_->readEncryptedHeader(boost::bind(&Bag::readHeader, this, _1), connection_header, header_buffer_, file_))
     if (!encryptor_->readEncryptedHeader(
         [this](miniros::Header& header) -> bool { return readHeader(header);}, connection_header, header_buffer_, file_))
     {
@@ -1077,7 +1074,7 @@ bool Bag::isOp(M_string& fields, uint8_t reqOp) const {
 }
 
 void Bag::writeHeader(M_string const& fields) {
-    std::shared_ptr<uint8_t> header_buffer;
+    std::shared_ptr<uint8_t[]> header_buffer;
     uint32_t header_len;
     miniros::Header::write(fields, header_buffer, header_len);
     write((char*) &header_len, 4);
@@ -1089,7 +1086,7 @@ void Bag::writeDataLength(uint32_t data_len) {
 }
 
 void Bag::appendHeaderToBuffer(Buffer& buf, M_string const& fields) {
-    std::shared_ptr<uint8_t> header_buffer;
+    std::shared_ptr<uint8_t[]> header_buffer;
     uint32_t header_len;
     miniros::Header::write(fields, header_buffer, header_len);
 

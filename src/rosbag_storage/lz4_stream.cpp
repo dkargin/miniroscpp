@@ -33,7 +33,7 @@
 ********************************************************************/
 
 #include "minibag/chunked_file.h"
-#include "minibag/stream.h"
+#include "minibag/lz4_stream.h"
 
 #include <iostream>
 #include <cstring>

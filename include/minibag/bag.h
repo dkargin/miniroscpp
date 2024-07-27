@@ -37,19 +37,16 @@
 #include "minibag/macros.h"
 
 #include "minibag/buffer.h"
-#include "minibag/chunked_file.h"
 #include "minibag/constants.h"
 #include "minibag/encryptor.h"
 #include "minibag/exceptions.h"
 #include "minibag/structures.h"
 
 #include "miniros/header.h"
-#include "miniros/time.h"
+#include "miniros/rostime.h"
 #include "miniros/traits/message_traits.h"
 #include "miniros/message_event.h"
 #include "miniros/serialization.h"
-
-//#include "ros/subscription_callback_helper.h"
 
 #include <ios>
 #include <map>

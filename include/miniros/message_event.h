@@ -28,13 +28,13 @@
 
 #pragma once
 
-#include <miniros/traits/message_traits.h>
 #include <memory>
 #include <functional>
 #include <type_traits>
 
-#include "miniros/time.h"
-#include "datatypes.h"
+#include <miniros/traits/message_traits.h>
+#include <miniros/rostime.h>
+#include <miniros/datatypes.h>
 
 
 namespace miniros
@@ -99,9 +99,8 @@ public:
 
   MessageEvent(const MessageEvent<void const>& rhs, const CreateFunction& create)
   {
-    init(const_cast<Message*>(static_cast<ConstMessage*>(rhs.getMessage())),
-      rhs.getConnectionHeaderPtr(),
-      rhs.getReceiptTime(), rhs.nonConstWillCopy(), create);
+    ConstMessagePtr msg = std::static_pointer_cast<ConstMessage>(rhs.getMessage());
+    init(msg, rhs.getConnectionHeaderPtr(), rhs.getReceiptTime(), rhs.nonConstWillCopy(), create);
   }
 
   /**
@@ -146,7 +145,8 @@ public:
 
   void operator=(const MessageEvent<ConstMessage>& rhs)
   {
-    init(const_cast<Message*>(static_cast<ConstMessage*>(rhs.getMessage())),
+    ConstMessagePtr msg = std::static_pointer_cast<ConstMessage>(rhs.getMessage());
+    init(msg,
       rhs.getConnectionHeaderPtr(),
       rhs.getReceiptTime(), rhs.nonConstWillCopy(), rhs.getMessageFactory());
     message_copy_.reset();
@@ -222,7 +222,7 @@ private:
   {
     if (std::is_const<M>::value || !nonconst_need_copy_)
     {
-      return const_cast<Message*>(message_);
+      return std::const_pointer_cast<Message>(message_);
     }
 
     if (message_copy_)
@@ -240,7 +240,7 @@ private:
   template<typename M2>
   typename std::enable_if<std::is_void<M2>::value, std::shared_ptr<M> >::type copyMessageIfNecessary() const
   {
-    return const_cast<Message*>(message_);
+    return std::const_pointer_cast<Message>(message_);
   }
 
   ConstMessagePtr message_;
