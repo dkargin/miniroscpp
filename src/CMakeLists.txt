@@ -146,7 +146,15 @@ set(transport_SRC
   shape_shifter.cpp
   )
 
-find_package(Boost REQUIRED COMPONENTS regex program_options system thread)
+set(BOOST_COMPONENTS regex system thread)
+if (MINIROS_USE_SYSTEM_PROGRAM_OPTIONS)
+    list(APPEND BOOST_COMPONENTS program_options)
+endif()
+
+find_package(Boost REQUIRED COMPONENTS ${BOOST_COMPONENTS})
+if (MINIROS_USE_SYSTEM_PROGRAM_OPTIONS)
+    add_library(impl::program_options ALIAS Boost::program_options)
+endif ()
 
 if (MINIROS_BUILD_SHARED_LIBS)
   add_library(roscxx SHARED ${rostime_SRC} ${cpp_common_SRC} ${transport_SRC})
@@ -203,17 +211,17 @@ if (MINIROS_BUILD_ROSBAG_APPS)
         rosbag/recorder.cpp
         rosbag/time_translator.cpp
     )
-    target_link_libraries(bag_app bag_storage roscxx impl::program_options)
+    target_link_libraries(bag_app bag_storage roscxx)
     target_include_directories(bag_app PRIVATE ${MINIROS_INCLUDE_DIRS} ${MINIROS_INCLUDE_GENERATED_DIRS})
 
     # ROSBag recorder app
     add_executable(record rosbag/record.cpp)
-    target_link_libraries(record bag_app)
+    target_link_libraries(record bag_app impl::program_options)
     target_include_directories(record PRIVATE ${MINIROS_INCLUDE_DIRS} ${MINIROS_INCLUDE_GENERATED_DIRS})
 
     # ROSBag player app.
     add_executable(play rosbag/play.cpp)
-    target_link_libraries(play bag_app)
+    target_link_libraries(play bag_app impl::program_options)
     target_include_directories(play PRIVATE ${MINIROS_INCLUDE_DIRS} ${MINIROS_INCLUDE_GENERATED_DIRS})
 endif()
 

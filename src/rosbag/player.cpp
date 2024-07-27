@@ -40,8 +40,6 @@
   #include <sys/select.h>
 #endif
 
-//#include <boost/format.hpp>
-
 #include "rosgraph_msgs/Clock.hxx"
 
 #include <set>

@@ -52,7 +52,7 @@ set(MINIROS_ADDITIONAL_COMPONENTS $<NOT:${MINIROS_SUBMODULE}>)
 
 option(MINIROS_USE_SYSTEM_BZIP2 "Use bzip2 from system" OFF)
 option(MINIROS_USE_SYSTEM_LZ4 "Use lz4 from system" OFF)
-option(MINIROS_USE_SYSTEM_PROGRAM_OPTONS "Use boost::program_options instead of local implementation" OFF)
+option(MINIROS_USE_SYSTEM_PROGRAM_OPTIONS "Use boost::program_options instead of local implementation" OFF)
 option(MINIROS_BUILD_EXAMPLES "Build examples" ${MINIROS_ADDITIONAL_COMPONENTS})
 option(MINIROS_BUILD_ROSBAG_APPS "Build rosbag applications, like rosbag/play and rosbag/record" OFF)
 option(MINIROS_BUILD_TESTS "Build tests" ${MINIROS_ADDITIONAL_COMPONENTS})
