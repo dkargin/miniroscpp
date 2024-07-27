@@ -1,9 +1,14 @@
+// Copyright Vladimir Prus 2004, modified by Dmitry Kargin 2024.
+// Distributed under the Boost Software License, Version 1.0.
+// (See accompanying file LICENSE_1_0.txt
+// or copy at http://www.boost.org/LICENSE_1_0.txt
+
 #include <cassert>
 #include <set>
 #include <iterator>
 #include <cstring>
 
-#include "replacements/program_options/program_options.h"
+#include "program_options.h"
 
 namespace program_options {
 namespace {
@@ -82,8 +87,7 @@ option_description::match_result option_description::match(
     return result;
 }
 
-const std::string&
-option_description::key(const std::string& option) const
+const std::string& option_description::key(const std::string& option) const
 {
     // We make the arbitrary choise of using the first long
     // name as the key, regardless of anything else
@@ -504,6 +508,7 @@ std::vector<std::string> tokenize(const char* input, const char* separators)
     }
     return result;
 }
+
 void format_description(std::ostream& os,
                         const std::string& desc,
                         unsigned first_column_width,

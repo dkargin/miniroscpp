@@ -1,15 +1,28 @@
+// Copyright Vladimir Prus 2004, modified by Dmitry Kargin 2024.
+// Distributed under the Boost Software License, Version 1.0.
+// (See accompanying file LICENSE_1_0.txt
+// or copy at http://www.boost.org/LICENSE_1_0.txt
+
 #include <cassert>
 #include <climits>
 
-#include "replacements/program_options/program_options.h"
+#include "program_options.h"
 
 namespace program_options {
-command_line_parser::command_line_parser(int argc, char* const argv[]) {
-    m_rawArguments.resize(argc);
-    for (int i = 0; i < argc; i++) {
-        m_rawArguments[i] = argv[i];
+command_line_parser::command_line_parser(int argc, const char* const argv[]) {
+    if (argc > 0) {
+        m_executableName = argv[0];
     }
+
+    m_rawArguments.resize(argc-1);
+    for (int i = 0; i < argc-1; i++) {
+        m_rawArguments[i] = argv[i+1];
+    }
+
+    m_style = command_line_style::default_style;
+    m_allow_unregistered = false;
 }
+
 command_line_parser::~command_line_parser() {
 
 }

@@ -1,11 +1,52 @@
+// Copyright Vladimir Prus 2004, modified by Dmitry Kargin 2024.
+// Distributed under the Boost Software License, Version 1.0.
+// (See accompanying file LICENSE_1_0.txt
+// or copy at http://www.boost.org/LICENSE_1_0.txt
+
 #include <vector>
 #include <map>
 #include <set>
 
-#include "replacements/program_options/errors.h"
-#include "replacements/program_options/command_line.h"
+#include "errors.h"
+#include "command_line.h"
 
 namespace program_options {
+
+
+std::string invalid_syntax::get_template(kind_t kind)
+{
+    // Initially, store the message in 'const char*' variable,
+    // to avoid conversion to string in all cases.
+    const char* msg;
+    switch(kind)
+    {
+    case empty_adjacent_parameter:
+        msg = "the argument for option '%canonical_option%' should follow immediately after the equal sign";
+        break;
+    case missing_parameter:
+        msg = "the required argument for option '%canonical_option%' is missing";
+        break;
+    case unrecognized_line:
+        msg = "the options configuration file contains an invalid line '%invalid_line%'";
+        break;
+    // none of the following are currently used:
+    case long_not_allowed:
+        msg = "the unabbreviated option '%canonical_option%' is not valid";
+        break;
+    case long_adjacent_not_allowed:
+        msg = "the unabbreviated option '%canonical_option%' does not take any arguments";
+        break;
+    case short_adjacent_not_allowed:
+        msg = "the abbreviated option '%canonical_option%' does not take any arguments";
+        break;
+    case extra_parameter:
+        msg = "option '%canonical_option%' does not take any arguments";
+        break;
+    default:
+        msg = "unknown command line syntax error for '%s'";
+    }
+    return msg;
+}
 
 inline std::string strip_prefixes(const std::string& text)
 {

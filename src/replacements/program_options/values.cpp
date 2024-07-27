@@ -1,4 +1,9 @@
-#include "replacements/program_options/program_options.h"
+// Copyright Vladimir Prus 2004, modified by Dmitry Kargin 2024.
+// Distributed under the Boost Software License, Version 1.0.
+// (See accompanying file LICENSE_1_0.txt
+// or copy at http://www.boost.org/LICENSE_1_0.txt
+
+#include "program_options.h"
 
 namespace program_options {
 
@@ -93,6 +98,14 @@ unsigned base_typed_value::max_tokens() const {
     } else {
         return 1;
     }
+}
+
+bool base_typed_value::apply_default(std::any& output) const {
+    if (m_default_value.has_value()) {
+        output = m_default_value;
+        return true;
+    }
+    return false;
 }
 
 std::string g_arg("arg");

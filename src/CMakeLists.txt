@@ -197,24 +197,24 @@ target_link_libraries(bag_storage ${ENCRYPT_LIBRARIES} ${rosbag_LIBS} roscxx)
 
 
 if (MINIROS_BUILD_ROSBAG_APPS)
-	# Common library for rosbag applications.
-	add_library(bag_app 
-		rosbag/player.cpp
-                rosbag/recorder.cpp
-          rosbag/time_translator.cpp
-	)
-        target_link_libraries(bag_app bag_storage roscxx program_options)
-	target_include_directories(bag_app PRIVATE ${MINIROS_INCLUDE_DIRS} ${MINIROS_INCLUDE_GENERATED_DIRS})
+    # Common library for rosbag applications.
+    add_library(bag_app
+        rosbag/player.cpp
+        rosbag/recorder.cpp
+        rosbag/time_translator.cpp
+    )
+    target_link_libraries(bag_app bag_storage roscxx impl::program_options)
+    target_include_directories(bag_app PRIVATE ${MINIROS_INCLUDE_DIRS} ${MINIROS_INCLUDE_GENERATED_DIRS})
 
-	# ROSBag recorder app
-	add_executable(record rosbag/record.cpp)
-	target_link_libraries(record bag_app ${Boost_LIBRARIES})
-	target_include_directories(record PRIVATE ${MINIROS_INCLUDE_DIRS} ${MINIROS_INCLUDE_GENERATED_DIRS})
+    # ROSBag recorder app
+    add_executable(record rosbag/record.cpp)
+    target_link_libraries(record bag_app)
+    target_include_directories(record PRIVATE ${MINIROS_INCLUDE_DIRS} ${MINIROS_INCLUDE_GENERATED_DIRS})
 
-	# ROSBag player app.
-	add_executable(play rosbag/play.cpp)
-	target_link_libraries(play bag_app ${Boost_LIBRARIES})
-	target_include_directories(play PRIVATE ${MINIROS_INCLUDE_DIRS} ${MINIROS_INCLUDE_GENERATED_DIRS})
+    # ROSBag player app.
+    add_executable(play rosbag/play.cpp)
+    target_link_libraries(play bag_app)
+    target_include_directories(play PRIVATE ${MINIROS_INCLUDE_DIRS} ${MINIROS_INCLUDE_GENERATED_DIRS})
 endif()
 
 set(MINIROS_LIBRARY roscxx PARENT_SCOPE)
