@@ -28,7 +28,7 @@ public:
     {}
 
     /** If stored value if of type T, returns that value. Otherwise,
-        throws boost::bad_any_cast exception. */
+        throws std::bad_any_cast exception. */
    template<class T>
    const T& as() const {
        return std::any_cast<const T&>(v);

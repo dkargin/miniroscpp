@@ -34,16 +34,21 @@
 
 #include <iostream>
 
-#include <boost/scoped_ptr.hpp>
-#include <boost/program_options.hpp>
 #include <boost/progress.hpp>
-#include <boost/regex.hpp>
+#include <regex>
 
 #include "miniros/console.h"
 #include "minibag/bag.h"
 #include "minibag/view.h"
 
+/// This define is injected in replacements/CMakeLists.txt
+#ifdef USE_LOCAL_PROGRAM_OPTIONS
+#include "program_options/program_options.h"
+namespace po = program_options;
+#else
+#include "boost/program_options.hpp"
 namespace po = boost::program_options;
+#endif
 
 struct EncryptorOptions
 {
@@ -98,11 +103,11 @@ EncryptorOptions parseOptions(int argc, char** argv)
     {
         po::store(po::command_line_parser(argc, argv).options(desc).positional(p).run(), vm);
     }
-    catch (boost::program_options::invalid_command_line_syntax& e)
+    catch (po::invalid_command_line_syntax& e)
     {
         throw miniros::Exception(e.what());
     }
-    catch (boost::program_options::unknown_option& e)
+    catch (po::unknown_option& e)
     {
         throw miniros::Exception(e.what());
     }
@@ -160,7 +165,7 @@ int encrypt(EncryptorOptions const& options)
     outbag.setEncryptorPlugin(options.plugin, options.param);
     outbag.setCompression(options.compression);
     minibag::View view(inbag);
-    boost::scoped_ptr<boost::progress_display> progress;
+    std::unique_ptr<boost::progress_display> progress;
     if (!options.quiet)
         progress.reset(new boost::progress_display(view.size(), std::cout, "Progress:\n  ", "  ", "  "));
     for (minibag::View::const_iterator it = view.begin(); it != view.end(); ++it)
@@ -187,7 +192,7 @@ int main(int argc, char** argv)
         MINIROS_ERROR("Error reading options: %s", ex.what());
         return 1;
     }
-    catch(boost::regex_error const& ex)
+    catch(std::regex_error const& ex)
     {
         MINIROS_ERROR("Error reading options: %s\n", ex.what());
         return 1;

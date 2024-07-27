@@ -278,8 +278,11 @@ void AesCbcEncryptor::readFieldsFromFileHeader(miniros::M_string const& header_f
     AES_set_decrypt_key(&symmetric_key_[0], AES_BLOCK_SIZE*8, &aes_decrypt_key_);
 }
 
-void AesCbcEncryptor::writeEncryptedHeader(std::function<void(miniros::M_string const&)>, miniros::M_string const& header_fields, ChunkedFile& file) {
-    std::shared_ptr<uint8_t> header_buffer;
+void AesCbcEncryptor::writeEncryptedHeader(
+        std::function<void(miniros::M_string const&)>,
+        miniros::M_string const& header_fields, ChunkedFile& file)
+{
+    std::shared_ptr<uint8_t[]> header_buffer;
     uint32_t header_len;
     miniros::Header::write(header_fields, header_buffer, header_len);
     // Apply PKCS#7 padding to the header

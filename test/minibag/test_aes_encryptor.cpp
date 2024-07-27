@@ -38,6 +38,8 @@
 
 #include <gpgme.h>
 
+#include <filesystem>
+
 #include "std_msgs/String.h"
 
 #include "rosbag/bag.h"
@@ -150,7 +152,7 @@ TEST(AesCbcEncryptor, EncryptAndDecryptBag) {
     bag.close();
 
     // Remove the bag file
-    boost::filesystem::remove(bag_file_name);
+    std::filesystem::remove(bag_file_name);
     // Delete the key
     gpgme_op_delete(ctx, key, 1);
     // Release GPG context

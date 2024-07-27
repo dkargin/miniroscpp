@@ -281,7 +281,7 @@ options_description::find(const std::string& name,
     const option_description* d = find_nothrow(name, approx,
                                                long_ignore_case, short_ignore_case);
     if (!d)
-        boost::throw_exception(unknown_option());
+        throw unknown_option();
     return *d;
 }*/
 
@@ -531,10 +531,7 @@ void format_description(std::ostream& os,
     // boost::tokenizer, not typedef.
 
     auto paragraphs = tokenize(desc.c_str(), "\n");
-    /*
-    typedef boost::tokenizer<boost::char_separator<char> > tok;
-    tok paragraphs(desc, char_separator<char>("\n", "", boost::keep_empty_tokens));
-*/
+
     auto par_iter = paragraphs.cbegin();
     const auto par_end = paragraphs.cend();
 
