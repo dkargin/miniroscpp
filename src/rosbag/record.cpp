@@ -31,19 +31,24 @@
 *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 *  POSSIBILITY OF SUCH DAMAGE.
 ********************************************************************/
+#include <string>
+#include <sstream>
+
+/// This define is injected in replacements/CMakeLists.txt
+#ifdef USE_BOOST_PROGRAM_OPTIONS
+#include "boost/program_options.hpp"
+namespace po = boost::program_options;
+#else
+#include "program_options/program_options.h"
+namespace po = program_options;
+#endif
 
 #include "minibag/recorder.h"
 #include "minibag/exceptions.h"
 
-#include "boost/program_options.hpp"
-#include <string>
-#include <sstream>
-
-namespace po = boost::program_options;
-
 //! Parse the command-line arguments for recorder options
 minibag::RecorderOptions parseOptions(int argc, char** argv) {
-	minibag::RecorderOptions opts;
+    minibag::RecorderOptions opts;
 
     po::options_description desc("Allowed options");
 
@@ -80,10 +85,10 @@ minibag::RecorderOptions parseOptions(int argc, char** argv) {
     try 
     {
       po::store(po::command_line_parser(argc, argv).options(desc).positional(p).run(), vm);
-    } catch (boost::program_options::invalid_command_line_syntax& e)
+    } catch (po::invalid_command_line_syntax& e)
     {
       throw miniros::Exception(e.what());
-    }  catch (boost::program_options::unknown_option& e)
+    }  catch (po::unknown_option& e)
     {
       throw miniros::Exception(e.what());
     }

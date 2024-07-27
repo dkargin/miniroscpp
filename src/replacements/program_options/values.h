@@ -1,3 +1,8 @@
+// Copyright Vladimir Prus 2004, modified by Dmitry Kargin 2024.
+// Distributed under the Boost Software License, Version 1.0.
+// (See accompanying file LICENSE_1_0.txt
+// or copy at http://www.boost.org/LICENSE_1_0.txt
+
 #ifndef MINIROS_PROGRAM_OPTIONS_VALUES_H
 #define MINIROS_PROGRAM_OPTIONS_VALUES_H
 
@@ -65,6 +70,10 @@ inline std::string toString(T val) {
     return std::to_string(val);
 }
 
+template <class T> class typed_value;
+
+/// Base class for typed value. It implements all the common things,
+/// which do not require explicit type.
 class base_typed_value : public value_base {
 public:
     base_typed_value();
@@ -74,11 +83,14 @@ public:
 
     bool is_required() const override ;
 
-    bool is_composing() const;
+    bool is_composing() const override;
 
-    unsigned min_tokens() const;
+    unsigned min_tokens() const override;
 
-    unsigned max_tokens() const;
+    unsigned max_tokens() const override;
+
+    bool apply_default(std::any& output) const override;
+
 protected:
     std::string m_value_name;
 
@@ -160,14 +172,6 @@ public:
     typed_value<T>* requred() {
         m_required = true;
         return *this;
-    }
-
-    bool apply_default(std::any& output) const {
-        if (m_default_value.has_value()) {
-            output = m_default_value;
-            return true;
-        }
-        return false;
     }
 
     /** If 'value_store' is already initialized, or new_tokens

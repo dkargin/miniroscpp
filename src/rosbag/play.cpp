@@ -35,18 +35,14 @@
 #include "minibag/player.h"
 #include "miniros/console.h"
 
-#define PO_REPLACE
 
-#ifdef PO_REPLACE
-// po::value<std::string>()->default_value("") -> defaultValue<std::string>("");
-// po::multitoken<std::vector<std::string>>() -> multiple<std::string>()
-
-#include "replacements/program_options/program_options.h"
-
-namespace po = program_options;
-#else
+/// This define is injected in replacements/CMakeLists.txt
+#ifdef USE_BOOST_PROGRAM_OPTIONS
 #include "boost/program_options.hpp"
 namespace po = boost::program_options;
+#else
+#include "program_options/program_options.h"
+namespace po = program_options;
 #endif
 
 minibag::PlayerOptions parseOptions(int argc, char** argv) {

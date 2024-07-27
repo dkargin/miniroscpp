@@ -1,3 +1,8 @@
+// Copyright Vladimir Prus 2004, modified by Dmitry Kargin 2024.
+// Distributed under the Boost Software License, Version 1.0.
+// (See accompanying file LICENSE_1_0.txt
+// or copy at http://www.boost.org/LICENSE_1_0.txt
+
 #ifndef MINIROS_PROGRAM_OPTIONS_COMMAND_LINE_H
 #define MINIROS_PROGRAM_OPTIONS_COMMAND_LINE_H
 
@@ -97,7 +102,7 @@ public:
 
     using style_parser = std::function<std::vector<option> (std::vector<std::string>&)>;
 
-    command_line_parser(int argc, char* const argv[]);
+    command_line_parser(int argc, const char* const argv[]);
     ~command_line_parser();
 
     command_line_parser& options(const options_description& desc);
@@ -130,6 +135,8 @@ protected:
 
     command_line_style::style_t m_style;
     bool m_allow_unregistered;
+
+    std::string m_executableName;
 };
 
 } // namespace program_options
