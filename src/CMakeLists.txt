@@ -146,7 +146,7 @@ set(transport_SRC
   shape_shifter.cpp
   )
 
-set(BOOST_COMPONENTS regex system thread)
+set(BOOST_COMPONENTS system thread)
 if (MINIROS_USE_SYSTEM_PROGRAM_OPTIONS)
     list(APPEND BOOST_COMPONENTS program_options)
 endif()
