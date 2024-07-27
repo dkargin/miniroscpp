@@ -104,7 +104,6 @@ CallbackInterface::CallResult SubscriptionQueue::call()
   // The callback may result in our own destruction.  Therefore, we may need to keep a reference to ourselves
   // that outlasts the scoped_try_lock
   std::shared_ptr<SubscriptionQueue> self;
-  //std::recursive_mutex::scoped_try_lock lock(callback_mutex_, boost::defer_lock);
 
   if (!allow_concurrent_callbacks_)
   {

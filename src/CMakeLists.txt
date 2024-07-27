@@ -240,6 +240,12 @@ if (MINIROS_BUILD_ROSBAG_APPS)
     add_executable(play rosbag/play.cpp)
     target_link_libraries(play bag_app impl::program_options)
     target_include_directories(play PRIVATE ${MINIROS_INCLUDE_DIRS} ${MINIROS_INCLUDE_GENERATED_DIRS})
+
+    # ROSBag encryptor
+    add_executable(encrypt rosbag/encrypt.cpp)
+    target_link_libraries(encrypt bag_app impl::program_options)
+    target_include_directories(encrypt PRIVATE ${MINIROS_INCLUDE_DIRS} ${MINIROS_INCLUDE_GENERATED_DIRS})
+
 endif()
 
 set(MINIROS_LIBRARY roscxx PARENT_SCOPE)

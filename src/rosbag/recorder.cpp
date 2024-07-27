@@ -176,7 +176,6 @@ int Recorder::run() {
         record_thread = std::thread(&Recorder::doRecordSnapshotter, this);
 
         // Subscribe to the snapshot trigger
-        //trigger_sub = nh.subscribe<std_msgs::Empty>("snapshot_trigger", 100, boost::bind(&Recorder::snapshotTrigger, this, _1));
         trigger_sub = nh.subscribe<std_msgs::Empty>("snapshot_trigger", 100,
             [this](std_msgs::Empty::ConstPtr trigger)
             {

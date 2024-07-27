@@ -265,7 +265,6 @@ public:
 TEST_F(Poller, read)
 {
   SocketHelper sh(sockets_[0]);
-  //ASSERT_TRUE(poll_set_.addSocket(sh.socket_, boost::bind(&SocketHelper::processEvents, &sh, _1)));
   ASSERT_TRUE(poll_set_.addSocket(sh.socket_, [&sh](int events){sh.processEvents(events);}));
 
   char b = 0;

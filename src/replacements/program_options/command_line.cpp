@@ -75,12 +75,13 @@ std::vector<option> command_line_parser::run_impl()
     //if (m_style_parser)
     //    style_parsers.push_back(m_style_parser);
 
-    //if (m_additional_parser)
-    //    style_parsers.push_back(
-    //        boost::bind(&cmdline::handle_additional_parser, this, _1));
+    //if (m_additional_parser) {
+    //    style_parsers.push_back([this] (std::vector<std::string>& args) {
+    //        return this->handle_additional_parser(args);
+    //    });
+    //}
 
     if (m_style & allow_long) {
-        //style_parsers.push_back(boost::bind(&cmdline::parse_long_option, this, _1));
         style_parsers.push_back(
                     [this] (std::vector<std::string>& args) {
             return this->parse_long_option(args);
@@ -88,7 +89,6 @@ std::vector<option> command_line_parser::run_impl()
     }
 
     if ((m_style & allow_long_disguise)) {
-        //style_parsers.push_back(boost::bind(&cmdline::parse_disguised_long_option, this, _1));
         style_parsers.push_back(
                     [this] (std::vector<std::string>& args) {
             return this->parse_disguised_long_option(args);
@@ -96,7 +96,6 @@ std::vector<option> command_line_parser::run_impl()
     }
 
     if ((m_style & allow_short) && (m_style & allow_dash_for_short)) {
-        //style_parsers.push_back(boost::bind(&cmdline::parse_short_option, this, _1));
         style_parsers.push_back(
                     [this] (std::vector<std::string>& args) {
             return this->parse_short_option(args);
@@ -104,14 +103,12 @@ std::vector<option> command_line_parser::run_impl()
     }
 
     if ((m_style & allow_short) && (m_style & allow_slash_for_short)) {
-        //style_parsers.push_back(boost::bind(&cmdline::parse_dos_option, this, _1));
         style_parsers.push_back(
                     [this] (std::vector<std::string>& args) {
             return this->parse_dos_option(args);
         });
     }
 
-    //style_parsers.push_back(boost::bind(&cmdline::parse_terminator, this, _1));
     style_parsers.push_back(
                 [this](std::vector<std::string>& args) {
         return parse_terminator(args);
