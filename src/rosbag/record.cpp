@@ -33,6 +33,7 @@
 ********************************************************************/
 #include <string>
 #include <sstream>
+#include <regex> // to catch std::regex_error
 
 /// This define is injected in replacements/CMakeLists.txt
 #ifdef USE_LOCAL_PROGRAM_OPTIONS
@@ -292,11 +293,11 @@ int main(int argc, char** argv) {
     catch (miniros::Exception const& ex) {
         MINIROS_ERROR("Error reading options: %s", ex.what());
         return 1;
-    }/*
-    catch(boost::regex_error const& ex) {
+    }
+    catch(std::regex_error const& ex) {
         MINIROS_ERROR("Error reading options: %s\n", ex.what());
         return 1;
-    }*/
+    }
 
     // Run the recorder
     minibag::Recorder recorder(opts);
