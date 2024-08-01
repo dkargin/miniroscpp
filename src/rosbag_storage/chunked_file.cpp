@@ -255,21 +255,35 @@ void ChunkedFile::swap(ChunkedFile& other) {
 
     swap(stream_factory_, other.stream_factory_);
 
-    FileAccessor::setFile(*stream_factory_->getStream(compression::Uncompressed), this);
-    FileAccessor::setFile(*stream_factory_->getStream(compression::BZ2), this);
-    FileAccessor::setFile(*stream_factory_->getStream(compression::LZ4), this);
+    if (stream_factory) {
+        FileAccessor::setFile(*stream_factory_->getStream(compression::Uncompressed), this);
+        FileAccessor::setFile(*stream_factory_->getStream(compression::BZ2), this);
+        FileAccessor::setFile(*stream_factory_->getStream(compression::LZ4), this);
+    }
 
-    FileAccessor::setFile(*other.stream_factory_->getStream(compression::Uncompressed), &other);
-    FileAccessor::setFile(*other.stream_factory_->getStream(compression::BZ2), &other);
-    FileAccessor::setFile(*other.stream_factory_->getStream(compression::LZ4), &other);
+    if (other.stream_factory_) {
+        FileAccessor::setFile(*other.stream_factory_->getStream(compression::Uncompressed), &other);
+        FileAccessor::setFile(*other.stream_factory_->getStream(compression::BZ2), &other);
+        FileAccessor::setFile(*other.stream_factory_->getStream(compression::LZ4), &other);
+    }
 
     swap(read_stream_, other.read_stream_);
-    FileAccessor::setFile(*read_stream_, this);
-    FileAccessor::setFile(*other.read_stream_, &other);
+    if (read_stream_) {
+        FileAccessor::setFile(*read_stream_, this);
+    }
+
+    if (other.read_stream_) {
+        FileAccessor::setFile(*other.read_stream_, &other);
+    }
 
     swap(write_stream_, other.write_stream_);
-    FileAccessor::setFile(*write_stream_, this);
-    FileAccessor::setFile(*other.write_stream_, &other);
+    if (write_stream_) {
+        FileAccessor::setFile(*write_stream_, this);
+    }
+
+    if (other.write_stream_) {
+        FileAccessor::setFile(*other.write_stream_, &other);
+    }
 }
 
 } // namespace minibag
