@@ -29,10 +29,10 @@
 #define ROSCPP_POLL_MANAGER_H
 
 #include "miniros/internal/forwards.h"
+#include "miniros/internal/observer.h"
+
 #include "poll_set.h"
 #include "common.h"
-
-#include <boost/signals2.hpp>
 
 #include <thread>
 #include <mutex>
@@ -42,12 +42,15 @@ namespace miniros
 
 class PollManager;
 typedef std::shared_ptr<PollManager> PollManagerPtr;
-typedef boost::signals2::signal<void(void)> VoidSignal;
-typedef std::function<void(void)> VoidFunc;
 
 class MINIROS_DECL PollManager
 {
 public:
+  class PollWatcher : public observer::Connection {
+  public:
+    virtual void onPollEvents() = 0;
+  };
+
   static const PollManagerPtr& instance();
 
   PollManager();
@@ -55,19 +58,20 @@ public:
 
   PollSet& getPollSet() { return poll_set_; }
 
-  boost::signals2::connection addPollThreadListener(const VoidFunc& func);
-  void removePollThreadListener(boost::signals2::connection c);
+  void addPollThreadWatcher(PollWatcher* watcher);
 
   void start();
   void shutdown();
+
 private:
   void threadFunc();
 
   PollSet poll_set_;
   volatile bool shutting_down_;
 
-  VoidSignal poll_signal_;
-  std::recursive_mutex signal_mutex_;
+  /// Signal raised when this connection is dropped.
+  using PollWatchers = observer::Target<PollWatcher>;
+  PollWatchers poll_watchers_;
 
   std::thread thread_;
 };

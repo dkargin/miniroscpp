@@ -83,6 +83,9 @@ private:
 
   PollManagerPtr poll_manager_;
 
+  class PollWatcher;
+  std::unique_ptr<PollWatcher> poll_watcher_;
+
   S_Connection connections_;
   V_Connection dropped_connections_;
   std::mutex connections_mutex_;
@@ -93,7 +96,6 @@ private:
   uint32_t connection_id_counter_;
   std::mutex connection_id_counter_mutex_;
 
-  boost::signals2::connection poll_conn_;
 
   TransportTCPPtr tcpserver_transport_;
   TransportUDPPtr udpserver_transport_;

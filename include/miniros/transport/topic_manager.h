@@ -227,6 +227,9 @@ private:
   std::mutex shutting_down_mutex_;
 
   PollManagerPtr poll_manager_;
+  class PollWatcher;
+  std::unique_ptr<PollWatcher> poll_watcher_;
+
   ConnectionManagerPtr connection_manager_;
   XMLRPCManagerPtr xmlrpc_manager_;
 };

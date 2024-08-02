@@ -43,8 +43,6 @@
 
 #include "common.h"
 
-#include <boost/signals2.hpp>
-
 #define READ_BUFFER_SIZE (1024*64)
 
 namespace miniros

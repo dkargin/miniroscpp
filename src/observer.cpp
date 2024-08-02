@@ -15,11 +15,15 @@ public:
     using mutex_t = std::recursive_mutex;
 
     Connections(TargetBase* owner) {
+        resetRoot();
+        m_owner = owner;
+    }
+
+    void resetRoot() {
         m_head = &m_root;
         m_tail = &m_root;
         m_root.m_next = &m_root;
         m_root.m_prev = &m_root;
-        m_owner = owner;
     }
 
     /// Check if there are any connections.
@@ -56,7 +60,12 @@ public:
     /// @returns true if there are no links left and connection list can be safely deleted.
     bool detachConnection(Connection* object, Connection* prev, Connection* next);
 
+    /// Detach owner from connection list
+    /// It is often called by owner in its destructor.
     bool detachOwner(TargetBase* owner);
+
+    /// Disconnect all current connection, while keeping link to a owner.
+    void disconnectAll();
 
     void pushBack(Connection* object);
 
@@ -116,6 +125,19 @@ bool Connections::detachOwner(TargetBase* owner) {
     return false;
 }
 
+void Connections::disconnectAll() {
+    std::scoped_lock<mutex_t> lock(m_mutex);
+    Connection* ptr = this->objBegin();
+    Connection* end = this->objEnd();
+    while (ptr && ptr != end) {
+        auto next = ptr->next();
+        ptr->m_prev = nullptr;
+        ptr->m_next = nullptr;
+        ptr = next;
+    }
+    resetRoot();
+}
+
 } // namespace impl
 
 TargetBase::TargetBase() {
@@ -127,6 +149,12 @@ TargetBase::~TargetBase() {
         delete m_list;
     }
     m_list = nullptr;
+}
+
+void TargetBase::disconnectAll() {
+    if (m_list) {
+        m_list->disconnectAll();
+    }
 }
 
 void TargetBase::lock() const {

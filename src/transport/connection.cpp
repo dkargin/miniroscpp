@@ -39,6 +39,7 @@
 #include <miniros/rosassert.h>
 
 #include <sstream>
+#include <cstring>
 
 namespace miniros
 {
@@ -360,7 +361,6 @@ void Connection::drop(DropReason reason)
             watcher.onConnectionDropped(shared_from_this(), reason);
         }
     }
-    //drop_signal_(shared_from_this(), reason);
     transport_->close();
   }
 }

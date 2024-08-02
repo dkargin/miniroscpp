@@ -44,7 +44,7 @@
 
 namespace rosgraph_msgs
 {
-MINIROS_DECLARE_MESSAGE(Log);
+MINIROS_DECLARE_MESSAGE(Log)
 }
 
 namespace miniros

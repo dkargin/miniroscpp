@@ -73,7 +73,7 @@ public:
     {
         // actual increment takes place here
         if (m_obj)
-            m_obj = m_obj->next;
+            m_obj = static_cast<ConnectionImpl*>(m_obj->next());
         return *this;
     }
 
@@ -109,6 +109,8 @@ class TargetBase {
 public:
     TargetBase();
     ~TargetBase();
+
+    void disconnectAll();
 
     void lock() const;
     void unlock() const;

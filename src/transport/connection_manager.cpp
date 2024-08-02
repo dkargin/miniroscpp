@@ -40,6 +40,18 @@
 namespace miniros
 {
 
+class ConnectionManager::PollWatcher : public PollManager::PollWatcher {
+public:
+    PollWatcher(ConnectionManager& owner) : m_owner(owner) {}
+
+    void onPollEvents() override {
+        m_owner.removeDroppedConnections();
+    }
+
+protected:
+    ConnectionManager& m_owner;
+};
+
 const ConnectionManagerPtr& ConnectionManager::instance()
 {
   static ConnectionManagerPtr connection_manager = std::make_shared<ConnectionManager>();
@@ -49,6 +61,7 @@ const ConnectionManagerPtr& ConnectionManager::instance()
 ConnectionManager::ConnectionManager()
 : connection_id_counter_(0)
 {
+    poll_watcher_.reset(new PollWatcher(*this));
 }
 
 ConnectionManager::~ConnectionManager()
@@ -59,11 +72,8 @@ ConnectionManager::~ConnectionManager()
 void ConnectionManager::start()
 {
   poll_manager_ = PollManager::instance();
-  poll_conn_ = poll_manager_->addPollThreadListener(
-    [this]()
-    {
-      this->removeDroppedConnections();
-    });
+
+  poll_manager_->addPollThreadWatcher(poll_watcher_.get());
 
   // Bring up the TCP listener socket
   tcpserver_transport_ = std::make_shared<TransportTCP>(&poll_manager_->getPollSet());
@@ -101,7 +111,7 @@ void ConnectionManager::shutdown()
     tcpserver_transport_.reset();
   }
 
-  poll_manager_->removePollThreadListener(poll_conn_);
+  poll_watcher_->disconnect();
 
   clear(Connection::Destructing);
 }

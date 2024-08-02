@@ -66,8 +66,7 @@ void PollManager::shutdown()
     thread_.join();
   }
 
-  std::scoped_lock<std::recursive_mutex> lock(signal_mutex_);
-  poll_signal_.disconnect_all_slots();
+  poll_watchers_.disconnectAll();
 }
 
 void PollManager::threadFunc()
@@ -77,8 +76,11 @@ void PollManager::threadFunc()
   while (!shutting_down_)
   {
     {
-      std::scoped_lock<std::recursive_mutex> lock(signal_mutex_);
-      poll_signal_();
+      std::scoped_lock<PollWatchers> lock(poll_watchers_);
+      for (PollWatcher& watcher: poll_watchers_)
+      {
+          watcher.onPollEvents();;
+      }
     }
 
     if (shutting_down_)
@@ -86,20 +88,15 @@ void PollManager::threadFunc()
       return;
     }
 
-    poll_set_.update(100);
+    constexpr int updatePeriodMS = 100;
+    poll_set_.update(updatePeriodMS);
   }
 }
 
-boost::signals2::connection PollManager::addPollThreadListener(const VoidFunc& func)
-{
-  std::scoped_lock<std::recursive_mutex> lock(signal_mutex_);
-  return poll_signal_.connect(func);
-}
-
-void PollManager::removePollThreadListener(boost::signals2::connection c)
-{
-  std::scoped_lock<std::recursive_mutex> lock(signal_mutex_);
-  c.disconnect();
+void PollManager::addPollThreadWatcher(PollWatcher* watcher) {
+    assert(watcher);
+    if (watcher)
+        this->poll_watchers_.attach(watcher);
 }
 
 }

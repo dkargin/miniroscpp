@@ -53,6 +53,18 @@ using namespace XmlRpc; // A battle to be fought later
 namespace miniros
 {
 
+class TopicManager::PollWatcher : public PollManager::PollWatcher {
+public:
+    PollWatcher(TopicManager& owner) : m_owner(owner) {}
+
+    void onPollEvents() override {
+        m_owner.processPublishQueues();
+    }
+
+protected:
+    TopicManager& m_owner;
+};
+
 const TopicManagerPtr& TopicManager::instance()
 {
   static TopicManagerPtr topic_manager = std::make_shared<TopicManager>();
@@ -62,6 +74,7 @@ const TopicManagerPtr& TopicManager::instance()
 TopicManager::TopicManager()
 : shutting_down_(false)
 {
+    poll_watcher_.reset(new PollWatcher(*this));
 }
 
 TopicManager::~TopicManager()
@@ -109,7 +122,7 @@ void TopicManager::start()
       this->getPublicationsCallback(params, result);
     });
 
-  poll_manager_->addPollThreadListener([this]() {this->processPublishQueues();});
+  poll_manager_->addPollThreadWatcher(poll_watcher_.get());
 }
 
 void TopicManager::shutdown()
