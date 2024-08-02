@@ -142,6 +142,15 @@ void checkForShutdown()
   }
 }
 
+class ShutdownWatcher : public PollManager::PollWatcher {
+public:
+    virtual void onPollEvents() override {
+        checkForShutdown();
+    }
+};
+
+ShutdownWatcher g_shutdownWatcher;
+
 void requestShutdown()
 {
   g_shutdown_requested = true;
@@ -322,7 +331,7 @@ void start()
 
   param::param("/tcp_keepalive", TransportTCP::s_use_keepalive_, TransportTCP::s_use_keepalive_);
 
-  PollManager::instance()->addPollThreadListener(checkForShutdown);
+  PollManager::instance()->addPollThreadWatcher(&g_shutdownWatcher);
   XMLRPCManager::instance()->bind("shutdown", shutdownCallback);
 
   initInternalTimerManager();
