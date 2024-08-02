@@ -45,9 +45,25 @@
 namespace miniros
 {
 
+class ServiceClientLink::DropWatcher : public Connection::DropWatcher {
+public:
+    DropWatcher(ServiceClientLink& owner) : owner_(owner) {}
+
+    void onConnectionDropped(
+        const ConnectionPtr& connection,
+        miniros::Connection::DropReason reason) override
+    {
+        owner_.onConnectionDropped(connection);
+    }
+
+    ServiceClientLink& owner_;
+};
+
+
 ServiceClientLink::ServiceClientLink()
 : persistent_(false)
 {
+    drop_watcher_ = std::make_unique<DropWatcher>(*this);
 }
 
 ServiceClientLink::~ServiceClientLink()
@@ -56,7 +72,7 @@ ServiceClientLink::~ServiceClientLink()
   {
     if (connection_->isSendingHeaderError())
     {
-      connection_->removeDropListener(dropped_conn_);
+      drop_watcher_->disconnect();
     }
     else
     {
@@ -68,11 +84,7 @@ ServiceClientLink::~ServiceClientLink()
 bool ServiceClientLink::initialize(const ConnectionPtr& connection)
 {
   connection_ = connection;
-  dropped_conn_ = connection_->addDropListener(
-      [this](const ConnectionPtr& conn, Connection::DropReason reason)
-      {
-          onConnectionDropped(conn);
-      });
+  connection_->addDropWatcher(drop_watcher_.get());
 
   return true;
 }

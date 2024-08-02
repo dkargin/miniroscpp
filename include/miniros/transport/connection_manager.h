@@ -31,8 +31,6 @@
 
 #include <mutex>
 
-#include <boost/signals2/connection.hpp>
-
 namespace miniros
 {
 

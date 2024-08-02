@@ -54,12 +54,27 @@
 namespace miniros
 {
 
+class TransportPublisherLink::DropWatcher : public Connection::DropWatcher {
+public:
+    DropWatcher(TransportPublisherLink& owner) : owner_(owner) {}
+
+    void onConnectionDropped(
+        const ConnectionPtr& connection,
+        miniros::Connection::DropReason reason) override
+    {
+        owner_.onConnectionDropped(connection, reason);
+    }
+
+    TransportPublisherLink& owner_;
+};
+
 TransportPublisherLink::TransportPublisherLink(const SubscriptionPtr& parent, const std::string& xmlrpc_uri, const TransportHints& transport_hints)
 : PublisherLink(parent, xmlrpc_uri, transport_hints)
 , retry_timer_handle_(-1)
 , needs_retry_(false)
 , dropping_(false)
 {
+    drop_watcher_ = std::make_unique<DropWatcher>(*this);
 }
 
 TransportPublisherLink::~TransportPublisherLink()
@@ -82,11 +97,7 @@ bool TransportPublisherLink::initialize(const ConnectionPtr& connection)
   // then decrements the shared_from_this reference count around calls to the
   // onConnectionDropped function, preventing a coredump in the middle of execution.
   auto thisptr = std::static_pointer_cast<TransportPublisherLink>(shared_from_this());
-  connection_->addDropListener(
-    [thisptr](const ConnectionPtr& connection, Connection::DropReason reason)
-    {
-      thisptr->onConnectionDropped(connection, reason);
-    });
+  connection_->addDropWatcher(drop_watcher_.get());
 
   if (connection_->getTransport()->requiresHeader())
   {

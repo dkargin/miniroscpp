@@ -25,12 +25,12 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ROSCPP_TRANSPORT_SUBSCRIBER_LINK_H
-#define ROSCPP_TRANSPORT_SUBSCRIBER_LINK_H
+#ifndef MINIROSCPP_TRANSPORT_SUBSCRIBER_LINK_H
+#define MINIROSCPP_TRANSPORT_SUBSCRIBER_LINK_H
+
 #include "common.h"
 #include "subscriber_link.h"
 
-#include <boost/signals2/connection.hpp>
 #include <mutex>
 
 namespace miniros
@@ -57,6 +57,7 @@ public:
   virtual std::string getTransportInfo();
 
 private:
+
   void onConnectionDropped(const ConnectionPtr& conn);
 
   void onHeaderWritten(const ConnectionPtr& conn);
@@ -67,7 +68,8 @@ private:
   bool header_written_;
 
   ConnectionPtr connection_;
-  boost::signals2::connection dropped_conn_;
+  class DropWatcher;
+  std::unique_ptr<DropWatcher> drop_watcher_;
 
   std::queue<SerializedMessage> outbox_;
   std::mutex outbox_mutex_;
@@ -77,4 +79,4 @@ typedef std::shared_ptr<TransportSubscriberLink> TransportSubscriberLinkPtr;
 
 } // namespace miniros
 
-#endif // ROSCPP_TRANSPORT_SUBSCRIBER_LINK_H
+#endif // MINIROSCPP_TRANSPORT_SUBSCRIBER_LINK_H

@@ -165,6 +165,7 @@ set(transport_SRC
   transport/this_node.cpp
   transport/steady_timer.cpp
   shape_shifter.cpp
+  observer.cpp
   )
 
 set(BOOST_COMPONENTS system thread)
