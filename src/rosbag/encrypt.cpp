@@ -34,8 +34,9 @@
 
 #include <iostream>
 
-#include <boost/progress.hpp>
 #include <regex>
+
+#include "../replacements/progress_display.h"
 
 #include "miniros/console.h"
 #include "minibag/bag.h"
@@ -165,9 +166,9 @@ int encrypt(EncryptorOptions const& options)
     outbag.setEncryptorPlugin(options.plugin, options.param);
     outbag.setCompression(options.compression);
     minibag::View view(inbag);
-    std::unique_ptr<boost::progress_display> progress;
+    std::unique_ptr<progress_display> progress;
     if (!options.quiet)
-        progress.reset(new boost::progress_display(view.size(), std::cout, "Progress:\n  ", "  ", "  "));
+        progress.reset(new progress_display(view.size(), std::cout, "Progress:\n  ", "  ", "  "));
     for (minibag::View::const_iterator it = view.begin(); it != view.end(); ++it)
     {
         outbag.write(it->getTopic(), it->getTime(), *it, it->getConnectionHeader());
