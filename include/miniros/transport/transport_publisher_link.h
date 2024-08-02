@@ -80,12 +80,16 @@ private:
 
   ConnectionPtr connection_;
 
+  class DropWatcher;
+  std::unique_ptr<DropWatcher> drop_watcher_;
+
   int32_t retry_timer_handle_;
   bool needs_retry_;
   WallDuration retry_period_;
   SteadyTime next_retry_;
   bool dropping_;
 };
+
 typedef std::shared_ptr<TransportPublisherLink> TransportPublisherLinkPtr;
 
 } // namespace miniros

@@ -32,12 +32,15 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ROSCPP_CONNECTION_H
-#define ROSCPP_CONNECTION_H
+#ifndef MINIROS_TRANSPORT_CONNECTION_H
+#define MINIROS_TRANSPORT_CONNECTION_H
 
 #include <thread>
 #include <mutex>
+
 #include "miniros/header.h"
+#include "miniros/internal/observer.h"
+
 #include "common.h"
 
 #include <boost/signals2.hpp>
@@ -139,13 +142,15 @@ public:
    */
   void write(const std::shared_ptr<uint8_t[]>& buffer, uint32_t size, const WriteFinishedFunc& finished_callback, bool immedate = true);
 
-  typedef boost::signals2::signal<void(const ConnectionPtr&, DropReason reason)> DropSignal;
-  typedef std::function<void(const ConnectionPtr&, DropReason reason)> DropFunc;
+  class DropWatcher : public observer::Connection {
+  public:
+      virtual void onConnectionDropped(const ConnectionPtr& connection, DropReason reason) = 0;
+  };
+
   /**
    * \brief Add a callback to be called when this connection has dropped
    */
-  boost::signals2::connection addDropListener(const DropFunc& slot);
-  void removeDropListener(const boost::signals2::connection& c);
+  void addDropWatcher(DropWatcher* watcher);
 
   /**
    * \brief Set the header receipt callback
@@ -250,8 +255,9 @@ private:
   /// Function to call when the outgoing header has finished writing
   WriteFinishedFunc header_written_callback_;
 
-  /// Signal raised when this connection is dropped
-  DropSignal drop_signal_;
+  /// Signal raised when this connection is dropped.
+  using DropWatchers = observer::Target<DropWatcher>;
+  DropWatchers drop_watchers_;
 
   /// Synchronizes drop() calls
   std::recursive_mutex drop_mutex_;
@@ -263,4 +269,4 @@ typedef std::shared_ptr<Connection> ConnectionPtr;
 
 } // namespace miniros
 
-#endif // ROSCPP_CONNECTION_H
+#endif // MINIROS_TRANSPORT_CONNECTION_H

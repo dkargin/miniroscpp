@@ -148,11 +148,7 @@ void ConnectionManager::addConnection(const ConnectionPtr& conn)
   std::scoped_lock<std::mutex> lock(connections_mutex_);
 
   connections_.insert(conn);
-  conn->addDropListener(
-    [this](const ConnectionPtr& conn, Connection::DropReason reason)
-    {
-      this->onConnectionDropped(conn);
-    });
+  // TODO: Once upon a time here was a registration for dropped connections.
 }
 
 void ConnectionManager::onConnectionDropped(const ConnectionPtr& conn)
@@ -165,8 +161,12 @@ void ConnectionManager::removeDroppedConnections()
 {
   V_Connection local_dropped;
   {
-    std::scoped_lock<std::mutex> dropped_lock(dropped_connections_mutex_);
-    dropped_connections_.swap(local_dropped);
+      // There are not much connections, so direct iteration should not be that slow.
+      for (const ConnectionPtr& connection: connections_) {
+          if (connection->isDropped()) {
+              local_dropped.push_back(connection);
+          }
+      }
   }
 
   std::scoped_lock<std::mutex> conn_lock(connections_mutex_);

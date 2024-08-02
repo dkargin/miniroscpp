@@ -31,8 +31,6 @@
 #include "miniros/macros.h"
 #include "miniros/transport/common.h"
 
-#include <boost/signals2/connection.hpp>
-
 #include <queue>
 
 namespace miniros
@@ -77,7 +75,9 @@ private:
   ConnectionPtr connection_;
   ServicePublicationWPtr parent_;
   bool persistent_;
-  boost::signals2::connection dropped_conn_;
+
+  class DropWatcher;
+  std::unique_ptr<DropWatcher> drop_watcher_;
 };
 typedef std::shared_ptr<ServiceClientLink> ServiceClientLinkPtr;
 

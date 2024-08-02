@@ -40,12 +40,24 @@
 #include "miniros/this_node.h"
 #include "miniros/transport/file_log.h"
 
-
-
 #include <sstream>
 
 namespace miniros
 {
+
+class ServiceServerLink::DropWatcher : public Connection::DropWatcher {
+public:
+    DropWatcher(ServiceServerLink& owner) : owner_(owner) {}
+
+    void onConnectionDropped(
+        const ConnectionPtr& connection,
+        miniros::Connection::DropReason reason) override
+    {
+        owner_.onConnectionDropped(connection);
+    }
+
+    ServiceServerLink& owner_;
+};
 
 ServiceServerLink::ServiceServerLink(const std::string& service_name, bool persistent, const std::string& request_md5sum,
                              const std::string& response_md5sum, const M_string& header_values)
@@ -58,6 +70,7 @@ ServiceServerLink::ServiceServerLink(const std::string& service_name, bool persi
 , header_read_(false)
 , dropped_(false)
 {
+    drop_watcher_ = std::make_unique<DropWatcher>(*this);
 }
 
 ServiceServerLink::~ServiceServerLink()
@@ -114,11 +127,9 @@ void ServiceServerLink::clearCalls()
 bool ServiceServerLink::initialize(const ConnectionPtr& connection)
 {
   connection_ = connection;
-  connection_->addDropListener(
-      [this](const ConnectionPtr& conn, Connection::DropReason reason)
-      {
-          this->onConnectionDropped(conn);
-      });
+
+  connection_->addDropWatcher(drop_watcher_.get());
+
   connection_->setHeaderReceivedCallback(
       [this](const ConnectionPtr& conn, const Header& header)
       {

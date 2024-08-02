@@ -151,6 +151,10 @@ private:
   CallInfoPtr current_call_;
 
   bool dropped_;
+
+  class DropWatcher;
+  std::unique_ptr<DropWatcher> drop_watcher_;
+
 };
 typedef std::shared_ptr<ServiceServerLink> ServiceServerLinkPtr;
 

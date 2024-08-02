@@ -39,12 +39,26 @@
 namespace miniros
 {
 
+class TransportSubscriberLink::DropWatcher : public Connection::DropWatcher {
+public:
+    DropWatcher(TransportSubscriberLink& owner) : owner_(owner) {}
+
+    void onConnectionDropped(
+        const ConnectionPtr& connection,
+        miniros::Connection::DropReason reason) override
+    {
+        owner_.onConnectionDropped(connection);
+    }
+
+    TransportSubscriberLink& owner_;
+};
+
 TransportSubscriberLink::TransportSubscriberLink()
 : writing_message_(false)
 , header_written_(false)
 , queue_full_(false)
 {
-
+    drop_watcher_ = std::make_unique<DropWatcher>(*this);
 }
 
 TransportSubscriberLink::~TransportSubscriberLink()
@@ -55,8 +69,8 @@ TransportSubscriberLink::~TransportSubscriberLink()
 bool TransportSubscriberLink::initialize(const ConnectionPtr& connection)
 {
   connection_ = connection;
-  dropped_conn_ = connection_->addDropListener(
-    [this](const ConnectionPtr& conn, Connection::DropReason reason){this->onConnectionDropped(conn);});
+
+  connection_->addDropWatcher(drop_watcher_.get());
 
   return true;
 }
@@ -236,7 +250,7 @@ void TransportSubscriberLink::drop()
   // If it is, it will automatically drop itself
   if (connection_->isSendingHeaderError())
   {
-    connection_->removeDropListener(dropped_conn_);
+    drop_watcher_->disconnect();
   }
   else
   {
