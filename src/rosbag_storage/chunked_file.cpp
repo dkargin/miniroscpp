@@ -255,7 +255,7 @@ void ChunkedFile::swap(ChunkedFile& other) {
 
     swap(stream_factory_, other.stream_factory_);
 
-    if (stream_factory) {
+    if (stream_factory_) {
         FileAccessor::setFile(*stream_factory_->getStream(compression::Uncompressed), this);
         FileAccessor::setFile(*stream_factory_->getStream(compression::BZ2), this);
         FileAccessor::setFile(*stream_factory_->getStream(compression::LZ4), this);
