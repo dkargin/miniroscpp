@@ -168,13 +168,8 @@ set(transport_SRC
   observer.cpp
   )
 
-set(BOOST_COMPONENTS system thread)
 if (MINIROS_USE_SYSTEM_PROGRAM_OPTIONS)
-    list(APPEND BOOST_COMPONENTS program_options)
-endif()
-
-find_package(Boost REQUIRED COMPONENTS ${BOOST_COMPONENTS})
-if (MINIROS_USE_SYSTEM_PROGRAM_OPTIONS)
+    find_package(Boost REQUIRED COMPONENTS program_options)
     add_library(impl::program_options ALIAS Boost::program_options)
 endif ()
 
@@ -186,7 +181,7 @@ endif()
 
 set_property(TARGET roscxx PROPERTY CXX_STANDARD 17)
 
-target_link_libraries(roscxx PRIVATE xmlrpcpp rt stdc++fs ${console_bridge_LIBRARIES} ${Boost_LIBRARIES})
+target_link_libraries(roscxx PRIVATE xmlrpcpp rt stdc++fs ${console_bridge_LIBRARIES})
 
 target_compile_definitions(roscxx PRIVATE rostime_EXPORTS miniros_EXPORTS)
 
