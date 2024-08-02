@@ -36,16 +36,17 @@
 #define ROSCPP_CALLBACK_QUEUE_H
 
 #include "miniros/transport/callback_queue_interface.h"
+#include "miniros/internal/thread_local_ptr.h"
 #include "miniros/rostime.h"
 #include "common.h"
 
 #include <mutex>
 #include <shared_mutex>
 #include <condition_variable>
-#include <boost/thread/tss.hpp>
 
 #include <list>
 #include <deque>
+#include <map>
 
 namespace miniros
 {
@@ -179,7 +180,7 @@ protected:
     D_CallbackInfo::iterator cb_it;
   };
 
-  boost::thread_specific_ptr<TLS> tls_;
+  ThreadLocalPointer<TLS> tls_;
 
   bool enabled_;
 };
