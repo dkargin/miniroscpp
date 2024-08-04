@@ -173,15 +173,23 @@ if (MINIROS_USE_SYSTEM_PROGRAM_OPTIONS)
     add_library(impl::program_options ALIAS Boost::program_options)
 endif ()
 
+find_package(Threads REQUIRED)
+
+add_library(miniros_time STATIC ${rostime_SRC})
+target_include_directories(miniros_time PUBLIC ${MINIROS_INCLUDE_DIRS})
+set_property(TARGET miniros_time PROPERTY POSITION_INDEPENDENT_CODE ON)
+add_library(miniros::time ALIAS miniros_time)
+
+
 if (MINIROS_BUILD_SHARED_LIBS)
-  add_library(roscxx SHARED ${rostime_SRC} ${cpp_common_SRC} ${transport_SRC})
+  add_library(roscxx SHARED ${cpp_common_SRC} ${transport_SRC})
 else()
-  add_library(roscxx ${rostime_SRC} ${cpp_common_SRC} ${transport_SRC})
+  add_library(roscxx ${cpp_common_SRC} ${transport_SRC})
 endif()
 
 set_property(TARGET roscxx PROPERTY CXX_STANDARD 17)
 
-target_link_libraries(roscxx PRIVATE xmlrpcpp rt stdc++fs ${console_bridge_LIBRARIES})
+target_link_libraries(roscxx PRIVATE xmlrpcpp rt stdc++fs miniros::time ${console_bridge_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
 
 target_compile_definitions(roscxx PRIVATE rostime_EXPORTS miniros_EXPORTS)
 
@@ -218,7 +226,7 @@ target_include_directories(bag_storage PRIVATE ${MINIROS_INCLUDE_DIRS} ${rosbag_
 target_compile_definitions(bag_storage PRIVATE rosbag_EXPORTS rosbag_storage_EXPORTS roslz4_EXPORTS)
 
 set_property(TARGET bag_storage PROPERTY CXX_STANDARD 17)
-target_link_libraries(bag_storage ${ENCRYPT_LIBRARIES} ${rosbag_LIBS} roscxx)
+target_link_libraries(bag_storage PRIVATE ${ENCRYPT_LIBRARIES} ${rosbag_LIBS} miniros_time roscxx)
 
 
 if (MINIROS_BUILD_ROSBAG_APPS)
@@ -233,19 +241,18 @@ if (MINIROS_BUILD_ROSBAG_APPS)
 
     # ROSBag recorder app
     add_executable(record rosbag/record.cpp)
-    target_link_libraries(record bag_app impl::program_options)
+    target_link_libraries(record PRIVATE bag_app impl::program_options)
     target_include_directories(record PRIVATE ${MINIROS_INCLUDE_DIRS} ${MINIROS_INCLUDE_GENERATED_DIRS})
 
     # ROSBag player app.
     add_executable(play rosbag/play.cpp)
-    target_link_libraries(play bag_app impl::program_options)
+    target_link_libraries(play PRIVATE bag_app impl::program_options)
     target_include_directories(play PRIVATE ${MINIROS_INCLUDE_DIRS} ${MINIROS_INCLUDE_GENERATED_DIRS})
 
     # ROSBag encryptor
     add_executable(encrypt rosbag/encrypt.cpp)
     target_link_libraries(encrypt bag_app impl::program_options)
     target_include_directories(encrypt PRIVATE ${MINIROS_INCLUDE_DIRS} ${MINIROS_INCLUDE_GENERATED_DIRS})
-
 endif()
 
 set(MINIROS_LIBRARY roscxx PARENT_SCOPE)
