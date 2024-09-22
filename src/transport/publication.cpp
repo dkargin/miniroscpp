@@ -381,11 +381,8 @@ uint32_t Publication::getNumSubscribers()
 void Publication::getPublishTypes(bool& serialize, bool& nocopy, const std::type_info& ti)
 {
   std::scoped_lock<std::mutex> lock(subscriber_links_mutex_);
-  V_SubscriberLink::const_iterator it = subscriber_links_.begin();
-  V_SubscriberLink::const_iterator end = subscriber_links_.end();
-  for (; it != end; ++it)
+  for (const SubscriberLinkPtr& sub: subscriber_links_)
   {
-    const SubscriberLinkPtr& sub = *it;
     bool s = false;
     bool n = false;
     sub->getPublishTypes(s, n, ti);
@@ -410,11 +407,8 @@ void Publication::publish(SerializedMessage& m)
   if (m.message)
   {
     std::scoped_lock<std::mutex> lock(subscriber_links_mutex_);
-    V_SubscriberLink::const_iterator it = subscriber_links_.begin();
-    V_SubscriberLink::const_iterator end = subscriber_links_.end();
-    for (; it != end; ++it)
+    for (const SubscriberLinkPtr& sub: subscriber_links_)
     {
-      const SubscriberLinkPtr& sub = *it;
       if (sub->isIntraprocess())
       {
         sub->enqueueMessage(m, false, true);

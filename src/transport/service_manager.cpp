@@ -69,14 +69,13 @@ ServiceManager::~ServiceManager()
   shutdown();
 }
 
-void ServiceManager::start()
+void ServiceManager::start(PollManagerPtr pm, ConnectionManagerPtr cm, XMLRPCManagerPtr rpcm)
 {
   shutting_down_ = false;
 
-  poll_manager_ = PollManager::instance();
-  connection_manager_ = ConnectionManager::instance();
-  xmlrpc_manager_ = XMLRPCManager::instance();
-
+  poll_manager_ = pm;
+  connection_manager_ = cm;
+  xmlrpc_manager_ = rpcm;
 }
 
 void ServiceManager::shutdown()

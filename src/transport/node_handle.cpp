@@ -71,8 +71,14 @@ public:
   std::mutex mutex_;
 
   // keep shared_ptrs to these managers to avoid assertions. Fixes #838
-  TopicManagerPtr keep_alive_topic_manager = TopicManager::instance();
-  ServiceManagerPtr keep_alive_service_manager = ServiceManager::instance();
+  TopicManagerPtr keep_alive_topic_manager;
+  ServiceManagerPtr keep_alive_service_manager;
+
+  NodeHandleBackingCollection(TopicManagerPtr tm, ServiceManagerPtr sm)
+  {
+      keep_alive_topic_manager = tm;
+      keep_alive_service_manager = sm;
+  }
 };
 
 NodeHandle::NodeHandle(const std::string& ns, const M_string& remappings)
@@ -158,7 +164,7 @@ void NodeHandle::construct(const std::string& ns, bool validate_name)
     MINIROS_BREAK();
   }
 
-  collection_ = new NodeHandleBackingCollection;
+  collection_ = new NodeHandleBackingCollection(getTopicManager(), getServiceManager());
   unresolved_namespace_ = ns;
   // if callback_queue_ is nonnull, we are in a non-nullary constructor
 
@@ -305,7 +311,7 @@ Publisher NodeHandle::advertise(AdvertiseOptions& ops)
   SubscriberCallbacksPtr callbacks(std::make_shared<SubscriberCallbacks>(ops.connect_cb, ops.disconnect_cb, 
                                                                            ops.tracked_object, ops.callback_queue));
 
-  if (TopicManager::instance()->advertise(ops, callbacks))
+  if (getTopicManager()->advertise(ops, callbacks))
   {
     Publisher pub(ops.topic, ops.md5sum, ops.datatype, *this, callbacks);
 
@@ -335,7 +341,7 @@ Subscriber NodeHandle::subscribe(SubscribeOptions& ops)
     }
   }
 
-  if (TopicManager::instance()->subscribe(ops))
+  if (getTopicManager()->subscribe(ops))
   {
     Subscriber sub(ops.topic, *this, ops.helper);
 
@@ -546,6 +552,14 @@ void NodeHandle::shutdown()
   }
 
   ok_ = false;
+}
+
+TopicManagerPtr NodeHandle::getTopicManager() {
+  return TopicManager::instance();
+}
+
+ServiceManagerPtr NodeHandle::getServiceManager() {
+  return ServiceManager::instance();
 }
 
 void NodeHandle::setParam(const std::string& key, const XmlRpc::XmlRpcValue& v) const

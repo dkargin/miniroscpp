@@ -182,7 +182,10 @@ bool execute(const std::string& method, const XmlRpc::XmlRpcValue& request, XmlR
 
   std::string master_host = getHost();
   uint32_t master_port = getPort();
-  XmlRpc::XmlRpcClient *c = XMLRPCManager::instance()->getXMLRPCClient(master_host, master_port, "/");
+  XMLRPCManagerPtr manager = XMLRPCManager::instance();
+  if (!manager)
+      return false;
+  XmlRpc::XmlRpcClient *c = manager->getXMLRPCClient(master_host, master_port, "/");
   bool printed = false;
   bool slept = false;
   bool ok = true;
@@ -197,7 +200,7 @@ bool execute(const std::string& method, const XmlRpc::XmlRpcValue& request, XmlR
       b = c->execute(method.c_str(), request, response);
     }
 
-    ok = !miniros::isShuttingDown() && !XMLRPCManager::instance()->isShuttingDown();
+    ok = !miniros::isShuttingDown() && !manager->isShuttingDown();
 
     if (!b && ok)
     {
@@ -209,14 +212,14 @@ bool execute(const std::string& method, const XmlRpc::XmlRpcValue& request, XmlR
 
       if (!wait_for_master)
       {
-        XMLRPCManager::instance()->releaseXMLRPCClient(c);
+        manager->releaseXMLRPCClient(c);
         return false;
       }
 
       if (!g_retry_timeout.isZero() && (miniros::SteadyTime::now() - start_time) >= g_retry_timeout)
       {
         MINIROS_ERROR("[%s] Timed out trying to connect to the master after [%f] seconds", method.c_str(), g_retry_timeout.toSec());
-        XMLRPCManager::instance()->releaseXMLRPCClient(c);
+        manager->releaseXMLRPCClient(c);
         return false;
       }
 
@@ -225,9 +228,9 @@ bool execute(const std::string& method, const XmlRpc::XmlRpcValue& request, XmlR
     }
     else
     {
-      if (!XMLRPCManager::instance()->validateXmlrpcResponse(method, response, payload))
+      if (!manager->validateXmlrpcResponse(method, response, payload))
       {
-        XMLRPCManager::instance()->releaseXMLRPCClient(c);
+        manager->releaseXMLRPCClient(c);
 
         return false;
       }
@@ -235,7 +238,7 @@ bool execute(const std::string& method, const XmlRpc::XmlRpcValue& request, XmlR
       break;
     }
 
-    ok = !miniros::isShuttingDown() && !XMLRPCManager::instance()->isShuttingDown();
+    ok = !miniros::isShuttingDown() && !manager->isShuttingDown();
   } while(ok);
 
   if (ok && slept)
@@ -243,7 +246,7 @@ bool execute(const std::string& method, const XmlRpc::XmlRpcValue& request, XmlR
     MINIROS_INFO("Connected to master at [%s:%d]", master_host.c_str(), master_port);
   }
 
-  XMLRPCManager::instance()->releaseXMLRPCClient(c);
+  manager->releaseXMLRPCClient(c);
 
   return b;
 }

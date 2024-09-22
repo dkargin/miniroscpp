@@ -2194,6 +2194,9 @@ if (service)  // Enter if advertised service is valid
    */
   bool ok() const;
 
+  TopicManagerPtr getTopicManager();
+  ServiceManagerPtr getServiceManager();
+
 private:
   struct no_validate { };
   // this is pretty awful, but required to preserve public interface (and make minimum possible changes)
