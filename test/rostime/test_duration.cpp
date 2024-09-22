@@ -80,8 +80,8 @@ TEST(Duration, castFromInt64Exceptions)
     // The next casts all incorrect.
     EXPECT_THROW(d1.fromSec(2147483648000000000), std::runtime_error);
     EXPECT_THROW(d2.fromSec(4294967296000000000), std::runtime_error);
-    EXPECT_THROW(d3.fromSec(-2147483648000000001), std::runtime_error);
-    EXPECT_THROW(d4.fromSec(-6442450943000000000), std::runtime_error);
+    EXPECT_THROW(d3.fromSec(-2.147483648E+18), std::runtime_error);
+    EXPECT_THROW(d4.fromSec(-6442450943000000512), std::runtime_error);
 }
 
 TEST(Duration, arithmeticExceptions)
