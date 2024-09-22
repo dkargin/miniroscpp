@@ -95,11 +95,9 @@ set(ENCRYPT_LIBRARIES "")
 if(MINIROS_ROSBAG_USE_GPGME_ENCRYPTION)
   find_package(Gpgme REQUIRED)
 
-  if (GPGME_FOUND)
-    list(APPEND ENCRYPT_SOURCE "rosbag_storage/gpgme_utils.cpp")
-    list(APPEND rosbag_INCLUDE ${GPGME_INCLUDES})
-    list(APPEND ENCRYPT_LIBRARIES gpgme)
-  endif()
+  list(APPEND ENCRYPT_SOURCE "rosbag_storage/gpgme_utils.cpp")
+  list(APPEND rosbag_INCLUDE ${GPGME_INCLUDES})
+  list(APPEND ENCRYPT_LIBRARIES gpgme)
 endif()
 
 # AES encryption plugin
@@ -176,7 +174,12 @@ endif ()
 find_package(Threads REQUIRED)
 
 add_library(miniros_time STATIC ${rostime_SRC})
-target_include_directories(miniros_time PUBLIC ${MINIROS_INCLUDE_DIRS})
+target_include_directories(miniros_time
+  PUBLIC
+    $<BUILD_INTERFACE:${MINIROS_INCLUDE_DIRS}>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
+)
+
 set_property(TARGET miniros_time PROPERTY POSITION_INDEPENDENT_CODE ON)
 add_library(miniros::time ALIAS miniros_time)
 
@@ -189,7 +192,9 @@ endif()
 
 set_property(TARGET roscxx PROPERTY CXX_STANDARD 17)
 
-target_link_libraries(roscxx PRIVATE xmlrpcpp rt stdc++fs miniros::time ${console_bridge_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries(roscxx PRIVATE xmlrpcpp rt stdc++fs ${console_bridge_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
+
+target_link_libraries(roscxx PUBLIC miniros::time)
 
 target_compile_definitions(roscxx PRIVATE rostime_EXPORTS miniros_EXPORTS)
 
@@ -256,4 +261,4 @@ if (MINIROS_BUILD_ROSBAG_APPS)
 endif()
 
 set(MINIROS_LIBRARY roscxx PARENT_SCOPE)
-set(MINIROS_EXPORT roscxx bag_storage ${rosbag_LIBS} PARENT_SCOPE)
+set(MINIROS_EXPORT roscxx bag_storage miniros_time ${rosbag_LIBS} PARENT_SCOPE)

@@ -331,16 +331,20 @@ void start()
 
   param::param("/tcp_keepalive", TransportTCP::s_use_keepalive_, TransportTCP::s_use_keepalive_);
 
-  PollManager::instance()->addPollThreadWatcher(&g_shutdownWatcher);
-  XMLRPCManager::instance()->bind("shutdown", shutdownCallback);
+  PollManagerPtr pm = PollManager::instance();
+  pm->addPollThreadWatcher(&g_shutdownWatcher);
+
+  XMLRPCManagerPtr rpcm = XMLRPCManager::instance();
+  rpcm->bind("shutdown", shutdownCallback);
 
   initInternalTimerManager();
 
-  TopicManager::instance()->start();
-  ServiceManager::instance()->start();
-  ConnectionManager::instance()->start();
-  PollManager::instance()->start();
-  XMLRPCManager::instance()->start();
+  ConnectionManagerPtr cm = ConnectionManager::instance();
+  TopicManager::instance()->start(pm, cm, rpcm);
+  ServiceManager::instance()->start(pm, cm, rpcm);
+  cm->start();
+  pm->start();
+  rpcm->start();
 
   if (!(g_init_options & init_options::NoSigintHandler))
   {
@@ -412,7 +416,7 @@ void start()
 
   ROSCPP_LOG_DEBUG("Started node [%s], pid [%d], bound on [%s], xmlrpc port [%d], tcpros port [%d], using [%s] time", 
 		   this_node::getName().c_str(), getpid(), network::getHost().c_str(), 
-		   XMLRPCManager::instance()->getServerPort(), ConnectionManager::instance()->getTCPPort(), 
+           rpcm->getServerPort(), cm->getTCPPort(),
 		   Time::useSystemTime() ? "real" : "sim");
 
   // Label used to abort if we've started shutting down in the middle of start(), which can happen in

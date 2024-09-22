@@ -82,14 +82,14 @@ TopicManager::~TopicManager()
   shutdown();
 }
 
-void TopicManager::start()
+void TopicManager::start(PollManagerPtr pm, ConnectionManagerPtr cm, XMLRPCManagerPtr rpcm)
 {
   std::scoped_lock<std::mutex> shutdown_lock(shutting_down_mutex_);
   shutting_down_ = false;
 
-  poll_manager_ = PollManager::instance();
-  connection_manager_ = ConnectionManager::instance();
-  xmlrpc_manager_ = XMLRPCManager::instance();
+  poll_manager_ = pm;
+  connection_manager_ = cm;
+  xmlrpc_manager_ = rpcm;
 
   xmlrpc_manager_->bind("publisherUpdate",
     [this](XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result)

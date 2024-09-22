@@ -51,7 +51,9 @@ void Publisher::Impl::unadvertise()
   if (!unadvertised_)
   {
     unadvertised_ = true;
-    TopicManager::instance()->unadvertise(topic_, callbacks_);
+    TopicManagerPtr tm = node_handle_->getTopicManager();
+    if (tm)
+      tm->unadvertise(topic_, callbacks_);
     node_handle_.reset();
   }
 }
@@ -75,6 +77,18 @@ Publisher::~Publisher()
 {
 }
 
+bool Publisher::isValid() const {
+  if (!impl_)
+    return false;
+  return impl_->isValid();
+}
+
+TopicManagerPtr Publisher::getTopicManager() const {
+  if (!impl_)
+    return nullptr;
+  return impl_->node_handle_? impl_->node_handle_->getTopicManager() : TopicManager::instance();
+}
+
 void Publisher::publishImpl(const std::function<SerializedMessage(void)>& serfunc, SerializedMessage& m) const
 {
   if (!impl_)
@@ -89,14 +103,18 @@ void Publisher::publishImpl(const std::function<SerializedMessage(void)>& serfun
     return;
   }
 
-  TopicManager::instance()->publish(impl_->topic_, serfunc, m);
+  TopicManagerPtr tm = getTopicManager();
+  if (tm)
+    tm->publish(impl_->topic_, serfunc, m);
 }
 
 void Publisher::incrementSequence() const
 {
   if (impl_ && impl_->isValid())
   {
-    TopicManager::instance()->incrementSequence(impl_->topic_);
+    TopicManagerPtr tm = getTopicManager();
+    if (tm)
+      tm->incrementSequence(impl_->topic_);
   }
 }
 
@@ -123,7 +141,9 @@ uint32_t Publisher::getNumSubscribers() const
 {
   if (impl_ && impl_->isValid())
   {
-    return TopicManager::instance()->getNumSubscribers(impl_->topic_);
+    TopicManagerPtr tm = getTopicManager();
+    if (tm)
+      return tm->getNumSubscribers(impl_->topic_);
   }
 
   return 0;
@@ -132,8 +152,9 @@ uint32_t Publisher::getNumSubscribers() const
 bool Publisher::isLatched() const {
   PublicationPtr publication_ptr;
   if (impl_ && impl_->isValid()) {
-    publication_ptr =
-      TopicManager::instance()->lookupPublication(impl_->topic_);
+    TopicManagerPtr tm = getTopicManager();
+    if (tm)
+      publication_ptr = tm->lookupPublication(impl_->topic_);
   } else {
     MINIROS_ASSERT_MSG(false, "Call to isLatched() on an invalid Publisher");
     throw miniros::Exception("Call to isLatched() on an invalid Publisher");

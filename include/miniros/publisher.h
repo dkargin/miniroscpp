@@ -38,6 +38,7 @@
 
 namespace miniros
 {
+  class TopicManager;
   /**
    * \brief Manages an advertisement on a specific topic.
    *
@@ -72,7 +73,7 @@ namespace miniros
           return;
         }
 
-      if (!impl_->isValid())
+      if (!isValid())
         {
           MINIROS_ASSERT_MSG(false, "Call to publish() on an invalid Publisher (topic [%s])", impl_->topic_.c_str());
           return;
@@ -105,7 +106,7 @@ namespace miniros
           return;
         }
 
-      if (!impl_->isValid())
+      if (!isValid())
         {
           MINIROS_ASSERT_MSG(false, "Call to publish() on an invalid Publisher (topic [%s])", impl_->topic_.c_str());
           return;
@@ -119,6 +120,9 @@ namespace miniros
       SerializedMessage m;
       publishImpl([&message]() {return serializeMessage<M>(message);}, m);
     }
+
+    /// Check if subscriber is a valid object.
+    bool isValid() const;
 
     /**
      * \brief Shutdown the advertisement associated with this Publisher
@@ -147,7 +151,7 @@ namespace miniros
      */
     bool isLatched() const;
 
-    operator void*() const { return (impl_ && impl_->isValid()) ? (void*)1 : (void*)0; }
+    operator void*() const { return (impl_ && isValid()) ? (void*)1 : (void*)0; }
 
     bool operator<(const Publisher& rhs) const
     {
@@ -172,6 +176,8 @@ namespace miniros
 
     void publishImpl(const std::function<SerializedMessage(void)>& serfunc, SerializedMessage& m) const;
     void incrementSequence() const;
+
+    std::shared_ptr<TopicManager> getTopicManager() const;
 
     class MINIROS_DECL Impl
     {

@@ -116,7 +116,7 @@ public:
 
   bool advertiseService(const AdvertiseServiceOptions& ops);
 
-  void start();
+  void start(PollManagerPtr pm, ConnectionManagerPtr cm, XMLRPCManagerPtr rpcm);
   void shutdown();
 private:
 

@@ -65,7 +65,7 @@ public:
   TopicManager();
   ~TopicManager();
 
-  void start();
+  void start(PollManagerPtr pm, ConnectionManagerPtr cm, XMLRPCManagerPtr rpcm);
   void shutdown();
 
   bool subscribe(const SubscribeOptions& ops);
