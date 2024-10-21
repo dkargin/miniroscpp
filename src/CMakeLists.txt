@@ -49,7 +49,7 @@ if (BZIP2_FOUND)
     list(APPEND rosbag_INCLUDE ${BZIP2_INCLUDE_DIR})
     list(APPEND rosbag_SRC rosbag_storage/bz2_stream.cpp)
 
-    if (NOT MINIROS_USE_SYSTEM_BZIP)
+    if (NOT MINIROS_USE_SYSTEM_BZIP2)
             list(APPEND rosbag_LIBS bz2_import)
     else ()
             list(APPEND rosbag_LIBS ${BZIP2_LIBRARIES})

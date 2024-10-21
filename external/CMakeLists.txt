@@ -1,6 +1,6 @@
 
-if (NOT MINIROS_USE_SYSTEM_BZIP)
-	if (EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/bzip2)
+if (NOT MINIROS_USE_SYSTEM_BZIP2)
+	if (EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/bzip2/CMakeLists.txt)
 		# Disabling bzip2 application.
 		set(ENABLE_LIB_ONLY ON)
 		# Dirty hack to make Python3 fail to find. bzip2 will not build tests without Python3.
@@ -34,7 +34,7 @@ if (NOT MINIROS_USE_SYSTEM_BZIP)
 endif()
 
 if (NOT MINIROS_USE_SYSTEM_LZ4)
-	if (EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/lz4)
+	if (EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/lz4/CMakeLists.txt)
 		set (LZ4_BUILD_CLI OFF)
 		set (LZ4_BUILD_LEGACY_LZ4C OFF)
 		add_subdirectory(lz4/build/cmake EXCLUDE_FROM_ALL)
