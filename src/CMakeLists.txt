@@ -50,9 +50,9 @@ if (BZIP2_FOUND)
     list(APPEND rosbag_SRC rosbag_storage/bz2_stream.cpp)
 
     if (NOT MINIROS_USE_SYSTEM_BZIP2)
-            list(APPEND rosbag_LIBS bz2_import)
+            list(APPEND rosbag_INTERNAL_LIBS bz2_import)
     else ()
-            list(APPEND rosbag_LIBS ${BZIP2_LIBRARIES})
+            list(APPEND rosbag_EXTERNAL_LIBS ${BZIP2_LIBRARIES})
     endif ()
 
     add_definitions(-DMINIBAG_HAS_BZIP2)
@@ -81,7 +81,11 @@ if (lz4_LIBRARIES)
 		roslz4/lz4s.c
 		roslz4/xxhash.c)
 	
-	list(APPEND rosbag_LIBS ${lz4_LIBRARIES})
+  if (MINIROS_USE_SYSTEM_LZ4)
+	  list(APPEND rosbag_EXTERNAL_LIBS ${lz4_LIBRARIES})
+  else ()
+    list(APPEND rosbag_INTERNAL_LIBS ${lz4_LIBRARIES})
+  endif ()
 	list(APPEND rosbag_INCLUDE ${lz4_INCLUDE_DIRS})
 	
 	set_source_files_properties(src/lz4s.c src/xxhash.c
@@ -231,7 +235,7 @@ target_include_directories(bag_storage PRIVATE ${MINIROS_INCLUDE_DIRS} ${rosbag_
 target_compile_definitions(bag_storage PRIVATE rosbag_EXPORTS rosbag_storage_EXPORTS roslz4_EXPORTS)
 
 set_property(TARGET bag_storage PROPERTY CXX_STANDARD 17)
-target_link_libraries(bag_storage PRIVATE ${ENCRYPT_LIBRARIES} ${rosbag_LIBS} miniros_time roscxx)
+target_link_libraries(bag_storage PRIVATE ${ENCRYPT_LIBRARIES} ${rosbag_INTERNAL_LIBS} ${rosbag_EXTERNAL_LIBS} miniros_time roscxx)
 
 
 if (MINIROS_BUILD_ROSBAG_APPS)
@@ -261,4 +265,4 @@ if (MINIROS_BUILD_ROSBAG_APPS)
 endif()
 
 set(MINIROS_LIBRARY roscxx PARENT_SCOPE)
-set(MINIROS_EXPORT roscxx bag_storage miniros_time ${rosbag_LIBS} PARENT_SCOPE)
+set(MINIROS_EXPORT roscxx bag_storage miniros_time ${rosbag_INTERNAL_LIBS} PARENT_SCOPE)
