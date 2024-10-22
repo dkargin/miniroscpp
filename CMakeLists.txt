@@ -75,6 +75,8 @@ endif()
 
 set(XMLRPCPP_SRC_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/xmlrpcpp)
 
+find_package(Threads REQUIRED)
+
 add_subdirectory(external)
 add_subdirectory(xmlrpcpp)
 add_subdirectory(src)

@@ -175,8 +175,6 @@ if (MINIROS_USE_SYSTEM_PROGRAM_OPTIONS)
     add_library(impl::program_options ALIAS Boost::program_options)
 endif ()
 
-find_package(Threads REQUIRED)
-
 add_library(miniros_time STATIC ${rostime_SRC})
 target_include_directories(miniros_time
   PUBLIC
@@ -240,12 +238,12 @@ target_link_libraries(bag_storage PRIVATE ${ENCRYPT_LIBRARIES} ${rosbag_INTERNAL
 
 if (MINIROS_BUILD_ROSBAG_APPS)
     # Common library for rosbag applications.
-    add_library(bag_app
+    add_library(bag_app STATIC
         rosbag/player.cpp
         rosbag/recorder.cpp
         rosbag/time_translator.cpp
     )
-    target_link_libraries(bag_app bag_storage roscxx)
+    target_link_libraries(bag_app bag_storage roscxx ${CMAKE_THREAD_LIBS_INIT})
     target_include_directories(bag_app PRIVATE ${MINIROS_INCLUDE_DIRS} ${MINIROS_INCLUDE_GENERATED_DIRS})
 
     # ROSBag recorder app
@@ -262,7 +260,11 @@ if (MINIROS_BUILD_ROSBAG_APPS)
     add_executable(encrypt rosbag/encrypt.cpp)
     target_link_libraries(encrypt bag_app impl::program_options)
     target_include_directories(encrypt PRIVATE ${MINIROS_INCLUDE_DIRS} ${MINIROS_INCLUDE_GENERATED_DIRS})
+
+    set(rosbag_APPS record play encrypt)
+else ()
+    set(rosbag_APPS)
 endif()
 
 set(MINIROS_LIBRARY roscxx PARENT_SCOPE)
-set(MINIROS_EXPORT roscxx bag_storage miniros_time ${rosbag_INTERNAL_LIBS} PARENT_SCOPE)
+set(MINIROS_EXPORT roscxx bag_storage miniros_time ${rosbag_INTERNAL_LIBS} ${rosbag_APPS} PARENT_SCOPE)
