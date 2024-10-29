@@ -249,6 +249,7 @@ bool XMLRPCManager::validateXmlrpcResponse(const std::string& method, XmlRpcValu
 void XMLRPCManager::serverThreadFunc()
 {
   disableAllSignalsInThisThread();
+  setThreadName("XMLRPCManager");
 
   while(!shutting_down_)
   {
