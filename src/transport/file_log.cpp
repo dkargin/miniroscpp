@@ -82,9 +82,9 @@ void init(const M_string& remappings)
           // Not cross-platform?
           if( get_environment_variable(ros_log_env, "HOME") )
           {
-            std::string dotros = ros_log_env + std::string("/.ros/");
+            fs::path dotros = fs::path(ros_log_env) / std::string(".ros");
             fs::create_directory(dotros);
-            log_file_name = dotros + "log/";
+            fs::path log_file_name = dotros / std::string("log");
             fs::create_directory(log_file_name);
           }
         }
