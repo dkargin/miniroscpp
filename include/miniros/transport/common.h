@@ -44,6 +44,7 @@ namespace miniros
 typedef std::map<std::string, std::string> M_string;
 
 void disableAllSignalsInThisThread();
+void setThreadName(const char* name);
 
 }
 

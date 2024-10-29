@@ -288,6 +288,7 @@ void basicSigintHandler(int sig)
 
 void internalCallbackQueueThreadFunc()
 {
+  setThreadName("ROS::internalCallbackQueue");
   disableAllSignalsInThisThread();
 
   CallbackQueuePtr queue = getInternalCallbackQueue();

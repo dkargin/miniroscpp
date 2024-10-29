@@ -71,6 +71,7 @@ void PollManager::shutdown()
 
 void PollManager::threadFunc()
 {
+  setThreadName("PollManager");
   disableAllSignalsInThisThread();
 
   while (!shutting_down_)

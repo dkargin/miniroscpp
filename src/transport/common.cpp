@@ -33,20 +33,28 @@
  */
 
 #include "miniros/transport/common.h"
+
 #include <cstdlib>
 #include <cstdio>
 #include <cerrno>
 #include <cassert>
 #include <sys/types.h>
-#if !defined(WIN32)
+
+#if defined(WIN32)
+#else
 #include <unistd.h>
 #include <pthread.h>
 #endif
+
+#ifdef __linux__
+#include <sys/prctl.h>
+#endif
+
 #include <signal.h>
 
-using std::string;
+namespace miniros {
 
-void miniros::disableAllSignalsInThisThread()
+void disableAllSignalsInThisThread()
 {
 #if !defined(WIN32)
   // pthreads_win32, despite having an implementation of pthread_sigmask,
@@ -59,3 +67,18 @@ void miniros::disableAllSignalsInThisThread()
   pthread_sigmask( SIG_BLOCK, &signal_set, NULL );
 #endif
 }
+
+// Following advice at https://stackoverflow.com/questions/10121560/stdthread-naming-your-thread
+void setThreadName(const char* threadName) {
+#if defined(WIN32)
+
+	// TODO: Implement.
+#elif defined(__linux__)
+  prctl(PR_SET_NAME, threadName,0,0,0);
+#else
+  pthread_t handle = pthread_self();
+  pthread_setname_np(handle, threadName);
+#endif
+}
+
+} // namespace miniros

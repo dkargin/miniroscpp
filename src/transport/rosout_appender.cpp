@@ -125,6 +125,7 @@ void ROSOutAppender::log(::miniros::console::Level level, const char* str, const
 
 void ROSOutAppender::logThread()
 {
+  setThreadName("ROSOutAppender");
   while (!shutting_down_)
   {
     V_Log local_queue;
