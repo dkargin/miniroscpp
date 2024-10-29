@@ -168,6 +168,7 @@ set(transport_SRC
   transport/steady_timer.cpp
   shape_shifter.cpp
   observer.cpp
+  tf2/transform_broadcaster.cpp
   )
 
 if (MINIROS_USE_SYSTEM_PROGRAM_OPTIONS)
