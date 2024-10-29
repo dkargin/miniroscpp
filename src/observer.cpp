@@ -20,8 +20,6 @@ public:
     }
 
     void resetRoot() {
-        m_head = &m_root;
-        m_tail = &m_root;
         m_root.m_next = &m_root;
         m_root.m_prev = &m_root;
     }
@@ -29,7 +27,7 @@ public:
     /// Check if there are any connections.
     bool isEmpty() const {
         std::scoped_lock<mutex_t> lock(m_mutex);
-        return m_head == m_tail;
+        return m_root.m_next == &m_root;
     }
 
     /// Check if target object is still attached.
@@ -48,12 +46,12 @@ public:
 
     Connection* objBegin() const {
         // Note that head is always a dummy "root" object.
-        return m_head->m_next;
+        return m_root.m_next;
     }
 
     Connection* objEnd() const {
         // Note that head is always a dummy "root" object.
-        return m_head;
+        return &m_root;
     }
 
     /// Detaches connection from the object.
@@ -70,12 +68,10 @@ public:
     void pushBack(Connection* object);
 
 protected:
-    Connection* m_head = nullptr;
-    Connection* m_tail = nullptr;
     TargetBase* m_owner = nullptr;
 
     /// Special placeholder object to for proper "end" iterator.
-    Connection m_root;
+    mutable Connection m_root;
 
     mutable mutex_t m_mutex;
 
@@ -83,21 +79,17 @@ protected:
 };
 
 bool Connections::detachConnection(Connection *object, Connection *prev, Connection *next) {
+    assert(object);
+    assert(prev);
+    assert(next);
     std::scoped_lock<mutex_t> lock(m_mutex);
-    if (object == m_head) {
-        m_head = m_head->m_next;
-    }
-    if (object == m_tail) {
-        m_tail = m_tail->m_prev;
-    }
 
+    // Since this list is always looped, we do not need to check head and tail directly.
     if (prev) {
-        assert(prev->m_next == object);
         prev->m_next = next;
     }
 
     if (next) {
-        assert(next->m_prev == object);
         next->m_prev = prev;
     }
     return isEmpty() && isOrphaned();
@@ -110,9 +102,13 @@ void Connections::pushBack(Connection* object) {
         object->disconnect();
     std::scoped_lock<mutex_t> lock(m_mutex);
     // Head and tail always exist due to additional "root" object.
-    m_tail->m_next = object;
-    m_tail = object;
-    object->m_prev = m_tail;
+    Connection* tail = m_root.m_prev;
+    tail->m_next = object;
+    m_root.m_prev = object;
+
+    object->m_prev = tail;
+    object->m_next = &m_root;
+    object->m_container = this;
 }
 
 bool Connections::detachOwner(TargetBase* owner) {
