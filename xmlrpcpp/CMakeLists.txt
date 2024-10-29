@@ -12,7 +12,7 @@ if(WIN32)
   add_definitions(-D_WINDOWS)
 endif()
 
-add_library(xmlrpcpp
+add_library(xmlrpcpp STATIC
   src/XmlRpcClient.cpp
   src/XmlRpcDispatch.cpp
   src/XmlRpcServer.cpp

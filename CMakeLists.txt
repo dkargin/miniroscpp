@@ -17,15 +17,21 @@ include(CMakePackageConfigHelpers)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
-find_package(catkin QUIET)
+option(MINIROS_USE_CATKIN "Use ros1 catkin build system" OFF)
 
-if(catkin_FOUND)
-  message(STATUS "Miniros has been used with catkin")
-  catkin_package(
-    DEPENDS
-    INCLUDE_DIRS include include/generated
-    LIBRARIES roscxx bag_storage)
-endif(catkin_FOUND)
+if (MINIROS_USE_CATKIN)
+  find_package(catkin QUIET)
+  if(catkin_FOUND)
+    message(STATUS "Miniros has been used with catkin")
+    catkin_package(
+      DEPENDS
+      INCLUDE_DIRS include include/generated
+      LIBRARIES roscxx bag_storage)
+  else()
+    message(STATUS "Catkin was not found")
+  endif(catkin_FOUND)
+endif()
+
 
 include_directories(include)
 set(MINIROS_INCLUDE_DIRS ${CMAKE_CURRENT_BINARY_DIR})
@@ -91,7 +97,7 @@ if (MINIROS_BUILD_TESTS)
 	endif()
 endif()
 
-if(catkin_FOUND)
+if (catkin_FOUND)
   # Catkin does all the packaging by itself. Also we do not need to install pregenerated messages,
   # since we are able to run gencxx directly here.
   install(DIRECTORY include/
@@ -134,12 +140,15 @@ else()
   
   # Installing regular headers
   install(DIRECTORY include/ DESTINATION include FILES_MATCHING PATTERN "*.h")
+  install(DIRECTORY include/ DESTINATION include FILES_MATCHING PATTERN "*.hxx")
+
   install(FILES
     ${CMAKE_CURRENT_BINARY_DIR}/miniros/config.h 
     DESTINATION include/miniros/)
 
   # Installing generated headers for message types
   install(DIRECTORY include/generated DESTINATION include/${PROJECT_NAME} FILES_MATCHING PATTERN "*.hxx")
+  install(DIRECTORY include/generated DESTINATION include/${PROJECT_NAME} FILES_MATCHING PATTERN "*.h")
 
   install(FILES
     "${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/${PROJECT_NAME}Config.cmake"
@@ -172,3 +181,14 @@ endif(catkin_FOUND)
 if (MINIROS_BUILD_EXAMPLES)
   add_subdirectory(examples)
 endif ()
+
+# uninstall target
+if(NOT TARGET uninstall)
+  configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/cmake_uninstall.cmake.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake"
+    IMMEDIATE @ONLY)
+
+  add_custom_target(uninstall
+    COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake)
+endif()
