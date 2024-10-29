@@ -8,19 +8,28 @@
 #ifndef MINIROS_INCLUDE_MINIROS_TF2_TRANSFORM_BROADCASTER_H_
 #define MINIROS_INCLUDE_MINIROS_TF2_TRANSFORM_BROADCASTER_H_
 
-#include "miniros/ros.h"
+#include <memory>
+
+#include "miniros/macros.h"
+
 #include "geometry_msgs/TransformStamped.hxx"
 
 namespace miniros {
 
+class NodeHandle;
+
+namespace tf2 {
 /** \brief This class provides an easy way to publish coordinate frame transform information.
  * It will handle all the messaging and stuffing of messages.  And the function prototypes lay out all the
  * necessary data needed for each message.  */
 
-class TransformBroadcaster{
+class MINIROS_DECL TransformBroadcaster{
 public:
   /** \brief Constructor (needs a ros::Node reference) */
   TransformBroadcaster();
+  TransformBroadcaster(miniros::NodeHandle& node);
+
+  ~TransformBroadcaster();
 
   /** \brief Send a StampedTransform
    * The stamped data structure includes frame_id, and time, and parent_id already.  */
@@ -39,11 +48,13 @@ public:
   void sendTransform(const std::vector<geometry_msgs::TransformStamped> & transforms);
 
 private:
-  /// Internal reference to ros::Node
-  miniros::NodeHandle node_;
-  miniros::Publisher publisher_;
+  void init(int sendQueueLength = 100);
 
+  struct Internal;
+  std::unique_ptr<Internal> m_internal;
 };
+
+} // namespace tf2
 
 } // namespace miniros
 
