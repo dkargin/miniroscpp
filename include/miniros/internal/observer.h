@@ -140,7 +140,9 @@ public:
     }
 
     void attach(ObsImpl* obj) {
-
+      if (obj) {
+        TargetBase::attach(static_cast<Connection*>(obj));
+      }
     }
 };
 
