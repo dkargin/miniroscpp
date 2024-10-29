@@ -49,8 +49,8 @@ if(WIN32)
 endif()
 
 if(WIN32)
-  # build everything from source, undefine ROS_BUILD_SHARED_LIBS to eliminate the dllimport/dllexport attributes
-  set_target_properties(test_client PROPERTIES COMPILE_FLAGS -UROS_BUILD_SHARED_LIBS)
+  # build everything from source, undefine MINIROS_BUILD_SHARED_LIBS to eliminate the dllimport/dllexport attributes
+  set_target_properties(test_client PROPERTIES COMPILE_FLAGS -UMINIROS_BUILD_SHARED_LIBS)
 endif()
 
 miniros_add_test(test_dispatch test_dispatch.cpp
@@ -61,8 +61,8 @@ miniros_add_test(test_dispatch test_dispatch.cpp
   ${XMLRPCPP_SRC_ROOT}/libb64/src/cencode.c)
 
 if(WIN32)
-  # build everything from source, undefine ROS_BUILD_SHARED_LIBS to eliminate the dllimport/dllexport attributes
-  set_target_properties(test_dispatch PROPERTIES COMPILE_FLAGS -UROS_BUILD_SHARED_LIBS)
+  # build everything from source, undefine MINIROS_BUILD_SHARED_LIBS to eliminate the dllimport/dllexport attributes
+  set_target_properties(test_dispatch PROPERTIES COMPILE_FLAGS -UMINIROS_BUILD_SHARED_LIBS)
 endif()
 
 target_link_libraries(test_dispatch mock_socket)
