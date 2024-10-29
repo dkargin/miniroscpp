@@ -404,7 +404,7 @@ if (sub)  // Enter if subscriber is valid
                        const TransportHints& transport_hints = TransportHints())
   {
     SubscribeOptions ops;
-    auto wrapFn = [fp, obj](const M& msg){obj->*(fp)(msg);};
+    auto wrapFn = [fp, obj](const M& msg){(obj->*fp)(msg);};
     ops.template initByFullCallbackType<M>(topic, queue_size, wrapFn);
     ops.transport_hints = transport_hints;
     return subscribe(ops);
@@ -416,7 +416,7 @@ if (sub)  // Enter if subscriber is valid
                        const TransportHints& transport_hints = TransportHints())
   {
     SubscribeOptions ops;
-    auto wrapFn = [fp, obj](const M& msg){obj->*(fp)(msg);};
+    auto wrapFn = [fp, obj](const M& msg){(obj->*fp)(msg);};
     ops.template initByFullCallbackType<M>(topic, queue_size, wrapFn);
     ops.transport_hints = transport_hints;
     return subscribe(ops);
@@ -470,7 +470,7 @@ if (sub)  // Enter if subscriber is valid
                        const TransportHints& transport_hints = TransportHints())
   {
     SubscribeOptions ops;
-    auto wrapFn = [fp, obj](const std::shared_ptr<M const>& msg){obj->*(fp)(msg);};
+    auto wrapFn = [fp, obj](const std::shared_ptr<M const>& msg){(obj->*fp)(msg);};
     ops.template init<M>(topic, queue_size, wrapFn);
     ops.transport_hints = transport_hints;
     return subscribe(ops);
@@ -481,7 +481,7 @@ if (sub)  // Enter if subscriber is valid
                        const TransportHints& transport_hints = TransportHints())
   {
     SubscribeOptions ops;
-    auto wrapFn = [fp, obj](const std::shared_ptr<M const>& msg){obj->*(fp)(msg);};
+    auto wrapFn = [fp, obj](const std::shared_ptr<M const>& msg){(obj->*fp)(msg);};
     ops.template init<M>(topic, queue_size, wrapFn);
     ops.transport_hints = transport_hints;
     return subscribe(ops);
@@ -535,7 +535,7 @@ if (sub)  // Enter if subscriber is valid
                        const std::shared_ptr<T>& obj, const TransportHints& transport_hints = TransportHints())
   {
     SubscribeOptions ops;
-    auto wrapFn = [fp, obj](const M& msg){obj->*(fp)(msg);};
+    auto wrapFn = [fp, obj](const M& msg){(obj->*fp)(msg);};
     ops.template initByFullCallbackType<M>(topic, queue_size, wrapFn);
     ops.tracked_object = obj;
     ops.transport_hints = transport_hints;
@@ -547,7 +547,7 @@ if (sub)  // Enter if subscriber is valid
                        const std::shared_ptr<T>& obj, const TransportHints& transport_hints = TransportHints())
   {
     SubscribeOptions ops;
-    auto wrapFn = [fp, obj](const M& msg){obj->*(fp)(msg);};
+    auto wrapFn = [fp, obj](const M& msg){(obj->*fp)(msg);};
     ops.template initByFullCallbackType<M>(topic, queue_size, wrapFn);
     ops.tracked_object = obj;
     ops.transport_hints = transport_hints;
@@ -603,7 +603,7 @@ if (sub)  // Enter if subscriber is valid
                        const std::shared_ptr<T>& obj, const TransportHints& transport_hints = TransportHints())
   {
     SubscribeOptions ops;
-    auto wrapFn = [fp, obj](const std::shared_ptr<M const>& msg){obj->*(fp)(msg);};
+    auto wrapFn = [fp, obj](const std::shared_ptr<M const>& msg){(obj->*fp)(msg);};
     ops.template init<M>(topic, queue_size, wrapFn);
     ops.tracked_object = obj;
     ops.transport_hints = transport_hints;
@@ -615,7 +615,7 @@ if (sub)  // Enter if subscriber is valid
                        const std::shared_ptr<T>& obj, const TransportHints& transport_hints = TransportHints())
   {
     SubscribeOptions ops;
-    auto wrapFn = [fp, obj](const std::shared_ptr<M const>& msg){obj->*(fp)(msg);};
+    auto wrapFn = [fp, obj](const std::shared_ptr<M const>& msg){(obj->*fp)(msg);};
     ops.template init<M>(topic, queue_size, wrapFn);
     ops.tracked_object = obj;
     ops.transport_hints = transport_hints;
