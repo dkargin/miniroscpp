@@ -154,7 +154,7 @@ private:
     bool checkSize();
     bool checkDuration(const miniros::Time&);
     void doRecordSnapshotter();
-    void doCheckMaster(miniros::TimerEvent const& e, miniros::NodeHandle& node_handle);
+    bool doCheckMaster(miniros::TimerEvent const& e, miniros::NodeHandle& node_handle);
 
     bool shouldSubscribeToTopic(std::string const& topic, bool from_node = false);
 
