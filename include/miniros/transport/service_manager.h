@@ -50,6 +50,9 @@ typedef std::shared_ptr<XMLRPCManager> XMLRPCManagerPtr;
 class ConnectionManager;
 typedef std::shared_ptr<ConnectionManager> ConnectionManagerPtr;
 
+class MasterLink;
+typedef std::shared_ptr<MasterLink> MasterLinkPtr;
+
 class MINIROS_DECL ServiceManager
 {
 public:
@@ -116,8 +119,10 @@ public:
 
   bool advertiseService(const AdvertiseServiceOptions& ops);
 
-  void start(PollManagerPtr pm, ConnectionManagerPtr cm, XMLRPCManagerPtr rpcm);
+  void start(PollManagerPtr pm, MasterLinkPtr master_link, ConnectionManagerPtr cm, XMLRPCManagerPtr rpcm);
   void shutdown();
+
+  MasterLinkPtr getMasterLink() const;
 private:
 
   bool isServiceAdvertised(const std::string& serv_name);
@@ -137,6 +142,7 @@ private:
   PollManagerPtr poll_manager_;
   ConnectionManagerPtr connection_manager_;
   XMLRPCManagerPtr xmlrpc_manager_;
+  MasterLinkPtr master_link_;
 };
 
 } // namespace miniros

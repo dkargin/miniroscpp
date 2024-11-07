@@ -36,7 +36,7 @@
 #include "miniros/transport/service_server_link.h"
 #include "miniros/this_node.h"
 #include "miniros/transport/network.h"
-#include "miniros/master.h"
+#include "miniros/master_link.h"
 #include "miniros/transport/transport_tcp.h"
 #include "miniros/transport/transport_udp.h"
 #include "miniros/init.h"
@@ -69,10 +69,11 @@ ServiceManager::~ServiceManager()
   shutdown();
 }
 
-void ServiceManager::start(PollManagerPtr pm, ConnectionManagerPtr cm, XMLRPCManagerPtr rpcm)
+void ServiceManager::start(PollManagerPtr pm, MasterLinkPtr master_link, ConnectionManagerPtr cm, XMLRPCManagerPtr rpcm)
 {
   shutting_down_ = false;
 
+  master_link_ = master_link;
   poll_manager_ = pm;
   connection_manager_ = cm;
   xmlrpc_manager_ = rpcm;
@@ -107,24 +108,18 @@ void ServiceManager::shutdown()
     std::scoped_lock<std::mutex> lock(service_server_links_mutex_);
     local_service_clients.swap(service_server_links_);
   }
-
+  for (const auto& link: local_service_clients)
   {
-    L_ServiceServerLink::iterator it = local_service_clients.begin();
-    L_ServiceServerLink::iterator end = local_service_clients.end();
-    for (; it != end; ++it)
-    {
-      (*it)->getConnection()->drop(Connection::Destructing);
-    }
-
-    local_service_clients.clear();
+    link->getConnection()->drop(Connection::Destructing);
   }
 
+  local_service_clients.clear();
 }
 
 bool ServiceManager::advertiseService(const AdvertiseServiceOptions& ops)
 {
   std::scoped_lock<std::recursive_mutex> shutdown_lock(shutting_down_mutex_);
-  if (shutting_down_)
+  if (shutting_down_ || !master_link_)
   {
     return false;
   }
@@ -150,7 +145,7 @@ bool ServiceManager::advertiseService(const AdvertiseServiceOptions& ops)
            network::getHost().c_str(), connection_manager_->getTCPPort());
   args[2] = string(uri_buf);
   args[3] = xmlrpc_manager_->getServerURI();
-  master::execute("registerService", args, result, payload, true);
+  master_link_->execute("registerService", args, result, payload, true);
 
   return true;
 }
@@ -192,6 +187,8 @@ bool ServiceManager::unadvertiseService(const string &serv_name)
 
 bool ServiceManager::unregisterService(const std::string& service)
 {
+  if (!master_link_)
+    return false;
   XmlRpcValue args, result, payload;
   args[0] = this_node::getName();
   args[1] = service;
@@ -200,17 +197,15 @@ bool ServiceManager::unregisterService(const std::string& service)
            network::getHost().c_str(), connection_manager_->getTCPPort());
   args[2] = string(uri_buf);
 
-  return master::execute("unregisterService", args, result, payload, false);
+  return master_link_->execute("unregisterService", args, result, payload, false);
 }
 
 bool ServiceManager::isServiceAdvertised(const string& serv_name)
 {
-  for (L_ServicePublication::iterator s = service_publications_.begin(); s != service_publications_.end(); ++s)
+  for (auto & pub : service_publications_)
   {
-    if (((*s)->getName() == serv_name) && !(*s)->isDropped())
-    {
+    if (pub->getName() == serv_name && !pub->isDropped())
       return true;
-    }
   }
 
   return false;
@@ -220,16 +215,13 @@ ServicePublicationPtr ServiceManager::lookupServicePublication(const std::string
 {
   std::scoped_lock<std::mutex> lock(service_publications_mutex_);
 
-  for (L_ServicePublication::iterator t = service_publications_.begin();
-       t != service_publications_.end(); ++t)
+  for (const auto& pub: service_publications_)
   {
-    if ((*t)->getName() == service)
-    {
-      return *t;
-    }
+    if (pub->getName() == service)
+      return pub;
   }
 
-  return ServicePublicationPtr();
+  return {};
 }
 
 ServiceServerLinkPtr ServiceManager::createServiceServerLink(const std::string& service, bool persistent,
@@ -306,7 +298,7 @@ bool ServiceManager::lookupService(const string &name, string &serv_host, uint32
   XmlRpcValue args, result, payload;
   args[0] = this_node::getName();
   args[1] = name;
-  if (!master::execute("lookupService", args, result, payload, false))
+  if (!master_link_->execute("lookupService", args, result, payload, false))
     return false;
 
   string serv_uri(payload);
@@ -325,6 +317,11 @@ bool ServiceManager::lookupService(const string &name, string &serv_host, uint32
   }
 
   return true;
+}
+
+MasterLinkPtr ServiceManager::getMasterLink() const
+{
+  return master_link_;
 }
 
 } // namespace miniros

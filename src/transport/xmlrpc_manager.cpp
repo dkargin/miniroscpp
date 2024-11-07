@@ -29,7 +29,7 @@
 
 #include "miniros/transport/xmlrpc_manager.h"
 #include "miniros/transport/network.h"
-#include "miniros/param.h"
+#include "miniros/master_link.h"
 #include "miniros/rosassert.h"
 #include "miniros/transport/file_log.h"
 #include "miniros/transport/io.h"

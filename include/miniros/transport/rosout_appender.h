@@ -54,11 +54,14 @@ class Publication;
 typedef std::shared_ptr<Publication> PublicationPtr;
 typedef std::weak_ptr<Publication> PublicationWPtr;
 
+class MasterLink;
+typedef std::shared_ptr<MasterLink> MasterLinkPtr;
+
 class MINIROS_DECL ROSOutAppender : public miniros::console::LogAppender
 {
 public:
-  ROSOutAppender();
-  ~ROSOutAppender();
+  explicit ROSOutAppender(const MasterLinkPtr& master);
+  ~ROSOutAppender() override;
 
   const std::string& getLastError() const;
 
@@ -77,6 +80,7 @@ protected:
   bool disable_topics_;
 
   std::thread publish_thread_;
+  MasterLinkPtr master_;
 };
 
 } // namespace miniros

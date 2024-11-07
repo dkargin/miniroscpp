@@ -94,6 +94,7 @@ public:
   XmlRpc::XmlRpcValue getStats();
   void getInfo(XmlRpc::XmlRpcValue& info);
 
+  void initStatistics(const SubscriptionCallbackHelperPtr& helper, const MasterLinkPtr& master_link);
   bool addCallback(const SubscriptionCallbackHelperPtr& helper, const std::string& md5sum, CallbackQueueInterface* queue, int32_t queue_size, const VoidConstPtr& tracked_object, bool allow_concurrent_callbacks);
   void removeCallback(const SubscriptionCallbackHelperPtr& helper);
 

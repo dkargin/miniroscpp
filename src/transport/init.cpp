@@ -39,11 +39,11 @@
 #include "miniros/transport/connection_manager.h"
 #include "miniros/transport/topic_manager.h"
 #include "miniros/transport/service_manager.h"
+#include "miniros/master_link.h"
 #include "miniros/this_node.h"
 #include "miniros/transport/network.h"
 #include "miniros/transport/file_log.h"
 #include "miniros/transport/callback_queue.h"
-#include "miniros/param.h"
 #include "miniros/transport/rosout_appender.h"
 #include "miniros/transport/subscribe_options.h"
 #include "miniros/transport/transport_tcp.h"
@@ -71,22 +71,12 @@
 namespace miniros
 {
 
-namespace master
-{
-void init(const M_string& remappings);
-}
-
 namespace this_node
 {
 void init(const std::string& names, const M_string& remappings, uint32_t options);
 }
 
 namespace network
-{
-void init(const M_string& remappings);
-}
-
-namespace param
 {
 void init(const M_string& remappings);
 }
@@ -110,6 +100,7 @@ static bool g_shutdown_requested = false;
 static std::atomic_bool g_shutting_down = false;
 static std::recursive_mutex g_shutting_down_mutex;
 static std::thread g_internal_queue_thread;
+static MasterLinkPtr g_master_link;
 
 bool isInitialized()
 {
@@ -330,7 +321,8 @@ void start()
         enable_debug = false;
   }
 
-  param::param("/tcp_keepalive", TransportTCP::s_use_keepalive_, TransportTCP::s_use_keepalive_);
+  if (g_master_link)
+    g_master_link->param("/tcp_keepalive", TransportTCP::s_use_keepalive_, TransportTCP::s_use_keepalive_);
 
   PollManagerPtr pm = PollManager::instance();
   pm->addPollThreadWatcher(&g_shutdownWatcher);
@@ -340,10 +332,12 @@ void start()
 
   initInternalTimerManager();
 
-  ConnectionManagerPtr cm = ConnectionManager::instance();
-  TopicManager::instance()->start(pm, cm, rpcm);
-  ServiceManager::instance()->start(pm, cm, rpcm);
-  cm->start();
+  ConnectionManagerPtr connectionManager = ConnectionManager::instance();
+  TopicManagerPtr topicManager = TopicManager::instance();
+  ServiceManagerPtr serviceManager = ServiceManager::instance();
+  topicManager->start(pm, g_master_link, connectionManager, rpcm);
+  serviceManager->start(pm, g_master_link, connectionManager, rpcm);
+  connectionManager->start();
   pm->start();
   rpcm->start();
 
@@ -356,7 +350,7 @@ void start()
 
   if (!(g_init_options & init_options::NoRosout))
   {
-    g_rosout_appender = new ROSOutAppender;
+    g_rosout_appender = new ROSOutAppender(g_master_link);
     miniros::console::register_appender(g_rosout_appender);
   }
 
@@ -366,7 +360,7 @@ void start()
     miniros::AdvertiseServiceOptions ops;
     ops.init<roscpp::GetLoggers>(names::resolve("~get_loggers"), getLoggers);
     ops.callback_queue = getInternalCallbackQueue().get();
-    ServiceManager::instance()->advertiseService(ops);
+    serviceManager->advertiseService(ops);
   }
 
   if (g_shutting_down) goto end;
@@ -375,7 +369,7 @@ void start()
     miniros::AdvertiseServiceOptions ops;
     ops.init<roscpp::SetLoggerLevel>(names::resolve("~set_logger_level"), setLoggerLevel);
     ops.callback_queue = getInternalCallbackQueue().get();
-    ServiceManager::instance()->advertiseService(ops);
+    serviceManager->advertiseService(ops);
   }
 
   if (g_shutting_down) goto end;
@@ -385,14 +379,14 @@ void start()
     miniros::AdvertiseServiceOptions ops;
     ops.init<roscpp::Empty>(names::resolve("~debug/close_all_connections"), closeAllConnections);
     ops.callback_queue = getInternalCallbackQueue().get();
-    ServiceManager::instance()->advertiseService(ops);
+    serviceManager->advertiseService(ops);
   }
 
   if (g_shutting_down) goto end;
 
   {
     bool use_sim_time = false;
-    param::param("/use_sim_time", use_sim_time, use_sim_time);
+    g_master_link->param("/use_sim_time", use_sim_time, use_sim_time);
 
     if (use_sim_time)
     {
@@ -406,7 +400,7 @@ void start()
       miniros::SubscribeOptions ops;
       ops.init<rosgraph_msgs::Clock>(names::resolve("/clock"), 1, clockCallback);
       ops.callback_queue = getInternalCallbackQueue().get();
-      TopicManager::instance()->subscribe(ops);
+      topicManager->subscribe(ops);
     }
   }
 
@@ -478,17 +472,18 @@ void init(const M_string& remappings, const std::string& name, uint32_t options)
 #endif
     check_ipv6_environment();
     network::init(remappings);
-    master::init(remappings);
+    g_master_link.reset(new MasterLink());
+    g_master_link->initLink(remappings);
     // names:: namespace is initialized by this_node
     this_node::init(name, remappings, options);
     file_log::init(remappings);
-    param::init(remappings);
+    g_master_link->initParam(remappings);
 
     g_initialized = true;
   }
 }
 
-void init(int& argc, char** argv, const std::string& name, uint32_t options)
+M_string extractRemappings(int& argc, char** argv, const std::string& name, uint32_t options)
 {
   M_string remappings;
 
@@ -518,21 +513,13 @@ void init(int& argc, char** argv, const std::string& name, uint32_t options)
       i++; // move on, since we didn't shuffle anybody here to replace it
     }
   }
-
-  init(remappings, name, options);
+  return remappings;
 }
 
-void init(const VP_string& remappings, const std::string& name, uint32_t options)
+void init(int& argc, char** argv, const std::string& name, uint32_t options)
 {
-  M_string remappings_map;
-  VP_string::const_iterator it = remappings.begin();
-  VP_string::const_iterator end = remappings.end();
-  for (; it != end; ++it)
-  {
-    remappings_map[it->first] = it->second;
-  }
-
-  init(remappings_map, name, options);
+  M_string remappings = extractRemappings(argc, argv, name, options);
+  init(remappings, name, options);
 }
 
 std::string getROSArg(int argc, const char* const* argv, const std::string& arg)

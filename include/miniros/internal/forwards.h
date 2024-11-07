@@ -193,6 +193,8 @@ class XMLRPCManager;
 typedef std::shared_ptr<XMLRPCManager> XMLRPCManagerPtr;
 class PollManager;
 typedef std::shared_ptr<PollManager> PollManagerPtr;
+class MasterLink;
+typedef std::shared_ptr<MasterLink> MasterLinkPtr;
 
 }
 

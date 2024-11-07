@@ -33,7 +33,7 @@
 #include "miniros/transport/subscription.h"
 #include "miniros/this_node.h"
 #include "miniros/transport/network.h"
-#include "miniros/master.h"
+#include "miniros/master_link.h"
 #include "miniros/transport/transport_tcp.h"
 #include "miniros/transport/transport_udp.h"
 #include "miniros/transport/rosout_appender.h"
@@ -82,11 +82,12 @@ TopicManager::~TopicManager()
   shutdown();
 }
 
-void TopicManager::start(PollManagerPtr pm, ConnectionManagerPtr cm, XMLRPCManagerPtr rpcm)
+void TopicManager::start(PollManagerPtr pm, MasterLinkPtr master_link, ConnectionManagerPtr cm, XMLRPCManagerPtr rpcm)
 {
   std::scoped_lock<std::mutex> shutdown_lock(shutting_down_mutex_);
   shutting_down_ = false;
 
+  master_link_ = master_link;
   poll_manager_ = pm;
   connection_manager_ = cm;
   xmlrpc_manager_ = rpcm;
@@ -313,6 +314,7 @@ bool TopicManager::subscribe(const SubscribeOptions& ops)
   std::string datatype = ops.datatype;
 
   SubscriptionPtr s(std::make_shared<Subscription>(ops.topic, md5sum, datatype, ops.transport_hints));
+  s->initStatistics(ops.helper, master_link_);
   s->addCallback(ops.helper, ops.md5sum, ops.callback_queue, ops.queue_size, ops.tracked_object, ops.allow_concurrent_callbacks);
 
   if (!registerSubscriber(s, ops.datatype))
@@ -329,6 +331,11 @@ bool TopicManager::subscribe(const SubscribeOptions& ops)
 
 bool TopicManager::advertise(const AdvertiseOptions& ops, const SubscriberCallbacksPtr& callbacks)
 {
+  if (!master_link_) {
+    MINIROS_ERROR("TopicManager::advertise() called with no master link");
+    return false;
+  }
+
   if (ops.datatype == "*")
   {
     std::stringstream ss;
@@ -431,9 +438,7 @@ bool TopicManager::advertise(const AdvertiseOptions& ops, const SubscriberCallba
   args[1] = ops.topic;
   args[2] = ops.datatype;
   args[3] = xmlrpc_manager_->getServerURI();
-  master::execute("registerPublisher", args, result, payload, true);
-
-  return true;
+  return master_link_->execute("registerPublisher", args, result, payload, true);
 }
 
 bool TopicManager::unadvertise(const std::string &topic, const SubscriberCallbacksPtr& callbacks)
@@ -487,20 +492,20 @@ bool TopicManager::unadvertise(const std::string &topic, const SubscriberCallbac
 
 bool TopicManager::unregisterPublisher(const std::string& topic)
 {
+  if (!master_link_)
+    return false;
   XmlRpcValue args, result, payload;
   args[0] = this_node::getName();
   args[1] = topic;
   args[2] = xmlrpc_manager_->getServerURI();
-  master::execute("unregisterPublisher", args, result, payload, false);
-
-  return true;
+  return master_link_->execute("unregisterPublisher", args, result, payload, false);
 }
 
 bool TopicManager::isTopicAdvertised(const std::string &topic)
 {
-  for (V_Publication::iterator t = advertised_topics_.begin(); t != advertised_topics_.end(); ++t)
+  for (auto & advertised_topic : advertised_topics_)
   {
-    if (((*t)->getName() == topic) && (!(*t)->isDropped()))
+    if ((advertised_topic->getName() == topic) && (!advertised_topic->isDropped()))
     {
       return true;
     }
@@ -511,13 +516,18 @@ bool TopicManager::isTopicAdvertised(const std::string &topic)
 
 bool TopicManager::registerSubscriber(const SubscriptionPtr& s, const std::string &datatype)
 {
+  if (!master_link_) {
+    MINIROS_ERROR("TopicManager::registerSubscriber: master link is null");
+    return false;
+  }
+
   XmlRpcValue args, result, payload;
   args[0] = this_node::getName();
   args[1] = s->getName();
   args[2] = datatype;
   args[3] = xmlrpc_manager_->getServerURI();
 
-  if (!master::execute("registerSubscriber", args, result, payload, true))
+  if (!master_link_->execute("registerSubscriber", args, result, payload, true))
   {
     return false;
   }
@@ -574,14 +584,14 @@ bool TopicManager::registerSubscriber(const SubscriptionPtr& s, const std::strin
 
 bool TopicManager::unregisterSubscriber(const std::string &topic)
 {
+  if (!master_link_)
+    return false;
   XmlRpcValue args, result, payload;
   args[0] = this_node::getName();
   args[1] = topic;
   args[2] = xmlrpc_manager_->getServerURI();
 
-  master::execute("unregisterSubscriber", args, result, payload, false);
-
-  return true;
+  return master_link_->execute("unregisterSubscriber", args, result, payload, false);
 }
 
 bool TopicManager::pubUpdate(const std::string &topic, const std::vector<std::string> &pubs)
@@ -1102,5 +1112,11 @@ void TopicManager::getPublicationsCallback(XmlRpc::XmlRpcValue& params, XmlRpc::
   getPublications(response);
   result[2] = response;
 }
+
+MasterLinkPtr TopicManager::getMasterLink() const
+{
+  return master_link_;
+}
+
 
 } // namespace miniros

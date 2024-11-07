@@ -675,12 +675,20 @@ uint32_t Subscription::handleMessage(const SerializedMessage& m, bool ser, bool 
   return drops;
 }
 
-bool Subscription::addCallback(const SubscriptionCallbackHelperPtr& helper, const std::string& md5sum, CallbackQueueInterface* queue, int32_t queue_size, const VoidConstPtr& tracked_object, bool allow_concurrent_callbacks)
+void Subscription::initStatistics(const SubscriptionCallbackHelperPtr& helper, const MasterLinkPtr& master_link)
+{
+  MINIROS_ASSERT(helper);
+  MINIROS_ASSERT(master_link);
+
+  statistics_.init(helper, master_link);
+}
+
+bool Subscription::addCallback(const SubscriptionCallbackHelperPtr& helper, const std::string& md5sum,
+  CallbackQueueInterface* queue, int32_t queue_size, const VoidConstPtr& tracked_object, bool allow_concurrent_callbacks)
 {
   MINIROS_ASSERT(helper);
   MINIROS_ASSERT(queue);
 
-  statistics_.init(helper);
 
   // Decay to a real type as soon as we have a subscriber with a real type
   {
