@@ -25,8 +25,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ROSCPP_NODE_HANDLE_H
-#define ROSCPP_NODE_HANDLE_H
+#ifndef MINIROSCPP_NODE_HANDLE_H
+#define MINIROSCPP_NODE_HANDLE_H
 
 #include "miniros/internal/forwards.h"
 #include "miniros/publisher.h"
