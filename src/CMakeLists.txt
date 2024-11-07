@@ -118,7 +118,7 @@ endif()
 
 
 set(transport_SRC
-  transport/master.cpp
+    transport/master_link.cpp
   transport/network.cpp
   transport/subscriber.cpp
   transport/common.cpp
@@ -126,8 +126,7 @@ set(transport_SRC
   transport/service_publication.cpp
   transport/connection.cpp
   transport/single_subscriber_publisher.cpp
-  transport/param.cpp
-  transport/service_server.cpp
+    transport/service_server.cpp
   transport/wall_timer.cpp
   transport/xmlrpc_manager.cpp
   transport/publisher.cpp

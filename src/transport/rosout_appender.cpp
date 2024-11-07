@@ -35,20 +35,21 @@
 #include "miniros/transport/rosout_appender.h"
 #include "miniros/this_node.h"
 #include "miniros/node_handle.h"
+#include "miniros/master_link.h"
 #include "miniros/transport/topic_manager.h"
 #include "miniros/transport/advertise_options.h"
 #include "miniros/names.h"
-#include "miniros/param.h"
 
 #include <rosgraph_msgs/Log.hxx>
 
 namespace miniros
 {
 
-ROSOutAppender::ROSOutAppender()
+ROSOutAppender::ROSOutAppender(const MasterLinkPtr& master)
 : shutting_down_(false)
 , disable_topics_(false)
 , publish_thread_(&ROSOutAppender::logThread, this)
+, master_(master)
 {
   AdvertiseOptions ops;
   ops.init<rosgraph_msgs::Log>(names::resolve("/rosout"), 0);
@@ -104,12 +105,13 @@ void ROSOutAppender::log(::miniros::console::Level level, const char* str, const
   msg->file = file;
   msg->function = function;
   msg->line = line;
-  
+
   // check parameter server/cache for omit_topics flag
   // the same parameter is checked in rosout.py for the same purpose
-  miniros::param::getCached("/rosout_disable_topics_generation", disable_topics_);
+  if (master_)
+    master_->getCached("/rosout_disable_topics_generation", disable_topics_);
 
-  if (!disable_topics_){
+  if (!disable_topics_) {
     this_node::getAdvertisedTopics(msg->topics);
   }
 

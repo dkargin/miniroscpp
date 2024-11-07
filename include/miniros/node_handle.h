@@ -2194,8 +2194,9 @@ if (service)  // Enter if advertised service is valid
    */
   bool ok() const;
 
-  TopicManagerPtr getTopicManager();
-  ServiceManagerPtr getServiceManager();
+  TopicManagerPtr getTopicManager() const;
+  ServiceManagerPtr getServiceManager() const;
+  MasterLinkPtr getMasterLink() const;
 
 private:
   struct no_validate { };

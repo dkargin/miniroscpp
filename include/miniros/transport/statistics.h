@@ -58,7 +58,7 @@ public:
   /**
    * Actual initialization. Must be called before the first call to callback()
    */
-  void init(const SubscriptionCallbackHelperPtr& helper);
+  void init(const SubscriptionCallbackHelperPtr& helper, const MasterLinkPtr& master_link);
 
   /**
    * Callback function. Must be called for every message received.

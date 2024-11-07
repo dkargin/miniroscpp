@@ -57,6 +57,10 @@ typedef std::shared_ptr<ConnectionManager> ConnectionManagerPtr;
 class SubscriptionCallbackHelper;
 typedef std::shared_ptr<SubscriptionCallbackHelper> SubscriptionCallbackHelperPtr;
 
+namespace master {
+class MasterLink;
+}
+
 class MINIROS_DECL TopicManager
 {
 public:
@@ -65,7 +69,7 @@ public:
   TopicManager();
   ~TopicManager();
 
-  void start(PollManagerPtr pm, ConnectionManagerPtr cm, XMLRPCManagerPtr rpcm);
+  void start(PollManagerPtr pm, MasterLinkPtr master_link, ConnectionManagerPtr cm, XMLRPCManagerPtr rpcm);
   void shutdown();
 
   bool subscribe(const SubscribeOptions& ops);
@@ -128,6 +132,8 @@ public:
 
   void incrementSequence(const std::string &_topic);
   bool isLatched(const std::string& topic);
+
+  MasterLinkPtr getMasterLink() const;
 
 private:
   /** if it finds a pre-existing subscription to the same topic and of the
@@ -232,6 +238,8 @@ private:
 
   ConnectionManagerPtr connection_manager_;
   XMLRPCManagerPtr xmlrpc_manager_;
+
+  MasterLinkPtr master_link_;
 };
 
 } // namespace miniros

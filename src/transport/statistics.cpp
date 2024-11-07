@@ -31,7 +31,7 @@
 #include "miniros/this_node.h"
 #include "miniros/traits/message_traits.h"
 #include "generated/std_msgs/Header.hxx"
-#include "miniros/param.h"
+#include "miniros/master_link.h"
 
 namespace miniros
 {
@@ -41,13 +41,15 @@ StatisticsLogger::StatisticsLogger()
 {
 }
 
-void StatisticsLogger::init(const SubscriptionCallbackHelperPtr& helper) {
+void StatisticsLogger::init(const SubscriptionCallbackHelperPtr& helper, const MasterLinkPtr& master_link) {
   hasHeader_ = helper->hasHeader();
-  param::param("/enable_statistics", enable_statistics, false);
-  param::param("/statistics_window_min_elements", min_elements, 10);
-  param::param("/statistics_window_max_elements", max_elements, 100);
-  param::param("/statistics_window_min_size", min_window, 4);
-  param::param("/statistics_window_max_size", max_window, 64);
+  if (master_link) {
+    master_link->param("/enable_statistics", enable_statistics, false);
+    master_link->param("/statistics_window_min_elements", min_elements, 10);
+    master_link->param("/statistics_window_max_elements", max_elements, 100);
+    master_link->param("/statistics_window_min_size", min_window, 4);
+    master_link->param("/statistics_window_max_size", max_window, 64);
+  }
 }
 
 void StatisticsLogger::callback(const std::shared_ptr<M_string>& connection_header,

@@ -49,9 +49,8 @@
 #include "miniros/subscriber.h"
 #include "miniros/service.h"
 #include "miniros/init.h"
-#include "miniros/master.h"
+#include "miniros/master_link.h"
 #include "miniros/this_node.h"
-#include "miniros/param.h"
 #include "miniros/topic.h"
 #include "miniros/names.h"
 
