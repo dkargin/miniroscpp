@@ -32,8 +32,8 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ROSCPP_ROS_H
-#define ROSCPP_ROS_H
+#ifndef MINIROS_ROS_H
+#define MINIROS_ROS_H
 
 #include "miniros/rostime.h"
 #include "miniros/rate.h"
