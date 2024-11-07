@@ -93,16 +93,6 @@ MINIROS_DECL void init(int &argc, char **argv, const std::string& name, uint32_t
 MINIROS_DECL void init(const M_string& remappings, const std::string& name, uint32_t options = 0);
 
 /**
- * \brief alternate ROS initialization function.
- *
- * \param remappings A vector<pair<string, string> > where each one constitutes a name remapping, or one of the special remappings like __name, __master, __ns, etc.
- * \param name Name of this node.  The name must be a base name, ie. it cannot contain namespaces.
- * \param options [optional] Options to start the node with (a set of bit flags from \ref miniros::init_options)
- * \throws InvalidNodeNameException If the name passed in is not a valid "base" name
- */
-MINIROS_DECL void init(const VP_string& remapping_args, const std::string& name, uint32_t options = 0);
-
-/**
  * \brief Returns whether or not miniros::init() has been called
  */
 MINIROS_DECL bool isInitialized();

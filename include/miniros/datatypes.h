@@ -39,9 +39,7 @@ namespace miniros {
 
 typedef std::vector<std::pair<std::string, std::string> > VP_string;
 typedef std::vector<std::string> V_string;
-typedef std::set<std::string> S_string;
 typedef std::map<std::string, std::string> M_string;
-typedef std::pair<std::string, std::string> StringPair;
 
 typedef std::shared_ptr<M_string> M_stringPtr;
 
