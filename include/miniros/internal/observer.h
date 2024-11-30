@@ -1,6 +1,7 @@
 #ifndef MINIROS_OBSERVER_H
 #define MINIROS_OBSERVER_H
 
+#include <cassert>
 #include <type_traits> // for std::is_base_of
 
 namespace miniros {
@@ -96,6 +97,15 @@ public:
 
     ConnectionImpl& operator *() {
         return *m_obj;
+    }
+
+    operator bool () const {
+        return m_obj != nullptr;
+    }
+
+    ConnectionImpl* operator -> () {
+        assert(m_obj);
+        return m_obj;
     }
 
 protected:

@@ -357,8 +357,9 @@ void Connection::drop(DropReason reason)
         std::scoped_lock<DropWatchers> lock(drop_watchers_);
         for (auto it = drop_watchers_.begin(); it != drop_watchers_.end(); it++)
         {
-            DropWatcher& watcher = *it;
-            watcher.onConnectionDropped(shared_from_this(), reason);
+            if (!it)
+              continue;
+            it->onConnectionDropped(shared_from_this(), reason);
         }
     }
     transport_->close();
