@@ -28,6 +28,7 @@
 #ifndef ROSCPP_POLL_MANAGER_H
 #define ROSCPP_POLL_MANAGER_H
 
+#include "miniros/macros.h"
 #include "miniros/internal/forwards.h"
 #include "miniros/internal/observer.h"
 
