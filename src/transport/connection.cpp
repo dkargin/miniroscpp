@@ -358,7 +358,7 @@ void Connection::drop(DropReason reason)
         for (auto it = drop_watchers_.begin(); it != drop_watchers_.end(); it++)
         {
             if (!it)
-              continue;
+              break;
             it->onConnectionDropped(shared_from_this(), reason);
         }
     }
