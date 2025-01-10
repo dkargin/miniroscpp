@@ -14,6 +14,7 @@ miniros_add_test(miniroscpp-test_subscription_queue test_subscription_queue.cpp)
 miniros_add_test(miniroscpp-test_callback_queue test_callback_queue.cpp)
 miniros_add_test(miniroscpp-test_names test_names.cpp)
 miniros_add_test(miniroscpp-test_args test_args.cpp)
+miniros_add_test(miniroscpp-test_observer test_observer.cpp)
 
 if(catkin_FOUND AND CATKIN_ENABLE_TESTING)
   message(STATUS "Trying to find rostest for more complex testing")

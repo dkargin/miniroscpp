@@ -1,5 +1,7 @@
 include_directories(${MINIROS_INCLUDE_DIRS})
 
+include(CTest)
+
 function(miniros_add_test TARGET_NAME SOURCES)
 	set (EXTRA_ARGS ${ARGN})
 	list(LENGTH EXTRA_ARGS NUM_EXTRA_ARGS)

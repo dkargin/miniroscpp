@@ -10,6 +10,7 @@ namespace observer {
 namespace impl {
 
 /// Thread safe list of connected observers.
+/// Both observer and observed are pointing to this object.
 class Connections {
 public:
     using mutex_t = std::recursive_mutex;
@@ -17,6 +18,12 @@ public:
     Connections(TargetBase* owner) {
         resetRoot();
         m_owner = owner;
+    }
+
+    ~Connections() {
+        // Strongly expecting that owner already issued disconnectAll for all listeners.
+        assert(m_owner == nullptr);
+        assert(isEmpty());
     }
 
     void resetRoot() {
@@ -63,7 +70,8 @@ public:
     bool detachOwner(TargetBase* owner);
 
     /// Disconnect all current connection, while keeping link to a owner.
-    void disconnectAll();
+    /// @returns number of disconnected objects.
+    size_t disconnectAll();
 
     void pushBack(Connection* object);
 
@@ -121,17 +129,21 @@ bool Connections::detachOwner(TargetBase* owner) {
     return false;
 }
 
-void Connections::disconnectAll() {
+size_t Connections::disconnectAll() {
     std::scoped_lock<mutex_t> lock(m_mutex);
     Connection* ptr = this->objBegin();
     Connection* end = this->objEnd();
+    size_t count = 0;
     while (ptr && ptr != end) {
         auto next = ptr->next();
         ptr->m_prev = nullptr;
         ptr->m_next = nullptr;
+        ptr->m_container = nullptr;
         ptr = next;
+        count++;
     }
     resetRoot();
+    return count;
 }
 
 } // namespace impl
@@ -141,16 +153,21 @@ TargetBase::TargetBase() {
 }
 
 TargetBase::~TargetBase() {
-    if (m_list && m_list->detachOwner(this)) {
+    assert(m_list);
+    if (m_list) {
+        m_list->disconnectAll();
+        bool detached = m_list->detachOwner(this);
+        assert(detached);
         delete m_list;
     }
     m_list = nullptr;
 }
 
-void TargetBase::disconnectAll() {
+size_t TargetBase::disconnectAll() {
     if (m_list) {
-        m_list->disconnectAll();
+        return m_list->disconnectAll();
     }
+    return 0;
 }
 
 void TargetBase::lock() const {
@@ -178,6 +195,11 @@ Connection* TargetBase::objBegin() const {
 Connection* TargetBase::objEnd() const {
     return m_list ? m_list->objEnd() : nullptr;
 }
+
+bool TargetBase::hasConnections() const {
+    return m_list ? !m_list->isEmpty() : false;
+}
+
 
 Connection::Connection() {
     m_container = nullptr;
@@ -219,6 +241,10 @@ Connection::Connection(Connection&& other) {
     other.m_container = nullptr;
     other.m_next = nullptr;
     other.m_prev = nullptr;
+}
+
+bool Connection::connected() const {
+  return m_container != nullptr && !m_container->isOrphaned();
 }
 
 void Connection::disconnect() {
