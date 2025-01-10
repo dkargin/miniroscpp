@@ -87,9 +87,8 @@ add_subdirectory(external)
 add_subdirectory(xmlrpcpp)
 add_subdirectory(src)
 
-
 if (MINIROS_BUILD_TESTS)
-	find_package(GTest)
+	find_package(GTest 1.8.0)
 	if (GTEST_FOUND)
 		add_subdirectory(test)
 	else()

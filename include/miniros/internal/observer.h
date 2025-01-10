@@ -34,9 +34,7 @@ public:
     virtual ~Connection();
 
     /// Check if this connection is attached to anything.
-    bool connected() const {
-        return m_container != nullptr;
-    }
+    bool connected() const;
 
     /// Disconnect from the target.
     void disconnect();
@@ -118,9 +116,14 @@ protected:
 class TargetBase {
 public:
     TargetBase();
-    ~TargetBase();
+    virtual ~TargetBase();
 
-    void disconnectAll();
+    /// Disconnect all listeners.
+    /// @returns number of objects actually disconnected.
+    size_t disconnectAll();
+
+    /// Check if there are any connections.
+    bool hasConnections() const;
 
     void lock() const;
     void unlock() const;
