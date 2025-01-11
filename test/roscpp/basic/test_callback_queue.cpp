@@ -300,7 +300,7 @@ TEST(CallbackQueue, threadedCallAvailable)
 {
   CountingCallbackPtr cb(std::make_shared<CountingCallback>());
   size_t i = runThreadedTest(cb, callAvailableThread);
-  ROS_INFO_STREAM(i);
+  MINIROS_INFO_STREAM(i);
   EXPECT_EQ(cb->count, i);
 }
 
@@ -316,7 +316,7 @@ TEST(CallbackQueue, threadedCallOne)
 {
   CountingCallbackPtr cb(std::make_shared<CountingCallback>());
   size_t i = runThreadedTest(cb, callOneThread);
-  ROS_INFO_STREAM(i);
+  MINIROS_INFO_STREAM(i);
   EXPECT_EQ(cb->count, i);
 }
 

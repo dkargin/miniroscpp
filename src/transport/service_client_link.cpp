@@ -32,6 +32,8 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define MINIROS_PACKAGE_NAME "service_client_link"
+
 #include "miniros/transport/service_client_link.h"
 #include "miniros/transport/service_publication.h"
 #include "miniros/header.h"
@@ -114,7 +116,7 @@ bool ServiceClientLink::handleHeader(const Header& header)
     }
   }
 
-  ROSCPP_LOG_DEBUG("Service client [%s] wants service [%s] with md5sum [%s]", client_callerid.c_str(), service.c_str(), md5sum.c_str());
+  MINIROS_DEBUG("Service client [%s] wants service [%s] with md5sum [%s]", client_callerid.c_str(), service.c_str(), md5sum.c_str());
   ServicePublicationPtr ss = ServiceManager::instance()->lookupServicePublication(service);
   if (!ss)
   {

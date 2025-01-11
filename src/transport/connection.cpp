@@ -32,6 +32,8 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define MINIROS_PACKAGE_NAME "connection"
+
 #include "miniros/transport/connection.h"
 #include "miniros/transport/transport.h"
 #include "miniros/transport/file_log.h"
@@ -61,7 +63,7 @@ Connection::Connection()
 
 Connection::~Connection()
 {
-  ROS_DEBUG_NAMED("superdebug", "Connection destructing, dropped=%s", dropped_ ? "true" : "false");
+  MINIROS_DEBUG("Connection destructing, dropped=%s", dropped_ ? "true" : "false");
 
   drop(Destructing);
 }
@@ -135,7 +137,7 @@ void Connection::readTransport()
     if (to_read > 0)
     {
       int32_t bytes_read = transport_->read(read_buffer_.get() + read_filled_, to_read);
-      ROS_DEBUG_NAMED("superdebug", "Connection read %d bytes", bytes_read);
+      MINIROS_DEBUG("Connection read %d bytes", bytes_read);
       if (dropped_)
       {
         return;
@@ -185,7 +187,7 @@ void Connection::readTransport()
       read_filled_ = 0;
       has_read_callback_ = 0;
 
-      ROS_DEBUG_NAMED("superdebug", "Calling read callback");
+      MINIROS_DEBUG("Calling read callback");
       callback(shared_from_this(), buffer, size, true);
     }
     else
@@ -220,9 +222,9 @@ void Connection::writeTransport()
   while (has_write_callback_ && can_write_more && !dropped_)
   {
     uint32_t to_write = write_size_ - write_sent_;
-    ROS_DEBUG_NAMED("superdebug", "Connection writing %d bytes", to_write);
+    MINIROS_DEBUG("Connection writing %d bytes", to_write);
     int32_t bytes_sent = transport_->write(write_buffer_.get() + write_sent_, to_write);
-    ROS_DEBUG_NAMED("superdebug", "Connection wrote %d bytes", bytes_sent);
+    MINIROS_DEBUG("Connection wrote %d bytes", bytes_sent);
 
     if (bytes_sent < 0)
     {
@@ -253,7 +255,7 @@ void Connection::writeTransport()
         has_write_callback_ = 0;
       }
 
-      ROS_DEBUG_NAMED("superdebug", "Calling write callback");
+      MINIROS_DEBUG("Calling write callback");
       callback(shared_from_this());
     }
   }
@@ -340,7 +342,7 @@ void Connection::onDisconnect(const TransportPtr& transport)
 
 void Connection::drop(DropReason reason)
 {
-  ROSCPP_LOG_DEBUG("Connection::drop(%u)", reason);
+  MINIROS_DEBUG("Connection::drop(%u)", reason);
   bool did_drop = false;
   {
     std::scoped_lock<std::recursive_mutex> lock(drop_mutex_);
@@ -452,7 +454,7 @@ void Connection::onHeaderRead(const ConnectionPtr& conn, const std::shared_ptr<u
     std::string error_val;
     if (header_.getValue("error", error_val))
     {
-      ROSCPP_LOG_DEBUG("Received error message in header for connection to [%s]: [%s]", transport_->getTransportInfo().c_str(), error_val.c_str());
+      MINIROS_DEBUG("Received error message in header for connection to [%s]: [%s]", transport_->getTransportInfo().c_str(), error_val.c_str());
       drop(HeaderError);
     }
     else

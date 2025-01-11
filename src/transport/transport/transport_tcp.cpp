@@ -32,6 +32,8 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define MINIROS_PACKAGE_NAME "transport_tcp"
+
 #include "miniros/transport/io.h"
 #include "miniros/transport/transport_tcp.h"
 #include "miniros/transport/poll_set.h"
@@ -160,7 +162,7 @@ void TransportTCP::parseHeader(const Header& header)
   std::string nodelay;
   if (header.getValue("tcp_nodelay", nodelay) && nodelay == "1")
   {
-    ROSCPP_LOG_DEBUG("Setting nodelay on socket [%d]", sock_);
+    MINIROS_DEBUG("Setting nodelay on socket [%d]", sock_);
     setNoDelay(true);
   }
 }
@@ -323,7 +325,7 @@ bool TransportTCP::connect(const std::string& host, int port)
       return false;
     }
 
-    ROSCPP_LOG_DEBUG("Resolved publisher host [%s] to [%s] for socket [%d]", host.c_str(), namebuf, sock_);
+    MINIROS_DEBUG("Resolved publisher host [%s] to [%s] for socket [%d]", host.c_str(), namebuf, sock_);
   }
 
   int ret = ::connect(sock_, (sockaddr*) &sas, sas_len);
@@ -333,7 +335,7 @@ bool TransportTCP::connect(const std::string& host, int port)
       (!(flags_ & SYNCHRONOUS) && ret != 0 && last_socket_error() != ROS_SOCKETS_ASYNCHRONOUS_CONNECT_RETURN)) 
       // asynchronous, connect() may return 0 or -1. When return -1, WSAGetLastError()=WSAEWOULDBLOCK/errno=EINPROGRESS
   {
-    ROSCPP_CONN_LOG_DEBUG("Connect to tcpros publisher [%s:%d] failed with error [%d, %s]", host.c_str(), port, ret, last_socket_error_string());
+    MINIROS_DEBUG("Connect to tcpros publisher [%s:%d] failed with error [%d, %s]", host.c_str(), port, ret, last_socket_error_string());
     close();
 
     return false;
@@ -358,11 +360,11 @@ bool TransportTCP::connect(const std::string& host, int port)
 
   if (flags_ & SYNCHRONOUS)
   {
-    ROSCPP_CONN_LOG_DEBUG("connect() succeeded to [%s:%d] on socket [%d]", host.c_str(), port, sock_);
+    MINIROS_DEBUG("connect() succeeded to [%s:%d] on socket [%d]", host.c_str(), port, sock_);
   }
   else
   {
-    ROSCPP_CONN_LOG_DEBUG("Async connect() in progress to [%s:%d] on socket [%d]", host.c_str(), port, sock_);
+    MINIROS_DEBUG("Async connect() in progress to [%s:%d] on socket [%d]", host.c_str(), port, sock_);
   }
 
   return true;
@@ -461,7 +463,7 @@ void TransportTCP::close()
           MINIROS_ERROR("Error closing socket [%d]: [%s]", sock_, last_socket_error_string());
         } else
         {
-          ROSCPP_LOG_DEBUG("TCP socket [%d] closed", sock_);
+          MINIROS_DEBUG("TCP socket [%d] closed", sock_);
         }
         sock_ = ROS_INVALID_SOCKET;
 
@@ -488,7 +490,7 @@ int32_t TransportTCP::read(uint8_t* buffer, uint32_t size)
 
     if (closed_)
     {
-      ROSCPP_LOG_DEBUG("Tried to read on a closed socket [%d]", sock_);
+      MINIROS_DEBUG("Tried to read on a closed socket [%d]", sock_);
       return -1;
     }
   }
@@ -500,9 +502,9 @@ int32_t TransportTCP::read(uint8_t* buffer, uint32_t size)
   int num_bytes = ::recv(sock_, reinterpret_cast<char*>(buffer), read_size, 0);
   if (num_bytes < 0)
   {
-	if ( !last_socket_error_is_would_block() ) // !WSAWOULDBLOCK / !EAGAIN && !EWOULDBLOCK
+    if ( !last_socket_error_is_would_block() ) // !WSAWOULDBLOCK / !EAGAIN && !EWOULDBLOCK
     {
-      ROSCPP_LOG_DEBUG("recv() on socket [%d] failed with error [%s]", sock_, last_socket_error_string());
+      MINIROS_DEBUG("recv() on socket [%d] failed with error [%s]", sock_, last_socket_error_string());
       close();
     }
     else
@@ -512,7 +514,7 @@ int32_t TransportTCP::read(uint8_t* buffer, uint32_t size)
   }
   else if (num_bytes == 0)
   {
-    ROSCPP_LOG_DEBUG("Socket [%d] received 0/%u bytes, closing", sock_, size);
+    MINIROS_DEBUG("Socket [%d] received 0/%u bytes, closing", sock_, size);
     close();
     return -1;
   }
@@ -527,7 +529,7 @@ int32_t TransportTCP::write(uint8_t* buffer, uint32_t size)
 
     if (closed_)
     {
-      ROSCPP_LOG_DEBUG("Tried to write on a closed socket [%d]", sock_);
+      MINIROS_DEBUG("Tried to write on a closed socket [%d]", sock_);
       return -1;
     }
   }
@@ -541,7 +543,7 @@ int32_t TransportTCP::write(uint8_t* buffer, uint32_t size)
   {
     if ( !last_socket_error_is_would_block() )
     {
-      ROSCPP_LOG_DEBUG("send() on socket [%d] failed with error [%s]", sock_, last_socket_error_string());
+      MINIROS_DEBUG("send() on socket [%d] failed with error [%s]", sock_, last_socket_error_string());
       close();
     }
     else
@@ -642,7 +644,7 @@ TransportTCPPtr TransportTCP::accept()
   int new_sock = ::accept(sock_, (sockaddr *)&client_address, &len);
   if (new_sock >= 0)
   {
-    ROSCPP_LOG_DEBUG("Accepted connection on socket [%d], new socket [%d]", sock_, new_sock);
+    MINIROS_DEBUG("Accepted connection on socket [%d], new socket [%d]", sock_, new_sock);
 
     TransportTCPPtr transport(std::make_shared<TransportTCP>(poll_set_, flags_));
     if (!transport->setSocket(new_sock))
@@ -712,14 +714,14 @@ void TransportTCP::socketUpdate(int events)
     socklen_t len = sizeof(error);
     if (getsockopt(sock_, SOL_SOCKET, SO_ERROR, reinterpret_cast<char*>(&error), &len) < 0)
     {
-      ROSCPP_LOG_DEBUG("getsockopt failed on socket [%d]", sock_);
+      MINIROS_DEBUG("getsockopt failed on socket [%d]", sock_);
     }
   #ifdef _MSC_VER
     char err[60];
     strerror_s(err,60,error);
     ROSCPP_LOG_DEBUG("Socket %d closed with (ERR|HUP|NVAL) events %d: %s", sock_, events, err);
   #else
-    ROSCPP_LOG_DEBUG("Socket %d closed with (ERR|HUP|NVAL) events %d: %s", sock_, events, strerror(error));
+    MINIROS_DEBUG("Socket %d closed with (ERR|HUP|NVAL) events %d: %s", sock_, events, strerror(error));
   #endif
 
     close();

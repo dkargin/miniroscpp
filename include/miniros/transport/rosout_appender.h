@@ -57,7 +57,7 @@ typedef std::weak_ptr<Publication> PublicationWPtr;
 class MasterLink;
 typedef std::shared_ptr<MasterLink> MasterLinkPtr;
 
-class MINIROS_DECL ROSOutAppender : public miniros::console::LogAppender
+class MINIROS_DECL ROSOutAppender : public console::LogAppender
 {
 public:
   explicit ROSOutAppender(const MasterLinkPtr& master);
@@ -65,7 +65,7 @@ public:
 
   const std::string& getLastError() const;
 
-  virtual void log(::miniros::console::Level level, const char* str, const char* file, const char* function, int line);
+  void log(console::Level level, const char* str, const char* file, const char* function, int line) override;
 
 protected:
   void logThread();

@@ -130,7 +130,7 @@ void SingleThreadedSpinner::spin(CallbackQueue* queue)
   if (!spinner_monitor.add(queue, true))
   {
     std::string errorMessage = "SingleThreadedSpinner: " + DEFAULT_ERROR_MESSAGE + " You might want to use a MultiThreadedSpinner instead.";
-    ROS_FATAL_STREAM(errorMessage);
+    MINIROS_FATAL_STREAM(errorMessage);
     throw std::runtime_error(errorMessage);
   }
 
@@ -221,7 +221,7 @@ void AsyncSpinnerImpl::start()
   if (!spinner_monitor.add(callback_queue_, false))
   {
     std::string errorMessage = "AsyncSpinnerImpl: " + DEFAULT_ERROR_MESSAGE;
-    ROS_FATAL_STREAM(errorMessage);
+    MINIROS_FATAL_STREAM(errorMessage);
     throw std::runtime_error(errorMessage);
   }
 

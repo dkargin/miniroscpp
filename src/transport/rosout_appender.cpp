@@ -150,11 +150,9 @@ void ROSOutAppender::logThread()
       local_queue.swap(log_queue_);
     }
 
-    V_Log::iterator it = local_queue.begin();
-    V_Log::iterator end = local_queue.end();
-    for (; it != end; ++it)
+    for (const auto& msg: local_queue)
     {
-      TopicManager::instance()->publish(names::resolve("/rosout"), *(*it));
+      TopicManager::instance()->publish(names::resolve("/rosout"), *msg);
     }
   }
 }

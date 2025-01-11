@@ -25,6 +25,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define MINIROS_PACKAGE_NAME "topic_manager"
+
 #include "miniros/transport/topic_manager.h"
 #include "miniros/transport/xmlrpc_manager.h"
 #include "miniros/transport/connection_manager.h"
@@ -151,8 +153,8 @@ void TopicManager::shutdown()
   xmlrpc_manager_->unbind("getSubscriptions");
   xmlrpc_manager_->unbind("getPublications");
 
-  ROSCPP_LOG_DEBUG("Shutting down topics...");
-  ROSCPP_LOG_DEBUG("  shutting down publishers");
+  MINIROS_DEBUG("Shutting down topics...");
+  MINIROS_DEBUG("  shutting down publishers");
   {
     std::scoped_lock<std::recursive_mutex> adv_lock(advertised_topics_mutex_);
 
@@ -169,7 +171,7 @@ void TopicManager::shutdown()
   }
 
   // unregister all of our subscriptions
-  ROSCPP_LOG_DEBUG("  shutting down subscribers");
+  MINIROS_DEBUG("  shutting down subscribers");
   {
     std::scoped_lock<std::mutex> subs_lock(subs_mutex_);
 
@@ -625,7 +627,7 @@ bool TopicManager::pubUpdate(const std::string &topic, const std::vector<std::st
   }
   else
   {
-    ROSCPP_LOG_DEBUG("got a request for updating publishers of topic %s, but I " \
+    MINIROS_DEBUG("got a request for updating publishers of topic %s, but I " \
               "don't have any subscribers to that topic.", topic.c_str());
   }
 
@@ -641,13 +643,13 @@ bool TopicManager::requestTopic(const std::string &topic,
     XmlRpcValue proto = protos[proto_idx]; // save typing
     if (proto.getType() != XmlRpcValue::TypeArray)
     {
-    	ROSCPP_LOG_DEBUG( "requestTopic protocol list was not a list of lists");
+    	MINIROS_DEBUG( "requestTopic protocol list was not a list of lists");
       return false;
     }
 
     if (proto[0].getType() != XmlRpcValue::TypeString)
     {
-    	ROSCPP_LOG_DEBUG( "requestTopic received a protocol list in which a sublist " \
+    	MINIROS_DEBUG( "requestTopic received a protocol list in which a sublist " \
                  "did not start with a string");
       return false;
     }
@@ -672,7 +674,7 @@ bool TopicManager::requestTopic(const std::string &topic,
           proto[3].getType() != XmlRpcValue::TypeInt ||
           proto[4].getType() != XmlRpcValue::TypeInt)
       {
-      	ROSCPP_LOG_DEBUG("Invalid protocol parameters for UDPROS");
+      	MINIROS_DEBUG("Invalid protocol parameters for UDPROS");
         return false;
       }
       std::vector<char> header_bytes = proto[1];
@@ -682,14 +684,14 @@ bool TopicManager::requestTopic(const std::string &topic,
       std::string err;
       if (!h.parse(buffer, header_bytes.size(), err))
       {
-      	ROSCPP_LOG_DEBUG("Unable to parse UDPROS connection header: %s", err.c_str());
+      	MINIROS_DEBUG("Unable to parse UDPROS connection header: %s", err.c_str());
         return false;
       }
 
       PublicationPtr pub_ptr = lookupPublication(topic);
       if(!pub_ptr)
       {
-      	ROSCPP_LOG_DEBUG("Unable to find advertised topic %s for UDPROS connection", topic.c_str());
+      	MINIROS_DEBUG("Unable to find advertised topic %s for UDPROS connection", topic.c_str());
         return false;
       }
 
@@ -700,7 +702,7 @@ bool TopicManager::requestTopic(const std::string &topic,
       std::string error_msg;
       if (!pub_ptr->validateHeader(h, error_msg))
       {
-        ROSCPP_LOG_DEBUG("Error validating header from [%s:%d] for topic [%s]: %s", host.c_str(), port, topic.c_str(), error_msg.c_str());
+        MINIROS_DEBUG("Error validating header from [%s:%d] for topic [%s]: %s", host.c_str(), port, topic.c_str(), error_msg.c_str());
         return false;
       }
 
@@ -709,7 +711,7 @@ bool TopicManager::requestTopic(const std::string &topic,
       TransportUDPPtr transport = connection_manager_->getUDPServerTransport()->createOutgoing(host, port, conn_id, max_datagram_size);
       if (!transport)
       {
-        ROSCPP_LOG_DEBUG("Error creating outgoing transport for [%s:%d]", host.c_str(), port);
+        MINIROS_DEBUG("Error creating outgoing transport for [%s:%d]", host.c_str(), port);
         return false;
       }
       connection_manager_->udprosIncomingConnection(transport, h);
@@ -737,12 +739,12 @@ bool TopicManager::requestTopic(const std::string &topic,
     }
     else
     {
-      ROSCPP_LOG_DEBUG( "an unsupported protocol was offered: [%s]",
+      MINIROS_DEBUG( "an unsupported protocol was offered: [%s]",
           proto_name.c_str());
     }
   }
 
-  ROSCPP_LOG_DEBUG( "Currently, roscpp only supports TCPROS. The caller to " \
+  MINIROS_DEBUG( "Currently, roscpp only supports TCPROS. The caller to " \
              "requestTopic did not support TCPROS, so there are no " \
              "protocols in common.");
   return false;
@@ -760,7 +762,7 @@ void TopicManager::publish(const std::string& topic, const std::function<Seriali
   PublicationPtr p = lookupPublicationWithoutLock(topic);
   if (p->hasSubscribers() || p->isLatching())
   {
-    ROS_DEBUG_NAMED("superdebug", "Publishing message on topic [%s] with sequence number [%d]", p->getName().c_str(), p->getSequence());
+    MINIROS_DEBUG_NAMED("superdebug", "Publishing message on topic [%s] with sequence number [%d]", p->getName().c_str(), p->getSequence());
 
     // Determine what kinds of subscribers we're publishing to.  If they're intraprocess with the same C++ type we can
     // do a no-copy publish.
@@ -892,7 +894,7 @@ bool TopicManager::unsubscribe(const std::string &topic, const SubscriptionCallb
 
       if (!unregisterSubscriber(topic))
       {
-      	ROSCPP_LOG_DEBUG("Couldn't unregister subscriber for topic [%s]", topic.c_str());
+      	MINIROS_DEBUG("Couldn't unregister subscriber for topic [%s]", topic.c_str());
       }
     }
 
