@@ -24,12 +24,18 @@ jobs:
       with:
         submodules: 'true'
     - name: Install dependencies
-      run: sudo apt-get install -y libgpgme-dev libssl-dev
+      run: sudo apt-get install -y libgpgme-dev libssl-dev libgtest-dev
 
     - name: Configure CMake
       # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
       # See https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html?highlight=cmake_build_type
-      run: cmake -B ${{github.workspace}}/build -DMINIROS_ROSBAG_USE_GPGME_ENCRYPTION=ON -DMINIROS_ROSBAG_USE_OPENSSL_ENCRYPTION=ON -DMINIROS_BUILD_EXAMPLES=ON -DMINIROS_BUILD_ROSBAG_APPS=ON -DMINIROS_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
+      run: 
+        cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
+          -DMINIROS_ROSBAG_USE_GPGME_ENCRYPTION=ON 
+          -DMINIROS_ROSBAG_USE_OPENSSL_ENCRYPTION=ON 
+          -DMINIROS_BUILD_EXAMPLES=ON 
+          -DMINIROS_BUILD_ROSBAG_APPS=ON 
+          -DMINIROS_BUILD_TESTS=ON
 
     - name: Build
       # Build your program with the given configuration
@@ -39,4 +45,4 @@ jobs:
       working-directory: ${{github.workspace}}/build
       # Execute tests defined by the CMake configuration.
       # See https://cmake.org/cmake/help/latest/manual/ctest.1.html for more detail
-      run: ctest -C ${{env.BUILD_TYPE}}
+      run: ROS_MASTER_URI=http://localhost:11311 ctest -C ${{env.BUILD_TYPE}}
