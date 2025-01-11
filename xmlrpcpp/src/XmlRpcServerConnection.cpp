@@ -21,12 +21,12 @@ const char XmlRpcServerConnection::PARAMS_ETAG[] = "</params>";
 const char XmlRpcServerConnection::PARAM_TAG[] = "<param>";
 const char XmlRpcServerConnection::PARAM_ETAG[] = "</param>";
 
-const std::string XmlRpcServerConnection::SYSTEM_MULTICALL = "system.multicall";
-const std::string XmlRpcServerConnection::METHODNAME = "methodName";
-const std::string XmlRpcServerConnection::PARAMS = "params";
+const char XmlRpcServerConnection::SYSTEM_MULTICALL[] = "system.multicall";
+const char XmlRpcServerConnection::METHODNAME[] = "methodName";
+const char XmlRpcServerConnection::PARAMS[] = "params";
 
-const std::string XmlRpcServerConnection::FAULTCODE = "faultCode";
-const std::string XmlRpcServerConnection::FAULTSTRING = "faultString";
+const char XmlRpcServerConnection::FAULTCODE[] = "faultCode";
+const char XmlRpcServerConnection::FAULTSTRING[] = "faultString";
 
 
 
@@ -281,7 +281,7 @@ XmlRpcServerConnection::executeMulticall(const std::string& methodName,
 
   // There ought to be 1 parameter, an array of structs
   if (params.size() != 1 || params[0].getType() != XmlRpcValue::TypeArray)
-    throw XmlRpcException(SYSTEM_MULTICALL + ": Invalid argument (expected an array)");
+    throw XmlRpcException(std::string(SYSTEM_MULTICALL) + ": Invalid argument (expected an array)");
 
   int nc = params[0].size();
   result.setSize(nc);
@@ -291,7 +291,7 @@ XmlRpcServerConnection::executeMulticall(const std::string& methodName,
     if ( ! params[0][i].hasMember(METHODNAME) ||
          ! params[0][i].hasMember(PARAMS)) {
       result[i][FAULTCODE] = -1;
-      result[i][FAULTSTRING] = SYSTEM_MULTICALL +
+      result[i][FAULTSTRING] = std::string(SYSTEM_MULTICALL) +
               ": Invalid argument (expected a struct with members methodName and params)";
       continue;
     }
