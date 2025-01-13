@@ -572,7 +572,7 @@ MINIROS_DECL extern void (*function_print)(void*, console::Level, const char*, c
  * \param name Name of the logger.  Note that this is the fully qualified name, and does NOT include "ros.<package_name>".  Use MINIROS_CONSOLE_DEFAULT_NAME if you would like to use the default name.
  * \param rate The rate it should actually trigger at
  */
-#define ROS_LOG_STREAM_THROTTLE(rate, level, name, args) \
+#define MINIROS_LOG_STREAM_THROTTLE(rate, level, name, args) \
   do \
   { \
     MINIROS_CONSOLE_DEFINE_LOCATION(true, level, name); \
@@ -634,34 +634,33 @@ MINIROS_DECL extern void (*function_print)(void*, console::Level, const char*, c
  */
 #define MINIROS_LOG_STREAM(level, name, args) MINIROS_LOG_STREAM_COND(true, level, name, args)
 
-// Placeholders for regular logging.
-
-/*
-
-// TODO: we still need proper logging.
-#define MINIROS_FATAL(...) do{std::terminate();}while(0);
-
-#define MINIROS_ERROR(...)
-#define MINIROS_ERROR_STREAM(...)
-
-#define MINIROS_INFO(...)
-#define MINIROS_INFO_NAMED(...)
-#define MINIROS_INFO_STREAM(...)
-
-#define MINIROS_DEBUG(...)
-#define MINIROS_DEBUG_NAMED(...)
-#define MINIROS_DEBUG_STREAM(...)
-
-#define MINIROS_WARN(...)
-#define MINIROS_WARN_STREAM(...)
-#define MINIROS_FATAL_STREAM(...)
-*/
-
 #define MINIROS_DEBUG(...) MINIROS_LOG(::miniros::console::Level::Debug, MINIROS_CONSOLE_DEFAULT_NAME, __VA_ARGS__)
 #define MINIROS_DEBUG_STREAM(args) MINIROS_LOG_STREAM(::miniros::console::Level::Debug, MINIROS_CONSOLE_DEFAULT_NAME, args)
 #define MINIROS_DEBUG_NAMED(name, ...) MINIROS_LOG(::miniros::console::Level::Debug, std::string(MINIROS_CONSOLE_NAME_PREFIX) + "." + name, __VA_ARGS__)
 #define MINIROS_DEBUG_STREAM_NAMED(name, args) MINIROS_LOG_STREAM(::miniros::console::Level::Debug, std::string(MINIROS_CONSOLE_NAME_PREFIX) + "." + name, args)
-/*
+
+#define MINIROS_INFO(...) MINIROS_LOG(::miniros::console::Level::Info, MINIROS_CONSOLE_DEFAULT_NAME, __VA_ARGS__)
+#define MINIROS_INFO_STREAM(args) MINIROS_LOG_STREAM(::miniros::console::Level::Info, MINIROS_CONSOLE_DEFAULT_NAME, args)
+#define MINIROS_INFO_NAMED(name, ...) MINIROS_LOG(::miniros::console::Level::Info, std::string(MINIROS_CONSOLE_NAME_PREFIX) + "." + name, __VA_ARGS__)
+#define MINIROS_INFO_STREAM_NAMED(name, args) MINIROS_LOG_STREAM(::miniros::console::Level::Info, std::string(MINIROS_CONSOLE_NAME_PREFIX) + "." + name, args)
+
+#define MINIROS_WARN(...) MINIROS_LOG(::miniros::console::Level::Warn, MINIROS_CONSOLE_DEFAULT_NAME, __VA_ARGS__)
+#define MINIROS_WARN_STREAM(args) MINIROS_LOG_STREAM(::miniros::console::Level::Warn, MINIROS_CONSOLE_DEFAULT_NAME, args)
+#define MINIROS_WARN_NAMED(name, ...) MINIROS_LOG(::miniros::console::Level::Warn, std::string(MINIROS_CONSOLE_NAME_PREFIX) + "." + name, __VA_ARGS__)
+#define MINIROS_WARN_STREAM_NAMED(name, args) MINIROS_LOG_STREAM(::miniros::console::Level::Warn, std::string(MINIROS_CONSOLE_NAME_PREFIX) + "." + name, args)
+
+#define MINIROS_ERROR(...) MINIROS_LOG(::miniros::console::Level::Error, MINIROS_CONSOLE_DEFAULT_NAME, __VA_ARGS__)
+#define MINIROS_ERROR_STREAM(args) MINIROS_LOG_STREAM(::miniros::console::Level::Error, MINIROS_CONSOLE_DEFAULT_NAME, args)
+#define MINIROS_ERROR_NAMED(name, ...) MINIROS_LOG(::miniros::console::Level::Error, std::string(MINIROS_CONSOLE_NAME_PREFIX) + "." + name, __VA_ARGS__)
+#define MINIROS_ERROR_STREAM_NAMED(name, args) MINIROS_LOG_STREAM(::miniros::console::Level::Error, std::string(MINIROS_CONSOLE_NAME_PREFIX) + "." + name, args)
+
+#define MINIROS_FATAL(...) MINIROS_LOG(::miniros::console::Level::Fatal, MINIROS_CONSOLE_DEFAULT_NAME, __VA_ARGS__)
+#define MINIROS_FATAL_STREAM(args) MINIROS_LOG_STREAM(::miniros::console::Level::Fatal, MINIROS_CONSOLE_DEFAULT_NAME, args)
+#define MINIROS_FATAL_NAMED(name, ...) MINIROS_LOG(::miniros::console::Level::Fatal, std::string(MINIROS_CONSOLE_NAME_PREFIX) + "." + name, __VA_ARGS__)
+#define MINIROS_FATAL_STREAM_NAMED(name, args) MINIROS_LOG_STREAM(::miniros::console::Level::Fatal, std::string(MINIROS_CONSOLE_NAME_PREFIX) + "." + name, args)
+
+#ifdef MINIROS_SUPPORT_COMPLICATED_LOGGING
+// These logging macros do not seem to be absolutely necessary and can be implemented on customer side.
 #define MINIROS_DEBUG_COND(cond, ...) ROS_LOG_COND(cond, ::miniros::console::Level::Debug, MINIROS_CONSOLE_DEFAULT_NAME, __VA_ARGS__)
 #define MINIROS_DEBUG_STREAM_COND(cond, args) ROS_LOG_STREAM_COND(cond, ::miniros::console::Level::Debug, MINIROS_CONSOLE_DEFAULT_NAME, args)
 #define MINIROS_DEBUG_COND_NAMED(cond, name, ...) ROS_LOG_COND(cond, ::miniros::console::Level::Debug, std::string(MINIROS_CONSOLE_NAME_PREFIX) + "." + name, __VA_ARGS__)
@@ -678,13 +677,7 @@ MINIROS_DECL extern void (*function_print)(void*, console::Level, const char*, c
 #define MINIROS_DEBUG_STREAM_FILTER(filter, args) ROS_LOG_STREAM_FILTER(filter, ::miniros::console::Level::Debug, MINIROS_CONSOLE_DEFAULT_NAME, args)
 #define MINIROS_DEBUG_FILTER_NAMED(filter, name, ...) ROS_LOG_FILTER(filter, ::miniros::console::Level::Debug, std::string(MINIROS_CONSOLE_NAME_PREFIX) + "." + name, __VA_ARGS__)
 #define MINIROS_DEBUG_STREAM_FILTER_NAMED(filter, name, args) ROS_LOG_STREAM_FILTER(filter, ::miniros::console::Level::Debug, std::string(MINIROS_CONSOLE_NAME_PREFIX) + "." + name, args)
-*/
 
-#define MINIROS_INFO(...) MINIROS_LOG(::miniros::console::Level::Info, MINIROS_CONSOLE_DEFAULT_NAME, __VA_ARGS__)
-#define MINIROS_INFO_STREAM(args) MINIROS_LOG_STREAM(::miniros::console::Level::Info, MINIROS_CONSOLE_DEFAULT_NAME, args)
-#define MINIROS_INFO_NAMED(name, ...) MINIROS_LOG(::miniros::console::Level::Info, std::string(MINIROS_CONSOLE_NAME_PREFIX) + "." + name, __VA_ARGS__)
-#define MINIROS_INFO_STREAM_NAMED(name, args) MINIROS_LOG_STREAM(::miniros::console::Level::Info, std::string(MINIROS_CONSOLE_NAME_PREFIX) + "." + name, args)
-/*
 #define MINIROS_INFO_COND(cond, ...) ROS_LOG_COND(cond, ::miniros::console::Level::Info, MINIROS_CONSOLE_DEFAULT_NAME, __VA_ARGS__)
 #define MINIROS_INFO_STREAM_COND(cond, args) ROS_LOG_STREAM_COND(cond, ::miniros::console::Level::Info, MINIROS_CONSOLE_DEFAULT_NAME, args)
 #define MINIROS_INFO_COND_NAMED(cond, name, ...) ROS_LOG_COND(cond, ::miniros::console::Level::Info, std::string(MINIROS_CONSOLE_NAME_PREFIX) + "." + name, __VA_ARGS__)
@@ -701,13 +694,7 @@ MINIROS_DECL extern void (*function_print)(void*, console::Level, const char*, c
 #define MINIROS_INFO_STREAM_FILTER(filter, args) ROS_LOG_STREAM_FILTER(filter, ::miniros::console::Level::Info, MINIROS_CONSOLE_DEFAULT_NAME, args)
 #define MINIROS_INFO_FILTER_NAMED(filter, name, ...) ROS_LOG_FILTER(filter, ::miniros::console::Level::Info, std::string(MINIROS_CONSOLE_NAME_PREFIX) + "." + name, __VA_ARGS__)
 #define MINIROS_INFO_STREAM_FILTER_NAMED(filter, name, args) ROS_LOG_STREAM_FILTER(filter, ::miniros::console::Level::Info, std::string(MINIROS_CONSOLE_NAME_PREFIX) + "." + name, args)
-*/
 
-#define MINIROS_WARN(...) MINIROS_LOG(::miniros::console::Level::Warn, MINIROS_CONSOLE_DEFAULT_NAME, __VA_ARGS__)
-#define MINIROS_WARN_STREAM(args) MINIROS_LOG_STREAM(::miniros::console::Level::Warn, MINIROS_CONSOLE_DEFAULT_NAME, args)
-#define MINIROS_WARN_NAMED(name, ...) MINIROS_LOG(::miniros::console::Level::Warn, std::string(MINIROS_CONSOLE_NAME_PREFIX) + "." + name, __VA_ARGS__)
-#define MINIROS_WARN_STREAM_NAMED(name, args) MINIROS_LOG_STREAM(::miniros::console::Level::Warn, std::string(MINIROS_CONSOLE_NAME_PREFIX) + "." + name, args)
-/*
 #define MINIROS_WARN_COND(cond, ...) ROS_LOG_COND(cond, ::miniros::console::Level::Warn, MINIROS_CONSOLE_DEFAULT_NAME, __VA_ARGS__)
 #define MINIROS_WARN_STREAM_COND(cond, args) ROS_LOG_STREAM_COND(cond, ::miniros::console::Level::Warn, MINIROS_CONSOLE_DEFAULT_NAME, args)
 #define MINIROS_WARN_COND_NAMED(cond, name, ...) ROS_LOG_COND(cond, ::miniros::console::Level::Warn, std::string(MINIROS_CONSOLE_NAME_PREFIX) + "." + name, __VA_ARGS__)
@@ -724,51 +711,39 @@ MINIROS_DECL extern void (*function_print)(void*, console::Level, const char*, c
 #define MINIROS_WARN_STREAM_FILTER(filter, args) ROS_LOG_STREAM_FILTER(filter, ::miniros::console::Level::Warn, MINIROS_CONSOLE_DEFAULT_NAME, args)
 #define MINIROS_WARN_FILTER_NAMED(filter, name, ...) ROS_LOG_FILTER(filter, ::miniros::console::Level::Warn, std::string(MINIROS_CONSOLE_NAME_PREFIX) + "." + name, __VA_ARGS__)
 #define MINIROS_WARN_STREAM_FILTER_NAMED(filter, name, args) ROS_LOG_STREAM_FILTER(filter, ::miniros::console::Level::Warn, std::string(MINIROS_CONSOLE_NAME_PREFIX) + "." + name, args)
-*/
 
-#define MINIROS_ERROR(...) MINIROS_LOG(::miniros::console::Level::Error, MINIROS_CONSOLE_DEFAULT_NAME, __VA_ARGS__)
-#define MINIROS_ERROR_STREAM(args) MINIROS_LOG_STREAM(::miniros::console::Level::Error, MINIROS_CONSOLE_DEFAULT_NAME, args)
-#define MINIROS_ERROR_NAMED(name, ...) MINIROS_LOG(::miniros::console::Level::Error, std::string(MINIROS_CONSOLE_NAME_PREFIX) + "." + name, __VA_ARGS__)
-#define MINIROS_ERROR_STREAM_NAMED(name, args) MINIROS_LOG_STREAM(::miniros::console::Level::Error, std::string(MINIROS_CONSOLE_NAME_PREFIX) + "." + name, args)
+#define MINIROS_ERROR_COND(cond, ...) ROS_LOG_COND(cond, ::miniros::console::Level::Error, ROSCONSOLE_DEFAULT_NAME, __VA_ARGS__)
+#define MINIROS_ERROR_STREAM_COND(cond, args) ROS_LOG_STREAM_COND(cond, ::miniros::console::Level::Error, ROSCONSOLE_DEFAULT_NAME, args)
+#define MINIROS_ERROR_COND_NAMED(cond, name, ...) ROS_LOG_COND(cond, ::miniros::console::Level::Error, std::string(MINIROS_CONSOLE_PACKAGE_NAME) + "." + name, __VA_ARGS__)
+#define MINIROS_ERROR_STREAM_COND_NAMED(cond, name, args) ROS_LOG_STREAM_COND(cond, ::miniros::console::Level::Error, std::string(MINIROS_CONSOLE_PACKAGE_NAME) + "." + name, args)
+#define MINIROS_ERROR_ONCE(...) ROS_LOG_ONCE(::miniros::console::Level::Error, ROSCONSOLE_DEFAULT_NAME, __VA_ARGS__)
+#define MINIROS_ERROR_STREAM_ONCE(args) ROS_LOG_STREAM_ONCE(::miniros::console::Level::Error, ROSCONSOLE_DEFAULT_NAME, args)
+#define MINIROS_ERROR_ONCE_NAMED(name, ...) ROS_LOG_ONCE(::miniros::console::Level::Error, std::string(MINIROS_CONSOLE_PACKAGE_NAME) + "." + name, __VA_ARGS__)
+#define MINIROS_ERROR_STREAM_ONCE_NAMED(name, args) ROS_LOG_STREAM_ONCE(::miniros::console::Level::Error, std::string(MINIROS_CONSOLE_PACKAGE_NAME) + "." + name, args)
+#define MINIROS_ERROR_THROTTLE(rate, ...) ROS_LOG_THROTTLE(rate, ::miniros::console::Level::Error, ROSCONSOLE_DEFAULT_NAME, __VA_ARGS__)
+#define MINIROS_ERROR_STREAM_THROTTLE(rate, args) ROS_LOG_STREAM_THROTTLE(rate, ::miniros::console::Level::Error, ROSCONSOLE_DEFAULT_NAME, args)
+#define MINIROS_ERROR_THROTTLE_NAMED(rate, name, ...) ROS_LOG_THROTTLE(rate, ::miniros::console::Level::Error, std::string(MINIROS_CONSOLE_PACKAGE_NAME) + "." + name, __VA_ARGS__)
+#define MINIROS_ERROR_STREAM_THROTTLE_NAMED(rate, name, args) ROS_LOG_STREAM_THROTTLE(rate, ::miniros::console::Level::Error, std::string(MINIROS_CONSOLE_PACKAGE_NAME) + "." + name, args)
+#define MINIROS_ERROR_FILTER(filter, ...) ROS_LOG_FILTER(filter, ::miniros::console::Level::Error, ROSCONSOLE_DEFAULT_NAME, __VA_ARGS__)
+#define MINIROS_ERROR_STREAM_FILTER(filter, args) ROS_LOG_STREAM_FILTER(filter, ::miniros::console::Level::Error, ROSCONSOLE_DEFAULT_NAME, args)
+#define MINIROS_ERROR_FILTER_NAMED(filter, name, ...) ROS_LOG_FILTER(filter, ::miniros::console::Level::Error, std::string(MINIROS_CONSOLE_PACKAGE_NAME) + "." + name, __VA_ARGS__)
+#define MINIROS_ERROR_STREAM_FILTER_NAMED(filter, name, args) ROS_LOG_STREAM_FILTER(filter, ::miniros::console::Level::Error, std::string(MINIROS_CONSOLE_PACKAGE_NAME) + "." + name, args)
 
-/*
-#define ROS_ERROR_COND(cond, ...) ROS_LOG_COND(cond, ::miniros::console::Level::Error, ROSCONSOLE_DEFAULT_NAME, __VA_ARGS__)
-#define ROS_ERROR_STREAM_COND(cond, args) ROS_LOG_STREAM_COND(cond, ::miniros::console::Level::Error, ROSCONSOLE_DEFAULT_NAME, args)
-#define ROS_ERROR_COND_NAMED(cond, name, ...) ROS_LOG_COND(cond, ::miniros::console::Level::Error, std::string(MINIROS_CONSOLE_PACKAGE_NAME) + "." + name, __VA_ARGS__)
-#define ROS_ERROR_STREAM_COND_NAMED(cond, name, args) ROS_LOG_STREAM_COND(cond, ::miniros::console::Level::Error, std::string(MINIROS_CONSOLE_PACKAGE_NAME) + "." + name, args)
-#define ROS_ERROR_ONCE(...) ROS_LOG_ONCE(::miniros::console::Level::Error, ROSCONSOLE_DEFAULT_NAME, __VA_ARGS__)
-#define ROS_ERROR_STREAM_ONCE(args) ROS_LOG_STREAM_ONCE(::miniros::console::Level::Error, ROSCONSOLE_DEFAULT_NAME, args)
-#define ROS_ERROR_ONCE_NAMED(name, ...) ROS_LOG_ONCE(::miniros::console::Level::Error, std::string(MINIROS_CONSOLE_PACKAGE_NAME) + "." + name, __VA_ARGS__)
-#define ROS_ERROR_STREAM_ONCE_NAMED(name, args) ROS_LOG_STREAM_ONCE(::miniros::console::Level::Error, std::string(MINIROS_CONSOLE_PACKAGE_NAME) + "." + name, args)
-#define ROS_ERROR_THROTTLE(rate, ...) ROS_LOG_THROTTLE(rate, ::miniros::console::Level::Error, ROSCONSOLE_DEFAULT_NAME, __VA_ARGS__)
-#define ROS_ERROR_STREAM_THROTTLE(rate, args) ROS_LOG_STREAM_THROTTLE(rate, ::miniros::console::Level::Error, ROSCONSOLE_DEFAULT_NAME, args)
-#define ROS_ERROR_THROTTLE_NAMED(rate, name, ...) ROS_LOG_THROTTLE(rate, ::miniros::console::Level::Error, std::string(MINIROS_CONSOLE_PACKAGE_NAME) + "." + name, __VA_ARGS__)
-#define ROS_ERROR_STREAM_THROTTLE_NAMED(rate, name, args) ROS_LOG_STREAM_THROTTLE(rate, ::miniros::console::Level::Error, std::string(MINIROS_CONSOLE_PACKAGE_NAME) + "." + name, args)
-#define ROS_ERROR_FILTER(filter, ...) ROS_LOG_FILTER(filter, ::miniros::console::Level::Error, ROSCONSOLE_DEFAULT_NAME, __VA_ARGS__)
-#define ROS_ERROR_STREAM_FILTER(filter, args) ROS_LOG_STREAM_FILTER(filter, ::miniros::console::Level::Error, ROSCONSOLE_DEFAULT_NAME, args)
-#define ROS_ERROR_FILTER_NAMED(filter, name, ...) ROS_LOG_FILTER(filter, ::miniros::console::Level::Error, std::string(MINIROS_CONSOLE_PACKAGE_NAME) + "." + name, __VA_ARGS__)
-#define ROS_ERROR_STREAM_FILTER_NAMED(filter, name, args) ROS_LOG_STREAM_FILTER(filter, ::miniros::console::Level::Error, std::string(MINIROS_CONSOLE_PACKAGE_NAME) + "." + name, args)
-*/
+#define MINIROS_FATAL_COND(cond, ...) ROS_LOG_COND(cond, ::miniros::console::Level::Fatal, ROSCONSOLE_DEFAULT_NAME, __VA_ARGS__)
+#define MINIROS_FATAL_STREAM_COND(cond, args) ROS_LOG_STREAM_COND(cond, ::miniros::console::Level::Fatal, ROSCONSOLE_DEFAULT_NAME, args)
+#define MINIROS_FATAL_COND_NAMED(cond, name, ...) ROS_LOG_COND(cond, ::miniros::console::Level::Fatal, std::string(ROSCONSOLE_NAME_PREFIX) + "." + name, __VA_ARGS__)
+#define MINIROS_FATAL_STREAM_COND_NAMED(cond, name, args) ROS_LOG_STREAM_COND(cond, ::miniros::console::Level::Fatal, std::string(ROSCONSOLE_NAME_PREFIX) + "." + name, args)
+#define MINIROS_FATAL_ONCE(...) ROS_LOG_ONCE(::miniros::console::Level::Fatal, ROSCONSOLE_DEFAULT_NAME, __VA_ARGS__)
+#define MINIROS_FATAL_STREAM_ONCE(args) ROS_LOG_STREAM_ONCE(::miniros::console::Level::Fatal, ROSCONSOLE_DEFAULT_NAME, args)
+#define MINIROS_FATAL_ONCE_NAMED(name, ...) ROS_LOG_ONCE(::miniros::console::Level::Fatal, std::string(ROSCONSOLE_NAME_PREFIX) + "." + name, __VA_ARGS__)
+#define MINIROS_FATAL_STREAM_ONCE_NAMED(name, args) ROS_LOG_STREAM_ONCE(::miniros::console::Level::Fatal, std::string(ROSCONSOLE_NAME_PREFIX) + "." + name, args)
+#define MINIROS_FATAL_THROTTLE(rate, ...) ROS_LOG_THROTTLE(rate, ::miniros::console::Level::Fatal, ROSCONSOLE_DEFAULT_NAME, __VA_ARGS__)
+#define MINIROS_FATAL_STREAM_THROTTLE(rate, args) ROS_LOG_STREAM_THROTTLE(rate, ::miniros::console::Level::Fatal, ROSCONSOLE_DEFAULT_NAME, args)
+#define MINIROS_FATAL_THROTTLE_NAMED(rate, name, ...) ROS_LOG_THROTTLE(rate, ::miniros::console::Level::Fatal, std::string(ROSCONSOLE_NAME_PREFIX) + "." + name, __VA_ARGS__)
+#define MINIROS_FATAL_STREAM_THROTTLE_NAMED(rate, name, args) ROS_LOG_STREAM_THROTTLE(rate, ::miniros::console::Level::Fatal, std::string(ROSCONSOLE_NAME_PREFIX) + "." + name, args)
+#define MINIROS_FATAL_FILTER(filter, ...) ROS_LOG_FILTER(filter, ::miniros::console::Level::Fatal, ROSCONSOLE_DEFAULT_NAME, __VA_ARGS__)
+#define MINIROS_FATAL_STREAM_FILTER(filter, args) ROS_LOG_STREAM_FILTER(filter, ::miniros::console::Level::Fatal, ROSCONSOLE_DEFAULT_NAME, args)
+#define MINIROS_FATAL_FILTER_NAMED(filter, name, ...) ROS_LOG_FILTER(filter, ::miniros::console::Level::Fatal, std::string(ROSCONSOLE_NAME_PREFIX) + "." + name, __VA_ARGS__)
+#define MINIROS_FATAL_STREAM_FILTER_NAMED(filter, name, args) ROS_LOG_STREAM_FILTER(filter, ::miniros::console::Level::Fatal, std::string(ROSCONSOLE_NAME_PREFIX) + "." + name, args)
 
-#define MINIROS_FATAL(...) MINIROS_LOG(::miniros::console::Level::Fatal, MINIROS_CONSOLE_DEFAULT_NAME, __VA_ARGS__)
-#define MINIROS_FATAL_STREAM(args) MINIROS_LOG_STREAM(::miniros::console::Level::Fatal, MINIROS_CONSOLE_DEFAULT_NAME, args)
-#define MINIROS_FATAL_NAMED(name, ...) MINIROS_LOG(::miniros::console::Level::Fatal, std::string(MINIROS_CONSOLE_NAME_PREFIX) + "." + name, __VA_ARGS__)
-#define MINIROS_FATAL_STREAM_NAMED(name, args) MINIROS_LOG_STREAM(::miniros::console::Level::Fatal, std::string(MINIROS_CONSOLE_NAME_PREFIX) + "." + name, args)
-/*
-#define ROS_FATAL_COND(cond, ...) ROS_LOG_COND(cond, ::miniros::console::Level::Fatal, ROSCONSOLE_DEFAULT_NAME, __VA_ARGS__)
-#define ROS_FATAL_STREAM_COND(cond, args) ROS_LOG_STREAM_COND(cond, ::miniros::console::Level::Fatal, ROSCONSOLE_DEFAULT_NAME, args)
-#define ROS_FATAL_COND_NAMED(cond, name, ...) ROS_LOG_COND(cond, ::miniros::console::Level::Fatal, std::string(ROSCONSOLE_NAME_PREFIX) + "." + name, __VA_ARGS__)
-#define ROS_FATAL_STREAM_COND_NAMED(cond, name, args) ROS_LOG_STREAM_COND(cond, ::miniros::console::Level::Fatal, std::string(ROSCONSOLE_NAME_PREFIX) + "." + name, args)
-#define ROS_FATAL_ONCE(...) ROS_LOG_ONCE(::miniros::console::Level::Fatal, ROSCONSOLE_DEFAULT_NAME, __VA_ARGS__)
-#define ROS_FATAL_STREAM_ONCE(args) ROS_LOG_STREAM_ONCE(::miniros::console::Level::Fatal, ROSCONSOLE_DEFAULT_NAME, args)
-#define ROS_FATAL_ONCE_NAMED(name, ...) ROS_LOG_ONCE(::miniros::console::Level::Fatal, std::string(ROSCONSOLE_NAME_PREFIX) + "." + name, __VA_ARGS__)
-#define ROS_FATAL_STREAM_ONCE_NAMED(name, args) ROS_LOG_STREAM_ONCE(::miniros::console::Level::Fatal, std::string(ROSCONSOLE_NAME_PREFIX) + "." + name, args)
-#define ROS_FATAL_THROTTLE(rate, ...) ROS_LOG_THROTTLE(rate, ::miniros::console::Level::Fatal, ROSCONSOLE_DEFAULT_NAME, __VA_ARGS__)
-#define ROS_FATAL_STREAM_THROTTLE(rate, args) ROS_LOG_STREAM_THROTTLE(rate, ::miniros::console::Level::Fatal, ROSCONSOLE_DEFAULT_NAME, args)
-#define ROS_FATAL_THROTTLE_NAMED(rate, name, ...) ROS_LOG_THROTTLE(rate, ::miniros::console::Level::Fatal, std::string(ROSCONSOLE_NAME_PREFIX) + "." + name, __VA_ARGS__)
-#define ROS_FATAL_STREAM_THROTTLE_NAMED(rate, name, args) ROS_LOG_STREAM_THROTTLE(rate, ::miniros::console::Level::Fatal, std::string(ROSCONSOLE_NAME_PREFIX) + "." + name, args)
-#define ROS_FATAL_FILTER(filter, ...) ROS_LOG_FILTER(filter, ::miniros::console::Level::Fatal, ROSCONSOLE_DEFAULT_NAME, __VA_ARGS__)
-#define ROS_FATAL_STREAM_FILTER(filter, args) ROS_LOG_STREAM_FILTER(filter, ::miniros::console::Level::Fatal, ROSCONSOLE_DEFAULT_NAME, args)
-#define ROS_FATAL_FILTER_NAMED(filter, name, ...) ROS_LOG_FILTER(filter, ::miniros::console::Level::Fatal, std::string(ROSCONSOLE_NAME_PREFIX) + "." + name, __VA_ARGS__)
-#define ROS_FATAL_STREAM_FILTER_NAMED(filter, name, args) ROS_LOG_STREAM_FILTER(filter, ::miniros::console::Level::Fatal, std::string(ROSCONSOLE_NAME_PREFIX) + "." + name, args)
-*/
+#endif
