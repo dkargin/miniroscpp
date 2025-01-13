@@ -87,15 +87,6 @@ add_subdirectory(external)
 add_subdirectory(xmlrpcpp)
 add_subdirectory(src)
 
-if (MINIROS_BUILD_TESTS)
-	find_package(GTest 1.8.0)
-	if (GTEST_FOUND)
-		add_subdirectory(test)
-	else()
-		message(STATUS "Failed to find gtest. No tests will be built")
-	endif()
-endif()
-
 if (catkin_FOUND)
   # Catkin does all the packaging by itself. Also we do not need to install pregenerated messages,
   # since we are able to run gencxx directly here.
@@ -126,6 +117,7 @@ else()
   # ... for the install tree
   set(CONF_INCLUDE_DIRS "\${roscxx_CMAKE_DIR}/${REL_INCLUDE_DIR}")
   set(GENERATED_INCLUDE "${PROJECT_NAME}/generated")
+  set(MINIROS_GENERATED_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/include/generated")
   configure_file(${PROJECT_NAME}Config.cmake.in
     "${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/${PROJECT_NAME}Config.cmake" @ONLY)
 
@@ -176,6 +168,22 @@ else()
   add_library(${PROJECT_NAME}::roscxx ALIAS roscxx)
   add_library(${PROJECT_NAME}::bag_storage ALIAS bag_storage)
 endif(catkin_FOUND)
+
+
+if (MINIROS_BUILD_TESTS)
+	find_package(GTest 1.8.0)
+	# Ensuring target "tests" is exists at a top level CMakeLists for compatibility with Eclipse CDT.
+	if(TARGET tests)
+	else ()
+		add_custom_target(tests)
+	endif()
+		
+	if (GTEST_FOUND)
+		add_subdirectory(test)
+	else()
+		message(STATUS "Failed to find gtest. No tests will be built")
+	endif()
+endif()
 
 if (MINIROS_BUILD_EXAMPLES)
   add_subdirectory(examples)

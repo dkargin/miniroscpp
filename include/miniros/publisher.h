@@ -88,7 +88,7 @@ namespace miniros
       m.type_info = &typeid(M);
       m.message = message;
 
-      publishImpl([&message]() {return serializeMessage<M>(message);}, m);
+      publishImpl([&message]() {return serializeMessage<M>(*message);}, m);
     }
 
     /**

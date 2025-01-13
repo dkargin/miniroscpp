@@ -603,7 +603,7 @@ if (sub)  // Enter if subscriber is valid
                        const std::shared_ptr<T>& obj, const TransportHints& transport_hints = TransportHints())
   {
     SubscribeOptions ops;
-    auto wrapFn = [fp, obj](const std::shared_ptr<M const>& msg){(obj->*fp)(msg);};
+    auto wrapFn = [fp, obj](const std::shared_ptr<M const>& msg){(obj.get()->*fp)(msg);};
     ops.template init<M>(topic, queue_size, wrapFn);
     ops.tracked_object = obj;
     ops.transport_hints = transport_hints;
@@ -615,7 +615,7 @@ if (sub)  // Enter if subscriber is valid
                        const std::shared_ptr<T>& obj, const TransportHints& transport_hints = TransportHints())
   {
     SubscribeOptions ops;
-    auto wrapFn = [fp, obj](const std::shared_ptr<M const>& msg){(obj->*fp)(msg);};
+    auto wrapFn = [fp, obj](const std::shared_ptr<M const>& msg){(obj.get()->*fp)(msg);};
     ops.template init<M>(topic, queue_size, wrapFn);
     ops.tracked_object = obj;
     ops.transport_hints = transport_hints;
@@ -989,7 +989,7 @@ if (service)  // Enter if advertised service is valid
   ServiceServer advertiseService(const std::string& service, bool(T::*srv_func)(MReq &, MRes &), const std::shared_ptr<T>& obj)
   {
     AdvertiseServiceOptions ops;
-    auto wrapFn = [obj, srv_func](MReq& req, MRes& res) { return obj->*srv_func(req, res); };
+    auto wrapFn = [obj, srv_func](MReq& req, MRes& res) { return (obj.get()->*srv_func)(req, res); };
     ops.template init<MReq, MRes>(service, wrapFn);
     ops.tracked_object = obj;
     return advertiseService(ops);
@@ -1328,7 +1328,7 @@ if (service)  // Enter if advertised service is valid
   Timer createTimer(Duration period, void(T::*callback)(const TimerEvent&) const, T* obj, 
                     bool oneshot = false, bool autostart = true) const
   {
-    auto wrapFn = [obj, callback](const TimerEvent& te) { obj->*callback(te); };
+    auto wrapFn = [obj, callback](const TimerEvent& te) { (obj->*callback)(te); };
     return createTimer(period, wrapFn, oneshot, autostart);
   }
 
@@ -1349,7 +1349,7 @@ if (service)  // Enter if advertised service is valid
   Timer createTimer(Duration period, void(T::*callback)(const TimerEvent&), T* obj, 
                     bool oneshot = false, bool autostart = true) const
   {
-    auto wrapFn = [obj, callback](const TimerEvent& te) { obj->*callback(te); };
+    auto wrapFn = [obj, callback](const TimerEvent& te) { (obj->*callback)(te); };
     return createTimer(period, wrapFn, oneshot, autostart);
   }
 
@@ -1372,7 +1372,7 @@ if (service)  // Enter if advertised service is valid
   Timer createTimer(Duration period, void(T::*callback)(const TimerEvent&), const std::shared_ptr<T>& obj, 
                     bool oneshot = false, bool autostart = true) const
   {
-    auto wrapFn = [obj, callback](const TimerEvent& te) { obj->*callback(te); };
+    auto wrapFn = [obj, callback](const TimerEvent& te) { (obj.get()->*callback)(te); };
     TimerOptions ops(period, wrapFn, 0);
     ops.tracked_object = obj;
     ops.oneshot = oneshot;
@@ -1428,7 +1428,7 @@ if (service)  // Enter if advertised service is valid
   WallTimer createWallTimer(WallDuration period, void(T::*callback)(const WallTimerEvent&), T* obj, 
                             bool oneshot = false, bool autostart = true) const
   {
-    auto wrapFn = [obj, callback](const WallTimerEvent& te) { obj->*callback(te); };
+    auto wrapFn = [obj, callback](const WallTimerEvent& te) { (obj->*callback)(te); };
     return createWallTimer(period, wrapFn, oneshot, autostart);
   }
 
@@ -1452,7 +1452,7 @@ if (service)  // Enter if advertised service is valid
                             const std::shared_ptr<T>& obj, 
                             bool oneshot = false, bool autostart = true) const
   {
-    auto wrapFn = [obj, callback](const WallTimerEvent& te) { obj->*callback(te); };
+    auto wrapFn = [obj, callback](const WallTimerEvent& te) { (obj.get()->*callback)(te); };
     WallTimerOptions ops(period, wrapFn, 0);
     ops.tracked_object = obj;
     ops.oneshot = oneshot;
@@ -1508,7 +1508,7 @@ if (service)  // Enter if advertised service is valid
   SteadyTimer createSteadyTimer(WallDuration period, void(T::*callback)(const SteadyTimerEvent&), T* obj,
                                 bool oneshot = false, bool autostart = true) const
   {
-    auto wrapFn = [obj, callback](const SteadyTimerEvent& te) { obj->*callback(te); };
+    auto wrapFn = [obj, callback](const SteadyTimerEvent& te) { (obj->*callback)(te); };
     return createSteadyTimer(period, wrapFn, oneshot, autostart);
   }
 
@@ -1532,7 +1532,7 @@ if (service)  // Enter if advertised service is valid
                                 const std::shared_ptr<T>& obj,
                                 bool oneshot = false, bool autostart = true) const
   {
-    auto wrapFn = [obj, callback](const SteadyTimerEvent& te) { obj->*callback(te); };
+    auto wrapFn = [obj, callback](const SteadyTimerEvent& te) { (obj.get()->*callback)(te); };
     SteadyTimerOptions ops(period, wrapFn, 0);
     ops.tracked_object = obj;
     ops.oneshot = oneshot;

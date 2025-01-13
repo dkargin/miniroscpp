@@ -137,7 +137,7 @@ public:
 
   void operator=(const MessageEvent<Message>& rhs)
   {
-    init(static_cast<Message*>(rhs.getMessage()),
+    init(std::const_pointer_cast<Message>(rhs.getMessage()),
       rhs.getConnectionHeaderPtr(),
       rhs.getReceiptTime(), rhs.nonConstWillCopy(), rhs.getMessageFactory());
     message_copy_.reset();

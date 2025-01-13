@@ -173,6 +173,7 @@ void ConnectionManager::removeDroppedConnections()
 {
   V_Connection local_dropped;
   {
+      std::scoped_lock<std::mutex> conn_lock(connections_mutex_);
       // There are not much connections, so direct iteration should not be that slow.
       for (const ConnectionPtr& connection: connections_) {
           if (connection->isDropped()) {
