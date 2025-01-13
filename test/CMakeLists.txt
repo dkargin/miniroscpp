@@ -2,6 +2,9 @@ include_directories(${MINIROS_INCLUDE_DIRS})
 
 include(CTest)
 
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
 function(miniros_add_test TARGET_NAME SOURCES)
 	set (EXTRA_ARGS ${ARGN})
 	list(LENGTH EXTRA_ARGS NUM_EXTRA_ARGS)
@@ -23,3 +26,8 @@ miniros_add_test(test_time rostime/test_time.cpp)
 add_subdirectory(xmlrpc)
 
 add_subdirectory(roscpp/basic)
+
+option(MINIROS_ADVANCED_TESTS "Build and run advanced tests which require living rosmaster" OFF)
+if (MINIROS_ADVANCED_TESTS)
+	add_subdirectory(roscpp/advanced)
+endif()
