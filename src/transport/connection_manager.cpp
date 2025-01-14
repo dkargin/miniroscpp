@@ -25,6 +25,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define MINIROS_PACKAGE_NAME "connection_manager"
+
 #include "miniros/transport/connection_manager.h"
 #include "miniros/transport/poll_manager.h"
 #include "miniros/transport/connection.h"
@@ -171,6 +173,7 @@ void ConnectionManager::removeDroppedConnections()
 {
   V_Connection local_dropped;
   {
+      std::scoped_lock<std::mutex> conn_lock(connections_mutex_);
       // There are not much connections, so direct iteration should not be that slow.
       for (const ConnectionPtr& connection: connections_) {
           if (connection->isDropped()) {
@@ -193,7 +196,7 @@ void ConnectionManager::removeDroppedConnections()
 void ConnectionManager::udprosIncomingConnection(const TransportUDPPtr& transport, Header& header)
 {
   std::string client_uri = ""; // TODO: transport->getClientURI();
-  ROSCPP_LOG_DEBUG("UDPROS received a connection from [%s]", client_uri.c_str());
+  MINIROS_DEBUG("UDPROS received a connection from [%s]", client_uri.c_str());
 
   ConnectionPtr conn(std::make_shared<Connection>());
   addConnection(conn);
@@ -205,7 +208,7 @@ void ConnectionManager::udprosIncomingConnection(const TransportUDPPtr& transpor
 void ConnectionManager::tcprosAcceptConnection(const TransportTCPPtr& transport)
 {
   std::string client_uri = transport->getClientURI();
-  ROSCPP_LOG_DEBUG("TCPROS received a connection from [%s]", client_uri.c_str());
+  MINIROS_DEBUG("TCPROS received a connection from [%s]", client_uri.c_str());
 
   ConnectionPtr conn(std::make_shared<Connection>());
   addConnection(conn);
@@ -223,7 +226,7 @@ bool ConnectionManager::onConnectionHeaderReceived(const ConnectionPtr& conn, co
   std::string val;
   if (header.getValue("topic", val))
   {
-    ROSCPP_CONN_LOG_DEBUG(
+    MINIROS_DEBUG(
      "Connection: Creating TransportSubscriberLink for topic [%s] connected to [%s]",
      val.c_str(), conn->getRemoteString().c_str());
 
@@ -233,7 +236,7 @@ bool ConnectionManager::onConnectionHeaderReceived(const ConnectionPtr& conn, co
   }
   else if (header.getValue("service", val))
   {
-    ROSCPP_LOG_DEBUG(
+    MINIROS_DEBUG(
       "Connection: Creating ServiceClientLink for service [%s] connected to [%s]",
       val.c_str(), conn->getRemoteString().c_str());
 
@@ -243,7 +246,7 @@ bool ConnectionManager::onConnectionHeaderReceived(const ConnectionPtr& conn, co
   }
   else
   {
-    ROSCPP_LOG_DEBUG(
+    MINIROS_DEBUG(
       "Got a connection for a type other than 'topic' or 'service' from [%s].  Fail.",
       conn->getRemoteString().c_str());
     return false;

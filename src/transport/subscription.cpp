@@ -32,6 +32,8 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define MINIROS_PACKAGE_NAME "subscription"
+
 #include <sstream>
 #include <fcntl.h>
 #include <cerrno>
@@ -180,7 +182,7 @@ void Subscription::addLocalConnection(const PublicationPtr& pub)
     return;
   }
 
-  ROSCPP_LOG_DEBUG("Creating intraprocess link for topic [%s]", name_.c_str());
+  MINIROS_DEBUG("Creating intraprocess link for topic [%s]", name_.c_str());
 
   IntraProcessPublisherLinkPtr pub_link(std::make_shared<IntraProcessPublisherLink>(shared_from_this(), XMLRPCManager::instance()->getServerURI(), transport_hints_));
   IntraProcessSubscriberLinkPtr sub_link(std::make_shared<IntraProcessSubscriberLink>(pub));
@@ -238,7 +240,7 @@ bool Subscription::pubUpdate(const V_string& new_pubs)
       ss << (*it)->getRemoteURI() << ", ";
     }
 
-    ROSCPP_LOG_DEBUG("Publisher update for [%s]: %s", name_.c_str(), ss.str().c_str());
+    MINIROS_DEBUG("Publisher update for [%s]: %s", name_.c_str(), ss.str().c_str());
   }
 
   V_string additions;
@@ -309,13 +311,13 @@ bool Subscription::pubUpdate(const V_string& new_pubs)
 	const PublisherLinkPtr& link = *i;
     if (link->getPublisherXMLRPCURI() != XMLRPCManager::instance()->getServerURI())
     {
-      ROSCPP_LOG_DEBUG("Disconnecting from publisher [%s] of topic [%s] at [%s]",
+      MINIROS_DEBUG("Disconnecting from publisher [%s] of topic [%s] at [%s]",
                         link->getCallerID().c_str(), name_.c_str(), link->getPublisherXMLRPCURI().c_str());
 		  link->drop();
 	  }
 	  else
 	  {
-		  ROSCPP_LOG_DEBUG("Disconnect: skipping myself for topic [%s]", name_.c_str());
+		  MINIROS_DEBUG("Disconnect: skipping myself for topic [%s]", name_.c_str());
 	  }
 	}
 
@@ -329,7 +331,7 @@ bool Subscription::pubUpdate(const V_string& new_pubs)
     }
     else
     {
-      ROSCPP_LOG_DEBUG("Skipping myself (%s, %s)", name_.c_str(), XMLRPCManager::instance()->getServerURI().c_str());
+      MINIROS_DEBUG("Skipping myself (%s, %s)", name_.c_str(), XMLRPCManager::instance()->getServerURI().c_str());
     }
   }
 
@@ -404,7 +406,7 @@ bool Subscription::negotiateConnection(const std::string& xmlrpc_uri)
   // Initiate the negotiation.  We'll come back and check on it later.
   if (!c->executeNonBlock("requestTopic", params))
   {
-    ROSCPP_LOG_DEBUG("Failed to contact publisher [%s:%d] for topic [%s]",
+    MINIROS_DEBUG("Failed to contact publisher [%s:%d] for topic [%s]",
               peer_host.c_str(), peer_port, name_.c_str());
     delete c;
     if (udp_transport)
@@ -415,7 +417,7 @@ bool Subscription::negotiateConnection(const std::string& xmlrpc_uri)
     return false;
   }
 
-  ROSCPP_LOG_DEBUG("Began asynchronous xmlrpc connection to [%s:%d]", peer_host.c_str(), peer_port);
+  MINIROS_DEBUG("Began asynchronous xmlrpc connection to [%s:%d]", peer_host.c_str(), peer_port);
 
   // The PendingConnectionPtr takes ownership of c, and will delete it on
   // destruction.
@@ -464,7 +466,7 @@ void Subscription::pendingConnectionDone(const PendingConnectionPtr& conn, XmlRp
   XmlRpc::XmlRpcValue proto;
   if(!XMLRPCManager::instance()->validateXmlrpcResponse("requestTopic", result, proto))
   {
-  	ROSCPP_LOG_DEBUG("Failed to contact publisher [%s:%d] for topic [%s]",
+  	MINIROS_DEBUG("Failed to contact publisher [%s:%d] for topic [%s]",
               peer_host.c_str(), peer_port, name_.c_str());
   	closeTransport(udp_transport);
   	return;
@@ -472,20 +474,20 @@ void Subscription::pendingConnectionDone(const PendingConnectionPtr& conn, XmlRp
 
   if (proto.size() == 0)
   {
-  	ROSCPP_LOG_DEBUG("Couldn't agree on any common protocols with [%s] for topic [%s]", xmlrpc_uri.c_str(), name_.c_str());
+  	MINIROS_DEBUG("Couldn't agree on any common protocols with [%s] for topic [%s]", xmlrpc_uri.c_str(), name_.c_str());
   	closeTransport(udp_transport);
   	return;
   }
 
   if (proto.getType() != XmlRpcValue::TypeArray)
   {
-  	ROSCPP_LOG_DEBUG("Available protocol info returned from %s is not a list.", xmlrpc_uri.c_str());
+  	MINIROS_DEBUG("Available protocol info returned from %s is not a list.", xmlrpc_uri.c_str());
   	closeTransport(udp_transport);
   	return;
   }
   if (proto[0].getType() != XmlRpcValue::TypeString)
   {
-  	ROSCPP_LOG_DEBUG("Available protocol info list doesn't have a string as its first element.");
+  	MINIROS_DEBUG("Available protocol info list doesn't have a string as its first element.");
   	closeTransport(udp_transport);
   	return;
   }
@@ -497,13 +499,13 @@ void Subscription::pendingConnectionDone(const PendingConnectionPtr& conn, XmlRp
         proto[1].getType() != XmlRpcValue::TypeString ||
         proto[2].getType() != XmlRpcValue::TypeInt)
     {
-    	ROSCPP_LOG_DEBUG("publisher implements TCPROS, but the " \
+        MINIROS_DEBUG("publisher implements TCPROS, but the " \
                 "parameters aren't string,int");
       return;
     }
     std::string pub_host = proto[1];
     int pub_port = proto[2];
-    ROSCPP_CONN_LOG_DEBUG("Connecting via tcpros to topic [%s] at host [%s:%d]", name_.c_str(), pub_host.c_str(), pub_port);
+    MINIROS_DEBUG("Connecting via tcpros to topic [%s] at host [%s:%d]", name_.c_str(), pub_host.c_str(), pub_port);
 
     TransportTCPPtr transport(std::make_shared<TransportTCP>(&PollManager::instance()->getPollSet()));
     if (transport->connect(pub_host, pub_port))
@@ -519,11 +521,11 @@ void Subscription::pendingConnectionDone(const PendingConnectionPtr& conn, XmlRp
       std::scoped_lock<std::mutex> lock(publisher_links_mutex_);
       addPublisherLink(pub_link);
 
-      ROSCPP_CONN_LOG_DEBUG("Connected to publisher of topic [%s] at [%s:%d]", name_.c_str(), pub_host.c_str(), pub_port);
+      MINIROS_DEBUG("Connected to publisher of topic [%s] at [%s:%d]", name_.c_str(), pub_host.c_str(), pub_port);
     }
     else
     {
-      ROSCPP_CONN_LOG_DEBUG("Failed to connect to publisher of topic [%s] at [%s:%d]", name_.c_str(), pub_host.c_str(), pub_port);
+      MINIROS_DEBUG("Failed to connect to publisher of topic [%s] at [%s:%d]", name_.c_str(), pub_host.c_str(), pub_port);
     }
   }
   else if (proto_name == "UDPROS")
@@ -535,7 +537,7 @@ void Subscription::pendingConnectionDone(const PendingConnectionPtr& conn, XmlRp
         proto[4].getType() != XmlRpcValue::TypeInt ||
         proto[5].getType() != XmlRpcValue::TypeBase64)
     {
-      ROSCPP_LOG_DEBUG("publisher implements UDPROS, but the " \
+      MINIROS_DEBUG("publisher implements UDPROS, but the " \
 	    	       "parameters aren't string,int,int,int,base64");
       closeTransport(udp_transport);
       return;
@@ -551,16 +553,16 @@ void Subscription::pendingConnectionDone(const PendingConnectionPtr& conn, XmlRp
     std::string err;
     if (!h.parse(buffer, header_bytes.size(), err))
     {
-      ROSCPP_LOG_DEBUG("Unable to parse UDPROS connection header: %s", err.c_str());
+      MINIROS_DEBUG("Unable to parse UDPROS connection header: %s", err.c_str());
       closeTransport(udp_transport);
       return;
     }
-    ROSCPP_LOG_DEBUG("Connecting via udpros to topic [%s] at host [%s:%d] connection id [%08x] max_datagram_size [%d]", name_.c_str(), pub_host.c_str(), pub_port, conn_id, max_datagram_size);
+    MINIROS_DEBUG("Connecting via udpros to topic [%s] at host [%s:%d] connection id [%08x] max_datagram_size [%d]", name_.c_str(), pub_host.c_str(), pub_port, conn_id, max_datagram_size);
 
     std::string error_msg;
     if (h.getValue("error", error_msg))
     {
-      ROSCPP_LOG_DEBUG("Received error message in header for connection to [%s]: [%s]", xmlrpc_uri.c_str(), error_msg.c_str());
+      MINIROS_DEBUG("Received error message in header for connection to [%s]: [%s]", xmlrpc_uri.c_str(), error_msg.c_str());
       closeTransport(udp_transport);
       return;
     }
@@ -578,18 +580,18 @@ void Subscription::pendingConnectionDone(const PendingConnectionPtr& conn, XmlRp
       std::scoped_lock<std::mutex> lock(publisher_links_mutex_);
       addPublisherLink(pub_link);
 
-      ROSCPP_LOG_DEBUG("Connected to publisher of topic [%s] at [%s:%d]", name_.c_str(), pub_host.c_str(), pub_port);
+      MINIROS_DEBUG("Connected to publisher of topic [%s] at [%s:%d]", name_.c_str(), pub_host.c_str(), pub_port);
     }
     else
     {
-      ROSCPP_LOG_DEBUG("Failed to connect to publisher of topic [%s] at [%s:%d]", name_.c_str(), pub_host.c_str(), pub_port);
+      MINIROS_DEBUG("Failed to connect to publisher of topic [%s] at [%s:%d]", name_.c_str(), pub_host.c_str(), pub_port);
       closeTransport(udp_transport);
       return;
     }
   }
   else
   {
-  	ROSCPP_LOG_DEBUG("Publisher offered unsupported transport [%s]", proto_name.c_str());
+  	MINIROS_DEBUG("Publisher offered unsupported transport [%s]", proto_name.c_str());
   }
 }
 

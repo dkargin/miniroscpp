@@ -25,6 +25,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define MINIROS_PACKAGE_NAME "master_link"
+
 #include "miniros/master_link.h"
 #include "miniros/init.h"
 #include "miniros/names.h"
@@ -105,7 +107,7 @@ void MasterLink::initLink(const M_string& remappings)
 
   // Split URI into
   if (!network::splitURI(internal_->uri, internal_->host, internal_->port)) {
-    MINIROS_FATAL("Couldn't parse the master URI [%s] into a host:port pair.", g_uri.c_str());
+    MINIROS_FATAL("Couldn't parse the master URI [%s] into a host:port pair.", internal_->uri.c_str());
     MINIROS_BREAK();
   }
 }
@@ -227,7 +229,7 @@ bool MasterLink::execute(const std::string& method, const XmlRpc::XmlRpcValue& r
 
       if (!internal_->retry_timeout.isZero() && (miniros::SteadyTime::now() - start_time) >= internal_->retry_timeout) {
         MINIROS_ERROR(
-          "[%s] Timed out trying to connect to the master after [%f] seconds", method.c_str(), g_retry_timeout.toSec());
+          "[%s] Timed out trying to connect to the master after [%f] seconds", method.c_str(), internal_->retry_timeout.toSec());
         manager->releaseXMLRPCClient(c);
         return false;
       }
@@ -472,12 +474,12 @@ bool MasterLink::getParamImpl(const std::string& key, XmlRpc::XmlRpcValue& v, bo
       auto it = internal_->params.find(mapped_key);
       if (it != internal_->params.end()) {
         if (it->second.valid()) {
-          ROS_DEBUG_NAMED("cached_parameters", "Using cached parameter value for key [%s]", mapped_key.c_str());
+          MINIROS_DEBUG_NAMED("cached_parameters", "Using cached parameter value for key [%s]", mapped_key.c_str());
 
           v = it->second;
           return true;
         } else {
-          ROS_DEBUG_NAMED("cached_parameters", "Cached parameter is invalid for key [%s]", mapped_key.c_str());
+          MINIROS_DEBUG_NAMED("cached_parameters", "Cached parameter is invalid for key [%s]", mapped_key.c_str());
           return false;
         }
       }
@@ -490,12 +492,12 @@ bool MasterLink::getParamImpl(const std::string& key, XmlRpc::XmlRpcValue& v, bo
         params[2] = mapped_key;
 
         if (!this->execute("subscribeParam", params, result, payload, false)) {
-          ROS_DEBUG_NAMED(
+          MINIROS_DEBUG_NAMED(
             "cached_parameters", "Subscribe to parameter [%s]: call to the master failed", mapped_key.c_str());
           internal_->subscribed_params.erase(mapped_key);
           use_cache = false;
         } else {
-          ROS_DEBUG_NAMED("cached_parameters", "Subscribed to parameter [%s]", mapped_key.c_str());
+          MINIROS_DEBUG_NAMED("cached_parameters", "Subscribed to parameter [%s]", mapped_key.c_str());
         }
       }
     }
@@ -513,7 +515,7 @@ bool MasterLink::getParamImpl(const std::string& key, XmlRpc::XmlRpcValue& v, bo
   if (use_cache) {
     std::scoped_lock<std::mutex> lock(internal_->params_mutex);
 
-    ROS_DEBUG_NAMED(
+    MINIROS_DEBUG_NAMED(
       "cached_parameters", "Caching parameter [%s] with value type [%d]", mapped_key.c_str(), v.getType());
     internal_->params[mapped_key] = v;
   }
@@ -957,7 +959,7 @@ void MasterLink::update(const std::string& key, const XmlRpc::XmlRpcValue& v)
   if (!internal_)
     return;
   std::string clean_key = names::clean(key);
-  ROS_DEBUG_NAMED("cached_parameters", "Received parameter update for key [%s]", clean_key.c_str());
+  MINIROS_DEBUG_NAMED("cached_parameters", "Received parameter update for key [%s]", clean_key.c_str());
 
   std::scoped_lock<std::mutex> lock(internal_->params_mutex);
 

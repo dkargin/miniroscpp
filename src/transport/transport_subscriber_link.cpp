@@ -26,6 +26,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define MINIROS_PACKAGE_NAME "transport_subscriber_link"
+
 #include "miniros/transport/transport_subscriber_link.h"
 #include "miniros/transport/publication.h"
 #include "miniros/header.h"
@@ -97,7 +99,7 @@ bool TransportSubscriberLink::handleHeader(const Header& header)
     std::string msg = std::string("received a connection for a nonexistent topic [") +
                     topic + std::string("] from [" + connection_->getTransport()->getTransportInfo() + "] [" + client_callerid +"].");
 
-    ROSCPP_LOG_DEBUG("%s", msg.c_str());
+    MINIROS_DEBUG("%s", msg.c_str());
     connection_->sendHeaderError(msg);
 
     return false;
@@ -106,7 +108,7 @@ bool TransportSubscriberLink::handleHeader(const Header& header)
   std::string error_msg;
   if (!pt->validateHeader(header, error_msg))
   {
-    ROSCPP_LOG_DEBUG("%s", error_msg.c_str());
+    MINIROS_DEBUG("%s", error_msg.c_str());
     connection_->sendHeaderError(error_msg);
 
     return false;
@@ -141,7 +143,7 @@ void TransportSubscriberLink::onConnectionDropped(const ConnectionPtr& conn)
 
   if (parent)
   {
-    ROSCPP_CONN_LOG_DEBUG("Connection to subscriber [%s] to topic [%s] dropped", connection_->getRemoteString().c_str(), topic_.c_str());
+    MINIROS_DEBUG("Connection to subscriber [%s] to topic [%s] dropped", connection_->getRemoteString().c_str(), topic_.c_str());
 
     parent->removeSubscriberLink(shared_from_this());
   }
@@ -205,7 +207,7 @@ void TransportSubscriberLink::enqueueMessage(const SerializedMessage& m, bool se
       max_queue = parent->getMaxQueue();
     }
 
-    ROS_DEBUG_NAMED("superdebug", "TransportSubscriberLink on topic [%s] to caller [%s], queueing message (queue size [%d])", topic_.c_str(), destination_caller_id_.c_str(), (int)outbox_.size());
+    MINIROS_DEBUG_NAMED("superdebug", "TransportSubscriberLink on topic [%s] to caller [%s], queueing message (queue size [%d])", topic_.c_str(), destination_caller_id_.c_str(), (int)outbox_.size());
 
     if (max_queue > 0 && (int)outbox_.size() >= max_queue)
     {

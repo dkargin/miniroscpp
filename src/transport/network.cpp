@@ -91,7 +91,7 @@ std::string determineHost()
   std::string ip_env;
   // First, did the user set ROS_HOSTNAME?
   if ( get_environment_variable(ip_env, "ROS_HOSTNAME")) {
-    ROSCPP_LOG_DEBUG( "determineIP: using value of ROS_HOSTNAME:%s:", ip_env.c_str());
+    MINIROS_DEBUG_NAMED("roscxx", "determineIP: using value of ROS_HOSTNAME:%s:", ip_env.c_str());
     if (ip_env.size() == 0)
     {
       MINIROS_WARN("invalid ROS_HOSTNAME (an empty string)");
@@ -101,7 +101,7 @@ std::string determineHost()
 
   // Second, did the user set ROS_IP?
   if ( get_environment_variable(ip_env, "ROS_IP")) {
-    ROSCPP_LOG_DEBUG( "determineIP: using value of ROS_IP:%s:", ip_env.c_str());
+    MINIROS_DEBUG( "determineIP: using value of ROS_IP:%s:", ip_env.c_str());
     if (ip_env.size() == 0)
     {
         MINIROS_WARN("invalid ROS_IP (an empty string)");
@@ -148,7 +148,7 @@ std::string determineHost()
     if (getnameinfo(ifa->ifa_addr, salen, ip_, sizeof(ip_), NULL, 0,
                     NI_NUMERICHOST) < 0)
     {
-      ROSCPP_LOG_DEBUG( "getnameinfo couldn't get the ip of interface [%s]", ifa->ifa_name);
+      MINIROS_DEBUG_NAMED("roscxx", "getnameinfo couldn't get the ip of interface [%s]", ifa->ifa_name);
       continue;
     }
     //ROS_INFO( "ip of interface [%s] is [%s]", ifa->ifa_name, ip);
@@ -166,13 +166,13 @@ std::string determineHost()
   freeifaddrs(ifp);
   if (!preferred_ip[0])
   {
-      MINIROS_ERROR( "Couldn't find a preferred IP via the getifaddrs() call; I'm assuming that your IP "
+      MINIROS_ERROR_NAMED("roscxx", "Couldn't find a preferred IP via the getifaddrs() call; I'm assuming that your IP "
         "address is 127.0.0.1.  This should work for local processes, "
         "but will almost certainly not work if you have remote processes."
         "Report to the ROS development team to seek a fix.");
     return std::string("127.0.0.1");
   }
-  ROSCPP_LOG_DEBUG( "preferred IP is guessed to be %s", preferred_ip);
+  MINIROS_DEBUG_NAMED("roscxx", "preferred IP is guessed to be %s", preferred_ip);
   return std::string(preferred_ip);
 #else
   // @todo Fix IP determination in the case where getifaddrs() isn't

@@ -32,6 +32,8 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define MINIROS_PACKAGE_NAME "service_server_link"
+
 #include "miniros/transport/service_server_link.h"
 #include "miniros/header.h"
 #include "miniros/transport/connection.h"
@@ -192,7 +194,7 @@ bool ServiceServerLink::onHeaderReceived(const ConnectionPtr& conn, const Header
 void ServiceServerLink::onConnectionDropped(const ConnectionPtr& conn)
 {
   MINIROS_ASSERT(conn == connection_);
-  ROSCPP_LOG_DEBUG("Service client from [%s] for [%s] dropped", conn->getRemoteString().c_str(), service_name_.c_str());
+  MINIROS_DEBUG("Service client from [%s] for [%s] dropped", conn->getRemoteString().c_str(), service_name_.c_str());
 
   dropped_ = true;
   clearCalls();
@@ -290,7 +292,7 @@ void ServiceServerLink::callFinished()
     std::scoped_lock<std::mutex> queue_lock(call_queue_mutex_);
     std::scoped_lock<std::mutex> finished_lock(current_call_->finished_mutex_);
 
-    ROS_DEBUG_NAMED("superdebug", "Client to service [%s] call finished with success=[%s]", service_name_.c_str(), current_call_->success_ ? "true" : "false");
+    MINIROS_DEBUG_NAMED("superdebug", "Client to service [%s] call finished with success=[%s]", service_name_.c_str(), current_call_->success_ ? "true" : "false");
 
     current_call_->finished_ = true;
     current_call_->finished_condition_.notify_all();
@@ -322,7 +324,7 @@ void ServiceServerLink::processNextCall()
 
     if (!call_queue_.empty())
     {
-      ROS_DEBUG_NAMED("superdebug", "[%s] Client to service [%s] processing next service call", persistent_ ? "persistent" : "non-persistent", service_name_.c_str());
+      MINIROS_DEBUG_NAMED("superdebug", "[%s] Client to service [%s] processing next service call", persistent_ ? "persistent" : "non-persistent", service_name_.c_str());
 
       current_call_ = call_queue_.front();
       call_queue_.pop();
@@ -337,12 +339,12 @@ void ServiceServerLink::processNextCall()
   {
     if (!persistent_)
     {
-      ROS_DEBUG_NAMED("superdebug", "Dropping non-persistent client to service [%s]", service_name_.c_str());
+      MINIROS_DEBUG_NAMED("superdebug", "Dropping non-persistent client to service [%s]", service_name_.c_str());
       connection_->drop(Connection::Destructing);
     }
     else
     {
-      ROS_DEBUG_NAMED("superdebug", "Keeping persistent client to service [%s]", service_name_.c_str());
+      MINIROS_DEBUG_NAMED("superdebug", "Keeping persistent client to service [%s]", service_name_.c_str());
     }
   }
   else
@@ -380,7 +382,7 @@ bool ServiceServerLink::call(const SerializedMessage& req, SerializedMessage& re
 
     if (connection_->isDropped())
     {
-      ROSCPP_LOG_DEBUG("ServiceServerLink::call called on dropped connection for service [%s]", service_name_.c_str());
+      MINIROS_DEBUG("ServiceServerLink::call called on dropped connection for service [%s]", service_name_.c_str());
       info->call_finished_ = true;
       return false;
     }

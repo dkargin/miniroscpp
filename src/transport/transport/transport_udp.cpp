@@ -31,6 +31,9 @@
  *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
+
+#define MINIROS_PACKAGE_NAME "transport_udp"
+
 #include <sstream>
 #include <cstring>
 
@@ -114,7 +117,7 @@ void TransportUDP::socketUpdate(int events)
      (events & POLLHUP) ||
      (events & POLLNVAL))
   {
-    ROSCPP_LOG_DEBUG("Socket %d closed with (ERR|HUP|NVAL) events %d", sock_, events);
+    MINIROS_DEBUG("Socket %d closed with (ERR|HUP|NVAL) events %d", sock_, events);
     close();
   }
   else
@@ -198,7 +201,7 @@ bool TransportUDP::connect(const std::string& host, int port, int connection_id)
       return false;
     }
 
-    ROSCPP_LOG_DEBUG("Resolved host [%s] to [%s]", host.c_str(), inet_ntoa(sin.sin_addr));
+    MINIROS_DEBUG("Resolved host [%s] to [%s]", host.c_str(), inet_ntoa(sin.sin_addr));
   }
   else
   {
@@ -209,7 +212,7 @@ bool TransportUDP::connect(const std::string& host, int port, int connection_id)
 
   if (::connect(sock_, (sockaddr *)&sin, sizeof(sin)))
   {
-    ROSCPP_LOG_DEBUG("Connect to udpros host [%s:%d] failed with error [%s]", host.c_str(), port,  last_socket_error_string());
+    MINIROS_DEBUG("Connect to udpros host [%s:%d] failed with error [%s]", host.c_str(), port,  last_socket_error_string());
     close();
 
     return false;
@@ -231,7 +234,7 @@ bool TransportUDP::connect(const std::string& host, int port, int connection_id)
     return false;
   }
 
-  ROSCPP_LOG_DEBUG("Connect succeeded to [%s:%d] on socket [%d]", host.c_str(), port, sock_);
+  MINIROS_DEBUG("Connect succeeded to [%s:%d] on socket [%d]", host.c_str(), port, sock_);
 
   return true;
 }
@@ -262,7 +265,7 @@ bool TransportUDP::createIncoming(int port, bool is_server)
   socklen_t len = sizeof(server_address_);
   getsockname(sock_, (sockaddr *)&server_address_, &len);
   server_port_ = ntohs(server_address_.sin_port);
-  ROSCPP_LOG_DEBUG("UDPROS server listening on port [%d]", server_port_);
+  MINIROS_DEBUG("UDPROS server listening on port [%d]", server_port_);
 
   if (!initializeSocket())
   {
@@ -315,7 +318,7 @@ void TransportUDP::close()
       {
         closed_ = true;
 
-        ROSCPP_LOG_DEBUG("UDP socket [%d] closed", sock_);
+        MINIROS_DEBUG("UDP socket [%d] closed", sock_);
 
         MINIROS_ASSERT(sock_ != ROS_INVALID_SOCKET);
 
@@ -352,7 +355,7 @@ int32_t TransportUDP::read(uint8_t* buffer, uint32_t size)
     std::scoped_lock<std::mutex> lock(close_mutex_);
     if (closed_)
     {
-      ROSCPP_LOG_DEBUG("Tried to read on a closed socket [%d]", sock_);
+      MINIROS_DEBUG("Tried to read on a closed socket [%d]", sock_);
       return -1;
     }
   }
@@ -421,14 +424,14 @@ int32_t TransportUDP::read(uint8_t* buffer, uint32_t size)
           }
           else
           {
-            ROSCPP_LOG_DEBUG("readv() failed with error [%s]",  last_socket_error_string());
+            MINIROS_DEBUG("readv() failed with error [%s]",  last_socket_error_string());
             close();
             break;
           }
         }
         else if (num_bytes == 0)
         {
-          ROSCPP_LOG_DEBUG("Socket [%d] received 0/%d bytes, closing", sock_, size);
+          MINIROS_DEBUG("Socket [%d] received 0/%d bytes, closing", sock_, size);
           close();
           return -1;
         }
@@ -532,7 +535,7 @@ int32_t TransportUDP::write(uint8_t* buffer, uint32_t size)
 
     if (closed_)
     {
-      ROSCPP_LOG_DEBUG("Tried to write on a closed socket [%d]", sock_);
+      MINIROS_DEBUG("Tried to write on a closed socket [%d]", sock_);
       return -1;
     }
   }
@@ -589,7 +592,7 @@ int32_t TransportUDP::write(uint8_t* buffer, uint32_t size)
     {
       if( !last_socket_error_is_would_block() ) // Actually EAGAIN or EWOULDBLOCK on posix
       {
-        ROSCPP_LOG_DEBUG("writev() failed with error [%s]", last_socket_error_string());
+        MINIROS_DEBUG("writev() failed with error [%s]", last_socket_error_string());
         close();
         break;
       }
@@ -601,7 +604,7 @@ int32_t TransportUDP::write(uint8_t* buffer, uint32_t size)
     }
     else if (num_bytes < (unsigned) sizeof(header))
     {
-      ROSCPP_LOG_DEBUG("Socket [%d] short write (%d bytes), closing", sock_, int(num_bytes));
+      MINIROS_DEBUG("Socket [%d] short write (%d bytes), closing", sock_, int(num_bytes));
       close();
       break;
     }

@@ -26,11 +26,11 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define MINIROS_PACKAGE_NAME "intraprocess_subscriber_link"
+
 #include "miniros/transport/intraprocess_subscriber_link.h"
 #include "miniros/transport/intraprocess_publisher_link.h"
 #include "miniros/transport/publication.h"
-#include "miniros/header.h"
-#include "miniros/transport/connection.h"
 #include "miniros/transport/transport.h"
 #include "miniros/this_node.h"
 #include "miniros/transport/connection_manager.h"
@@ -112,7 +112,7 @@ void IntraProcessSubscriberLink::drop()
 
   if (PublicationPtr parent = parent_.lock())
   {
-    ROSCPP_LOG_DEBUG("Connection to local subscriber on topic [%s] dropped", topic_.c_str());
+    MINIROS_DEBUG("Connection to local subscriber on topic [%s] dropped", topic_.c_str());
 
     parent->removeSubscriberLink(shared_from_this());
   }

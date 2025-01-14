@@ -25,6 +25,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define MINIROS_PACKAGE_NAME "service_manager"
+
 #include <cstdio>
 
 #include "miniros/transport/service_manager.h"
@@ -89,7 +91,7 @@ void ServiceManager::shutdown()
 
   shutting_down_ = true;
 
-  ROSCPP_LOG_DEBUG("ServiceManager::shutdown(): unregistering our advertised services");
+  MINIROS_DEBUG("ServiceManager::shutdown(): unregistering our advertised services");
   {
     std::scoped_lock<std::mutex> ss_lock(service_publications_mutex_);
 
@@ -97,7 +99,7 @@ void ServiceManager::shutdown()
          i != service_publications_.end(); ++i)
     {
       unregisterService((*i)->getName());
-      //ROSCPP_LOG_DEBUG( "shutting down service %s", (*i)->getName().c_str());
+      //MINIROS_DEBUG( "shutting down service %s", (*i)->getName().c_str());
       (*i)->drop();
     }
     service_publications_.clear();
@@ -177,7 +179,7 @@ bool ServiceManager::unadvertiseService(const string &serv_name)
   if (pub)
   {
     unregisterService(pub->getName());
-    ROSCPP_LOG_DEBUG( "shutting down service [%s]", pub->getName().c_str());
+    MINIROS_DEBUG( "shutting down service [%s]", pub->getName().c_str());
     pub->drop();
     return true;
   }
@@ -264,7 +266,7 @@ ServiceServerLinkPtr ServiceManager::createServiceServerLink(const std::string& 
     return client;
   }
 
-  ROSCPP_LOG_DEBUG("Failed to connect to service [%s] (mapped=[%s]) at [%s:%d]", service.c_str(), service.c_str(), serv_host.c_str(), serv_port);
+  MINIROS_DEBUG("Failed to connect to service [%s] (mapped=[%s]) at [%s:%d]", service.c_str(), service.c_str(), serv_host.c_str(), serv_port);
 
   return ServiceServerLinkPtr();
 }

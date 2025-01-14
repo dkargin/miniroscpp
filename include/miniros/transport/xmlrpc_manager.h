@@ -33,6 +33,7 @@
 #include <memory>
 #include <thread>
 #include <mutex>
+#include <atomic>
 
 #include "common.h"
 // TODO: Move it to impl section
@@ -130,7 +131,7 @@ public:
   void start();
   void shutdown();
 
-  bool isShuttingDown() { return shutting_down_; }
+  bool isShuttingDown() const;
 
 private:
   void serverThreadFunc();
@@ -148,7 +149,7 @@ private:
   V_CachedXmlRpcClient clients_;
   std::mutex clients_mutex_;
 
-  bool shutting_down_;
+  std::atomic_bool shutting_down_;
 
   miniros::WallDuration master_retry_timeout_;
 
@@ -170,7 +171,7 @@ private:
   std::mutex functions_mutex_;
   M_StringToFuncInfo functions_;
 
-  volatile bool unbind_requested_;
+  std::atomic_bool unbind_requested_;
 };
 
 }

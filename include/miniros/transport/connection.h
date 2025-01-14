@@ -35,6 +35,7 @@
 #ifndef MINIROS_TRANSPORT_CONNECTION_H
 #define MINIROS_TRANSPORT_CONNECTION_H
 
+#include <atomic>
 #include <thread>
 #include <mutex>
 
@@ -89,7 +90,7 @@ public:
   /**
    * \brief Returns whether or not this connection has been dropped
    */
-  bool isDropped();
+  bool isDropped() const;
 
   /**
    * \brief Returns true if we're currently sending a header error (and will be automatically dropped when it's finished)
@@ -207,7 +208,7 @@ private:
   /// Are we a server?  Servers wait for clients to send a header and then send a header in response.
   bool is_server_;
   /// Have we dropped?
-  bool dropped_;
+  std::atomic_bool dropped_;
   /// Incoming header
   Header header_;
   /// Transport associated with us
@@ -230,7 +231,7 @@ private:
   /// flag telling us if there is a read callback
   /// 32-bit loads and stores are atomic on x86 and PPC... TODO: use a cross-platform atomic operations library
   /// to ensure this is done atomically
-  volatile uint32_t has_read_callback_;
+  std::atomic_uint32_t has_read_callback_;
 
   /// Buffer to write from
   std::shared_ptr<uint8_t[]> write_buffer_;
@@ -244,11 +245,11 @@ private:
   /// Mutex used for protecting writing.  Recursive because a write can immediately cause another write through the callback
   std::recursive_mutex write_mutex_;
   /// Flag telling us if we're in the middle of a write (mostly used to avoid recursive deadlocking)
-  bool writing_;
+  std::atomic_bool writing_;
   /// flag telling us if there is a write callback
   /// 32-bit loads and stores are atomic on x86 and PPC... TODO: use a cross-platform atomic operations library
   /// to ensure this is done atomically
-  volatile uint32_t has_write_callback_;
+  std::atomic_uint32_t has_write_callback_;
 
   /// Function to call when the outgoing header has finished writing
   WriteFinishedFunc header_written_callback_;
@@ -256,9 +257,6 @@ private:
   /// Signal raised when this connection is dropped.
   using DropWatchers = observer::Target<DropWatcher>;
   DropWatchers drop_watchers_;
-
-  /// Synchronizes drop() calls
-  std::recursive_mutex drop_mutex_;
 
   /// If we're sending a header error we disable most other calls
   bool sending_header_error_;

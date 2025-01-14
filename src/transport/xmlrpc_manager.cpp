@@ -25,6 +25,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define MINIROS_PACKAGE_NAME "xmlrpc"
+
 #include <sstream>
 
 #include "miniros/transport/xmlrpc_manager.h"
@@ -169,7 +171,7 @@ void XMLRPCManager::shutdown()
   // Wait for the clients that are in use to finish and remove themselves from clients_
   for (int wait_count = 0; !clients_.empty() && wait_count < 10; wait_count++)
   {
-    ROSCPP_LOG_DEBUG("waiting for xmlrpc connection to finish...");
+    MINIROS_DEBUG("waiting for xmlrpc connection to finish...");
     miniros::WallDuration(0.01).sleep();
   }
 
@@ -203,33 +205,33 @@ bool XMLRPCManager::validateXmlrpcResponse(const std::string& method, XmlRpcValu
 {
   if (response.getType() != XmlRpcValue::TypeArray)
   {
-    ROSCPP_LOG_DEBUG("XML-RPC call [%s] didn't return an array",
+    MINIROS_DEBUG("XML-RPC call [%s] didn't return an array",
         method.c_str());
     return false;
   }
   if (response.size() != 2 && response.size() != 3)
   {
-    ROSCPP_LOG_DEBUG("XML-RPC call [%s] didn't return a 2 or 3-element array",
+    MINIROS_DEBUG("XML-RPC call [%s] didn't return a 2 or 3-element array",
         method.c_str());
     return false;
   }
   if (response[0].getType() != XmlRpcValue::TypeInt)
   {
-    ROSCPP_LOG_DEBUG("XML-RPC call [%s] didn't return a int as the 1st element",
+    MINIROS_DEBUG("XML-RPC call [%s] didn't return a int as the 1st element",
         method.c_str());
     return false;
   }
   int status_code = response[0];
   if (response[1].getType() != XmlRpcValue::TypeString)
   {
-    ROSCPP_LOG_DEBUG("XML-RPC call [%s] didn't return a string as the 2nd element",
+    MINIROS_DEBUG("XML-RPC call [%s] didn't return a string as the 2nd element",
         method.c_str());
     return false;
   }
   std::string status_string = response[1];
   if (status_code != 1)
   {
-    ROSCPP_LOG_DEBUG("XML-RPC call [%s] returned an error (%d): [%s]",
+    MINIROS_DEBUG("XML-RPC call [%s] returned an error (%d): [%s]",
         method.c_str(), status_code, status_string.c_str());
     return false;
   }
@@ -424,6 +426,11 @@ void XMLRPCManager::unbind(const std::string& function_name)
   std::scoped_lock<std::mutex> lock(functions_mutex_);
   functions_.erase(function_name);
   unbind_requested_ = false;
+}
+
+bool XMLRPCManager::isShuttingDown() const
+{
+  return shutting_down_;
 }
 
 } // namespace miniros

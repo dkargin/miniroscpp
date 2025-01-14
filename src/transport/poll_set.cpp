@@ -32,6 +32,8 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define MINIROS_PACKAGE_NAME "poll_set"
+
 #include "miniros/transport/poll_set.h"
 #include "miniros/transport/file_log.h"
 
@@ -75,7 +77,7 @@ bool PollSet::addSocket(int fd, const SocketUpdateFunc& update_func, const Trans
     bool b = socket_info_.insert(std::make_pair(fd, info)).second;
     if (!b)
     {
-      ROSCPP_LOG_DEBUG("PollSet: Tried to add duplicate fd [%d]", fd);
+      MINIROS_DEBUG("PollSet: Tried to add duplicate fd [%d]", fd);
       return false;
     }
 
@@ -115,7 +117,7 @@ bool PollSet::delSocket(int fd)
     return true;
   }
 
-  ROSCPP_LOG_DEBUG("PollSet: Tried to delete fd [%d] which is not being tracked", fd);
+  MINIROS_DEBUG("PollSet: Tried to delete fd [%d] which is not being tracked", fd);
 
   return false;
 }
@@ -129,7 +131,7 @@ bool PollSet::addEvents(int sock, int events)
 
   if (it == socket_info_.end())
   {
-    ROSCPP_LOG_DEBUG("PollSet: Tried to add events [%d] to fd [%d] which does not exist in this pollset", events, sock);
+    MINIROS_DEBUG("PollSet: Tried to add events [%d] to fd [%d] which does not exist in this pollset", events, sock);
     return false;
   }
 
@@ -154,7 +156,7 @@ bool PollSet::delEvents(int sock, int events)
   }
   else
   {
-    ROSCPP_LOG_DEBUG("PollSet: Tried to delete events [%d] to fd [%d] which does not exist in this pollset", events, sock);
+    MINIROS_DEBUG("PollSet: Tried to delete events [%d] to fd [%d] which does not exist in this pollset", events, sock);
     return false;
   }
 
@@ -188,7 +190,7 @@ void PollSet::update(int poll_timeout)
   std::shared_ptr<std::vector<socket_pollfd> > ofds = poll_sockets(epfd_, &ufds_.front(), ufds_.size(), poll_timeout);
   if (!ofds)
   {
-    ROS_ERROR_STREAM("poll failed with error " << last_socket_error_string());
+    MINIROS_ERROR("poll failed with error %s", last_socket_error_string());
   }
   else
   {

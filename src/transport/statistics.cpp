@@ -165,11 +165,11 @@ void StatisticsLogger::callback(const std::shared_ptr<M_string>& connection_head
       catch(std::runtime_error& e)
       {
         msg.stamp_age_stddev = miniros::Duration(0);
-        ROS_WARN_STREAM("Error updating stamp_age_stddev for topic [" << topic << "]"
-          << " from node [" << callerid << "],"
+        MINIROS_WARN_STREAM("Error updating stamp_age_stddev for topic [" << topic.c_str() << "]"
+          << " from node [" << callerid.c_str()<< "],"
           << " likely due to the time between the mean stamp age and this message being exceptionally large."
           << " Exception was: " << e.what());
-        ROS_DEBUG_STREAM("Mean stamp age was: " << msg.stamp_age_mean << " - std_dev of: " << stamp_age_stddev);
+        MINIROS_DEBUG_STREAM("Mean stamp age was: " << msg.stamp_age_mean << " - std_dev of: " << stamp_age_stddev);
       }
 
     }

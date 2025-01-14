@@ -32,6 +32,8 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define MINIROS_PACKAGE_NAME "intraprocess_publisher_link"
+
 #include "miniros/transport/intraprocess_publisher_link.h"
 #include "miniros/transport/intraprocess_subscriber_link.h"
 #include "miniros/transport/subscription.h"
@@ -96,7 +98,7 @@ void IntraProcessPublisherLink::drop()
 
   if (SubscriptionPtr parent = parent_.lock())
   {
-    ROSCPP_LOG_DEBUG("Connection to local publisher on topic [%s] dropped", parent->getName().c_str());
+    MINIROS_DEBUG("Connection to local publisher on topic [%s] dropped", parent->getName().c_str());
 
     parent->removePublisherLink(shared_from_this());
   }

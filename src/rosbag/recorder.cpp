@@ -440,7 +440,7 @@ void Recorder::doRecord()
   try {
     checkDisk();
   } catch (minibag::BagException& ex) {
-    MINIROS_ERROR(ex.what());
+    MINIROS_ERROR("BagException: %s", ex.what());
     exit_code_ = 1;
     stopWriting();
     return;
@@ -488,7 +488,7 @@ void Recorder::doRecord()
       if (scheduledCheckDisk() && checkLogging())
         bag_.write(out.topic, out.time, *out.msg, out.connection_header);
     } catch (minibag::BagException& ex) {
-      MINIROS_ERROR(ex.what());
+      MINIROS_ERROR("BagException: %s", ex.what());
       exit_code_ = 1;
       break;
     }

@@ -32,12 +32,12 @@ namespace XmlRpc {
     static const char PARAM_TAG[];
     static const char PARAM_ETAG[];
 
-    static const std::string SYSTEM_MULTICALL;
-    static const std::string METHODNAME;
-    static const std::string PARAMS;
+    static const char SYSTEM_MULTICALL[];
+    static const char METHODNAME[];
+    static const char PARAMS[];
 
-    static const std::string FAULTCODE;
-    static const std::string FAULTSTRING;
+    static const char FAULTCODE[];
+    static const char FAULTSTRING[];
 
     //! Constructor
     XmlRpcServerConnection(int fd, XmlRpcServer* server, bool deleteOnClose = false);

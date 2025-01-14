@@ -151,7 +151,7 @@ void atexitCallback()
 {
   if (ok() && !isShuttingDown())
   {
-    ROSCPP_LOG_DEBUG("shutting down due to exit() or end of main() without cleanup of all NodeHandles");
+    MINIROS_DEBUG("shutting down due to exit() or end of main() without cleanup of all NodeHandles");
     g_started = false; // don't shutdown singletons, because they are already destroyed
     shutdown();
   }
@@ -251,7 +251,7 @@ bool setLoggerLevel(roscpp::SetLoggerLevel::Request& req, roscpp::SetLoggerLevel
 
 bool closeAllConnections(roscpp::Empty::Request&, roscpp::Empty::Response&)
 {
-  ROSCPP_LOG_DEBUG("close_all_connections service called, closing connections");
+  MINIROS_DEBUG("close_all_connections service called, closing connections");
   ConnectionManager::instance()->clear(Connection::TransportDisconnect);
   return true;
 }
@@ -409,10 +409,10 @@ void start()
   g_internal_queue_thread = std::thread(internalCallbackQueueThreadFunc);
   getGlobalCallbackQueue()->enable();
 
-  ROSCPP_LOG_DEBUG("Started node [%s], pid [%d], bound on [%s], xmlrpc port [%d], tcpros port [%d], using [%s] time", 
-		   this_node::getName().c_str(), getpid(), network::getHost().c_str(), 
-           rpcm->getServerPort(), cm->getTCPPort(),
-		   Time::useSystemTime() ? "real" : "sim");
+  MINIROS_DEBUG("Started node [%s], pid [%d], bound on [%s], xmlrpc port [%d], tcpros port [%d], using [%s] time", 
+           this_node::getName().c_str(), getpid(), network::getHost().c_str(),
+           rpcm->getServerPort(), connectionManager->getTCPPort(),
+           Time::useSystemTime() ? "real" : "sim");
 
   // Label used to abort if we've started shutting down in the middle of start(), which can happen in
   // threaded code or if Ctrl-C is pressed while we're initializing
@@ -498,7 +498,7 @@ M_string extractRemappings(int& argc, char** argv, const std::string& name, uint
       std::string local_name = arg.substr(0, pos);
       std::string external_name = arg.substr(pos + 2);
 
-      ROSCPP_LOG_DEBUG("remap: %s => %s", local_name.c_str(), external_name.c_str());
+      MINIROS_DEBUG("remap: %s => %s", local_name.c_str(), external_name.c_str());
       remappings[local_name] = external_name;
 
       // shuffle everybody down and stuff this guy at the end of argv

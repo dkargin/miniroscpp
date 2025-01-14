@@ -486,7 +486,7 @@ void TimerManager<T, D, E>::threadFunc()
     // detect time jumping backwards
     if (T::now() < current)
     {
-      ROSCPP_LOG_DEBUG("Time jumped backward, resetting timers");
+      MINIROS_DEBUG("Time jumped backward, resetting timers");
 
       current = T::now();
 
@@ -522,7 +522,7 @@ void TimerManager<T, D, E>::threadFunc()
         {
           current = T::now();
 
-          ROSCPP_LOG_DEBUG("Scheduling timer callback for timer [%d] of period [%f], [%f] off expected", info->handle, info->period.toSec(), (current - info->next_expected).toSec());
+          MINIROS_DEBUG("Scheduling timer callback for timer [%d] of period [%f], [%f] off expected", info->handle, info->period.toSec(), (current - info->next_expected).toSec());
           CallbackInterfacePtr cb(std::make_shared<TimerQueueCallback>(this, info, info->last_expected, info->last_real, info->next_expected, info->last_expired, current));
           info->callback_queue->addCallback(cb, (uint64_t)info.get());
 
@@ -549,7 +549,7 @@ void TimerManager<T, D, E>::threadFunc()
 
       if (T::now() < current)
       {
-        ROSCPP_LOG_DEBUG("Time jumped backwards, breaking out of sleep");
+        MINIROS_DEBUG("Time jumped backwards, breaking out of sleep");
         break;
       }
 

@@ -32,6 +32,8 @@
 #include "miniros/internal/forwards.h"
 #include "miniros/internal/observer.h"
 
+#include <atomic>
+
 #include "poll_set.h"
 #include "common.h"
 
@@ -68,7 +70,7 @@ private:
   void threadFunc();
 
   PollSet poll_set_;
-  volatile bool shutting_down_;
+  std::atomic_bool shutting_down_;
 
   /// Signal raised when this connection is dropped.
   using PollWatchers = observer::Target<PollWatcher>;
