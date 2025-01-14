@@ -18,24 +18,23 @@ include(CMakePackageConfigHelpers)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 option(MINIROS_USE_CATKIN "Use ros1 catkin build system" OFF)
-
-if (MINIROS_USE_CATKIN)
-  find_package(catkin QUIET)
-  if(catkin_FOUND)
-    message(STATUS "Miniros has been used with catkin")
-    catkin_package(
-      DEPENDS
-      INCLUDE_DIRS include include/generated
-      LIBRARIES roscxx bag_storage)
-  else()
-    message(STATUS "Catkin was not found")
-  endif(catkin_FOUND)
-endif()
+option(MINIROS_USE_SYSTEM_BZIP2 "Use bzip2 from system" OFF)
+option(MINIROS_USE_SYSTEM_LZ4 "Use lz4 from system" OFF)
+option(MINIROS_USE_SYSTEM_PROGRAM_OPTIONS "Use boost::program_options instead of local implementation" OFF)
+option(MINIROS_BUILD_EXAMPLES "Build examples" ${MINIROS_ADDITIONAL_COMPONENTS})
+option(MINIROS_BUILD_ROSBAG_APPS "Build rosbag applications, like rosbag/play and rosbag/record" OFF)
+option(MINIROS_BUILD_TESTS "Build tests" ${MINIROS_ADDITIONAL_COMPONENTS})
+option(MINIROS_BUILD_SHARED_LIBS "Build shared version of miniros" ON)
+option(MINIROS_ROSBAG_USE_GPGME_ENCRYPTION "Use GPGME encryption support" OFF)
+option(MINIROS_ROSBAG_USE_OPENSSL_ENCRYPTION "Use openssl encryption for rosbag" OFF)
 
 
 include_directories(include)
+
 set(MINIROS_INCLUDE_DIRS ${CMAKE_CURRENT_BINARY_DIR})
 set(MINIROS_XMLRPCPP_B64_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/xmlrpcpp/libb64/include")
+
+set(CMAKE_DEBUG_POSTFIX d)
 
 set(MINIROS_INCLUDE_GENERATED_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/include/generated
@@ -58,15 +57,19 @@ endif()
 
 set(MINIROS_ADDITIONAL_COMPONENTS $<NOT:${MINIROS_SUBMODULE}>)
 
-option(MINIROS_USE_SYSTEM_BZIP2 "Use bzip2 from system" OFF)
-option(MINIROS_USE_SYSTEM_LZ4 "Use lz4 from system" OFF)
-option(MINIROS_USE_SYSTEM_PROGRAM_OPTIONS "Use boost::program_options instead of local implementation" OFF)
-option(MINIROS_BUILD_EXAMPLES "Build examples" ${MINIROS_ADDITIONAL_COMPONENTS})
-option(MINIROS_BUILD_ROSBAG_APPS "Build rosbag applications, like rosbag/play and rosbag/record" OFF)
-option(MINIROS_BUILD_TESTS "Build tests" ${MINIROS_ADDITIONAL_COMPONENTS})
-option(MINIROS_BUILD_SHARED_LIBS "Build shared version of miniros" ON)
-option(MINIROS_ROSBAG_USE_GPGME_ENCRYPTION "Use GPGME encryption support" OFF)
-option(MINIROS_ROSBAG_USE_OPENSSL_ENCRYPTION "Use openssl encryption for rosbag" OFF)
+if (MINIROS_USE_CATKIN)
+  find_package(catkin QUIET)
+  if(catkin_FOUND)
+    message(STATUS "Miniros has been used with catkin")
+    catkin_package(
+      DEPENDS
+      INCLUDE_DIRS include include/generated
+      LIBRARIES roscxx bag_storage)
+  else()
+    message(STATUS "Catkin was not found")
+  endif(catkin_FOUND)
+endif()
+
 
 # Generate external config
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/include/miniros/config.h.in" "miniros/config.h")
