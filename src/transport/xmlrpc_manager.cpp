@@ -428,4 +428,9 @@ void XMLRPCManager::unbind(const std::string& function_name)
   unbind_requested_ = false;
 }
 
+bool XMLRPCManager::isShuttingDown() const
+{
+  return shutting_down_;
+}
+
 } // namespace miniros

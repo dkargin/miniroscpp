@@ -345,7 +345,6 @@ void Connection::drop(DropReason reason)
   MINIROS_DEBUG("Connection::drop(%u)", reason);
   bool did_drop = false;
   {
-    std::scoped_lock<std::recursive_mutex> lock(drop_mutex_);
     if (!dropped_)
     {
       dropped_ = true;
@@ -368,9 +367,8 @@ void Connection::drop(DropReason reason)
   }
 }
 
-bool Connection::isDropped()
+bool Connection::isDropped() const
 {
-  std::scoped_lock<std::recursive_mutex> lock(drop_mutex_);
   return dropped_;
 }
 
