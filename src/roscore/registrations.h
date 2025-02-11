@@ -70,7 +70,7 @@ public:
 
     bool has_key(const std::string& key) const;
 
-    std::vector<std::vector<std::string>> getState() const;
+    std::map<std::string, std::vector<std::string>> getState() const;
 
     void registerObj(const std::string& key, const std::string& caller_id,
       const std::string& caller_api, const std::string& service_api="");

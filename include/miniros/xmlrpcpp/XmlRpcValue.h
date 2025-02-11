@@ -10,6 +10,8 @@
 
 #include "XmlRpcDecl.h"
 
+#include <cstring>
+
 #ifndef MAKEDEPEND
 # include <map>
 # include <string>
@@ -72,8 +74,20 @@ namespace XmlRpc {
     //! Copy
     XmlRpcValue(XmlRpcValue const& rhs) : _type(TypeInvalid) { *this = rhs; }
 
+    //! Transfer
+    XmlRpcValue(XmlRpcValue && rhs) noexcept
+    {
+      _type = rhs._type;
+      _value = rhs._value;
+      // No need to zero rhs._value, TypeInvalid ensures that destructor of rhs does nothing.
+      rhs._type = TypeInvalid;
+    }
+
     //! Destructor (make virtual if you want to subclass)
     /*virtual*/ ~XmlRpcValue() { invalidate(); }
+
+    /// Creates array of specified size.
+    NODISCARD static XmlRpcValue Array(int size);
 
     //! Erase the current value
     void clear() { invalidate(); }

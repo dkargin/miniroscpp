@@ -52,6 +52,12 @@ namespace XmlRpc {
   std::string XmlRpcValue::_doubleFormat("%.16g");
 
 
+  XmlRpcValue XmlRpcValue::Array(int size)
+  {
+    XmlRpcValue value;
+    value.setSize(size);
+    return value;
+  }
 
   // Clean up
   void XmlRpcValue::invalidate()

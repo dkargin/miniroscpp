@@ -118,9 +118,12 @@ class MINIROS_DECL MasterHandler
     std::map<std::string,std::string> getTopicTypes(const std::string& caller_id) const;
 
     struct SystemState {
+      std::map<std::string, std::vector<std::string>> publishers;
+      std::map<std::string, std::vector<std::string>> subscribers;
+      std::map<std::string, std::vector<std::string>> services;
     };
 
-    std::vector<std::vector<std::vector<std::string>>> getSystemState(const std::string& caller_id);
+    SystemState getSystemState(const std::string& caller_id) const;
 };
 } // namespace miniros
 
