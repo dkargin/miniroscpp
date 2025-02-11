@@ -173,7 +173,7 @@ set(transport_SRC
 # minimaster contains core rosmaster API. It can be embedded to some other apps.
 set(master_SRC
     roscore/master.cpp
-    roscore/master_api.cpp
+    roscore/master_handler.cpp
     roscore/registrations.cpp)
 
 if (MINIROS_USE_SYSTEM_PROGRAM_OPTIONS)

@@ -7,7 +7,7 @@
 
 #include "miniros/console.h"
 #include "miniros/transport/xmlrpc_manager.h"
-#include "master_api.h"
+#include "master_handler.h"
 
 /*
 More info at:
@@ -37,7 +37,7 @@ class MINIROS_DECL Master
   protected:
     int _port=-1;
     std::string _host;
-    ROSMasterHandler handler;
+    MasterHandler handler;
     std::unique_ptr<XMLRPCManager> manager;
 
   public:
