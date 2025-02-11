@@ -73,3 +73,5 @@
 #else // miniros is being built around static libraries
   #define MINIROS_DECL
 #endif
+
+#define NODISCARD [[nodiscard]]

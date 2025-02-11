@@ -969,7 +969,7 @@ void MasterLink::update(const std::string& key, const XmlRpc::XmlRpcValue& v)
   invalidateParentParams(clean_key);
 }
 
-void MasterLink::paramUpdateCallback(XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result)
+void MasterLink::paramUpdateCallback(const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result)
 {
   result[0] = 1;
   result[1] = std::string("");
@@ -1029,7 +1029,7 @@ void MasterLink::initParam(const M_string& remappings)
     }
   }
 
-  XMLRPCManager::instance()->bind("paramUpdate", [this](XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result) {
+  XMLRPCManager::instance()->bind("paramUpdate", [this](const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result) {
     return this->paramUpdateCallback(params, result);
   });
 }

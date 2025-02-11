@@ -68,7 +68,7 @@ public:
 
   void udprosIncomingConnection(const TransportUDPPtr& transport, Header& header);
 
-  void start();
+  NODISCARD bool start(PollManagerPtr pollManager);
   void shutdown();
 
 private:

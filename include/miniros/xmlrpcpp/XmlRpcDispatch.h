@@ -10,10 +10,8 @@
 
 #include "XmlRpcDecl.h"
 
-#ifndef MAKEDEPEND
 # include <list>
 # include <vector>
-#endif
 
 namespace XmlRpc {
 
@@ -81,8 +79,8 @@ namespace XmlRpc {
     // When work should stop (-1 implies wait forever, or until exit is called)
     double _endTime;
 
-    bool _doClear;
-    bool _inWork;
+    volatile bool  _doClear;
+    volatile bool _inWork;
 
   };
 } // namespace XmlRpc

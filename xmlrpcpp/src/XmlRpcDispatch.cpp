@@ -1,3 +1,7 @@
+#include <cassert>
+#include <cmath>
+#include <errno.h>
+#include <sys/timeb.h>
 
 #include "xmlrpcpp/XmlRpcDispatch.h"
 #include "xmlrpcpp/XmlRpcSource.h"
@@ -5,9 +9,6 @@
 
 #include "miniros/rostime.h"
 
-#include <math.h>
-#include <errno.h>
-#include <sys/timeb.h>
 
 #if defined(_WINDOWS)
 # include <winsock2.h>
@@ -78,8 +79,7 @@ XmlRpcDispatch::setSourceEvents(XmlRpcSource* source, unsigned eventMask)
 
 
 // Watch current set of sources and process events
-void
-XmlRpcDispatch::work(double timeout)
+void XmlRpcDispatch::work(double timeout)
 {
   // Loosely based on `man select` > Correspondence between select() and poll() notifications
   // and cloudius-systems/osv#35, cloudius-systems/osv@b53d39a using poll to emulate select
@@ -102,7 +102,7 @@ XmlRpcDispatch::work(double timeout)
   int timeout_ms = static_cast<int>(floor(timeout * 1000.));
 
   // Only work while there is something to monitor
-  while (_sources.size() > 0) {
+  while (!_sources.empty()) {
 
     // Construct the sets of descriptors we are interested in
     const unsigned source_cnt = _sources.size();
@@ -182,11 +182,12 @@ XmlRpcDispatch::work(double timeout)
     {
       SourceList closeList = _sources;
       _sources.clear();
-      for (SourceList::iterator it=closeList.begin(); it!=closeList.end(); ++it) {
-	XmlRpcSource *src = it->getSource();
-        src->close();
+      for (MonitoredSource& ms: closeList) {
+        XmlRpcSource* src = ms.getSource();
+        assert(src);
+        if (src)
+          src->close();
       }
-
       _doClear = false;
     }
 

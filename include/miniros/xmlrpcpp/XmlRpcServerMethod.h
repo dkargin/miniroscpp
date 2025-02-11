@@ -22,23 +22,26 @@ namespace XmlRpc {
   // The XmlRpcServer processes client requests to call RPCs
   class XmlRpcServer;
 
+  class XmlRpcServerConnection;
+
   //! Abstract class representing a single RPC method
   class XMLRPCPP_DECL XmlRpcServerMethod {
   public:
     //! Constructor
     XmlRpcServerMethod(std::string const& name, XmlRpcServer* server = 0);
+
     //! Destructor
     virtual ~XmlRpcServerMethod();
 
     //! Returns the name of the method
-    std::string& name() { return _name; }
+    const std::string& name() { return _name; }
 
     //! Execute the method. Subclasses must provide a definition for this method.
-    virtual void execute(XmlRpcValue& params, XmlRpcValue& result) = 0;
+    virtual void execute(const XmlRpcValue& params, XmlRpcValue& result, XmlRpcServerConnection* connection) = 0;
 
     //! Returns a help string for the method.
     //! Subclasses should define this method if introspection is being used.
-    virtual std::string help() { return std::string(); }
+    virtual std::string help() const { return {}; }
 
   protected:
     std::string _name;

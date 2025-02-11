@@ -95,9 +95,20 @@ namespace XmlRpc {
     operator BinaryData&()    { assertTypeOrInvalid(TypeBase64); return *_value.asBinary; }
     operator struct tm&()     { assertTypeOrInvalid(TypeDateTime); return *_value.asTime; }
 
+    operator const bool&() const         { assertType(TypeBoolean); return _value.asBool; }
+    operator const int&() const          { assertType(TypeInt); return _value.asInt; }
+    operator const double&() const       { assertType(TypeDouble); return _value.asDouble; }
+    operator const std::string&() const  { assertType(TypeString); return *_value.asString; }
+    operator const BinaryData&() const   { assertType(TypeBase64); return *_value.asBinary; }
+    operator const struct tm&() const    { assertType(TypeDateTime); return *_value.asTime; }
+
+    template <class T> T as() const
+    {
+      return static_cast<T>(*this);
+    }
+
     XmlRpcValue const& operator[](int i) const { assertArray(i+1); return _value.asArray->at(i); }
     XmlRpcValue& operator[](int i)             { assertArray(i+1); return _value.asArray->at(i); }
-
     XmlRpcValue& operator[](std::string const& k) const { assertStruct(); return (*_value.asStruct)[k]; }
     XmlRpcValue& operator[](std::string const& k) { assertStruct(); return (*_value.asStruct)[k]; }
     XmlRpcValue& operator[](const char* k) const { assertStruct(); std::string s(k); return (*_value.asStruct)[s]; }
@@ -141,13 +152,13 @@ namespace XmlRpc {
     //! Specify the format used to write double values.
     static void setDoubleFormat(const char* f) { _doubleFormat = f; }
 
-
   protected:
     // Clean up
     void invalidate();
 
     // Type checking
     void assertTypeOrInvalid(Type t);
+    void assertType(Type t) const;
     void assertArray(int size) const;
     void assertArray(int size);
     void assertStruct() const;

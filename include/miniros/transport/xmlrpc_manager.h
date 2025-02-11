@@ -40,7 +40,7 @@
 #include "miniros/xmlrpcpp/XmlRpc.h"
 
 #include <miniros/rostime.h>
-
+#include <xmlrpcpp/XmlRpcServerConnection.h>
 
 namespace miniros
 {
@@ -90,14 +90,21 @@ public:
 class XMLRPCManager;
 typedef std::shared_ptr<XMLRPCManager> XMLRPCManagerPtr;
 
-typedef std::function<void(XmlRpc::XmlRpcValue&, XmlRpc::XmlRpcValue&)> XMLRPCFunc;
+// Compact RPC callback function.
+typedef std::function<void(const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result)> XMLRPCFunc;
+
+// Extended RPC callback function.
+typedef std::function<int (const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result, XmlRpc::XmlRpcServerConnection* conn)> XMLRPCFuncEx;
+
 
 class MINIROS_DECL XMLRPCManager
 {
 public:
+  using RpcValue = XmlRpc::XmlRpcValue;
+
   static const XMLRPCManagerPtr& instance();
 
-  XMLRPCManager();
+  XMLRPCManager(int port = 0);
   ~XMLRPCManager();
 
   /** @brief Validate an XML/RPC response
@@ -116,8 +123,8 @@ public:
   /**
    * @brief Get the xmlrpc server URI of this node
    */
-  inline const std::string& getServerURI() const { return uri_; }
-  inline uint32_t getServerPort() const { return port_; }
+  const std::string& getServerURI() const { return uri_; }
+  uint32_t getServerPort() const { return port_; }
 
   XmlRpc::XmlRpcClient* getXMLRPCClient(const std::string& host, const int port, const std::string& uri);
   void releaseXMLRPCClient(XmlRpc::XmlRpcClient* c);
@@ -125,10 +132,15 @@ public:
   void addASyncConnection(const ASyncXMLRPCConnectionPtr& conn);
   void removeASyncConnection(const ASyncXMLRPCConnectionPtr& conn);
 
+  /// Bind regular callback method.
   bool bind(const std::string& function_name, const XMLRPCFunc& cb);
+
+  /// Bind extended callback.
+  bool bindEx(const std::string& function_name, const XMLRPCFuncEx& cb);
+
   void unbind(const std::string& function_name);
 
-  void start();
+  NODISCARD bool start();
   void shutdown();
 
   bool isShuttingDown() const;
@@ -164,8 +176,11 @@ private:
   struct FunctionInfo
   {
     std::string name;
+    // Regular callback.
     XMLRPCFunc function;
-    XMLRPCCallWrapperPtr wrapper;
+    // Extended callback.
+    XMLRPCFuncEx functionEx;
+    std::shared_ptr<XmlRpc::XmlRpcServerMethod> wrapper;
   };
   typedef std::map<std::string, FunctionInfo> M_StringToFuncInfo;
   std::mutex functions_mutex_;

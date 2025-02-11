@@ -777,7 +777,7 @@ protected:
   bool getParamImpl(const std::string& key, XmlRpc::XmlRpcValue& v, bool use_cache);
   void invalidateParentParams(const std::string& key);
   void update(const std::string& key, const XmlRpc::XmlRpcValue& v);
-  void paramUpdateCallback(XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result);
+  void paramUpdateCallback(const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result);
 
   template <class T>
   void setParamImpl(const std::string& key, const std::vector<T>& vec);

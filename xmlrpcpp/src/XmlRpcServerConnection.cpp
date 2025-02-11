@@ -263,7 +263,7 @@ XmlRpcServerConnection::executeMethod(const std::string& methodName,
 
   if ( ! method) return false;
 
-  method->execute(params, result);
+  method->execute(params, result, this);
 
   // Ensure a valid result value
   if ( ! result.valid())

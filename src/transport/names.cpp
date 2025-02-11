@@ -125,7 +125,7 @@ std::string remap(const std::string& name)
 {
   std::string resolved = resolve(name, false);
 
-  M_string::const_iterator it = g_remappings.find(resolved);
+  auto it = g_remappings.find(resolved);
   if (it != g_remappings.end())
   {
     return it->second;
@@ -187,13 +187,8 @@ std::string resolve(const std::string& ns, const std::string& name, bool _remap)
 
 void init(const M_string& remappings)
 {
-  M_string::const_iterator it = remappings.begin();
-  M_string::const_iterator end = remappings.end();
-  for (; it != end; ++it)
+  for (const auto& [left, right] : remappings)
   {
-    const std::string& left = it->first;
-    const std::string& right = it->second;
-
     if (!left.empty() && left[0] != '_' && left != this_node::getName())
     {
       std::string resolved_left = resolve(left, false);

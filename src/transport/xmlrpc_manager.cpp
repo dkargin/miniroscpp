@@ -29,12 +29,14 @@
 
 #include <sstream>
 
-#include "miniros/transport/xmlrpc_manager.h"
-#include "miniros/transport/network.h"
 #include "miniros/master_link.h"
 #include "miniros/rosassert.h"
 #include "miniros/transport/file_log.h"
 #include "miniros/transport/io.h"
+#include "miniros/transport/network.h"
+#include "miniros/transport/xmlrpc_manager.h"
+
+#include <xmlrpcpp/XmlRpcServerConnection.h>
 
 using namespace XmlRpc;
 
@@ -71,23 +73,42 @@ XmlRpc::XmlRpcValue responseBool(int code, const std::string& msg, bool response
 }
 }
 
+/// Wrapper for regular callback functor.
 class XMLRPCCallWrapper : public XmlRpcServerMethod
 {
 public:
   XMLRPCCallWrapper(const std::string& function_name, const XMLRPCFunc& cb, XmlRpcServer *s)
   : XmlRpcServerMethod(function_name, s)
-  , name_(function_name)
-  , func_(cb)
+  , m_func(cb)
   { }
 
-  void execute(XmlRpcValue &params, XmlRpcValue &result)
+  void execute(const XmlRpcValue &params, XmlRpcValue &result, XmlRpcServerConnection* connection) override
   {
-    func_(params, result);
+    if (m_func)
+      m_func(params, result);
   }
 
 private:
-  std::string name_;
-  XMLRPCFunc func_;
+  XMLRPCFunc m_func;
+};
+
+/// Wrapper for extended callback functor.
+class XMLRPCCallWrapperEx : public XmlRpcServerMethod
+{
+public:
+  XMLRPCCallWrapperEx(const std::string& function_name, const XMLRPCFuncEx& cb, XmlRpcServer *s)
+  : XmlRpcServerMethod(function_name, s)
+  , m_func(cb)
+  { }
+
+  void execute(const XmlRpcValue &params, XmlRpcValue &result, XmlRpcServerConnection* connection) override
+  {
+    if (m_func)
+      m_func(params, result, connection);
+  }
+
+private:
+  XMLRPCFuncEx m_func;
 };
 
 void getPid(const XmlRpcValue& params, XmlRpcValue& result)
@@ -104,8 +125,8 @@ const XMLRPCManagerPtr& XMLRPCManager::instance()
   return xmlrpc_manager;
 }
 
-XMLRPCManager::XMLRPCManager()
-: port_(0)
+XMLRPCManager::XMLRPCManager(int port)
+: port_(port)
 , shutting_down_(false)
 , unbind_requested_(false)
 {
@@ -116,15 +137,14 @@ XMLRPCManager::~XMLRPCManager()
   shutdown();
 }
 
-void XMLRPCManager::start()
+bool XMLRPCManager::start()
 {
   shutting_down_ = false;
-  port_ = 0;
   bind("getPid", getPid);
 
-  bool bound = server_.bindAndListen(0);
-  (void) bound;
-  MINIROS_ASSERT(bound);
+  if (!server_.bindAndListen(port_))
+    return false;
+
   port_ = server_.get_port();
   MINIROS_ASSERT(port_ != 0);
 
@@ -133,6 +153,7 @@ void XMLRPCManager::start()
   uri_ = ss.str();
 
   server_thread_ = std::thread(&XMLRPCManager::serverThreadFunc, this);
+  return true;
 }
 
 void XMLRPCManager::shutdown()
@@ -152,8 +173,7 @@ void XMLRPCManager::shutdown()
   {
     std::scoped_lock<std::mutex> lock(clients_mutex_);
 
-    for (V_CachedXmlRpcClient::iterator i = clients_.begin();
-         i != clients_.end();)
+    for (auto i = clients_.begin(); i != clients_.end();)
     {
       if (!i->in_use_)
       {
@@ -179,8 +199,8 @@ void XMLRPCManager::shutdown()
   functions_.clear();
 
   {
-    S_ASyncXMLRPCConnection::iterator it = connections_.begin();
-    S_ASyncXMLRPCConnection::iterator end = connections_.end();
+    auto it = connections_.begin();
+    auto end = connections_.end();
     for (; it != end; ++it)
     {
       (*it)->removeFromDispatch(server_.get_dispatch());
@@ -257,8 +277,8 @@ void XMLRPCManager::serverThreadFunc()
   {
     {
       std::scoped_lock<std::mutex> lock(added_connections_mutex_);
-      S_ASyncXMLRPCConnection::iterator it = added_connections_.begin();
-      S_ASyncXMLRPCConnection::iterator end = added_connections_.end();
+      auto it = added_connections_.begin();
+      auto end = added_connections_.end();
       for (; it != end; ++it)
       {
         (*it)->addToDispatch(server_.get_dispatch());
@@ -285,8 +305,8 @@ void XMLRPCManager::serverThreadFunc()
     }
 
     {
-      S_ASyncXMLRPCConnection::iterator it = connections_.begin();
-      S_ASyncXMLRPCConnection::iterator end = connections_.end();
+      auto it = connections_.begin();
+      auto end = connections_.end();
       for (; it != end; ++it)
       {
         if ((*it)->check())
@@ -298,8 +318,8 @@ void XMLRPCManager::serverThreadFunc()
 
     {
       std::scoped_lock<std::mutex> lock(removed_connections_mutex_);
-      S_ASyncXMLRPCConnection::iterator it = removed_connections_.begin();
-      S_ASyncXMLRPCConnection::iterator end = removed_connections_.end();
+      auto it = removed_connections_.begin();
+      auto end = removed_connections_.end();
       for (; it != end; ++it)
       {
         (*it)->removeFromDispatch(server_.get_dispatch());
@@ -314,12 +334,11 @@ void XMLRPCManager::serverThreadFunc()
 XmlRpcClient* XMLRPCManager::getXMLRPCClient(const std::string &host, const int port, const std::string &uri)
 {
   // go through our vector of clients and grab the first available one
-  XmlRpcClient *c = NULL;
+  XmlRpcClient *c = nullptr;
 
   std::scoped_lock<std::mutex> lock(clients_mutex_);
 
-  for (V_CachedXmlRpcClient::iterator i = clients_.begin();
-       !c && i != clients_.end(); )
+  for (auto i = clients_.begin(); !c && i != clients_.end(); )
   {
     if (!i->in_use_)
     {
@@ -370,8 +389,7 @@ void XMLRPCManager::releaseXMLRPCClient(XmlRpcClient *c)
 {
   std::scoped_lock<std::mutex> lock(clients_mutex_);
 
-  for (V_CachedXmlRpcClient::iterator i = clients_.begin();
-       i != clients_.end(); ++i)
+  for (auto i = clients_.begin(); i != clients_.end(); ++i)
   {
     if (c == i->client_)
     {
@@ -415,6 +433,23 @@ bool XMLRPCManager::bind(const std::string& function_name, const XMLRPCFunc& cb)
   info.name = function_name;
   info.function = cb;
   info.wrapper.reset(new XMLRPCCallWrapper(function_name, cb, &server_));
+  functions_[function_name] = info;
+
+  return true;
+}
+
+bool XMLRPCManager::bindEx(const std::string& function_name, const XMLRPCFuncEx& cb)
+{
+  std::scoped_lock<std::mutex> lock(functions_mutex_);
+  if (functions_.find(function_name) != functions_.end())
+  {
+    return false;
+  }
+
+  FunctionInfo info;
+  info.name = function_name;
+  info.functionEx = cb;
+  info.wrapper.reset(new XMLRPCCallWrapperEx(function_name, cb, &server_));
   functions_[function_name] = info;
 
   return true;

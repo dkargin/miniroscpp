@@ -157,7 +157,7 @@ void atexitCallback()
   }
 }
 
-void shutdownCallback(XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result)
+void shutdownCallback(const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result)
 {
   int num_params = 0;
   if (params.getType() == XmlRpc::XmlRpcValue::TypeArray)
@@ -333,13 +333,21 @@ void start()
   initInternalTimerManager();
 
   ConnectionManagerPtr connectionManager = ConnectionManager::instance();
+
   TopicManagerPtr topicManager = TopicManager::instance();
   ServiceManagerPtr serviceManager = ServiceManager::instance();
   topicManager->start(pm, g_master_link, connectionManager, rpcm);
   serviceManager->start(pm, g_master_link, connectionManager, rpcm);
-  connectionManager->start();
+
+  if (!connectionManager->start(pm)) {
+    // TODO: Probably exit and unroll initialization.
+  }
+
   pm->start();
-  rpcm->start();
+
+  if (!rpcm->start()) {
+
+  }
 
   if (!(g_init_options & init_options::NoSigintHandler))
   {

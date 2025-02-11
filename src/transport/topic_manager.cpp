@@ -95,32 +95,32 @@ void TopicManager::start(PollManagerPtr pm, MasterLinkPtr master_link, Connectio
   xmlrpc_manager_ = rpcm;
 
   xmlrpc_manager_->bind("publisherUpdate",
-    [this](XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result)
+    [this](const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result)
     {
       this->pubUpdateCallback(params, result);
     });
   xmlrpc_manager_->bind("requestTopic",
-    [this](XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result)
+    [this](const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result)
     {
       this->requestTopicCallback(params, result);
     });
   xmlrpc_manager_->bind("getBusStats",
-    [this](XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result)
+    [this](const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result)
     {
       this->getBusStatsCallback(params, result);
     });
   xmlrpc_manager_->bind("getBusInfo",
-    [this](XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result)
+    [this](const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result)
     {
       this->getBusInfoCallback(params, result);
     });
   xmlrpc_manager_->bind("getSubscriptions",
-    [this](XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result)
+    [this](const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result)
     {
       this->getSubscriptionsCallback(params, result);
     });
   xmlrpc_manager_->bind("getPublications",
-    [this](XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result)
+    [this](const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result)
     {
       this->getPublicationsCallback(params, result);
     });
@@ -635,7 +635,7 @@ bool TopicManager::pubUpdate(const std::string &topic, const std::vector<std::st
 }
 
 bool TopicManager::requestTopic(const std::string &topic,
-                         XmlRpcValue &protos,
+                         const XmlRpcValue &protos,
                          XmlRpcValue &ret)
 {
   for (int proto_idx = 0; proto_idx < protos.size(); proto_idx++)
@@ -1050,7 +1050,7 @@ void TopicManager::getPublications(XmlRpcValue &pubs)
   }
 }
 
-void TopicManager::pubUpdateCallback(XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result)
+void TopicManager::pubUpdateCallback(const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result)
 {
   std::vector<std::string> pubs;
   for (int idx = 0; idx < params[2].size(); idx++)
@@ -1067,7 +1067,7 @@ void TopicManager::pubUpdateCallback(XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpc
   }
 }
 
-void TopicManager::requestTopicCallback(XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result)
+void TopicManager::requestTopicCallback(const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result)
 {
   if (!requestTopic(params[1], params[2], result))
   {
@@ -1075,7 +1075,7 @@ void TopicManager::requestTopicCallback(XmlRpc::XmlRpcValue& params, XmlRpc::Xml
   }
 }
 
-void TopicManager::getBusStatsCallback(XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result)
+void TopicManager::getBusStatsCallback(const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result)
 {
   (void)params;
   result[0] = 1;
@@ -1085,7 +1085,7 @@ void TopicManager::getBusStatsCallback(XmlRpc::XmlRpcValue& params, XmlRpc::XmlR
   result[2] = response;
 }
 
-void TopicManager::getBusInfoCallback(XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result)
+void TopicManager::getBusInfoCallback(const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result)
 {
   (void)params;
   result[0] = 1;
@@ -1095,7 +1095,7 @@ void TopicManager::getBusInfoCallback(XmlRpc::XmlRpcValue& params, XmlRpc::XmlRp
   result[2] = response;
 }
 
-void TopicManager::getSubscriptionsCallback(XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result)
+void TopicManager::getSubscriptionsCallback(const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result)
 {
   (void)params;
   result[0] = 1;
@@ -1105,7 +1105,7 @@ void TopicManager::getSubscriptionsCallback(XmlRpc::XmlRpcValue& params, XmlRpc:
   result[2] = response;
 }
 
-void TopicManager::getPublicationsCallback(XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result)
+void TopicManager::getPublicationsCallback(const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result)
 {
   (void)params;
   result[0] = 1;

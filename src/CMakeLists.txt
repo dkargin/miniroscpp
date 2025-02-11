@@ -207,6 +207,14 @@ target_include_directories(roscxx PRIVATE
     ${MINIROS_INCLUDE_GENERATED_DIRS}
 )
 
+add_executable(miniroscore roscore/miniroscore.cpp roscore/registrations.cpp roscore/master_api.cpp)
+target_link_libraries(miniroscore miniros::roscxx xmlrpcpp)
+target_include_directories(miniroscore PRIVATE
+    ${MINIROS_INCLUDE_DIRS}
+    ${MINIROS_INCLUDE_TRANSPORT}
+    ${MINIROS_INCLUDE_ROOT}
+)
+
 set(bag_storage_SRC
     rosbag_storage/bag_player.cpp
     rosbag_storage/bag.cpp

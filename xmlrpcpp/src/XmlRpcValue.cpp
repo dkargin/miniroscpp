@@ -88,6 +88,12 @@ namespace XmlRpc {
       throw XmlRpcException("type error");
   }
 
+  void XmlRpcValue::assertType(Type t) const
+  {
+    if (_type != t)
+      throw XmlRpcException("type error");
+  }
+
   void XmlRpcValue::assertArray(int size) const
   {
     if (_type != TypeArray)

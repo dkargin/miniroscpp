@@ -153,9 +153,8 @@ private:
    *
    * @return true on success, false otherwise
    *
-   * @todo Consider making this private
    */
-  bool requestTopic(const std::string &topic, XmlRpc::XmlRpcValue &protos, XmlRpc::XmlRpcValue &ret);
+  bool requestTopic(const std::string &topic, const XmlRpc::XmlRpcValue &protos, XmlRpc::XmlRpcValue &ret);
 
   // Must lock the advertised topics mutex before calling this function
   bool isTopicAdvertised(const std::string& topic);
@@ -212,12 +211,12 @@ private:
    */
   bool pubUpdate(const std::string &topic, const std::vector<std::string> &pubs);
 
-  void pubUpdateCallback(XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result);
-  void requestTopicCallback(XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result);
-  void getBusStatsCallback(XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result);
-  void getBusInfoCallback(XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result);
-  void getSubscriptionsCallback(XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result);
-  void getPublicationsCallback(XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result);
+  void pubUpdateCallback(const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result);
+  void requestTopicCallback(const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result);
+  void getBusStatsCallback(const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result);
+  void getBusInfoCallback(const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result);
+  void getSubscriptionsCallback(const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result);
+  void getPublicationsCallback(const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result);
 
   bool isShuttingDown() { return shutting_down_; }
 
