@@ -19,13 +19,6 @@
 
 namespace miniros {
 
-
-class Master_API {
-  int STATUS = 0;
-  int MSG = 1;
-  int VAL = 2;
-};
-
 bool startsWith(const std::string& str, const std::string& prefix);
 bool endsWith(const std::string& str, const std::string& suffix);
 
@@ -398,13 +391,13 @@ class ROSMasterHandler
         return rtn;
     }
 
-    int unregisterPublisher(std::string caller_id, std::string topic, std::string caller_api)
+    int unregisterPublisher(const std::string& caller_id, const std::string& topic, const std::string& caller_api)
     {
         reg_manager.unregister_publisher(topic, caller_id, caller_api);
         return 1;
     }
 
-    std::string lookupNode(std::string caller_id, std::string node_name) const
+    std::string lookupNode(const std::string& caller_id, std::string node_name) const
     {
         NodeRef node = reg_manager.get_node(caller_id);
         if (node.is_empty())
@@ -412,12 +405,7 @@ class ROSMasterHandler
         return node.api;
     }
 
-    /// <summary>
-    ///
-    /// </summary>
-    /// <param name="caller_id">Not used?Wtf?</param>
     /// <param name="subgraph">Optional std::string, only returns topics that start with that name</param>
-    /// <returns></returns>
     std::vector<std::vector<std::string>> getPublishedTopics(const std::string& caller_id, std::string subgraph) const
     {
         if (!subgraph.empty() && subgraph.back() != '/')
@@ -442,7 +430,7 @@ class ROSMasterHandler
         return rtn;
     }
 
-    std::map<std::string,std::string> getTopicTypes(const std::string& caller_id)
+    std::map<std::string,std::string> getTopicTypes(const std::string& caller_id) const
     {
         return topic_types;
     }

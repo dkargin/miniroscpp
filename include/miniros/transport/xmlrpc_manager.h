@@ -40,7 +40,6 @@
 #include "miniros/xmlrpcpp/XmlRpc.h"
 
 #include <miniros/rostime.h>
-#include <xmlrpcpp/XmlRpcServerConnection.h>
 
 namespace miniros
 {
@@ -50,6 +49,9 @@ namespace miniros
  */
 namespace xmlrpc
 {
+
+class XmlRpcServerConnection;
+
 MINIROS_DECL XmlRpc::XmlRpcValue responseStr(int code, const std::string& msg, const std::string& response);
 MINIROS_DECL XmlRpc::XmlRpcValue responseInt(int code, const std::string& msg, int response);
 MINIROS_DECL XmlRpc::XmlRpcValue responseBool(int code, const std::string& msg, bool response);

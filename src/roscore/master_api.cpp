@@ -7,6 +7,11 @@
 #include "master_api.h"
 
 namespace miniros {
+
+bool startsWith(const std::string& str, const std::string& prefix) {
+  return str.find(prefix) == 0;
+}
+
 #ifdef USE_DEPRECATED
 constexpr static std::string SEP = "/";
 constexpr static std::string PRIV_NAME = "~";

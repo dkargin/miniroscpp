@@ -118,7 +118,7 @@ endif()
 
 
 set(transport_SRC
-    transport/master_link.cpp
+  transport/master_link.cpp
   transport/network.cpp
   transport/subscriber.cpp
   transport/common.cpp
@@ -126,7 +126,7 @@ set(transport_SRC
   transport/service_publication.cpp
   transport/connection.cpp
   transport/single_subscriber_publisher.cpp
-    transport/service_server.cpp
+  transport/service_server.cpp
   transport/wall_timer.cpp
   transport/xmlrpc_manager.cpp
   transport/publisher.cpp
@@ -170,6 +170,12 @@ set(transport_SRC
   tf2/transform_broadcaster.cpp
   )
 
+# minimaster contains core rosmaster API. It can be embedded to some other apps.
+set(master_SRC
+    roscore/master.cpp
+    roscore/master_api.cpp
+    roscore/registrations.cpp)
+
 if (MINIROS_USE_SYSTEM_PROGRAM_OPTIONS)
     find_package(Boost REQUIRED COMPONENTS program_options)
     add_library(impl::program_options ALIAS Boost::program_options)
@@ -187,16 +193,16 @@ add_library(miniros::time ALIAS miniros_time)
 
 
 if (MINIROS_BUILD_SHARED_LIBS)
-  add_library(roscxx SHARED ${cpp_common_SRC} ${transport_SRC})
+  add_library(roscxx SHARED ${cpp_common_SRC} ${transport_SRC} ${master_SRC})
 else()
-  add_library(roscxx ${cpp_common_SRC} ${transport_SRC})
+  add_library(roscxx ${cpp_common_SRC} ${transport_SRC} ${master_SRC})
 endif()
 
 set_property(TARGET roscxx PROPERTY CXX_STANDARD 17)
 
-target_link_libraries(roscxx PRIVATE xmlrpcpp rt stdc++fs ${console_bridge_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
-
-target_link_libraries(roscxx PUBLIC miniros::time)
+target_link_libraries(roscxx
+    PUBLIC miniros::time
+    PRIVATE xmlrpcpp rt stdc++fs ${console_bridge_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
 
 target_compile_definitions(roscxx PRIVATE rostime_EXPORTS miniros_EXPORTS)
 
@@ -207,13 +213,9 @@ target_include_directories(roscxx PRIVATE
     ${MINIROS_INCLUDE_GENERATED_DIRS}
 )
 
-add_executable(miniroscore roscore/miniroscore.cpp roscore/registrations.cpp roscore/master_api.cpp)
-target_link_libraries(miniroscore miniros::roscxx xmlrpcpp)
-target_include_directories(miniroscore PRIVATE
-    ${MINIROS_INCLUDE_DIRS}
-    ${MINIROS_INCLUDE_TRANSPORT}
-    ${MINIROS_INCLUDE_ROOT}
-)
+add_executable(miniroscore roscore/miniroscore.cpp)
+target_link_libraries(miniroscore roscxx xmlrpcpp)
+target_include_directories(miniroscore PRIVATE ${MINIROS_INCLUDE_ROOT})
 
 set(bag_storage_SRC
     rosbag_storage/bag_player.cpp
@@ -232,9 +234,9 @@ set(bag_storage_SRC
 )
 
 if (MINIROS_BUILD_SHARED_LIBS)
-	add_library(bag_storage SHARED ${bag_storage_SRC})
+  add_library(bag_storage SHARED ${bag_storage_SRC})
 else ()
-	add_library(bag_storage ${bag_storage_SRC})
+  add_library(bag_storage ${bag_storage_SRC})
 endif()
 
 target_include_directories(bag_storage PRIVATE ${MINIROS_INCLUDE_DIRS} ${rosbag_INCLUDE})
@@ -275,4 +277,10 @@ else ()
 endif()
 
 set(MINIROS_LIBRARY roscxx PARENT_SCOPE)
-set(MINIROS_EXPORT roscxx bag_storage miniros_time ${rosbag_INTERNAL_LIBS} ${rosbag_APPS} PARENT_SCOPE)
+set(MINIROS_EXPORT
+    roscxx bag_storage
+    miniros_time
+    miniroscore
+    ${rosbag_INTERNAL_LIBS}
+    ${rosbag_APPS}
+    PARENT_SCOPE)
