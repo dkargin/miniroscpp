@@ -161,7 +161,7 @@ XmlRpcServer::bindAndListen(int port, int backlog /*= 5*/)
 // Process client requests for the specified time
 void XmlRpcServer::work(double msTime)
 {
-  XmlRpcUtil::log(2, "XmlRpcServer::work: waiting for a connection");
+  XmlRpcUtil::log(4, "XmlRpcServer::work: waiting for a connection");
   if(_accept_error && _disp.getTime() > _accept_retry_time_sec) {
     _disp.addSource(this, XmlRpcDispatch::ReadableEvent);
   }

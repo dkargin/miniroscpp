@@ -28,7 +28,7 @@
 #define MINIROS_PACKAGE_NAME "topic_manager"
 
 #include "miniros/transport/topic_manager.h"
-#include "miniros/transport/xmlrpc_manager.h"
+#include "miniros/transport/rpc_manager.h"
 #include "miniros/transport/connection_manager.h"
 #include "miniros/transport/poll_manager.h"
 #include "miniros/transport/publication.h"
@@ -39,8 +39,6 @@
 #include "miniros/transport/transport_tcp.h"
 #include "miniros/transport/transport_udp.h"
 #include "miniros/transport/rosout_appender.h"
-#include "miniros/init.h"
-#include "miniros/transport/file_log.h"
 #include "miniros/transport/subscribe_options.h"
 
 #include "xmlrpcpp/XmlRpc.h"

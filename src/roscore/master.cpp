@@ -23,7 +23,7 @@ bool Master::start()
     //creatre handler??
     MINIROS_DEBUG("Creating XmlRpc server");
 
-    manager.reset(new XMLRPCManager(_port));
+    manager.reset(new RPCManager(_port));
     setupBindings();
 
     if (!manager->start())

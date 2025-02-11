@@ -30,7 +30,7 @@ class MINIROS_DECL MasterHandler
     bool done = false;
 
   public:
-    using XmlRpcValue = XmlRpc::XmlRpcValue;
+    using RpcValue = XmlRpc::XmlRpcValue;
 
     RegistrationManager reg_manager;
 
@@ -39,18 +39,18 @@ class MINIROS_DECL MasterHandler
 
     /// Instance of parameter.
     struct Parameter {
-        XmlRpcValue value;
+        RpcValue value;
         bool save = false;
 
         Parameter() = default;
-        explicit Parameter(const XmlRpcValue& _value) : value(_value) {}
+        explicit Parameter(const RpcValue& _value) : value(_value) {}
     };
 
     std::map<std::string, Parameter> m_parameters;
 
     MasterHandler();
 
-    std::list<std::string> publisher_update_task(std::string api, std::string topic, std::vector<std::string> pub_uris);
+    std::list<std::string> publisher_update_task(const std::string& api, const std::string& topic, const std::vector<std::string>& pub_uris);
 
     void service_update_task(const std::string& api, const std::string& service, const std::string& uri);
 
@@ -67,13 +67,13 @@ class MINIROS_DECL MasterHandler
 
     int deleteParam(const std::string& caller_id, const std::string& key);
 
-    void setParam(const std::string& caller_id, const std::string& key, const XmlRpcValue& value);
+    void setParam(const std::string& caller_id, const std::string& key, const RpcValue& value);
 
-    XmlRpcValue getParam(const std::string& caller_id, const std::string& key) const;
+    RpcValue getParam(const std::string& caller_id, const std::string& key) const;
 
     std::string searchParam(const std::string& caller_id, const std::string& key) const;
 
-    XmlRpcValue subscribeParam(const std::string& caller_id, const std::string& caller_api, const std::string& key);
+    RpcValue subscribeParam(const std::string& caller_id, const std::string& caller_api, const std::string& key);
 
     ReturnStruct unsubscribeParam(const std::string& caller_id, const std::string& caller_api, const std::string &key);
 
@@ -85,10 +85,10 @@ class MINIROS_DECL MasterHandler
       std::function<std::vector<std::string> (std::string, std::string, std::vector<std::string>)> task,
       const std::string& key,
       const std::vector<std::string>& value, const std::vector<std::string>& node_apis);
-    int _notify_param_subscribers(const std::map<std::string, std::pair<std::string, XmlRpcValue>>& updates);
+    int _notify_param_subscribers(const std::map<std::string, std::pair<std::string, RpcValue>>& updates);
 
     void _param_update_task(const std::string& caller_id, const std::string& caller_api,
-        const std::string& param_key, const XmlRpcValue& param_value);
+        const std::string& param_key, const RpcValue& param_value);
 
     void _notify_topic_subscribers(const std::string& topic,
       const std::vector<std::string>& pub_uris,

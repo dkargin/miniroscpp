@@ -89,8 +89,8 @@ public:
   static const miniros::WallDuration s_zombie_time_; // how long before it is toasted
 };
 
-class XMLRPCManager;
-typedef std::shared_ptr<XMLRPCManager> XMLRPCManagerPtr;
+class RPCManager;
+typedef std::shared_ptr<RPCManager> XMLRPCManagerPtr;
 
 // Compact RPC callback function.
 typedef std::function<void(const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result)> XMLRPCFunc;
@@ -99,15 +99,15 @@ typedef std::function<void(const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValu
 typedef std::function<int (const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result, XmlRpc::XmlRpcServerConnection* conn)> XMLRPCFuncEx;
 
 
-class MINIROS_DECL XMLRPCManager
+class MINIROS_DECL RPCManager
 {
 public:
   using RpcValue = XmlRpc::XmlRpcValue;
 
   static const XMLRPCManagerPtr& instance();
 
-  XMLRPCManager(int port = 0);
-  ~XMLRPCManager();
+  RPCManager(int port = 0);
+  ~RPCManager();
 
   /** @brief Validate an XML/RPC response
    *
@@ -119,8 +119,7 @@ public:
    *
    * @todo Consider making this private.
    */
-  bool validateXmlrpcResponse(const std::string& method, 
-			      XmlRpc::XmlRpcValue &response, XmlRpc::XmlRpcValue &payload);
+  bool validateXmlrpcResponse(const std::string& method, RpcValue &response, RpcValue &payload);
 
   /**
    * @brief Get the xmlrpc server URI of this node

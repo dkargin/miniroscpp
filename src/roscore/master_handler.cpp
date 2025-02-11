@@ -17,18 +17,19 @@ MasterHandler::MasterHandler()
 {
 }
 
-std::list<std::string> MasterHandler::publisher_update_task(std::string api, std::string topic, std::vector<std::string> pub_uris)
+std::list<std::string> MasterHandler::publisher_update_task(const std::string& api, const std::string& topic, const std::vector<std::string>& pub_uris)
 {
-    XmlRpcValue l;
+    MINIROS_DEBUG_NAMED("rosmaster", "publisher_update_task");
+    RpcValue l;
     l[0] = api;
     l[1] = "";
     for(int i = 0; i < pub_uris.size(); i++)
     {
-        XmlRpcValue ll(pub_uris[i]);
+        RpcValue ll(pub_uris[i]);
         l[i + 1] = ll;
     }
 
-    XmlRpcValue args;
+    RpcValue args;
     args[0] = "master";
     args[1] = topic;
     args[2] = l;
@@ -47,7 +48,7 @@ std::list<std::string> MasterHandler::publisher_update_task(std::string api, std
 
 void MasterHandler::service_update_task(const std::string& api, const std::string& service, const std::string& uri)
 {
-    XmlRpcValue args;
+    RpcValue args;
     args[0] = "master";
     args[1] = service;
     args[2] = uri;
@@ -92,6 +93,7 @@ int MasterHandler::getPid(const std::string& caller_id) const
 
 int MasterHandler::deleteParam(const std::string& caller_id, const std::string& key)
 {
+    MINIROS_DEBUG_NAMED("rosparam", "deleteParam %s from %s", key.c_str(), caller_id.c_str());
     std::string fullKey = miniros::names::resolve(caller_id, key, false);
     auto it = m_parameters.find(fullKey);
     if (it == m_parameters.end())
@@ -109,14 +111,21 @@ int MasterHandler::deleteParam(const std::string& caller_id, const std::string& 
     catch (KeyNotFoundException e) { return -1; }*/
 }
 
-void MasterHandler::setParam(const std::string& caller_id, const std::string& key, const XmlRpcValue& value)
+void MasterHandler::setParam(const std::string& caller_id, const std::string& key, const RpcValue& value)
 {
+    std::stringstream ss;
+    ss << key << "=";
+    value.write(ss);
+    ss << " from " << caller_id;
+
+    MINIROS_DEBUG_NAMED("rosparam", "setParam %s", ss.str().c_str());
+
     std::string fullKey = miniros::names::resolve(caller_id, key, false);
     auto it = m_parameters.find(fullKey);
     if (it != m_parameters.end()) {
         it->second.value = value;
     } else {
-        it = m_parameters.emplace(fullKey, XmlRpcValue()).first;
+        it = m_parameters.emplace(fullKey, RpcValue()).first;
     }
     // TODO: Notify
     /*
@@ -124,8 +133,9 @@ void MasterHandler::setParam(const std::string& caller_id, const std::string& ke
     param_server.set_param(key, value, _notify_param_subscribers);*/
 }
 
-MasterHandler::XmlRpcValue MasterHandler::getParam(const std::string& caller_id, const std::string& key) const
+MasterHandler::RpcValue MasterHandler::getParam(const std::string& caller_id, const std::string& key) const
 {
+    MINIROS_DEBUG_NAMED("rosparam", "getParam %s from %s", key.c_str(), caller_id.c_str());
     std::string fullKey = miniros::names::resolve(caller_id, key, false);
     auto it = m_parameters.find(fullKey);
     if (it == m_parameters.end())
@@ -143,8 +153,9 @@ std::string MasterHandler::searchParam(const std::string& caller_id, const std::
     return {};
 }
 
-MasterHandler::XmlRpcValue MasterHandler::subscribeParam(const std::string& caller_id, const std::string& caller_api, const std::string& key)
+MasterHandler::RpcValue MasterHandler::subscribeParam(const std::string& caller_id, const std::string& caller_api, const std::string& key)
 {
+    MINIROS_DEBUG_NAMED("rosparam", "subscribeParam %s from %s, api=%s", key.c_str(), caller_id.c_str(), caller_api.c_str());
     std::string fullKey = miniros::names::resolve(caller_id, key, false);
     // TODO: Implement
     /*
@@ -162,6 +173,7 @@ MasterHandler::XmlRpcValue MasterHandler::subscribeParam(const std::string& call
 
 ReturnStruct MasterHandler::unsubscribeParam(const std::string& caller_id, const std::string& caller_api, const std::string& key)
 {
+    MINIROS_DEBUG_NAMED("rosparam", "unsubscribeParam %s from %s, api=%s", key.c_str(), caller_id.c_str(), caller_api.c_str());
     // TODO: Implement
     /*
     key = Names::resolve_name(key, caller_id, {});
@@ -198,13 +210,13 @@ void MasterHandler::_notify(Registrations& r,
         //}
     }
 }
-int MasterHandler::_notify_param_subscribers(const std::map<std::string, std::pair<std::string, XmlRpcValue>>& updates)
+int MasterHandler::_notify_param_subscribers(const std::map<std::string, std::pair<std::string, RpcValue>>& updates)
 {
     return 1;
 }
 
 void MasterHandler::_param_update_task(const std::string& caller_id, const std::string& caller_api,
-    const std::string& param_key, const XmlRpcValue& param_value)
+    const std::string& param_key, const RpcValue& param_value)
 {
 
 }
@@ -227,7 +239,7 @@ void MasterHandler::_notify_service_update(const std::string& service, const std
 ReturnStruct MasterHandler::registerService(const std::string& caller_id, const std::string& service, const std::string& service_api, const std::string& caller_api)
 {
     reg_manager.register_service(service, caller_id, caller_api, service_api);
-    return ReturnStruct(1, "Registered [" + caller_id + "] as provider of [" + service +"]", XmlRpcValue(1));
+    return ReturnStruct(1, "Registered [" + caller_id + "] as provider of [" + service +"]", RpcValue(1));
 }
 
 ReturnStruct MasterHandler::lookupService(const std::string& caller_id, const std::string& service) const
@@ -235,7 +247,7 @@ ReturnStruct MasterHandler::lookupService(const std::string& caller_id, const st
     std::string service_url = reg_manager.services.get_service_api(service);
 
     if (!service_url.empty())
-        return ReturnStruct(1, "rosrpc URI: [" + service_url + "]", XmlRpcValue(service_url));
+        return ReturnStruct(1, "rosrpc URI: [" + service_url + "]", RpcValue(service_url));
 
     return ReturnStruct(-1, "No provider");
 }
@@ -262,10 +274,10 @@ ReturnStruct MasterHandler::registerSubscriber(const std::string& caller_id, con
     rtn.statusMessage = ss.str();
     rtn.statusCode = 1;
 
-    rtn.value[0] = XmlRpcValue();
+    rtn.value[0] = RpcValue();
     for (int i = 0; i < puburis.size(); i++)
     {
-        XmlRpcValue tmp = new XmlRpcValue(puburis[i]);
+        RpcValue tmp = new RpcValue(puburis[i]);
         rtn.value[i] = tmp;
     }
     return rtn;
@@ -293,7 +305,7 @@ ReturnStruct MasterHandler::registerPublisher(const std::string& caller_id, cons
     rtn.statusMessage = ss.str();
     rtn.statusCode = 1;
     //rtn.value = new XmlRpcValue();
-    rtn.value[0] = XmlRpcValue();
+    rtn.value[0] = RpcValue();
     for (int i = 0; i < sub_uris.size(); i++)
     {
         // This looks very strange.

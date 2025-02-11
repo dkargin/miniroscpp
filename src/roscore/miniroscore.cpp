@@ -8,6 +8,8 @@
 
 #include "master.h"
 
+#include <xmlrpcpp/XmlRpcUtil.h>
+
 std::atomic_bool g_sigintReceived {false};
 
 void systemSignalHandler(int signal) {
@@ -22,7 +24,10 @@ int main(int argc, const char * argv[]) {
 
   miniros::Master master;
 
+  XmlRpc::setVerbosity(3);
+
   master.start();
+  // TODO: subsribe to rosout and publish to rosout_agg.
 
   while (!g_sigintReceived && master.ok()) {
     std::this_thread::sleep_for(std::chrono::milliseconds(100));

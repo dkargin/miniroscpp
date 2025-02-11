@@ -31,18 +31,16 @@
 #include "miniros/transport/callback_queue.h"
 
 #include "miniros/rostime.h"
-#include "miniros/rate.h"
 #include "miniros/timer.h"
 #include "miniros/wall_timer.h"
 #include "miniros/steady_timer.h"
 
-#include "miniros/transport/xmlrpc_manager.h"
+#include "miniros/transport/rpc_manager.h"
 #include "miniros/transport/topic_manager.h"
 #include "miniros/transport/service_manager.h"
 #include "miniros/master_link.h"
 #include "miniros/names.h"
 #include "miniros/init.h"
-#include "miniros/this_node.h"
 #include "xmlrpcpp/XmlRpc.h"
 
 #include <thread>

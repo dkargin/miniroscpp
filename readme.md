@@ -67,28 +67,28 @@ target_include_directories(some_executable PRIVATE ${MINIROS_INCLUDE_GENERATED_D
 # Current status #
 
 1. ROSBag C++ client is complete. It is an independent library. No boost or big external libraries are required.
-1. Ported ROS C++ client code to use only c++17.
-1. Ported rosbag play and record utilities.
-1. Added some tests from original ros_comm package. Though they do not work without some external rosmaster.
+2. Ported ROS C++ client code to use only c++17.
+3. Ported rosbag play and record utilities.
+4. Added some tests from original ros_comm package. Though they do not work without some external rosmaster.
 
 Missing things:
 
 1. This is not a complete ROS distribution. You still need regular ROS tools, like roslaunch, rostopic or rosmaster somewhere else. This is just a portable C++ client, which helps connecting ROS system from the projects, where using regular ROS is not the best idea.
-1. ROS logging is probably broken right now.
-1. Full testing from ros_comm is also missing.
+2. ROS logging is probably broken right now.
+3. Full testing from ros_comm is also missing.
 
 # Future plans #
 
 Since **miniros** is experimental distribution, I am free to improve core API. These are possible directions:
 
-1. Rework global initialization: ros::init should return some sort of a context.
+1. Rework global initialization: ros::init should return some sort of context.
   All global variables should be moved to this context.
   `NodeHandle` should use either this context, or parent node in its constructor.
-  This alows implementing nodelet approach without using separate API.
-1. Ticket-based API for ros services: resolve issues with crashing server.
-1. Reduce compilation time by moving some exposed class fields to "Impl" section.
-1. Test everything on android.
-1. Test everything on windows.
+  This allows implementing nodelet approach without using separate API.
+2. Ticket-based API for ros services: resolve issues with crashing server.
+3. Reduce compilation time by moving some exposed class fields to "Impl" section.
+4. Test everything on android.
+5. Test everything on windows.
 
 # ROS References #
 
@@ -115,11 +115,11 @@ Current codebase is an adaptation of the following ROS packages:
 
 ## Bzip2 ##
 
-I use experimental version of bzip2 from https://gitlab.com/federicomenaquintero/bzip2. It has handy CMake support.
+Miniros uses experimental version of bzip2 from https://gitlab.com/federicomenaquintero/bzip2. It has handy CMake support.
 
 ## LZ4 ##
 
-I am using official [lz4](https://github.com/lz4/lz4.git)
+Miniros uses official [lz4](https://github.com/lz4/lz4.git)
 
 # License #
 

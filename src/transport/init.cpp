@@ -34,7 +34,7 @@
 
 #include "miniros/init.h"
 #include "miniros/names.h"
-#include "miniros/transport/xmlrpc_manager.h"
+#include "miniros/transport/rpc_manager.h"
 #include "miniros/transport/poll_manager.h"
 #include "miniros/transport/connection_manager.h"
 #include "miniros/transport/topic_manager.h"
@@ -327,7 +327,7 @@ void start()
   PollManagerPtr pm = PollManager::instance();
   pm->addPollThreadWatcher(&g_shutdownWatcher);
 
-  XMLRPCManagerPtr rpcm = XMLRPCManager::instance();
+  XMLRPCManagerPtr rpcm = RPCManager::instance();
   rpcm->bind("shutdown", shutdownCallback);
 
   initInternalTimerManager();
@@ -619,7 +619,7 @@ void shutdown()
     ServiceManager::instance()->shutdown();
     PollManager::instance()->shutdown();
     ConnectionManager::instance()->shutdown();
-    XMLRPCManager::instance()->shutdown();
+    RPCManager::instance()->shutdown();
   }
 
   g_started = false;

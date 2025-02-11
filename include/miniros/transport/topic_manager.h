@@ -48,8 +48,8 @@ typedef std::shared_ptr<TopicManager> TopicManagerPtr;
 class PollManager;
 typedef std::shared_ptr<PollManager> PollManagerPtr;
 
-class XMLRPCManager;
-typedef std::shared_ptr<XMLRPCManager> XMLRPCManagerPtr;
+class RPCManager;
+typedef std::shared_ptr<RPCManager> XMLRPCManagerPtr;
 
 class ConnectionManager;
 typedef std::shared_ptr<ConnectionManager> ConnectionManagerPtr;

@@ -5,8 +5,7 @@
 #ifndef MINIROS_MASTER_H
 #define MINIROS_MASTER_H
 
-#include "miniros/console.h"
-#include "miniros/transport/xmlrpc_manager.h"
+#include "miniros/transport/rpc_manager.h"
 #include "master_handler.h"
 
 /*
@@ -38,7 +37,7 @@ class MINIROS_DECL Master
     int _port=-1;
     std::string _host;
     MasterHandler handler;
-    std::unique_ptr<XMLRPCManager> manager;
+    std::unique_ptr<RPCManager> manager;
 
   public:
     using XmlRpcValue = XmlRpc::XmlRpcValue;

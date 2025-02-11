@@ -30,7 +30,7 @@
 #include <cstdio>
 
 #include "miniros/transport/service_manager.h"
-#include "miniros/transport/xmlrpc_manager.h"
+#include "miniros/transport/rpc_manager.h"
 #include "miniros/transport/connection_manager.h"
 #include "miniros/transport/poll_manager.h"
 #include "miniros/transport/service_publication.h"
@@ -43,7 +43,6 @@
 #include "miniros/transport/transport_udp.h"
 #include "miniros/init.h"
 #include "miniros/transport/connection.h"
-#include "miniros/transport/file_log.h"
 
 #include "xmlrpcpp/XmlRpc.h"
 

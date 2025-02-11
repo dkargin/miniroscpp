@@ -32,7 +32,7 @@
 #include "miniros/names.h"
 #include "miniros/this_node.h"
 #include "miniros/transport/network.h"
-#include "miniros/transport/xmlrpc_manager.h"
+#include "miniros/transport/rpc_manager.h"
 #include <miniros/console.h>
 #include <miniros/rosassert.h>
 
@@ -196,7 +196,7 @@ bool MasterLink::execute(const std::string& method, const XmlRpc::XmlRpcValue& r
 
   std::string master_host = getHost();
   uint32_t master_port = getPort();
-  XMLRPCManagerPtr manager = XMLRPCManager::instance();
+  XMLRPCManagerPtr manager = RPCManager::instance();
   if (!manager)
     return false;
   XmlRpc::XmlRpcClient* c = manager->getXMLRPCClient(master_host, master_port, "/");
@@ -488,7 +488,7 @@ bool MasterLink::getParamImpl(const std::string& key, XmlRpc::XmlRpcValue& v, bo
       if (internal_->subscribed_params.insert(mapped_key).second) {
         XmlRpc::XmlRpcValue params, result, payload;
         params[0] = this_node::getName();
-        params[1] = XMLRPCManager::instance()->getServerURI();
+        params[1] = RPCManager::instance()->getServerURI();
         params[2] = mapped_key;
 
         if (!this->execute("subscribeParam", params, result, payload, false)) {
@@ -1029,7 +1029,7 @@ void MasterLink::initParam(const M_string& remappings)
     }
   }
 
-  XMLRPCManager::instance()->bind("paramUpdate", [this](const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result) {
+  RPCManager::instance()->bind("paramUpdate", [this](const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result) {
     return this->paramUpdateCallback(params, result);
   });
 }
