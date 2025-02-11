@@ -5,6 +5,7 @@
 #include "registrations.h"
 
 namespace miniros {
+namespace master {
 
 Registrations::Registrations(Type type_) : m_type(type_)
 {
@@ -140,4 +141,5 @@ void Registrations::unregister_all(const std::string& caller_id)
   }
 }
 
+} // namespace master
 } // namespace miniros

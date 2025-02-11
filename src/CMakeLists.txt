@@ -184,7 +184,8 @@ set(transport_SRC
 set(master_SRC
     roscore/master.cpp
     roscore/master_handler.cpp
-    roscore/registrations.cpp)
+    roscore/registrations.cpp
+    roscore/registration_manager.cpp)
 
 if (MINIROS_USE_SYSTEM_PROGRAM_OPTIONS)
     find_package(Boost REQUIRED COMPONENTS program_options)
@@ -224,7 +225,7 @@ target_include_directories(roscxx PRIVATE
 )
 
 add_executable(miniroscore roscore/miniroscore.cpp)
-target_link_libraries(miniroscore roscxx xmlrpcpp)
+target_link_libraries(miniroscore roscxx xmlrpcpp impl::program_options)
 target_include_directories(miniroscore PRIVATE ${MINIROS_INCLUDE_ROOT})
 
 set(bag_storage_SRC

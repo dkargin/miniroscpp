@@ -7,7 +7,7 @@
 #include "master_handler.h"
 
 namespace miniros {
-
+namespace master {
 bool startsWith(const std::string& str, const std::string& prefix)
 {
   return str.find(prefix) == 0;
@@ -120,17 +120,19 @@ void MasterHandler::setParam(const std::string& caller_id, const std::string& ke
 
   MINIROS_DEBUG_NAMED("rosparam", "setParam %s", ss.str().c_str());
 
-  std::string fullKey = miniros::names::resolve(caller_id, key, false);
-  auto it = m_parameters.find(fullKey);
-  if (it != m_parameters.end()) {
-    it->second.value = value;
+  if (value.getType() == RpcValue::TypeStruct) {
+    // TODO: Implement
   } else {
-    it = m_parameters.emplace(fullKey, RpcValue()).first;
+    std::string fullKey = miniros::names::resolve(caller_id, key, false);
+
+    auto it = m_parameters.find(fullKey);
+    if (it != m_parameters.end()) {
+      it->second.value = value;
+    } else {
+      it = m_parameters.emplace(fullKey, RpcValue()).first;
+    }
   }
   // TODO: Notify
-  /*
-  key = Names::resolve_name(key,caller_id);
-  param_server.set_param(key, value, _notify_param_subscribers);*/
 }
 
 MasterHandler::RpcValue MasterHandler::getParam(const std::string& caller_id, const std::string& key) const
@@ -380,4 +382,5 @@ MasterHandler::SystemState MasterHandler::getSystemState(const std::string& call
   return result;
 }
 
+} // namespace master
 } // namespace miniros

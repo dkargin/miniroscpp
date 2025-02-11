@@ -11,50 +11,50 @@
 #include <string>
 #include <vector>
 #include <cassert>
-#include <stdexcept>
 #include <sstream>
 
 #include "xmlrpcpp/XmlRpcValue.h"
 
 namespace miniros {
-
+namespace master {
 
 struct ReturnStruct
 {
-  int statusCode;
-  std::string statusMessage;
-  XmlRpc::XmlRpcValue value;
+    int statusCode;
+    std::string statusMessage;
+    XmlRpc::XmlRpcValue value;
 
-  ReturnStruct(int _statusCode = 1, std::string _statusMessage = "", XmlRpc::XmlRpcValue _value = {})
-  {
-    statusCode = _statusCode;
-    statusMessage = _statusMessage;
-    value = _value;
-  }
+    ReturnStruct(int _statusCode = 1, std::string _statusMessage = "", XmlRpc::XmlRpcValue _value = {})
+    {
+        statusCode = _statusCode;
+        statusMessage = _statusMessage;
+        value = _value;
+    }
 };
 
+/// A collection of registrations.
 class Registrations
 {
 public:
     enum Type {
-      TOPIC_SUBSCRIPTIONS = 1,
-      TOPIC_PUBLICATIONS,
-      SERVICE = 3,
-      PARAM_SUBSCRIPTIONS = 4
-    };
+        TOPIC_SUBSCRIPTIONS = 1,
+        TOPIC_PUBLICATIONS,
+        SERVICE = 3,
+        PARAM_SUBSCRIPTIONS = 4
+      };
 
     /// Some registration record about network resource.
     struct Record {
-      std::string caller_id;
-      std::string api;
+        std::string caller_id;
+        std::string api;
 
-      friend bool operator == (const Record& lhs, const Record& rhs) {
-        return lhs.caller_id == rhs.caller_id && lhs.api == rhs.api;
-      }
+        friend bool operator == (const Record& lhs, const Record& rhs) {
+            return lhs.caller_id == rhs.caller_id && lhs.api == rhs.api;
+        }
 
-      friend bool operator != (const Record& lhs, const Record& rhs) {
-        return lhs.caller_id != rhs.caller_id || lhs.api != rhs.api;
-      }
+        friend bool operator != (const Record& lhs, const Record& rhs) {
+            return lhs.caller_id != rhs.caller_id || lhs.api != rhs.api;
+        }
     };
 
     using XmlRpcValue = XmlRpc::XmlRpcValue;
@@ -87,31 +87,30 @@ protected:
     const Type m_type;
 };
 
-/*
- * """
-   Container for node registration information. Used in master's
-   self.nodes data structure.  This is effectively a reference
-   counter for the node registration information: when the
-   subscriptions and publications are empty the node registration can
-   be deleted.
-   """ */
+
+/// Container for node registration information. Used in master's
+/// self.nodes data structure.  This is effectively a reference
+/// counter for the node registration information: when the
+/// subscriptions and publications are empty the node registration can be deleted.
 class NodeRef
 {
-  protected:
+protected:
     std::set<std::string> param_subscriptions;
     std::set<std::string> topic_subscriptions;
     std::set<std::string> topic_publications;
     std::set<std::string> services;
 
-  public:
-  using XmlRpcValue = XmlRpc::XmlRpcValue;
+public:
+    using RpcValue = XmlRpc::XmlRpcValue;
 
     std::string id;
+
+    /// URL of a node.
     std::string api;
 
     NodeRef() = default;
 
-    NodeRef(std::string _id, std::string _api)
+    NodeRef(const std::string& _id, const std::string& _api)
     {
         id = _id;
         api = _api;
@@ -125,12 +124,12 @@ class NodeRef
         services.clear();
     }
 
-    bool is_empty()
+    bool is_empty() const
     {
         return param_subscriptions.empty() && topic_subscriptions.empty() && topic_publications.empty() + services.empty();
     }
 
-    bool add(Registrations::Type type_, std::string key)
+    bool add(Registrations::Type type_, const std::string& key)
     {
         if (type_ == Registrations::TOPIC_SUBSCRIPTIONS)
         {
@@ -161,11 +160,11 @@ class NodeRef
             }
         }
         else
-          return false;
+            return false;
         return true;
     }
 
-    bool remove(Registrations::Type type_, std::string key)
+    bool remove(Registrations::Type type_, const std::string& key)
     {
         if (type_ == Registrations::TOPIC_SUBSCRIPTIONS)
         {
@@ -190,169 +189,14 @@ class NodeRef
         return true;
     }
 
-    void shutdown_node_task(const std::string& api, int caller_id, std::string reason)
+    void shutdown_node_task(const std::string& api, int caller_id, const std::string& reason)
     {
         //XmlRpcManager m = new XmlRpcManager();
         //m.shutdown();
     }
 };
 
-
-class RegistrationManager
-{
-public:
-    /*
-     *     Stores registrations for Master.
-     *     RegistrationManager is not threadsafe, so access must be externally locked as appropriate
-     */
-
-    using XmlRpcValue = XmlRpc::XmlRpcValue;
-
-    Registrations publishers;
-    Registrations subscribers;
-    Registrations services;
-    Registrations param_subscribers;
-
-    /// <summary>
-    /// Param 1 = caller_id
-    /// Param 2 = NodeRef
-    /// </summary>
-    std::map<std::string, NodeRef> nodes;
-
-    RegistrationManager()
-    : publishers(Registrations::TOPIC_PUBLICATIONS)
-    , subscribers(Registrations::TOPIC_SUBSCRIPTIONS)
-    , services(Registrations::SERVICE)
-    , param_subscribers(Registrations::PARAM_SUBSCRIPTIONS)
-    {}
-
-    bool reverse_lookup(std::string caller_api)
-    {
-        return true;
-    }
-
-    NodeRef get_node(const std::string& caller_id) const
-    {
-        auto it = nodes.find(caller_id);
-        if (it != nodes.end())
-            return it->second;
-        return {};
-    }
-
-    void _register(Registrations& r, std::string key, std::string caller_id, std::string caller_api, std::string service_api = "")
-    {
-        bool changed = false;
-        NodeRef node_ref = _register_node_api(caller_id, caller_api, changed);
-        node_ref.add(r.type(),key);
-
-        if (changed)
-        {
-            publishers.unregister_all(caller_id);
-            subscribers.unregister_all(caller_id);
-            services.unregister_all(caller_id);
-            param_subscribers.unregister_all(caller_id);
-        }
-        r.registerObj(key, caller_id, caller_api, service_api);
-    }
-
-    ReturnStruct _unregister(Registrations& r, std::string key, std::string caller_id, std::string caller_api, std::string service_api = "")
-    {
-        ReturnStruct ret;
-        if (nodes.count(caller_id))
-        {
-            NodeRef node_ref = nodes[caller_id];
-            ret = r.unregisterObj(key, caller_id, caller_api, service_api);
-            if (ret.statusCode == 1)
-            {
-                node_ref.remove(r.type(), key);
-            }
-            if (node_ref.is_empty())
-            {
-                nodes.erase(caller_id);
-            }
-        }
-        else
-        {
-          std::stringstream ss;
-          ss << "[" << caller_id << "] is not a registered node";
-          ret = ReturnStruct(0, ss.str(), XmlRpcValue(1));
-        }
-        return ret;
-    }
-
-    void register_service(const std::string& service, const std::string& caller_id,
-        const std::string& caller_api, const std::string& service_api)
-    {
-        _register(services, service, caller_id, caller_api, service_api);
-    }
-
-    void register_publisher(const std::string& topic, const std::string& caller_id,
-        const std::string& caller_api)
-    {
-        _register(publishers, topic, caller_id, caller_api);
-    }
-
-    void register_subscriber(std::string topic, std::string caller_id, std::string caller_api)
-    {
-        _register(subscribers, topic, caller_id, caller_api);
-    }
-
-    void register_param_subscriber(std::string param, std::string caller_id, std::string caller_api)
-    {
-        _register(param_subscribers, param, caller_id, caller_api);
-    }
-
-    ReturnStruct unregister_service(std::string service, std::string caller_id, std::string service_api)
-    {
-        std::string caller_api = "";
-        return _unregister(services, service, caller_id, caller_api, service_api);
-        //return new ReturnStruct(ret, msg);
-    }
-
-    ReturnStruct unregister_subscriber(std::string topic, std::string caller_id, std::string caller_api)
-    {
-        return _unregister(subscribers, topic, caller_id, caller_api);
-    }
-
-    ReturnStruct unregister_publisher(std::string topic, std::string caller_id, std::string caller_api)
-    {
-        return _unregister(publishers, topic, caller_id, caller_api);
-    }
-
-    ReturnStruct unregister_param_subscriber(std::string param, std::string caller_id, std::string caller_api)
-    {
-        return _unregister(param_subscribers, param, caller_id, caller_api);
-    }
-
-    NodeRef _register_node_api(std::string caller_id, std::string caller_api, bool& rtn)
-    {
-        NodeRef node_ref;
-        if (nodes.count(caller_id))
-            node_ref = nodes[caller_id];
-
-        std::string bumped_api = "";
-        if (!node_ref.is_empty())
-        {
-            if (node_ref.api == caller_api)
-            {
-                rtn = false;
-                return node_ref;
-            }
-            else
-            {
-                bumped_api = node_ref.api;
-                //thread_pool.queue_task(bumped_api, shutdown_node_task, (bumped_api, caller_id, "new node registered with same name"))
-            }
-        }
-
-        node_ref = NodeRef(caller_id, caller_api);
-        nodes[caller_id] = node_ref;
-
-        rtn = !bumped_api.empty();
-        return node_ref;
-    }
-};
-
+} // namespace master
 } // namespace miniros
 
 #endif //MINIROS_REGISTRATIONS_H

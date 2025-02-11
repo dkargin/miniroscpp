@@ -5,7 +5,7 @@
 #include "master.h"
 
 namespace miniros {
-
+namespace master {
 Master::Master()
 {
   // split the URI (if it's valid) into host and port
@@ -72,8 +72,6 @@ void Master::setupBindings()
   manager->bindEx("getParamNames", wrap1(this, &Master::getParamNames));
 
   manager->bindEx("lookupNode", wrap2(this, &Master::lookupNode));
-  // master_node.bind("getBusStats", tobind(new Func<std::string, std::string, std::string, std::string,
-  // RpcValue>(getBusStats))); master_node.bind("getBusInfo", tobind(new Func<std::string, std::string, std::string,
   // std::string, RpcValue>(getBusInfo)));
 
   // master_node.bind("Time", tobind(new Func<std::string, std::string, std::string, std::string, RpcValue>(Time)));
@@ -89,6 +87,8 @@ void Master::setupBindings()
   manager->bindEx("requestTopic", wrap3(this, &Master::requestTopic));
   manager->bindEx("publisherUpdate", wrap3(this, &Master::publisherUpdate));
   manager->bindEx("paramUpdate", wrap3(this, &Master::paramUpdate));
+  manager->bindEx("getBusStats", wrap1(this, &Master::getBusStats));
+  manager->bindEx("getBusInfo", wrap1(this, &Master::getBusInfo));
 }
 
 Master::RpcValue Master::lookupService(const std::string& caller_id, const std::string& service, Connection*)
@@ -145,89 +145,6 @@ Master::RpcValue Master::getTopicTypes(const std::string& topic, const std::stri
   res[1] = "getTopicTypes";
   res[2] = xmlTopics;
   return res;
-}
-
-Master::RpcValue Master::getPublications(const std::string& caller_id, Connection*)
-{
-  RpcValue res = RpcValue::Array(3);
-  res[0] = 1;
-  res[1] = "publications";
-
-  RpcValue response;
-
-  // response.Size = 0;
-  auto current = handler.getPublishedTopics(caller_id, "");
-
-  for (int i = 0; i < current.size(); i++) {
-    RpcValue pub;
-    // TODO: Expect problems here
-    pub[0] = current[i][0];
-    pub[1] = current[i][1];
-    response[i] = pub;
-  }
-  res[2] = response;
-  return res;
-}
-
-Master::RpcValue Master::getSubscriptions(const std::string& caller_id, Connection*)
-{
-  throw std::runtime_error("NOT IMPLEMENTED YET!");
-}
-
-Master::RpcValue Master::requestTopic(
-  const std::string& caller_id, const std::string& topic, const RpcValue& protocols, Connection*)
-{
-  throw std::runtime_error("NOT IMPLEMENTED YET!");
-  return {};
-}
-
-Master::RpcValue Master::publisherUpdate(
-  const std::string& caller_id, const std::string& topic, const RpcValue& publishers, Connection*)
-{
-  // throw std::runtime_error("NOT IMPLEMENTED YET!");
-  // mlRpcValue parm = RpcValue.Create(ref parms);
-  // List<string> pubs = new List<string>();
-  // for (int idx = 0; idx < parm[2].Size; idx++)
-  //     pubs.Add(parm[2][idx].Get<string>());
-  // if (pubUpdate(parm[1].Get<string>(), pubs))
-  //     manager->responseInt(1, "", 0)(result);
-  // else
-  //{
-  //     EDB.WriteLine("Unknown Error");
-  //     manager->responseInt(0, "Unknown Error or something", 0)(result);
-  // }
-
-  // EDB.WriteLine("TopicManager is updating publishers for " + topic);
-  // Subscription sub = null;
-  // lock (subs_mutex)
-  //{
-  //     if (shutting_down) return false;
-  //     foreach (Subscription s in subscriptions)
-  //     {
-  //         if (s.name != topic || s.IsDropped)
-  //             continue;
-  //         sub = s;
-  //         break;
-  //     }
-  // }
-  // if (sub != null)
-  //     return sub.pubUpdate(pubs);
-  // else
-  //     EDB.WriteLine("got a request for updating publishers of topic " + topic +
-  //                   ", but I don't have any subscribers to that topic.");
-  // return false;
-  return {};
-}
-
-Master::RpcValue Master::paramUpdate(
-  const std::string& caller_id, const std::string& key, const RpcValue& value, Connection*)
-{
-  // TODO: Implement
-  RpcValue result;
-  result[0] = 0;
-  result[1] = "Not implemented yet";
-  result[2] = 0;
-  return result;
 }
 
 Master::RpcValue Master::getSystemState(const std::string& caller_id, Connection*)
@@ -342,16 +259,6 @@ Master::RpcValue Master::lookupNode(const std::string& topic, const std::string&
   return res;
 }
 
-Master::RpcValue Master::getBusStatus(/*[In] [Out]*/ const RpcValue& parms, /*[In] [Out]*/ RpcValue& result)
-{
-  throw std::runtime_error("NOT IMPLEMENTED YET!");
-}
-
-Master::RpcValue Master::getBusInfo(/*[In] [Out]*/ const RpcValue& parms, /*[In] [Out]*/ RpcValue& result)
-{
-  throw std::runtime_error("NOT IMPLEMENTED YET!");
-}
-
 Master::RpcValue Master::getTime(Connection*)
 {
   throw std::runtime_error("NOT IMPLEMENTED YET!");
@@ -369,13 +276,13 @@ Master::RpcValue Master::hasParam(const std::string& caller_id, const std::strin
 }
 
 Master::RpcValue Master::setParam(
-  const std::string& caller_api, const std::string& topic, const RpcValue& value, Connection* /*conn*/)
+  const std::string& caller_api, const std::string& key, const RpcValue& value, Connection* /*conn*/)
 {
   RpcValue res;
   res[0] = 1;
   res[1] = "setParam";
-  handler.setParam(caller_api, topic, value);
-  res[2] = std::string("parameter ") + topic + std::string(" set");
+  handler.setParam(caller_api, key, value);
+  res[2] = std::string("parameter ") + key + std::string(" set");
   return res;
 }
 
@@ -422,4 +329,116 @@ Master::RpcValue Master::getParamNames(const std::string& caller_id, Connection*
   return res;
 }
 
+
+// This is SlaveAPI request to node.
+Master::RpcValue Master::getPublications(const std::string& caller_id, Connection*)
+{
+  RpcValue res = RpcValue::Array(3);
+  res[0] = 1;
+  res[1] = "publications";
+
+  RpcValue response;
+
+  // response.Size = 0;
+  auto current = handler.getPublishedTopics(caller_id, "");
+
+  for (int i = 0; i < current.size(); i++) {
+    RpcValue pub;
+    // TODO: Expect problems here
+    pub[0] = current[i][0];
+    pub[1] = current[i][1];
+    response[i] = pub;
+  }
+  res[2] = response;
+  return res;
+}
+
+// This is SlaveAPI request to node.
+Master::RpcValue Master::getSubscriptions(const std::string& caller_id, Connection*)
+{
+  throw std::runtime_error("NOT IMPLEMENTED YET!");
+}
+
+// This is SlaveAPI request to node.
+Master::RpcValue Master::requestTopic(
+  const std::string& caller_id, const std::string& topic, const RpcValue& protocols, Connection*)
+{
+  throw std::runtime_error("NOT IMPLEMENTED YET!");
+  return {};
+}
+
+// This is SlaveAPI request to node.
+Master::RpcValue Master::publisherUpdate(
+  const std::string& caller_id, const std::string& topic, const RpcValue& publishers, Connection*)
+{
+  // throw std::runtime_error("NOT IMPLEMENTED YET!");
+  // mlRpcValue parm = RpcValue.Create(ref parms);
+  // List<string> pubs = new List<string>();
+  // for (int idx = 0; idx < parm[2].Size; idx++)
+  //     pubs.Add(parm[2][idx].Get<string>());
+  // if (pubUpdate(parm[1].Get<string>(), pubs))
+  //     manager->responseInt(1, "", 0)(result);
+  // else
+  //{
+  //     EDB.WriteLine("Unknown Error");
+  //     manager->responseInt(0, "Unknown Error or something", 0)(result);
+  // }
+
+  // EDB.WriteLine("TopicManager is updating publishers for " + topic);
+  // Subscription sub = null;
+  // lock (subs_mutex)
+  //{
+  //     if (shutting_down) return false;
+  //     foreach (Subscription s in subscriptions)
+  //     {
+  //         if (s.name != topic || s.IsDropped)
+  //             continue;
+  //         sub = s;
+  //         break;
+  //     }
+  // }
+  // if (sub != null)
+  //     return sub.pubUpdate(pubs);
+  // else
+  //     EDB.WriteLine("got a request for updating publishers of topic " + topic +
+  //                   ", but I don't have any subscribers to that topic.");
+  // return false;
+  return {};
+}
+
+// This is SlaveAPI request to node.
+Master::RpcValue Master::paramUpdate(
+  const std::string& caller_id, const std::string& key, const RpcValue& value, Connection*)
+{
+  // TODO: Implement
+  RpcValue result = RpcValue::Array(3);
+  result[0] = 0;
+  result[1] = "Not implemented yet";
+  result[2] = 0;
+  return result;
+}
+
+// This is SlaveAPI request to node.
+Master::RpcValue Master::getBusStats(const std::string& caller_id, Connection* conn)
+{
+  // TODO: Implement
+  RpcValue result = RpcValue::Array(3);
+  result[0] = 0;
+  result[1] = "Not implemented yet";
+  result[2] = 0;
+  return result;
+}
+
+// This is SlaveAPI request to node.
+Master::RpcValue Master::getBusInfo(const std::string& caller_id, Connection* conn)
+{
+  // TODO: Implement
+  RpcValue result = RpcValue::Array(3);
+  result[0] = 0;
+  result[1] = "Not implemented yet";
+  result[2] = 0;
+  return result;
+}
+
+} // namespace master
 } // namespace miniros
