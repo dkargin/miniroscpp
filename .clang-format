@@ -1,0 +1,19 @@
+IndentWidth: 2
+UseTab: Never
+ColumnLimit: 120
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterFunction: true
+  AfterNamespace: false
+AlignAfterOpenBracket: DontAlign
+DerivePointerAlignment: false
+PointerAlignment: Left
+AccessModifierOffset: -2
+ContinuationIndentWidth: 2
+AllowShortFunctionsOnASingleLine: None
+SpaceBeforeParens: ControlStatements
+IndentCaseLabels: true
+MaxEmptyLinesToKeep: 1
+NamespaceIndentation: None
+# This does not work well with MSVC
+# SpaceBeforeCpp11BracedList: true
