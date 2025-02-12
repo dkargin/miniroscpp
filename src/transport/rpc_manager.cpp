@@ -434,7 +434,7 @@ bool RPCManager::bind(const std::string& function_name, const XMLRPCFunc& cb)
   return true;
 }
 
-bool RPCManager::bindEx(const std::string& function_name, const XMLRPCFuncEx& cb)
+bool RPCManager::bindEx(const std::string& function_name, const XMLRPCFuncEx& cb, void* object)
 {
   std::scoped_lock<std::mutex> lock(functions_mutex_);
   if (functions_.find(function_name) != functions_.end())
@@ -446,6 +446,7 @@ bool RPCManager::bindEx(const std::string& function_name, const XMLRPCFuncEx& cb
   info.name = function_name;
   info.functionEx = cb;
   info.wrapper.reset(new XMLRPCCallWrapperEx(function_name, cb, &server_));
+  info.object = object;
   functions_[function_name] = info;
 
   return true;
@@ -457,6 +458,27 @@ void RPCManager::unbind(const std::string& function_name)
   std::scoped_lock<std::mutex> lock(functions_mutex_);
   functions_.erase(function_name);
   unbind_requested_ = false;
+}
+
+size_t RPCManager::unbind(const void* object)
+{
+  if (!object)
+    return 0;
+  unbind_requested_ = true;
+  std::scoped_lock<std::mutex> lock(functions_mutex_);
+  std::vector<std::string> keysToRemove;
+  for (const auto& [key, info]: functions_) {
+    if (info.object == object) {
+      keysToRemove.push_back(key);
+    }
+  }
+
+  for (const auto& key: keysToRemove) {
+    functions_.erase(key);
+  }
+
+  unbind_requested_ = false;
+  return keysToRemove.size();
 }
 
 bool RPCManager::isShuttingDown() const

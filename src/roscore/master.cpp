@@ -17,6 +17,13 @@ Master::Master()
   }
 }
 
+Master::~Master()
+{
+  if (manager) {
+    manager->unbind(this);
+  }
+}
+
 bool Master::start()
 {
   // creatre handler??
@@ -51,27 +58,27 @@ bool Master::ok() const
 
 void Master::setupBindings()
 {
-  manager->bindEx("registerPublisher", wrap4(this, &Master::registerPublisher));
-  manager->bindEx("unregisterPublisher", wrap3(this, &Master::unregisterPublisher));
-  manager->bindEx("registerSubscriber", wrap4(this, &Master::registerSubscriber));
-  manager->bindEx("unregisterSubscriber", wrap3(this, &Master::unregisterSubscriber));
-  manager->bindEx("getPublishedTopics", wrap2(this, &Master::getPublishedTopics));
-  manager->bindEx("getTopicTypes", wrap1(this, &Master::getTopicTypes));
-  manager->bindEx("getSystemState", wrap1(this, &Master::getSystemState));
+  manager->bindEx4("registerPublisher", this, &Master::registerPublisher);
+  manager->bindEx3("unregisterPublisher", this, &Master::unregisterPublisher);
+  manager->bindEx4("registerSubscriber", this, &Master::registerSubscriber);
+  manager->bindEx3("unregisterSubscriber", this, &Master::unregisterSubscriber);
+  manager->bindEx2("getPublishedTopics", this, &Master::getPublishedTopics);
+  manager->bindEx1("getTopicTypes", this, &Master::getTopicTypes);
+  manager->bindEx1("getSystemState", this, &Master::getSystemState);
 
-  manager->bindEx("lookupService", wrap2(this, &Master::lookupService));
-  manager->bindEx("unregisterService", wrap3(this, &Master::unregisterService));
-  manager->bindEx("registerService", wrap4(this, &Master::registerService));
+  manager->bindEx2("lookupService", this, &Master::lookupService);
+  manager->bindEx3("unregisterService", this, &Master::unregisterService);
+  manager->bindEx4("registerService", this, &Master::registerService);
 
-  manager->bindEx("hasParam", wrap2(this, &Master::hasParam));
-  manager->bindEx("setParam", wrap3(this, &Master::setParam));
-  manager->bindEx("getParam", wrap2(this, &Master::getParam));
-  manager->bindEx("deleteParam", wrap2(this, &Master::deleteParam));
+  manager->bindEx2("hasParam", this, &Master::hasParam);
+  manager->bindEx3("setParam", this, &Master::setParam);
+  manager->bindEx2("getParam", this, &Master::getParam);
+  manager->bindEx2("deleteParam", this, &Master::deleteParam);
   // master_node.bind("subscribeParam", tobind(new Func<std::string, std::string, std::string, std::string,
   // RpcValue>(subscribeParam)));
-  manager->bindEx("getParamNames", wrap1(this, &Master::getParamNames));
+  manager->bindEx1("getParamNames", this, &Master::getParamNames);
 
-  manager->bindEx("lookupNode", wrap2(this, &Master::lookupNode));
+  manager->bindEx2("lookupNode", this, &Master::lookupNode);
   // std::string, RpcValue>(getBusInfo)));
 
   // master_node.bind("Time", tobind(new Func<std::string, std::string, std::string, std::string, RpcValue>(Time)));
@@ -82,13 +89,13 @@ void Master::setupBindings()
 
   // roscore is also a publisher/subsriber.
   // TODO: Probably it should be moved elsewhere.
-  manager->bindEx("getPublications", wrap1(this, &Master::getPublications));
-  manager->bindEx("getSubscriptions", wrap1(this, &Master::getSubscriptions));
-  manager->bindEx("requestTopic", wrap3(this, &Master::requestTopic));
-  manager->bindEx("publisherUpdate", wrap3(this, &Master::publisherUpdate));
-  manager->bindEx("paramUpdate", wrap3(this, &Master::paramUpdate));
-  manager->bindEx("getBusStats", wrap1(this, &Master::getBusStats));
-  manager->bindEx("getBusInfo", wrap1(this, &Master::getBusInfo));
+  manager->bindEx1("getPublications", this, &Master::getPublications);
+  manager->bindEx1("getSubscriptions", this, &Master::getSubscriptions);
+  manager->bindEx3("requestTopic", this, &Master::requestTopic);
+  manager->bindEx3("publisherUpdate", this, &Master::publisherUpdate);
+  manager->bindEx3("paramUpdate", this, &Master::paramUpdate);
+  manager->bindEx1("getBusStats", this, &Master::getBusStats);
+  manager->bindEx1("getBusInfo", this, &Master::getBusInfo);
 }
 
 Master::RpcValue Master::lookupService(const std::string& caller_id, const std::string& service, Connection*)

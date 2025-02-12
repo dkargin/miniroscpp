@@ -37,72 +37,18 @@ protected:
   int _port = -1;
   std::string _host;
   MasterHandler handler;
-  std::unique_ptr<RPCManager> manager;
+  std::shared_ptr<RPCManager> manager;
 
 public:
   using RpcValue = XmlRpc::XmlRpcValue;
   using Connection = XmlRpc::XmlRpcServerConnection;
 
   Master();
+  ~Master();
 
   bool start();
   void stop();
   bool ok() const;
-
-  XMLRPCFuncEx wrap0(Master* master, RpcValue (Master::*method)(Connection* conn))
-  {
-    return [=](const RpcValue& param, RpcValue& result, Connection* conn) {
-      result = (master->*method)(conn);
-      return 0;
-    };
-  }
-
-  template <class T0> XMLRPCFuncEx wrap1(Master* master, RpcValue (Master::*method)(const T0& arg0, Connection* conn))
-  {
-    return [=](const RpcValue& param, RpcValue& result, Connection* conn) {
-      T0 arg0 = param[0].as<T0>();
-      result = (master->*method)(arg0, conn);
-      return 0;
-    };
-  }
-
-  template <class T0, class T1>
-  XMLRPCFuncEx wrap2(Master* master, RpcValue (Master::*method)(const T0& arg0, const T1& arg1, Connection* conn))
-  {
-    return [=](const RpcValue& param, RpcValue& result, Connection* conn) {
-      T0 arg0 = param[0].as<T0>();
-      T1 arg1 = param[1].as<T1>();
-      result = (master->*method)(arg0, arg1, conn);
-      return 0;
-    };
-  }
-
-  template <class T0, class T1, class T2>
-  XMLRPCFuncEx wrap3(
-    Master* master, RpcValue (Master::*method)(const T0& arg0, const T1& arg1, const T2& arg2, Connection* conn))
-  {
-    return [=](const RpcValue& param, RpcValue& result, Connection* conn) {
-      T0 arg0 = param[0].as<T0>();
-      T1 arg1 = param[1].as<T1>();
-      T2 arg2 = param[2].as<T2>();
-      result = (master->*method)(arg0, arg1, arg2, conn);
-      return 0;
-    };
-  }
-
-  template <class T0, class T1, class T2, class T3>
-  XMLRPCFuncEx wrap4(Master* master,
-    RpcValue (Master::*method)(const T0& arg0, const T1& arg1, const T2& arg2, const T3& arg3, Connection* conn))
-  {
-    return [=](const RpcValue& param, RpcValue& result, Connection* conn) {
-      T0 arg0 = param[0].as<T0>();
-      T1 arg1 = param[1].as<T1>();
-      T2 arg2 = param[2].as<T2>();
-      T3 arg3 = param[3].as<T3>();
-      result = (master->*method)(arg0, arg1, arg2, arg3, conn);
-      return 0;
-    };
-  }
 
   /// Setup RPC callbacks.
   void setupBindings();

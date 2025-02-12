@@ -103,6 +103,7 @@ class MINIROS_DECL RPCManager
 {
 public:
   using RpcValue = XmlRpc::XmlRpcValue;
+  using RpcConnection = XmlRpc::XmlRpcServerConnection;
 
   static const XMLRPCManagerPtr& instance();
 
@@ -137,9 +138,74 @@ public:
   bool bind(const std::string& function_name, const XMLRPCFunc& cb);
 
   /// Bind extended callback.
-  bool bindEx(const std::string& function_name, const XMLRPCFuncEx& cb);
+  /// @param function_name - name of function to bind
+  /// @param cb - callback functor
+  /// @param object - attached object
+  bool bindEx(const std::string& function_name, const XMLRPCFuncEx& cb, void* object = nullptr);
+
+  template <class Object>
+  bool bindEx0(const std::string& function_name,
+    Object* object, RpcValue (Object::*method)(RpcConnection* conn))
+  {
+    return bindEx(function_name, [=](const RpcValue& param, RpcValue& result, RpcConnection* conn) {
+      result = (object->*method)(conn);
+      return 0;
+    }, object);
+  }
+
+  template <class Object, class T0>
+  bool bindEx1(const std::string& function_name,
+    Object* object, RpcValue (Object::*method)(const T0& arg0, RpcConnection* conn))
+  {
+    return bindEx(function_name, [=](const RpcValue& param, RpcValue& result, RpcConnection* conn) {
+      T0 arg0 = param[0].as<T0>();
+      result = (object->*method)(arg0, conn);
+      return 0;
+    }, object);
+  }
+
+  template <class Object, class T0, class T1>
+  bool bindEx2(const std::string& function_name,Object* object, RpcValue (Object::*method)(const T0& arg0, const T1& arg1, RpcConnection* conn))
+  {
+    return bindEx(function_name, [=](const RpcValue& param, RpcValue& result, RpcConnection* conn) {
+      T0 arg0 = param[0].as<T0>();
+      T1 arg1 = param[1].as<T1>();
+      result = (object->*method)(arg0, arg1, conn);
+      return 0;
+    }, object);
+  }
+
+  template <class Object, class T0, class T1, class T2>
+  bool bindEx3(const std::string& function_name,Object* object,
+    RpcValue (Object::*method)(const T0& arg0, const T1& arg1, const T2& arg2, RpcConnection* conn))
+  {
+    return bindEx(function_name, [=](const RpcValue& param, RpcValue& result, RpcConnection* conn) {
+      T0 arg0 = param[0].as<T0>();
+      T1 arg1 = param[1].as<T1>();
+      T2 arg2 = param[2].as<T2>();
+      result = (object->*method)(arg0, arg1, arg2, conn);
+      return 0;
+    }, object);
+  }
+
+  template <class Object, class T0, class T1, class T2, class T3>
+  bool bindEx4(const std::string& function_name, Object* object,
+    RpcValue (Object::*method)(const T0& arg0, const T1& arg1, const T2& arg2, const T3& arg3, RpcConnection* conn))
+  {
+    return bindEx(function_name, [=](const RpcValue& param, RpcValue& result, RpcConnection* conn) {
+      T0 arg0 = param[0].as<T0>();
+      T1 arg1 = param[1].as<T1>();
+      T2 arg2 = param[2].as<T2>();
+      T3 arg3 = param[3].as<T3>();
+      result = (object->*method)(arg0, arg1, arg2, arg3, conn);
+      return 0;
+    }, object);
+  }
 
   void unbind(const std::string& function_name);
+
+  /// Unbind all callbacks, associated with specific object.
+  size_t unbind(const void* object);
 
   NODISCARD bool start();
   void shutdown();
@@ -177,15 +243,18 @@ private:
   struct FunctionInfo
   {
     std::string name;
-    // Regular callback.
+    /// Regular callback.
     XMLRPCFunc function;
-    // Extended callback.
+    /// Extended callback.
     XMLRPCFuncEx functionEx;
+    /// Object to be tracked.
+    void* object = nullptr;
+
     std::shared_ptr<XmlRpc::XmlRpcServerMethod> wrapper;
   };
-  typedef std::map<std::string, FunctionInfo> M_StringToFuncInfo;
+
   std::mutex functions_mutex_;
-  M_StringToFuncInfo functions_;
+  std::map<std::string, FunctionInfo> functions_;
 
   std::atomic_bool unbind_requested_;
 };
