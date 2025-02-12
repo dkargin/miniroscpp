@@ -107,7 +107,7 @@ public:
 
   static const XMLRPCManagerPtr& instance();
 
-  RPCManager(int port = 0);
+  RPCManager();
   ~RPCManager();
 
   /** @brief Validate an XML/RPC response
@@ -207,7 +207,7 @@ public:
   /// Unbind all callbacks, associated with specific object.
   size_t unbind(const void* object);
 
-  NODISCARD bool start();
+  NODISCARD bool start(int port = 0);
   void shutdown();
 
   bool isShuttingDown() const;

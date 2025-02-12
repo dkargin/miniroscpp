@@ -125,8 +125,8 @@ const XMLRPCManagerPtr& RPCManager::instance()
   return xmlrpc_manager;
 }
 
-RPCManager::RPCManager(int port)
-: port_(port)
+RPCManager::RPCManager()
+: port_(0)
 , shutting_down_(false)
 , unbind_requested_(false)
 {
@@ -137,12 +137,13 @@ RPCManager::~RPCManager()
   shutdown();
 }
 
-bool RPCManager::start()
+bool RPCManager::start(int port)
 {
+  MINIROS_INFO_NAMED("RPCManager", "Starting manager at port %d", port);
   shutting_down_ = false;
   bind("getPid", getPid);
 
-  if (!server_.bindAndListen(port_))
+  if (!server_.bindAndListen(port))
     return false;
 
   port_ = server_.get_port();

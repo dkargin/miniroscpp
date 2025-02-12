@@ -33,17 +33,12 @@ namespace master {
 
 /// Core class of rosmaster/roscore.
 class MINIROS_DECL Master {
-protected:
-  int _port = -1;
-  std::string _host;
-  MasterHandler handler;
-  std::shared_ptr<RPCManager> manager;
 
 public:
   using RpcValue = XmlRpc::XmlRpcValue;
   using Connection = XmlRpc::XmlRpcServerConnection;
 
-  Master();
+  Master(const std::shared_ptr<RPCManager>& manager);
   ~Master();
 
   bool start();
@@ -214,6 +209,12 @@ public:
   ///   in Python at the moment (cf. rospy/masterslave.py in _TopicImpl.get_stats_info() vs. roscpp/publication.cpp
   /// in Publication::getInfo()).
   RpcValue getBusInfo(const std::string& caller_id, Connection* conn);
+
+protected:
+  int m_port = -1;
+  std::string m_host;
+  MasterHandler m_handler;
+  std::shared_ptr<RPCManager> m_manager;
 };
 
 } // namespace master

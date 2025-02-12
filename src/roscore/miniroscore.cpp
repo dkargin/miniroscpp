@@ -62,7 +62,8 @@ int main(int argc, const char * argv[]) {
     return EXIT_SUCCESS;
   }
 
-  miniros::master::Master master;
+  auto rpcManager = miniros::RPCManager::instance();
+  miniros::master::Master master(rpcManager);
 
   if (vm.count("xmlrpc_log")) {
     int level = vm["xmlrpc_log"].as<int>();
