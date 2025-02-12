@@ -56,7 +56,7 @@ void Master::setupBindings()
   manager->bindEx("registerSubscriber", wrap4(this, &Master::registerSubscriber));
   manager->bindEx("unregisterSubscriber", wrap3(this, &Master::unregisterSubscriber));
   manager->bindEx("getPublishedTopics", wrap2(this, &Master::getPublishedTopics));
-  manager->bindEx("getTopicTypes", wrap2(this, &Master::getTopicTypes));
+  manager->bindEx("getTopicTypes", wrap1(this, &Master::getTopicTypes));
   manager->bindEx("getSystemState", wrap1(this, &Master::getSystemState));
 
   manager->bindEx("lookupService", wrap2(this, &Master::lookupService));
@@ -95,7 +95,7 @@ Master::RpcValue Master::lookupService(const std::string& caller_id, const std::
 {
   ReturnStruct r = handler.lookupService(caller_id, service);
 
-  RpcValue res;
+  RpcValue res = RpcValue::Array(3);;
   res[0] = r.statusCode;
   res[1] = r.statusMessage;
   if (r.value)
@@ -108,7 +108,7 @@ Master::RpcValue Master::registerService(const std::string& caller_id, const std
 {
   ReturnStruct r = handler.registerService(caller_id, service, service_api, caller_api);
 
-  RpcValue res;
+  RpcValue res = RpcValue::Array(3);;
   res[0] = r.statusCode;
   res[1] = r.statusMessage;
   res[2] = r.value;
@@ -120,14 +120,14 @@ Master::RpcValue Master::unregisterService(
 {
   ReturnStruct r = handler.unregisterService(caller_id, service, service_api);
 
-  RpcValue res;
+  RpcValue res = RpcValue::Array(3);;
   res[0] = r.statusCode;
   res[1] = r.statusMessage;
   res[2] = r.value;
   return res;
 }
 
-Master::RpcValue Master::getTopicTypes(const std::string& topic, const std::string& caller_id, Connection*)
+Master::RpcValue Master::getTopicTypes(const std::string& topic, Connection*)
 {
   std::map<std::string, std::string> types = handler.getTopicTypes(topic);
 
@@ -140,7 +140,7 @@ Master::RpcValue Master::getTopicTypes(const std::string& topic, const std::stri
     xmlTopics[index++] = payload;
   }
 
-  RpcValue res;
+  RpcValue res = RpcValue::Array(3);;
   res[0] = 1;
   res[1] = "getTopicTypes";
   res[2] = xmlTopics;
@@ -210,7 +210,7 @@ Master::RpcValue Master::registerPublisher(const std::string& caller_id, const s
   MINIROS_INFO("PUBLISHING: %s : %s : %s", caller_id.c_str(), caller_api.c_str(), topic.c_str());
 
   ReturnStruct st = handler.registerPublisher(caller_id, topic, type, caller_api);
-  RpcValue res;
+  RpcValue res = RpcValue::Array(3);
   res[0] = st.statusCode;
   res[1] = st.statusMessage;
   res[2] = st.value;
@@ -222,10 +222,11 @@ Master::RpcValue Master::unregisterPublisher(
 {
   MINIROS_INFO("UNPUBLISHING: %s : %s", caller_id.c_str(), caller_api.c_str());
 
-  RpcValue res = new RpcValue();
+  RpcValue res = RpcValue::Array(3);
   int ret = handler.unregisterPublisher(caller_id, topic, caller_api);
-  res[0] = ret;
+  res[0] = 1;
   res[1] = std::string("unregistered ") + caller_id + std::string("as provder of ") + topic;
+  res[2] = ret;
   return res;
 }
 
@@ -233,7 +234,7 @@ Master::RpcValue Master::registerSubscriber(const std::string& caller_id, const 
   const std::string& type, const std::string& caller_api, Connection* /*conn*/)
 {
   ReturnStruct st = handler.registerSubscriber(caller_id, topic, type, caller_api);
-  RpcValue res;
+  RpcValue res = RpcValue::Array(3);
   res[0] = st.statusCode;
   res[1] = st.statusMessage;
   res[2] = st.value;
@@ -243,16 +244,18 @@ Master::RpcValue Master::registerSubscriber(const std::string& caller_id, const 
 Master::RpcValue Master::unregisterSubscriber(
   const std::string& caller_id, const std::string& topic, const std::string& caller_api, Connection* /*conn*/)
 {
-  RpcValue res;
-  res[0] = handler.unregisterSubscriber(caller_id, topic, caller_api);
+  RpcValue res = RpcValue::Array(3);
+  int ret = handler.unregisterSubscriber(caller_id, topic, caller_api);
+  res[0] = 1;
   res[1] = std::string("unregistered ") + caller_id + std::string("as provder of ") + topic;
+  res[2] = ret;
   return res;
 }
 
 Master::RpcValue Master::lookupNode(const std::string& topic, const std::string& caller_id, Connection* conn)
 {
   std::string api = handler.lookupNode(caller_id, topic);
-  RpcValue res;
+  RpcValue res = RpcValue::Array(3);
   res[0] = 1;
   res[1] = "lookupNode";
   res[2] = api;
@@ -266,11 +269,9 @@ Master::RpcValue Master::getTime(Connection*)
 
 Master::RpcValue Master::hasParam(const std::string& caller_id, const std::string& topic, Connection* /*conn*/)
 {
-  RpcValue res = new RpcValue(); // RpcValue.Create(ref result), parm = RpcValue.Create(ref parms);
+  RpcValue res = RpcValue::Array(3);
   res[0] = 1;
   res[1] = "hasParam";
-  // std::string caller_id = parm[0].Getstd::string();
-  // std::string topic = parm[1].Getstd::string();
   res[2] = handler.hasParam(caller_id, topic);
   return res;
 }
@@ -278,7 +279,7 @@ Master::RpcValue Master::hasParam(const std::string& caller_id, const std::strin
 Master::RpcValue Master::setParam(
   const std::string& caller_api, const std::string& key, const RpcValue& value, Connection* /*conn*/)
 {
-  RpcValue res;
+  RpcValue res = RpcValue::Array(3);
   res[0] = 1;
   res[1] = "setParam";
   handler.setParam(caller_api, key, value);
@@ -288,17 +289,16 @@ Master::RpcValue Master::setParam(
 
 Master::RpcValue Master::getParam(const std::string& caller_id, const std::string& topic, Connection*)
 {
-  RpcValue res;
-  res[0] = 1;
-  res[1] = "getParam";
-
+  RpcValue res = RpcValue::Array(3);
   RpcValue value = handler.getParam(caller_id, topic);
   if (!value) {
     res[0] = 0;
     res[1] = std::string("Parameter ") + topic + std::string(" is not set");
-    value = std::string("");
+  } else {
+    res[0] = 1;
+    res[1] = "getParam";
+    res[2] = value;
   }
-  res[2] = value;
   return res;
 }
 
@@ -315,7 +315,7 @@ Master::RpcValue Master::deleteParam(const std::string& caller_d, const std::str
 
 Master::RpcValue Master::getParamNames(const std::string& caller_id, Connection*)
 {
-  RpcValue res;
+  RpcValue res = RpcValue::Array(3);
   res[0] = 1;
   res[1] = "getParamNames";
 
