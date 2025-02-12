@@ -289,8 +289,7 @@ XmlRpcSocket::connect(int fd, const std::string& host, int port)
 
 
 // Read available text from the specified socket. Returns false on error.
-bool
-XmlRpcSocket::nbRead(int fd, std::string& s, bool *eof)
+bool XmlRpcSocket::nbRead(int fd, std::string& s, bool *eof)
 {
   const int READ_SIZE = 4096;   // Number of bytes to attempt to read at a time
   char readBuf[READ_SIZE];
@@ -352,8 +351,7 @@ XmlRpcSocket::nbWrite(int fd, const std::string& s, int *bytesSoFar)
 
 
 // Returns last errno
-int
-XmlRpcSocket::getError()
+int XmlRpcSocket::getError()
 {
 #if defined(_WINDOWS)
   return WSAGetLastError();
@@ -364,17 +362,15 @@ XmlRpcSocket::getError()
 
 
 // Returns message corresponding to last errno
-std::string
-XmlRpcSocket::getErrorMsg()
+std::string XmlRpcSocket::getErrorMsg()
 {
   return getErrorMsg(getError());
 }
 
 // Returns message corresponding to errno... well, it should anyway
-std::string
-XmlRpcSocket::getErrorMsg(int error)
+std::string XmlRpcSocket::getErrorMsg(int error)
 {
-  char err[60];
+  char err[255];
   std::snprintf(err,sizeof(err),"%s",strerror(error));
   return std::string(err);
 }
@@ -383,7 +379,7 @@ int XmlRpcSocket::get_port(int socket)
 {
   sockaddr_storage ss;
   socklen_t ss_len = sizeof(ss);
-  if(getsockname(socket, (sockaddr *)&ss, &ss_len) == 0) {
+  if (getsockname(socket, (sockaddr *)&ss, &ss_len) == 0) {
     sockaddr_in *sin = (sockaddr_in *)&ss;
     sockaddr_in6 *sin6 = (sockaddr_in6 *)&ss;
 
