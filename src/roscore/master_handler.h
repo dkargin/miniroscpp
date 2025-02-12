@@ -10,13 +10,14 @@
 #include <list>
 #include <functional>
 
-#include <unistd.h>
-
 #include "xmlrpcpp/XmlRpcValue.h"
 
 #include "miniros/names.h"
 #include "registration_manager.h"
 
+namespace XmlRpc {
+class XmlRpcServerConnection;
+}
 namespace miniros {
 
 namespace master {
@@ -32,6 +33,7 @@ protected:
 
 public:
   using RpcValue = XmlRpc::XmlRpcValue;
+  using RpcConnection = XmlRpc::XmlRpcServerConnection;
 
   RegistrationManager reg_manager;
 
@@ -97,22 +99,27 @@ public:
 
   void _notify_service_update(const std::string& service, const std::string& service_api);
 
-  ReturnStruct registerService(const std::string& caller_id, const std::string &service, const std::string& service_api, const std::string& caller_api);
+  ReturnStruct registerService(const std::string& caller_id, const std::string &service, const std::string& service_api,
+    const std::string& caller_api, RpcConnection* conn);
 
   ReturnStruct lookupService(const std::string& caller_id, const std::string& service) const;
 
   ReturnStruct unregisterService(const std::string& caller_id, const std::string& service, const std::string& service_api);
 
-  ReturnStruct registerSubscriber(const std::string& caller_id, const std::string& topic, const std::string& topic_type, const std::string& caller_api);
+  ReturnStruct registerSubscriber(const std::string& caller_id, const std::string& topic, const std::string& topic_type,
+    const std::string& caller_api, RpcConnection* conn);
 
   int unregisterSubscriber(const std::string& caller_id, const std::string& topic, const std::string& caller_api);
 
-  ReturnStruct registerPublisher(const std::string& caller_id, const std::string& topic, const std::string& topic_type, const std::string& caller_api);
+  ReturnStruct registerPublisher(const std::string& caller_id, const std::string& topic, const std::string& topic_type,
+    const std::string& caller_api, RpcConnection* conn);
 
   int unregisterPublisher(const std::string& caller_id, const std::string& topic, const std::string& caller_api);
 
   std::string lookupNode(const std::string& caller_id, const std::string& node_name) const;
 
+  /// Get list of piblished topics.
+  /// @param caller_id - name of requesting node.
   /// @param subgraph - Optional std::string, only returns topics that start with that name
   std::vector<std::vector<std::string>> getPublishedTopics(const std::string& caller_id, const std::string& subgraph) const;
 

@@ -210,6 +210,8 @@ public:
   /// in Publication::getInfo()).
   RpcValue getBusInfo(const std::string& caller_id, Connection* conn);
 
+  RpcValue getPid(const std::string& caller_id, Connection* conn);
+
 protected:
   int m_port = -1;
   std::string m_host;

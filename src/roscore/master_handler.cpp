@@ -4,6 +4,8 @@
 
 #include <algorithm>
 
+#include <unistd.h>
+
 #include "master_handler.h"
 
 namespace miniros {
@@ -238,7 +240,7 @@ void MasterHandler::_notify_service_update(const std::string& service, const std
 }
 
 ReturnStruct MasterHandler::registerService(const std::string& caller_id, const std::string& service,
-  const std::string& service_api, const std::string& caller_api)
+  const std::string& service_api, const std::string& caller_api, RpcConnection*)
 {
   reg_manager.register_service(service, caller_id, caller_api, service_api);
   return ReturnStruct(1, "Registered [" + caller_id + "] as provider of [" + service + "]", RpcValue(1));
@@ -261,8 +263,8 @@ ReturnStruct MasterHandler::unregisterService(
   // return new ReturnStruct(1, "Registered [" + caller_id + "] as provider of [" + service + "]", new XmlRpcValue(1));
 }
 
-ReturnStruct MasterHandler::registerSubscriber(
-  const std::string& caller_id, const std::string& topic, const std::string& topic_type, const std::string& caller_api)
+ReturnStruct MasterHandler::registerSubscriber(const std::string& caller_id, const std::string& topic,
+  const std::string& topic_type, const std::string& caller_api, RpcConnection*)
 {
   reg_manager.register_subscriber(topic, caller_id, caller_api);
 
@@ -292,12 +294,15 @@ int MasterHandler::unregisterSubscriber(
   return 1;
 }
 
-ReturnStruct MasterHandler::registerPublisher(
-  const std::string& caller_id, const std::string& topic, const std::string& topic_type, const std::string& caller_api)
+ReturnStruct MasterHandler::registerPublisher(const std::string& caller_id, const std::string& topic,
+  const std::string& topic_type, const std::string& caller_api, RpcConnection*)
 {
-  reg_manager.register_publisher(topic, caller_id, caller_api);
+  MINIROS_DEBUG_NAMED("handler", "registerPublisher topic=%s caller_id=%s caller_api=%s",
+    topic.c_str(), caller_id.c_str(), caller_api.c_str());
   if (!topic_types.count(topic_type))
     topic_types[topic] = topic_type;
+
+  reg_manager.register_publisher(topic, caller_id, caller_api);
 
   std::vector<std::string> pub_uris = reg_manager.publishers.get_apis(topic);
   std::vector<std::string> sub_uris = reg_manager.subscribers.get_apis(topic);
@@ -321,13 +326,16 @@ ReturnStruct MasterHandler::registerPublisher(
 int MasterHandler::unregisterPublisher(
   const std::string& caller_id, const std::string& topic, const std::string& caller_api)
 {
+  MINIROS_DEBUG_NAMED("handler", "unregisterPublisher topic=%s caller_id=%s caller_api=%s",
+    topic.c_str(), caller_id.c_str(), caller_api.c_str());
   reg_manager.unregister_publisher(topic, caller_id, caller_api);
   return 1;
 }
 
 std::string MasterHandler::lookupNode(const std::string& caller_id, const std::string& node_name) const
 {
-  NodeRef node = reg_manager.get_node(caller_id);
+  MINIROS_DEBUG_NAMED("handler", "lookupNode node=%s caller_id=%s", node_name.c_str(), caller_id.c_str());
+  NodeRef node = reg_manager.get_node(node_name);
   if (node.is_empty())
     return "";
   return node.api;

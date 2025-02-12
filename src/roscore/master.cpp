@@ -16,7 +16,7 @@ Master::Master(const std::shared_ptr<RPCManager>& manager)
   {
     m_host = "localhost";
     m_port = 11311;
-    MINIROS_WARN("Invalid XMLRPC uri. Using ROS_MASTER_URI=http://%s:%d:", m_host.c_str(), m_port);
+    MINIROS_WARN("Invalid XMLRPC uri. Using ROS_MASTER_URI=http://%s:%d", m_host.c_str(), m_port);
   }
 }
 
@@ -81,7 +81,6 @@ void Master::setupBindings()
   m_manager->bindEx1("getParamNames", this, &Master::getParamNames);
 
   m_manager->bindEx2("lookupNode", this, &Master::lookupNode);
-  // std::string, RpcValue>(getBusInfo)));
 
   // master_node.bind("Time", tobind(new Func<std::string, std::string, std::string, std::string, RpcValue>(Time)));
   // master_node.bind("Duration", tobind(new Func<std::string, std::string, std::string, std::string,
@@ -98,6 +97,7 @@ void Master::setupBindings()
   m_manager->bindEx3("paramUpdate", this, &Master::paramUpdate);
   m_manager->bindEx1("getBusStats", this, &Master::getBusStats);
   m_manager->bindEx1("getBusInfo", this, &Master::getBusInfo);
+  m_manager->bindEx1("getPid", this, &Master::getPid);
 }
 
 Master::RpcValue Master::lookupService(const std::string& caller_id, const std::string& service, Connection*)
@@ -113,9 +113,9 @@ Master::RpcValue Master::lookupService(const std::string& caller_id, const std::
 }
 
 Master::RpcValue Master::registerService(const std::string& caller_id, const std::string& service,
-  const std::string& caller_api, const std::string& service_api, Connection*)
+  const std::string& caller_api, const std::string& service_api, Connection* conn)
 {
-  ReturnStruct r = m_handler.registerService(caller_id, service, service_api, caller_api);
+  ReturnStruct r = m_handler.registerService(caller_id, service, service_api, caller_api, conn);
 
   RpcValue res = RpcValue::Array(3);;
   res[0] = r.statusCode;
@@ -214,11 +214,11 @@ Master::RpcValue Master::getPublishedTopics(const std::string& caller_id, const 
 }
 
 Master::RpcValue Master::registerPublisher(const std::string& caller_id, const std::string& topic,
-  const std::string& type, const std::string& caller_api, Connection* /*conn*/)
+  const std::string& type, const std::string& caller_api, Connection* conn)
 {
-  MINIROS_INFO("PUBLISHING: %s : %s : %s", caller_id.c_str(), caller_api.c_str(), topic.c_str());
+  MINIROS_INFO("PUBLISHING: caller_id=%s caller_api=%s topic=%s", caller_id.c_str(), caller_api.c_str(), topic.c_str());
 
-  ReturnStruct st = m_handler.registerPublisher(caller_id, topic, type, caller_api);
+  ReturnStruct st = m_handler.registerPublisher(caller_id, topic, type, caller_api, conn);
   RpcValue res = RpcValue::Array(3);
   res[0] = st.statusCode;
   res[1] = st.statusMessage;
@@ -229,7 +229,7 @@ Master::RpcValue Master::registerPublisher(const std::string& caller_id, const s
 Master::RpcValue Master::unregisterPublisher(
   const std::string& caller_id, const std::string& topic, const std::string& caller_api, Connection* /*conn*/)
 {
-  MINIROS_INFO("UNPUBLISHING: %s : %s", caller_id.c_str(), caller_api.c_str());
+  MINIROS_INFO("UNPUBLISHING caller_id=%s caller_api=%s topic=%s", caller_id.c_str(), caller_api.c_str(), topic.c_str());
 
   RpcValue res = RpcValue::Array(3);
   int ret = m_handler.unregisterPublisher(caller_id, topic, caller_api);
@@ -240,9 +240,9 @@ Master::RpcValue Master::unregisterPublisher(
 }
 
 Master::RpcValue Master::registerSubscriber(const std::string& caller_id, const std::string& topic,
-  const std::string& type, const std::string& caller_api, Connection* /*conn*/)
+  const std::string& type, const std::string& caller_api, Connection* conn)
 {
-  ReturnStruct st = m_handler.registerSubscriber(caller_id, topic, type, caller_api);
+  ReturnStruct st = m_handler.registerSubscriber(caller_id, topic, type, caller_api, conn);
   RpcValue res = RpcValue::Array(3);
   res[0] = st.statusCode;
   res[1] = st.statusMessage;
@@ -261,7 +261,7 @@ Master::RpcValue Master::unregisterSubscriber(
   return res;
 }
 
-Master::RpcValue Master::lookupNode(const std::string& topic, const std::string& caller_id, Connection* conn)
+Master::RpcValue Master::lookupNode(const std::string& topic, const std::string& caller_id, Connection* /*conn*/)
 {
   std::string api = m_handler.lookupNode(caller_id, topic);
   RpcValue res = RpcValue::Array(3);
@@ -446,6 +446,17 @@ Master::RpcValue Master::getBusInfo(const std::string& caller_id, Connection* co
   result[0] = 0;
   result[1] = "Not implemented yet";
   result[2] = 0;
+  return result;
+}
+
+// This is SlaveAPI request to node.
+Master::RpcValue Master::getPid(const std::string& caller_id, Connection* conn)
+{
+  MINIROS_INFO("getPid from %s", caller_id.c_str());
+  RpcValue result = RpcValue::Array(3);
+  result[0] = 1;
+  result[1] = "Master PID";
+  result[2] = m_handler.getPid(caller_id);
   return result;
 }
 
