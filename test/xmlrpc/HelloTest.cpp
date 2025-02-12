@@ -52,7 +52,7 @@ public:
     result = "Hello";
   }
 
-  std::string help()
+  std::string help() const override
   {
     return std::string("Say hello");
   }
