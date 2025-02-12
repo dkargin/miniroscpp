@@ -46,7 +46,7 @@ class Hello : public XmlRpcServerMethod
 public:
   Hello(XmlRpcServer* s) : XmlRpcServerMethod("Hello", s) {}
 
-  void execute(XmlRpcValue& params, XmlRpcValue& result)
+  void execute(const XmlRpcValue& params, XmlRpcValue& result, XmlRpc::XmlRpcServerConnection*) override
   {
     (void)params;
     result = "Hello";
@@ -64,7 +64,7 @@ class HelloName : public XmlRpcServerMethod
 public:
   HelloName(XmlRpcServer* s) : XmlRpcServerMethod("HelloName", s) {}
 
-  void execute(XmlRpcValue& params, XmlRpcValue& result)
+  void execute(const XmlRpcValue& params, XmlRpcValue& result, XmlRpc::XmlRpcServerConnection*) override
   {
     std::string resultString = "Hello, ";
     resultString += std::string(params[0]);
@@ -78,7 +78,7 @@ class Sum : public XmlRpcServerMethod
 public:
   Sum(XmlRpcServer* s) : XmlRpcServerMethod("Sum", s) {}
 
-  void execute(XmlRpcValue& params, XmlRpcValue& result)
+  void execute(const XmlRpcValue& params, XmlRpcValue& result, XmlRpc::XmlRpcServerConnection*) override
   {
     int nArgs = params.size();
     double sum = 0.0;
