@@ -261,6 +261,7 @@ bool XmlRpcServerConnection::readHeader()
 
   // Otherwise copy non-header data to request buffer and set state to read request.
   _httpFrame.request = bp;
+  assert(_httpFrame.request.size());
 
   // Parse out any interesting bits from the header (HTTP version, connection)
   _keepAlive = true;
@@ -274,13 +275,11 @@ bool XmlRpcServerConnection::readHeader()
 
   XmlRpcUtil::log(3, "XmlRpcServerConnection(%d)::readHeader: ContentLength=%d, KeepAlive=%d", _fd, _httpFrame.contentLength, _keepAlive);
 
-  _httpFrame.header = "";
   _connectionState = READ_REQUEST;
   return true;    // Continue monitoring this source
 }
 
-bool
-XmlRpcServerConnection::readRequest()
+bool XmlRpcServerConnection::readRequest()
 {
   // If we dont have the entire request yet, read available data
   const int requestLength = static_cast<int>(_httpFrame.request.length());
@@ -288,6 +287,7 @@ XmlRpcServerConnection::readRequest()
     bool eof;
     if ( ! XmlRpcSocket::nbRead(this->getfd(), _httpFrame.request, &eof)) {
       XmlRpcUtil::error("XmlRpcServerConnection(%d)::readRequest: read error (%s).", _fd, XmlRpcSocket::getErrorMsg().c_str());
+      _httpFrame.reset();
       return false;
     }
 
@@ -295,6 +295,7 @@ XmlRpcServerConnection::readRequest()
     if (requestLength < _httpFrame.contentLength) {
       if (eof) {
         XmlRpcUtil::error("XmlRpcServerConnection(%d)::readRequest: EOF while reading request", _fd);
+        _httpFrame.reset();
         return false;   // Either way we close the connection
       }
       return true;
@@ -310,12 +311,12 @@ XmlRpcServerConnection::readRequest()
 }
 
 
-bool
-XmlRpcServerConnection::writeResponse()
+bool XmlRpcServerConnection::writeResponse()
 {
   if (_response.length() == 0) {
     executeRequest();
     _bytesWritten = 0;
+
     if (_response.length() == 0) {
       XmlRpcUtil::error("XmlRpcServerConnection(%d)::writeResponse: empty response.", _fd);
       return false;
