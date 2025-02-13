@@ -8,6 +8,9 @@ cmake_policy(SET CMP0077 NEW)
 
 project(miniros VERSION 0.4.2)
 
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
 include(CheckIncludeFile)
 include(CheckIncludeFiles)
 include(CheckFunctionExists)

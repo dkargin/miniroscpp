@@ -1,6 +1,3 @@
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
 add_subdirectory(replacements)
 
 # Injecting flags for debug.
@@ -198,6 +195,7 @@ target_include_directories(miniros_time
     $<BUILD_INTERFACE:${MINIROS_INCLUDE_DIRS}>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
 )
+target_link_libraries(miniros_time PUBLIC ${CMAKE_THREAD_LIBS_INIT})
 
 set_property(TARGET miniros_time PROPERTY POSITION_INDEPENDENT_CODE ON)
 add_library(miniros::time ALIAS miniros_time)
