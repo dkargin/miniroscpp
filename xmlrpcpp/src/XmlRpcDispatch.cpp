@@ -45,15 +45,13 @@ XmlRpcDispatch::~XmlRpcDispatch()
 
 // Monitor this source for the specified events and call its event handler
 // when the event occurs
-void
-XmlRpcDispatch::addSource(XmlRpcSource* source, unsigned mask)
+void XmlRpcDispatch::addSource(XmlRpcSource* source, unsigned mask)
 {
   _sources.push_back(MonitoredSource(source, mask));
 }
 
 // Stop monitoring this source. Does not close the source.
-void
-XmlRpcDispatch::removeSource(XmlRpcSource* source)
+void XmlRpcDispatch::removeSource(XmlRpcSource* source)
 {
   for (SourceList::iterator it=_sources.begin(); it!=_sources.end(); ++it)
     if (it->getSource() == source)
@@ -65,8 +63,7 @@ XmlRpcDispatch::removeSource(XmlRpcSource* source)
 
 
 // Modify the types of events to watch for on this source
-void
-XmlRpcDispatch::setSourceEvents(XmlRpcSource* source, unsigned eventMask)
+void XmlRpcDispatch::setSourceEvents(XmlRpcSource* source, unsigned eventMask)
 {
   for (SourceList::iterator it=_sources.begin(); it!=_sources.end(); ++it)
     if (it->getSource() == source)
@@ -209,8 +206,7 @@ XmlRpcDispatch::exit()
 }
 
 // Clear all sources from the monitored sources list
-void
-XmlRpcDispatch::clear()
+void XmlRpcDispatch::clear()
 {
   if (_inWork)
     _doClear = true;  // Finish reporting current events before clearing
@@ -224,8 +220,7 @@ XmlRpcDispatch::clear()
 }
 
 
-double
-XmlRpcDispatch::getTime()
+double XmlRpcDispatch::getTime()
 {
 #ifdef USE_FTIME
   struct timeb	tbuff;

@@ -7,9 +7,7 @@
 # pragma warning(disable:4786)    // identifier was truncated in debug info
 #endif
 
-#ifndef MAKEDEPEND
-# include <string>
-#endif
+#include <string>
 
 #include "xmlrpcpp/XmlRpcValue.h"
 #include "xmlrpcpp/XmlRpcSource.h"
@@ -20,7 +18,6 @@ namespace XmlRpc {
 // The server waits for client connections and provides methods
 class XmlRpcServer;
 class XmlRpcServerMethod;
-
 
 /// Intermediate storage for HTTP data.
 struct HttpFrame {
@@ -62,6 +59,32 @@ struct HttpFrame {
   void reset();
 };
 
+/// Network address.
+struct XMLRPCPP_DECL NetAddress {
+  enum Type {
+    AddressInvalid, AddressIPv4, AddressIPv6
+  };
+
+  Type type = AddressInvalid;
+
+  /// String representation of network address.
+  std::string address;
+
+  /// Network port.
+  int port = 0;
+
+  /// Pointer to actual address implementation.
+  void* rawAddress = nullptr;
+
+  ~NetAddress();
+
+  /// Reset internal address.
+  void reset();
+
+  /// Check if address is valid.
+  bool valid() const { return type != AddressInvalid; }
+};
+
 //! A class to handle XML RPC requests from a particular client
 class XMLRPCPP_DECL XmlRpcServerConnection : public XmlRpcSource {
 public:
@@ -81,13 +104,16 @@ public:
 
   //! Constructor
   XmlRpcServerConnection(int fd, XmlRpcServer* server, bool deleteOnClose = false);
+
   //! Destructor
-  virtual ~XmlRpcServerConnection();
+  virtual ~XmlRpcServerConnection() override;
 
   // XmlRpcSource interface implementation
   //! Handle IO on the client connection socket.
   //!   @param eventType Type of IO event that occurred. @see XmlRpcDispatch::EventType.
   virtual unsigned handleEvent(unsigned eventType);
+
+  const NetAddress& getClientAddress() const;
 
 protected:
 
@@ -119,6 +145,9 @@ protected:
   // Possible IO states for the connection
   enum ServerConnectionState { READ_HEADER, READ_REQUEST, WRITE_RESPONSE };
   ServerConnectionState _connectionState;
+
+  /// Address of endpoint.
+  NetAddress _netAddress;
 
   HttpFrame _httpFrame;
 

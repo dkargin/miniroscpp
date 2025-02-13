@@ -87,7 +87,7 @@ void init(const M_string& remappings);
 }
 
 CallbackQueuePtr g_global_queue;
-ROSOutAppender* g_rosout_appender;
+ROSOutAppender* g_rosout_appender = nullptr;
 static CallbackQueuePtr g_internal_callback_queue;
 
 static bool g_initialized = false;

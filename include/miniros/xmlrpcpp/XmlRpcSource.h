@@ -39,7 +39,7 @@ namespace XmlRpc {
     //! Return true to continue monitoring this source
     virtual unsigned handleEvent(unsigned eventType) = 0;
 
-  private:
+  protected:
 
     // Socket. This should really be a SOCKET (an alias for unsigned int*) on windows...
     int _fd;

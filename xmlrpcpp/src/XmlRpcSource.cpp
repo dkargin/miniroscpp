@@ -16,8 +16,7 @@ namespace XmlRpc {
   }
 
 
-  void
-  XmlRpcSource::close()
+  void XmlRpcSource::close()
   {
     if (_fd != -1) {
       XmlRpcUtil::log(2,"XmlRpcSource::close: closing socket %d.", _fd);
