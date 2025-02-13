@@ -15,6 +15,9 @@
 
 #include "xmlrpcpp/XmlRpcValue.h"
 
+namespace XmlRpc {
+class XmlRpcClient;
+}
 namespace miniros {
 namespace master {
 

@@ -38,7 +38,7 @@ public:
   using RpcValue = XmlRpc::XmlRpcValue;
   using Connection = XmlRpc::XmlRpcServerConnection;
 
-  Master(const std::shared_ptr<RPCManager>& manager);
+  Master(std::shared_ptr<RPCManager> manager);
   ~Master();
 
   bool start();
@@ -109,14 +109,21 @@ public:
   RpcValue unregisterSubscriber(
     const std::string& caller_id, const std::string& topic, const std::string& caller_api, Connection* /*conn*/);
 
-  RpcValue lookupNode(const std::string& topic, const std::string& caller_id, Connection* conn);
+  /// Get the XML-RPC URI of the node with the associated name/caller_id.
+  /// This API is for looking information about publishers and subscribers.
+  /// Use lookupService instead to lookup ROS-RPC URIs.
+  /// Parameters:
+  ///  - caller_id (str) - ROS caller ID
+  ///  - node (str) - Name of node to lookup
+  /// Returns (int, str, str) (code, statusMessage, URI)
+  RpcValue lookupNode(const std::string& caller_id, const std::string& node, Connection* conn);
 
   RpcValue getTime(Connection*);
 
   /// Parameter API
 
   /// Check whether a parameter exists
-  RpcValue hasParam(const std::string& caller_id, const std::string& topic, Connection* /*conn*/);
+  RpcValue hasParam(const std::string& caller_id, const std::string& param, Connection* /*conn*/);
 
   /// Set parameter. NOTE: if value is a dictionary it will be treated as a parameter tree, where key is the parameter namespace. For example
   /// {'x':1,'y':2,'sub':{'z':3}}

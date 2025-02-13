@@ -5,6 +5,8 @@
 #ifndef MINIROS_REGISTRATION_MANAGER_H
 #define MINIROS_REGISTRATION_MANAGER_H
 
+#include <memory>
+
 #include "registrations.h"
 
 namespace miniros {
@@ -26,13 +28,14 @@ public:
   /// Param 1 = caller_id
   /// Param 2 = NodeRef
   /// </summary>
-  std::map<std::string, NodeRef> nodes;
+  std::map<std::string, std::shared_ptr<NodeRef>> nodes;
 
   RegistrationManager();
 
   bool reverse_lookup(const std::string& caller_api) const;
 
-  NodeRef get_node(const std::string& caller_id) const;
+  std::shared_ptr<NodeRef> getNode(const std::string& nodeName) const;
+
   void _register(Registrations& r, const std::string& key, const std::string& caller_id, const std::string& caller_api,
     const std::string& service_api = "");
 
@@ -56,7 +59,7 @@ public:
 
   ReturnStruct unregister_param_subscriber(const std::string& param, const std::string& caller_id, const std::string& caller_api);
 
-  NodeRef _register_node_api(const std::string& caller_id, const std::string& caller_api, bool& rtn);
+  std::shared_ptr<NodeRef> registerNodeApi(const std::string& caller_id, const std::string& caller_api, bool& rtn);
 };
 
 } // namespace master

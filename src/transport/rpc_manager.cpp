@@ -119,9 +119,9 @@ void getPid(const XmlRpcValue& params, XmlRpcValue& result)
 
 const miniros::WallDuration CachedXmlRpcClient::s_zombie_time_(30.0); // reap after 30 seconds
 
-const XMLRPCManagerPtr& RPCManager::instance()
+const RPCManagerPtr& RPCManager::instance()
 {
-  static XMLRPCManagerPtr xmlrpc_manager = std::make_shared<RPCManager>();
+  static RPCManagerPtr xmlrpc_manager = std::make_shared<RPCManager>();
   return xmlrpc_manager;
 }
 

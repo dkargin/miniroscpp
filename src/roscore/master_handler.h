@@ -35,11 +35,6 @@ public:
   using RpcValue = XmlRpc::XmlRpcValue;
   using RpcConnection = XmlRpc::XmlRpcServerConnection;
 
-  RegistrationManager reg_manager;
-
-  /// Maps topicName to type md5.
-  std::map<std::string, std::string> topic_types;
-
   /// Instance of parameter.
   struct Parameter {
     RpcValue value;
@@ -49,9 +44,7 @@ public:
     explicit Parameter(const RpcValue& _value) : value(_value) {}
   };
 
-  std::map<std::string, Parameter> m_parameters;
-
-  MasterHandler();
+  MasterHandler(RPCManagerPtr rpcManager);
 
   std::list<std::string> publisher_update_task(const std::string& api, const std::string& topic, const std::vector<std::string>& pub_uris);
 
@@ -84,10 +77,6 @@ public:
 
   std::vector<std::string> getParamNames(const std::string& caller_id);
 
-  void _notify(Registrations& r,
-    std::function<std::vector<std::string> (std::string, std::string, std::vector<std::string>)> task,
-    const std::string& key,
-    const std::vector<std::string>& value, const std::vector<std::string>& node_apis);
   int _notify_param_subscribers(const std::map<std::string, std::pair<std::string, RpcValue>>& updates);
 
   void _param_update_task(const std::string& caller_id, const std::string& caller_api,
@@ -132,6 +121,18 @@ public:
   };
 
   SystemState getSystemState(const std::string& caller_id) const;
+
+protected:
+  RegistrationManager m_regManager;
+
+  RPCManagerPtr m_rpcManager;
+
+  /// Collection of all parameters.
+  std::map<std::string, Parameter> m_parameters;
+
+  /// Maps topicName to type md5.
+  std::map<std::string, std::string> m_topicTypes;
+
 };
 
 } // namespace master

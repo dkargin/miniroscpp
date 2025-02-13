@@ -196,7 +196,7 @@ bool MasterLink::execute(const std::string& method, const RpcValue& request, Rpc
 
   std::string master_host = getHost();
   uint32_t master_port = getPort();
-  XMLRPCManagerPtr manager = RPCManager::instance();
+  RPCManagerPtr manager = RPCManager::instance();
   if (!manager)
     return false;
   XmlRpc::XmlRpcClient* c = manager->getXMLRPCClient(master_host, master_port, "/");

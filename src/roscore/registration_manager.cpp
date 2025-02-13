@@ -8,8 +8,10 @@ namespace miniros {
 namespace master {
 
 RegistrationManager::RegistrationManager()
-    : publishers(Registrations::TOPIC_PUBLICATIONS), subscribers(Registrations::TOPIC_SUBSCRIPTIONS),
-      services(Registrations::SERVICE), param_subscribers(Registrations::PARAM_SUBSCRIPTIONS)
+  : publishers(Registrations::TOPIC_PUBLICATIONS)
+  , subscribers(Registrations::TOPIC_SUBSCRIPTIONS)
+  , services(Registrations::SERVICE)
+  , param_subscribers(Registrations::PARAM_SUBSCRIPTIONS)
 {
 }
 
@@ -18,9 +20,9 @@ bool RegistrationManager::reverse_lookup(const std::string& caller_api) const
   return true;
 }
 
-NodeRef RegistrationManager::get_node(const std::string& caller_id) const
+std::shared_ptr<NodeRef> RegistrationManager::getNode(const std::string& node) const
 {
-  auto it = nodes.find(caller_id);
+  auto it = nodes.find(node);
   if (it != nodes.end())
     return it->second;
   return {};
@@ -30,8 +32,11 @@ void RegistrationManager::_register(Registrations& r, const std::string& key, co
   const std::string& service_api)
 {
   bool changed = false;
-  NodeRef node_ref = _register_node_api(caller_id, caller_api, changed);
-  node_ref.add(r.type(), key);
+  std::shared_ptr<NodeRef> node_ref = registerNodeApi(caller_id, caller_api, changed);
+  if (!node_ref)
+    return;
+
+  node_ref->add(r.type(), key);
 
   if (changed) {
     publishers.unregister_all(caller_id);
@@ -47,12 +52,12 @@ ReturnStruct RegistrationManager::_unregister(Registrations& r, const std::strin
 {
   ReturnStruct ret;
   if (nodes.count(caller_id)) {
-    NodeRef node_ref = nodes[caller_id];
+    auto node_ref = nodes[caller_id];
     ret = r.unregisterObj(key, caller_id, caller_api, service_api);
     if (ret.statusCode == 1) {
-      node_ref.remove(r.type(), key);
+      node_ref->remove(r.type(), key);
     }
-    if (node_ref.is_empty()) {
+    if (node_ref->is_empty()) {
       nodes.erase(caller_id);
     }
   } else {
@@ -113,25 +118,25 @@ ReturnStruct RegistrationManager::unregister_param_subscriber(const std::string&
   return _unregister(param_subscribers, param, caller_id, caller_api);
 }
 
-NodeRef RegistrationManager::_register_node_api(const std::string& caller_id, const std::string& caller_api, bool& rtn)
+std::shared_ptr<NodeRef> RegistrationManager::registerNodeApi(const std::string& caller_id, const std::string& caller_api, bool& rtn)
 {
-  NodeRef node_ref;
+  std::shared_ptr<NodeRef> node_ref;
   if (nodes.count(caller_id))
     node_ref = nodes[caller_id];
 
   std::string bumped_api = "";
-  if (!node_ref.is_empty()) {
-    if (node_ref.api == caller_api) {
+  if (node_ref) {
+    if (node_ref->api == caller_api) {
       rtn = false;
       return node_ref;
     } else {
-      bumped_api = node_ref.api;
+      bumped_api = node_ref->api;
       // thread_pool.queue_task(bumped_api, shutdown_node_task, (bumped_api, caller_id, "new node registered with same
       // name"))
     }
   }
 
-  node_ref = NodeRef(caller_id, caller_api);
+  node_ref.reset(new NodeRef(caller_id, caller_api));
   nodes[caller_id] = node_ref;
 
   rtn = !bumped_api.empty();

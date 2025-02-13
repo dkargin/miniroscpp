@@ -90,7 +90,7 @@ public:
 };
 
 class RPCManager;
-typedef std::shared_ptr<RPCManager> XMLRPCManagerPtr;
+typedef std::shared_ptr<RPCManager> RPCManagerPtr;
 
 // Compact RPC callback function.
 typedef std::function<void(const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result)> XMLRPCFunc;
@@ -105,7 +105,7 @@ public:
   using RpcValue = XmlRpc::XmlRpcValue;
   using RpcConnection = XmlRpc::XmlRpcServerConnection;
 
-  static const XMLRPCManagerPtr& instance();
+  static const RPCManagerPtr& instance();
 
   RPCManager();
   ~RPCManager();

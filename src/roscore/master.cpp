@@ -7,7 +7,8 @@
 namespace miniros {
 namespace master {
 
-Master::Master(const std::shared_ptr<RPCManager>& manager)
+Master::Master(std::shared_ptr<RPCManager> manager)
+  : m_handler(manager)
 {
   m_manager = manager;
   // TODO: Read environment.
@@ -216,7 +217,7 @@ Master::RpcValue Master::getPublishedTopics(const std::string& caller_id, const 
 Master::RpcValue Master::registerPublisher(const std::string& caller_id, const std::string& topic,
   const std::string& type, const std::string& caller_api, Connection* conn)
 {
-  MINIROS_INFO("PUBLISHING: caller_id=%s caller_api=%s topic=%s", caller_id.c_str(), caller_api.c_str(), topic.c_str());
+  MINIROS_INFO("PUBLISHING: caller_id=\"%s\" caller_api=%s topic=\"%s\"", caller_id.c_str(), caller_api.c_str(), topic.c_str());
 
   ReturnStruct st = m_handler.registerPublisher(caller_id, topic, type, caller_api, conn);
   RpcValue res = RpcValue::Array(3);
@@ -229,7 +230,7 @@ Master::RpcValue Master::registerPublisher(const std::string& caller_id, const s
 Master::RpcValue Master::unregisterPublisher(
   const std::string& caller_id, const std::string& topic, const std::string& caller_api, Connection* /*conn*/)
 {
-  MINIROS_INFO("UNPUBLISHING caller_id=%s caller_api=%s topic=%s", caller_id.c_str(), caller_api.c_str(), topic.c_str());
+  MINIROS_INFO("UNPUBLISHING caller_id=\"%s\" caller_api=%s topic=\"%s\"", caller_id.c_str(), caller_api.c_str(), topic.c_str());
 
   RpcValue res = RpcValue::Array(3);
   int ret = m_handler.unregisterPublisher(caller_id, topic, caller_api);
@@ -261,9 +262,9 @@ Master::RpcValue Master::unregisterSubscriber(
   return res;
 }
 
-Master::RpcValue Master::lookupNode(const std::string& topic, const std::string& caller_id, Connection* /*conn*/)
+Master::RpcValue Master::lookupNode(const std::string& caller_id, const std::string& node, Connection* /*conn*/)
 {
-  std::string api = m_handler.lookupNode(caller_id, topic);
+  std::string api = m_handler.lookupNode(caller_id, node);
   RpcValue res = RpcValue::Array(3);
   res[0] = 1;
   res[1] = "lookupNode";

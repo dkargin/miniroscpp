@@ -261,7 +261,6 @@ bool XmlRpcServerConnection::readHeader()
 
   // Otherwise copy non-header data to request buffer and set state to read request.
   _httpFrame.request = bp;
-  assert(_httpFrame.request.size());
 
   // Parse out any interesting bits from the header (HTTP version, connection)
   _keepAlive = true;

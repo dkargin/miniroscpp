@@ -45,7 +45,7 @@ std::map<std::string, std::vector<std::string>> Registrations::getState() const
   for (const auto& pair : map) {
     std::vector<std::string>& providers = result[pair.first];
     for (const Record& obj : pair.second) {
-      providers.push_back(obj.api);
+      providers.push_back(obj.caller_id);
     }
   }
   return result;
