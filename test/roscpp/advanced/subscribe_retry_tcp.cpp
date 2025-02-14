@@ -34,10 +34,10 @@
 #include <gtest/gtest.h>
 
 #include <miniros/ros.h>
-#include <miniros/connection_manager.h>
+#include <miniros/transport/connection_manager.h>
 
-#include "test_roscpp/TestArray.h"
-#include "roscpp/Empty.h"
+#include "test_roscpp/TestArray.hxx"
+#include "roscpp/Empty.hxx"
 
 int32_t g_count = 0;
 void callback(const test_roscpp::TestArrayConstPtr&)

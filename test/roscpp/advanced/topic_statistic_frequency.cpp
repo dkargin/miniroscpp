@@ -3,9 +3,8 @@
 
 #include <miniros/ros.h>
 #include <gtest/gtest.h>
-#include <rosgraph_msgs/TopicStatistics.h>
-#include <boost/thread.hpp>
-#include <std_msgs/Int8MultiArray.h>
+#include <rosgraph_msgs/TopicStatistics.hxx>
+#include <std_msgs/Int8MultiArray.hxx>
 
 class Aggregator {
 public:

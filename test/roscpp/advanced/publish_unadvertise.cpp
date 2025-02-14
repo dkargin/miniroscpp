@@ -63,7 +63,10 @@ public:
 
   bool adv()
   {
-    pub_ = nh_.advertise<test_roscpp::TestArray>("roscpp/pubsub_test", 1, boost::bind(&Publications::subscriberCallback, this, boost::placeholders::_1));
+    //pub_ = nh_.advertise<test_roscpp::TestArray>("roscpp/pubsub_test", 1, boost::bind(&Publications::subscriberCallback, this, boost::placeholders::_1));
+    pub_ = nh_.advertise<test_roscpp::TestArray>("roscpp/pubsub_test", 1, [this](const miniros::SingleSubscriberPublisher& sp) {
+      this->subscriberCallback(sp);
+    });
     return pub_;
   }
 

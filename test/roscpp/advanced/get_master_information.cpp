@@ -43,12 +43,17 @@
 #include <time.h>
 #include <stdlib.h>
 
-#include "miniros/ros.h"
-#include "test_roscpp/TestEmpty.h"
+#include "master_fixture.h"
 
-TEST(masterInfo, getPublishedTopics)
+#include "miniros/ros.h"
+#include "test_roscpp/TestEmpty.hxx"
+
+#include <miniros/transport/topic_manager.h>
+
+TEST_F(MasterFixture, getPublishedTopics)
 {
   miniros::NodeHandle nh;
+
 
   typedef std::set<std::string> S_string;
   S_string advertised_topics;
@@ -71,8 +76,8 @@ TEST(masterInfo, getPublishedTopics)
     pubs.push_back(nh.advertise<test_roscpp::TestEmpty>( topic, 0 ));
   }
 
-  miniros::master::V_TopicInfo master_topics;
-  miniros::master::getTopics(master_topics);
+  std::vector<miniros::TopicInfo> master_topics;
+  master->getTopics(master_topics);
 
   adv_it = advertised_topics.begin();
   adv_end = advertised_topics.end();
@@ -81,11 +86,8 @@ TEST(masterInfo, getPublishedTopics)
     const std::string& topic = *adv_it;
     bool found = false;
 
-    miniros::master::V_TopicInfo::iterator master_it = master_topics.begin();
-    miniros::master::V_TopicInfo::iterator master_end = master_topics.end();
-    for ( ; master_it != master_end; ++master_it )
+    for (const miniros::TopicInfo& info: master_topics)
     {
-      const miniros::master::TopicInfo& info = *master_it;
       if ( topic == info.name )
       {
         found = true;
@@ -97,9 +99,7 @@ TEST(masterInfo, getPublishedTopics)
   }
 }
 
-
-int
-main(int argc, char** argv)
+int main(int argc, char** argv)
 {
   testing::InitGoogleTest(&argc, argv);
   miniros::init( argc, argv, "get_master_information" );

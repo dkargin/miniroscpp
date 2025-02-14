@@ -632,4 +632,9 @@ void shutdown()
   Time::shutdown();
 }
 
+MINIROS_DECL MasterLinkPtr getMasterLink()
+{
+  return g_master_link;
+}
+
 }

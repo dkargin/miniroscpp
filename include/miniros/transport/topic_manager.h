@@ -33,7 +33,7 @@
 #include "miniros/serialization.h"
 #include "rosout_appender.h"
 
-#include "xmlrpcpp/XmlRpcValue.h"
+#include "miniros/xmlrpcpp/XmlRpcValue.h"
 
 namespace miniros
 {
@@ -56,10 +56,6 @@ typedef std::shared_ptr<ConnectionManager> ConnectionManagerPtr;
 
 class SubscriptionCallbackHelper;
 typedef std::shared_ptr<SubscriptionCallbackHelper> SubscriptionCallbackHelperPtr;
-
-namespace master {
-class MasterLink;
-}
 
 class MINIROS_DECL TopicManager
 {

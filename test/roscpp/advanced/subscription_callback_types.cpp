@@ -36,7 +36,7 @@
 
 #include <gtest/gtest.h>
 #include "miniros/ros.h"
-#include "std_msgs/String.h"
+#include "std_msgs/String.hxx"
 
 #include <vector>
 
@@ -167,8 +167,15 @@ TEST(SubscriptionCallbackTypes, compile)
   subs.push_back(n.subscribe("chatter", 1000, &A::chatterCallback4, &a));
   subs.push_back(n.subscribe("chatter", 1000, &A::chatterCallback5, &a));
 
-  subs.push_back(n.subscribe<std_msgs::String>("chatter", 1000, boost::bind(&A::chatterCallback6, &a, boost::placeholders::_1, std::string("hello"))));
-  subs.push_back(n.subscribe<std_msgs::String, const std_msgs::String&>("chatter", 1000, boost::bind(&A::chatterCallback7, &a, boost::placeholders::_1, std::string("hello2"))));
+  //subs.push_back(n.subscribe<std_msgs::String>("chatter", 1000, boost::bind(&A::chatterCallback6, &a, boost::placeholders::_1, std::string("hello"))));
+  subs.push_back(n.subscribe<std_msgs::String>("chatter", 1000, [&a](const std_msgs::String::ConstPtr& msg) {
+    a.chatterCallback6(msg, std::string("hello"));
+  }));
+
+  //subs.push_back(n.subscribe<std_msgs::String, const std_msgs::String&>("chatter", 1000, boost::bind(&A::chatterCallback7, &a, boost::placeholders::_1, std::string("hello2"))));
+  subs.push_back(n.subscribe<std_msgs::String>("chatter", 1000, [&a](const std_msgs::String& msg) {
+    a.chatterCallback7(msg, std::string("hello"));
+  }, {}));
 
 
   subs.push_back(n.subscribe("chatter", 1000, &A::chatterCallback8, &a));

@@ -74,8 +74,7 @@ bool caseFlipUnadvertise(test_roscpp::TestStringString::Request  &req,
 }
 
 
-int
-main(int argc, char** argv)
+int main(int argc, char** argv)
 {
   miniros::init(argc, argv, "service_adv");
   miniros::NodeHandle nh;
@@ -84,7 +83,9 @@ main(int argc, char** argv)
   srv1 = nh.advertiseService("service_adv", caseFlip);
   srv2 = nh.advertiseService("service_adv_long", caseFlipLongRunning);
   srv3 = nh.advertiseService<test_roscpp::TestStringString::Request, test_roscpp::TestStringString::Response>("service_adv_unadv_in_callback",
-      boost::bind(caseFlipUnadvertise, boost::placeholders::_1, boost::placeholders::_2, boost::ref(srv3)));
+  [&srv3](test_roscpp::TestStringString::Request &req, test_roscpp::TestStringString::Response &res) {
+    return caseFlipUnadvertise(req, res, srv3);
+  });
   miniros::spin();
 }
 

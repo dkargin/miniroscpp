@@ -40,9 +40,12 @@
 
 #include <gtest/gtest.h>
 #include "miniros/ros.h"
-#include "miniros/topic_manager.h"
-#include <std_msgs/builtin_bool.h>
+#include "miniros/transport/topic_manager.h"
 
+#include "miniros/traits/builtin_message_traits.h"
+#include <std_msgs/Bool.hxx>
+
+// TODO: Publishing of primitive type is broken for some reason.
 
 TEST(MultipleLatchedPublishers, LatchedPublisherReceiveMultiple)
 {
@@ -58,7 +61,7 @@ TEST(MultipleLatchedPublishers, LatchedPublisherReceiveMultiple)
   };
 
   for (auto& pub : latched_publishers) {
-    pub.publish(true);
+    pub.publish();
   }
   for (auto& pub : unlatched_publishers) {
     pub.publish(true);

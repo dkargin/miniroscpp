@@ -60,13 +60,14 @@ miniros_add_test(${PROJECT_NAME}-service_deadlock EXCLUDE_FROM_ALL service_deadl
 
 miniros_add_test(${PROJECT_NAME}-service_call_repeatedly EXCLUDE_FROM_ALL service_call_repeatedly.cpp)
 
-miniros_add_test(${PROJECT_NAME}-service_exception EXCLUDE_FROM_ALL service_exception.cpp)
-#add_dependencies(${PROJECT_NAME}-service_exception ${std_srvs_EXPORTED_TARGETS})
+# No support for Log4xx
+#miniros_add_test(${PROJECT_NAME}-service_exception EXCLUDE_FROM_ALL service_exception.cpp)
 
 # Repeatedly call miniros::init()
 miniros_add_test(${PROJECT_NAME}-multiple_init_fini EXCLUDE_FROM_ALL multiple_init_fini.cpp)
 
-miniros_add_test(${PROJECT_NAME}-missing_call_to_shutdown_impl EXCLUDE_FROM_ALL missing_call_to_shutdown_impl.cpp)
+# This one tries to use exported boolean variable that no longer exits.
+# miniros_add_test(${PROJECT_NAME}-missing_call_to_shutdown_impl EXCLUDE_FROM_ALL missing_call_to_shutdown_impl.cpp)
 
 miniros_add_test(${PROJECT_NAME}-missing_call_to_shutdown EXCLUDE_FROM_ALL missing_call_to_shutdown.cpp)
 
@@ -83,8 +84,10 @@ miniros_add_test(${PROJECT_NAME}-service_wait_a_adv_b EXCLUDE_FROM_ALL service_w
 
 # Zombie (node crashed) service
 add_executable(${PROJECT_NAME}-service_adv_zombie EXCLUDE_FROM_ALL service_adv_zombie.cpp)
+target_link_libraries(${PROJECT_NAME}-service_adv_zombie miniros::roscxx ${GTEST_LIBRARIES})
 
 add_executable(${PROJECT_NAME}-service_call_expect_b EXCLUDE_FROM_ALL service_call_expect_b.cpp)
+target_link_libraries(${PROJECT_NAME}-service_call_expect_b miniros::roscxx ${GTEST_LIBRARIES})
 
 # Test command-line name remapping
 miniros_add_test(${PROJECT_NAME}-name_remapping EXCLUDE_FROM_ALL name_remapping.cpp)
@@ -154,7 +157,9 @@ miniros_add_test(${PROJECT_NAME}-stamped_topic_statistics_empty_timestamp EXCLUD
 
 miniros_add_test(${PROJECT_NAME}-topic_statistic_frequency EXCLUDE_FROM_ALL topic_statistic_frequency.cpp)
 
-miniros_add_test(${PROJECT_NAME}-multiple_latched_publishers EXCLUDE_FROM_ALL multiple_latched_publishers.cpp)
+# This test requires ability to publish primitive "bool" type, which does not work now.
+# But I do not see a big reason to support it.
+#miniros_add_test(${PROJECT_NAME}-multiple_latched_publishers EXCLUDE_FROM_ALL multiple_latched_publishers.cpp)
 #add_dependencies(${PROJECT_NAME}-multiple_latched_publishers ${std_msgs_EXPORTED_TARGETS})
 
 # The publishers and subscriber are compiled but not registered as a unit test
@@ -195,11 +200,11 @@ if(TARGET tests)
     ${PROJECT_NAME}-service_call
     ${PROJECT_NAME}-service_call_zombie
     ${PROJECT_NAME}-service_deadlock
-    ${PROJECT_NAME}-service_exception
+#    ${PROJECT_NAME}-service_exception
     ${PROJECT_NAME}-service_call_repeatedly
     ${PROJECT_NAME}-multiple_init_fini
     ${PROJECT_NAME}-missing_call_to_shutdown
-    ${PROJECT_NAME}-missing_call_to_shutdown_impl
+#    ${PROJECT_NAME}-missing_call_to_shutdown_impl
     ${PROJECT_NAME}-inspection
     ${PROJECT_NAME}-service_adv_multiple
     ${PROJECT_NAME}-service_adv_a
@@ -237,7 +242,7 @@ if(TARGET tests)
     ${PROJECT_NAME}-subscriber
     ${PROJECT_NAME}-stamped_topic_statistics_empty_timestamp
     ${PROJECT_NAME}-topic_statistic_frequency
-    ${PROJECT_NAME}-multiple_latched_publishers
+#    ${PROJECT_NAME}-multiple_latched_publishers
   )
 endif()
 

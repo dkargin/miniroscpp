@@ -43,10 +43,11 @@
 */
 
 #include <gtest/gtest.h>
+#include <thread>
+
 #include "miniros/spinner.h"
 #include "miniros/init.h"
 #include "miniros/node_handle.h"
-#include <boost/thread.hpp>
 
 using namespace miniros;
 
@@ -73,7 +74,7 @@ TEST(Spinners, spin)
 TEST(Spinners, spinfail)
 {
   DOIT();
-  boost::thread th(boost::bind(&miniros::spin));
+  std::thread th([]() {miniros::spin(); });
   miniros::WallDuration(0.1).sleep(); // wait for thread to be started
 
   EXPECT_THROW(miniros::spin(), std::runtime_error);
@@ -90,13 +91,14 @@ TEST(Spinners, spinfail)
   EXPECT_THROW(as.start(), std::runtime_error);
 
   miniros::waitForShutdown();
+  th.join();
 }
 
 TEST(Spinners, singlefail)
 {
   DOIT();
   SingleThreadedSpinner ss;
-  boost::thread th(boost::bind(&miniros::spin, ss));
+  std::thread th([&ss]() {miniros::spin(ss); });
   miniros::WallDuration(0.1).sleep(); // wait for thread to be started
 
   EXPECT_THROW(miniros::spin(), std::runtime_error);
@@ -113,6 +115,7 @@ TEST(Spinners, singlefail)
   EXPECT_THROW(as.start(), std::runtime_error);
 
   miniros::waitForShutdown();
+  th.join();
 }
 
 TEST(Spinners, multi)
@@ -126,7 +129,7 @@ TEST(Spinners, multifail)
 {
   DOIT();
   MultiThreadedSpinner ms;
-  boost::thread th(boost::bind(&miniros::spin, ms));
+  std::thread th([&ms]() {miniros::spin(ms); });
   miniros::WallDuration(0.1).sleep(); // wait for thread to be started
 
   SingleThreadedSpinner ss2;
@@ -136,6 +139,7 @@ TEST(Spinners, multifail)
   // running another multi-threaded spinner is allowed
   MultiThreadedSpinner ms2;
   miniros::spin(ms2); // will block until ROS shutdown
+  th.join();
 }
 
 TEST(Spinners, async)
@@ -161,8 +165,7 @@ TEST(Spinners, async)
 }
 
 
-int
-main(int argc, char** argv)
+int main(int argc, char** argv)
 {
   testing::InitGoogleTest(&argc, argv);
   argc_ = argc;

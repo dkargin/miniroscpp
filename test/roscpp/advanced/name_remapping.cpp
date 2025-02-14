@@ -43,16 +43,17 @@
 #include <stdlib.h>
 
 #include "miniros/ros.h"
-#include <miniros/param.h>
 #include <miniros/names.h>
 
-TEST(roscpp, parameterRemapping)
+#include "master_fixture.h"
+
+TEST_F(MasterFixture, parameterRemapping)
 {
   std::string param;
-  ASSERT_TRUE(miniros::param::get("mapfrom", param));
+  ASSERT_TRUE(master->get("mapfrom", param));
   ASSERT_STREQ(miniros::names::resolve("mapfrom").c_str(), "/mapto");
 
-  ASSERT_TRUE(miniros::param::get("/mapto", param));
+  ASSERT_TRUE(master->get("/mapto", param));
   ASSERT_STREQ(miniros::names::resolve("/mapfrom").c_str(), "/mapto");
 }
 
@@ -92,8 +93,7 @@ TEST(RoscppHandles, nodeHandleNameRemapping)
   EXPECT_STREQ(n2.resolveName("d/e").c_str(), "/z/c/f");
 }
 
-int
-main(int argc, char** argv)
+int main(int argc, char** argv)
 {
   testing::InitGoogleTest(&argc, argv);
   miniros::init( argc, argv, "name_remapping" );

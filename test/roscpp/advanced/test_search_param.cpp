@@ -30,15 +30,20 @@
 #include <miniros/ros.h>
 #include <gtest/gtest.h>
 
+#include "master_fixture.h"
+
 static int argc_;
 static char** argv_;
 
 #define PRINT(cmd) printf(#cmd"\n"); cmd; printf("\n");
 
-TEST(SearchParamTest, search_test_A)
+TEST_F(MasterFixture, search_test_A)
 {
   miniros::NodeHandle nh;
-  miniros::param::set("A", "right one!");
+  master->set("A", "right one!");
+
+  nh.setParam("A", "rignt one!");
+
   std::string result;
 
   // Sanity check with getParam

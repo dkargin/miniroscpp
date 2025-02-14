@@ -36,8 +36,8 @@
 #include <time.h>
 #include <stdlib.h>
 #include "miniros/ros.h"
-#include <test_roscpp/TestArray.h>
-#include <test_roscpp/TestEmpty.h>
+#include <test_roscpp/TestArray.hxx>
+#include <test_roscpp/TestEmpty.hxx>
 
 int g_argc;
 char** g_argv;
@@ -80,10 +80,10 @@ class Subscriptions : public testing::Test
       MINIROS_INFO("Subscribing %d", cb_num);
       std::function<void(const test_roscpp::TestArrayConstPtr&)> funcs[4] =
       {
-        boost::bind(&Subscriptions::cb0, this, boost::placeholders::_1),
-        boost::bind(&Subscriptions::cb1, this, boost::placeholders::_1),
-        boost::bind(&Subscriptions::cb2, this, boost::placeholders::_1),
-        boost::bind(&Subscriptions::cb3, this, boost::placeholders::_1),
+        [this](const test_roscpp::TestArrayConstPtr& msg) { this->cb0(msg);},
+        [this](const test_roscpp::TestArrayConstPtr& msg) { this->cb1(msg);},
+        [this](const test_roscpp::TestArrayConstPtr& msg) { this->cb2(msg);},
+        [this](const test_roscpp::TestArrayConstPtr& msg) { this->cb3(msg);},
       };
 
       subs_[cb_num] = nh_.subscribe("roscpp/pubsub_test", 10, funcs[cb_num]);

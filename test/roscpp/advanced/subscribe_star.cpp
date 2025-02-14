@@ -34,20 +34,20 @@
 #include <gtest/gtest.h>
 
 #include <miniros/ros.h>
-#include <miniros/connection_manager.h>
+#include <miniros/transport/connection_manager.h>
 
-#include "test_roscpp/TestEmpty.h"
-#include "test_roscpp/TestArray.h"
+#include "test_roscpp/TestEmpty.hxx"
+#include "test_roscpp/TestArray.hxx"
 
-#include <std_srvs/Empty.h>
+#include <std_srvs/Empty.hxx>
 
 class AnyMessage
 {
 };
-typedef boost::shared_ptr<AnyMessage> AnyMessagePtr;
-typedef boost::shared_ptr<AnyMessage const> AnyMessageConstPtr;
+typedef std::shared_ptr<AnyMessage> AnyMessagePtr;
+typedef std::shared_ptr<AnyMessage const> AnyMessageConstPtr;
 
-namespace ros
+namespace miniros
 {
 namespace message_traits
 {
@@ -83,7 +83,7 @@ struct Serializer<AnyMessage>
   {
   }
 
-  ROS_DECLARE_ALLINONE_SERIALIZER
+  MINIROS_DECLARE_ALLINONE_SERIALIZER;
 };
 }
 }
@@ -114,7 +114,7 @@ TEST(SubscribeStar, simpleSubFirstIntra)
   EXPECT_EQ(pub.getNumSubscribers(), 1U);
   EXPECT_EQ(sub.getNumPublishers(), 1U);
 
-  AnyMessagePtr msg(boost::make_shared<AnyMessage>());
+  AnyMessagePtr msg(std::make_shared<AnyMessage>());
   pub.publish(msg);
   miniros::spinOnce();
   EXPECT_EQ(h.count, 1U);
@@ -130,7 +130,7 @@ TEST(SubscribeStar, simplePubFirstIntra)
   EXPECT_EQ(pub.getNumSubscribers(), 1U);
   EXPECT_EQ(sub.getNumPublishers(), 1U);
 
-  AnyMessagePtr msg(boost::make_shared<AnyMessage>());
+  AnyMessagePtr msg(std::make_shared<AnyMessage>());
   pub.publish(msg);
   miniros::spinOnce();
   EXPECT_EQ(h.count, 1U);

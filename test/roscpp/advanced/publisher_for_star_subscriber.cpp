@@ -32,9 +32,9 @@
  */
 
 #include <miniros/ros.h>
-#include <std_srvs/Empty.h>
-#include <test_roscpp/TestEmpty.h>
-#include <test_roscpp/TestArray.h>
+#include <std_srvs/Empty.hxx>
+#include <test_roscpp/TestEmpty.hxx>
+#include <test_roscpp/TestArray.hxx>
 
 miniros::Publisher g_pub;
 int8_t type = 0;

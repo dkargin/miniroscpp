@@ -39,7 +39,7 @@
 
 #include "miniros/ros.h"
 #include "miniros/service.h"
-#include <test_roscpp/TestStringString.h>
+#include <test_roscpp/TestStringString.hxx>
 
 TEST(SrvCall, callSrv)
 {
@@ -58,8 +58,7 @@ TEST(SrvCall, callSrv)
   ASSERT_STREQ(res.str.c_str(), "B");
 }
 
-int
-main(int argc, char** argv)
+int main(int argc, char** argv)
 {
   testing::InitGoogleTest(&argc, argv);
 

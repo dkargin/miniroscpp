@@ -134,7 +134,7 @@ TEST_F(Subscriptions, unsubInCallbackAndOtherThread)
     miniros::Subscriber sub;
     sub_ = nh_.subscribe<test_roscpp::TestArray>("roscpp/pubsub_test", 1,
       [&barrier, &sub](const test_roscpp::TestArray& array) {
-      unsubscribeAfterBarrierWait(&barrier, sub);
+        unsubscribeAfterBarrierWait(&barrier, sub);
       // ()boost::bind(unsubscribeAfterBarrierWait, &barrier, boost::ref(sub))
       });
     sub = sub_;

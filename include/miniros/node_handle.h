@@ -806,9 +806,22 @@ if (sub)  // Enter if subscriber is valid
    *  \throws InvalidNameException If the topic name begins with a tilde, or is an otherwise invalid graph resource name
    *  \throws ConflictingSubscriptionException If this node is already subscribed to the same topic with a different datatype
    */
-  template<class M, class C>
+  template<class C>
   Subscriber subscribe(const std::string& topic, uint32_t queue_size,
       const std::function<void (C)>& callback,
+      const VoidConstPtr& tracked_object = VoidConstPtr(),
+      const TransportHints& transport_hints = TransportHints())
+  {
+    SubscribeOptions ops;
+    ops.template initByFullCallbackType<C>(topic, queue_size, callback);
+    ops.tracked_object = tracked_object;
+    ops.transport_hints = transport_hints;
+    return subscribe(ops);
+  }
+
+  template<class C>
+  Subscriber subscribe(const std::string& topic, uint32_t queue_size,
+      const std::function<void (const C& )>& callback,
       const VoidConstPtr& tracked_object = VoidConstPtr(),
       const TransportHints& transport_hints = TransportHints())
   {
@@ -942,7 +955,7 @@ if (service)  // Enter if advertised service is valid
   ServiceServer advertiseService(const std::string& service, bool(T::*srv_func)(ServiceEvent<MReq, MRes>&), T *obj)
   {
     AdvertiseServiceOptions ops;
-    auto wrapFn = [obj, srv_func](ServiceEvent<MReq, MRes>& se) { return obj->*srv_func(se); };
+    auto wrapFn = [obj, srv_func](ServiceEvent<MReq, MRes>& se) { return (obj->*srv_func)(se); };
     ops.template initBySpecType<ServiceEvent<MReq, MRes> >(service, wrapFn);
     return advertiseService(ops);
   }
