@@ -100,91 +100,91 @@ typedef std::shared_ptr<FakeSubHelper> FakeSubHelperPtr;
 
 TEST(SubscriptionQueue, queueSize)
 {
-  SubscriptionQueue queue("blah", 1, false);
+  auto queue = std::make_shared<miniros::SubscriptionQueue>("blah", 1, false);
 
   FakeSubHelperPtr helper(std::make_shared<FakeSubHelper>());
   MessageDeserializerPtr des(std::make_shared<MessageDeserializer>(helper, SerializedMessage(), std::shared_ptr<M_string>()));
 
-  ASSERT_FALSE(queue.full());
+  ASSERT_FALSE(queue->full());
 
-  queue.push(helper, des, false, VoidConstWPtr(), true);
+  queue->push(helper, des, false, VoidConstWPtr(), true);
 
-  ASSERT_TRUE(queue.full());
+  ASSERT_TRUE(queue->full());
 
-  ASSERT_EQ(queue.call(), CallbackInterface::Success);
+  ASSERT_EQ(queue->call(), CallbackInterface::Success);
 
-  ASSERT_FALSE(queue.full());
+  ASSERT_FALSE(queue->full());
 
-  queue.push(helper, des, false, VoidConstWPtr(), true);
+  queue->push(helper, des, false, VoidConstWPtr(), true);
 
-  ASSERT_TRUE(queue.full());
+  ASSERT_TRUE(queue->full());
 
-  ASSERT_TRUE(queue.ready());
+  ASSERT_TRUE(queue->ready());
 
-  queue.push(helper, des, false, VoidConstWPtr(), true);
+  queue->push(helper, des, false, VoidConstWPtr(), true);
 
-  ASSERT_TRUE(queue.full());
+  ASSERT_TRUE(queue->full());
 
-  ASSERT_EQ(queue.call(), CallbackInterface::Success);
-  ASSERT_EQ(queue.call(), CallbackInterface::Invalid);
+  ASSERT_EQ(queue->call(), CallbackInterface::Success);
+  ASSERT_EQ(queue->call(), CallbackInterface::Invalid);
 
   ASSERT_EQ(helper->calls_, 2);
 }
 
 TEST(SubscriptionQueue, infiniteQueue)
 {
-  SubscriptionQueue queue("blah", 0, false);
+  auto queue = std::make_shared<miniros::SubscriptionQueue>("blah", 0, false);
 
   FakeSubHelperPtr helper(std::make_shared<FakeSubHelper>());
   MessageDeserializerPtr des(std::make_shared<MessageDeserializer>(helper, SerializedMessage(), std::shared_ptr<M_string>()));
 
-  ASSERT_FALSE(queue.full());
+  ASSERT_FALSE(queue->full());
 
-  queue.push(helper, des, false, VoidConstWPtr(), true);
-  ASSERT_EQ(queue.call(), CallbackInterface::Success);
+  queue->push(helper, des, false, VoidConstWPtr(), true);
+  ASSERT_EQ(queue->call(), CallbackInterface::Success);
 
-  ASSERT_FALSE(queue.full());
-
-  for (int i = 0; i < 10000; ++i)
-  {
-    queue.push(helper, des, false, VoidConstWPtr(), true);
-  }
-
-  ASSERT_FALSE(queue.full());
+  ASSERT_FALSE(queue->full());
 
   for (int i = 0; i < 10000; ++i)
   {
-    ASSERT_EQ(queue.call(), CallbackInterface::Success);
+    queue->push(helper, des, false, VoidConstWPtr(), true);
   }
 
-  ASSERT_EQ(queue.call(), CallbackInterface::Invalid);
+  ASSERT_FALSE(queue->full());
+
+  for (int i = 0; i < 10000; ++i)
+  {
+    ASSERT_EQ(queue->call(), CallbackInterface::Success);
+  }
+
+  ASSERT_EQ(queue->call(), CallbackInterface::Invalid);
 
   ASSERT_EQ(helper->calls_, 10001);
 }
 
 TEST(SubscriptionQueue, clearCall)
 {
-  SubscriptionQueue queue("blah", 1, false);
+  auto queue = std::make_shared<miniros::SubscriptionQueue>("blah", 1, false);
 
   FakeSubHelperPtr helper(std::make_shared<FakeSubHelper>());
   MessageDeserializerPtr des(std::make_shared<MessageDeserializer>(helper, SerializedMessage(), std::shared_ptr<M_string>()));
 
-  queue.push(helper, des, false, VoidConstWPtr(), true);
-  queue.clear();
-  ASSERT_EQ(queue.call(), CallbackInterface::Invalid);
+  queue->push(helper, des, false, VoidConstWPtr(), true);
+  queue->clear();
+  ASSERT_EQ(queue->call(), CallbackInterface::Invalid);
 }
 
 TEST(SubscriptionQueue, clearThenAddAndCall)
 {
-  SubscriptionQueue queue("blah", 1, false);
+  auto queue = std::make_shared<miniros::SubscriptionQueue>("blah", 1, false);
 
   FakeSubHelperPtr helper(std::make_shared<FakeSubHelper>());
   MessageDeserializerPtr des(std::make_shared<MessageDeserializer>(helper, SerializedMessage(), std::shared_ptr<M_string>()));
 
-  queue.push(helper, des, false, VoidConstWPtr(), true);
-  queue.clear();
-  queue.push(helper, des, false, VoidConstWPtr(), true);
-  ASSERT_EQ(queue.call(), CallbackInterface::Success);
+  queue->push(helper, des, false, VoidConstWPtr(), true);
+  queue->clear();
+  queue->push(helper, des, false, VoidConstWPtr(), true);
+  ASSERT_EQ(queue->call(), CallbackInterface::Success);
 }
 
 void clearInCallbackCallback(SubscriptionQueue& queue)
@@ -194,14 +194,14 @@ void clearInCallbackCallback(SubscriptionQueue& queue)
 
 TEST(SubscriptionQueue, clearInCallback)
 {
-  SubscriptionQueue queue("blah", 1, false);
+  auto queue = std::make_shared<miniros::SubscriptionQueue>("blah", 1, false);
 
   FakeSubHelperPtr helper(std::make_shared<FakeSubHelper>());
   MessageDeserializerPtr des(std::make_shared<MessageDeserializer>(helper, SerializedMessage(), std::shared_ptr<M_string>()));
 
-  helper->cb_ = [&queue](){ clearInCallbackCallback(queue);};
-  queue.push(helper, des, false, VoidConstWPtr(), true);
-  queue.call();
+  helper->cb_ = [queue](){ clearInCallbackCallback(*queue);};
+  queue->push(helper, des, false, VoidConstWPtr(), true);
+  queue->call();
 }
 
 void clearWhileThreadIsBlockingCallback(bool* done, Barrier* barrier)
@@ -218,7 +218,7 @@ void callThread(SubscriptionQueue& queue)
 
 TEST(SubscriptionQueue, clearWhileThreadIsBlocking)
 {
-  SubscriptionQueue queue("blah", 1, false);
+  auto queue = std::make_shared<miniros::SubscriptionQueue>("blah", 1, false);
 
   FakeSubHelperPtr helper(std::make_shared<FakeSubHelper>());
   MessageDeserializerPtr des(std::make_shared<MessageDeserializer>(helper, SerializedMessage(), std::shared_ptr<M_string>()));
@@ -226,11 +226,11 @@ TEST(SubscriptionQueue, clearWhileThreadIsBlocking)
   bool done = false;
   Barrier barrier(2);
   helper->cb_ = [&barrier, &done](){clearWhileThreadIsBlockingCallback(&done, &barrier);};
-  queue.push(helper, des, false, VoidConstWPtr(), true);
-  std::thread t(callThread, std::ref(queue));
+  queue->push(helper, des, false, VoidConstWPtr(), true);
+  std::thread t(callThread, std::ref(*queue));
   barrier.wait();
 
-  queue.clear();
+  queue->clear();
 
   ASSERT_TRUE(done);
   t.join();
@@ -243,16 +243,16 @@ void waitForBarrier(Barrier* bar)
 
 TEST(SubscriptionQueue, concurrentCallbacks)
 {
-  SubscriptionQueue queue("blah", 0, true);
+  auto queue = std::make_shared<miniros::SubscriptionQueue>("blah", 0, true);
   FakeSubHelperPtr helper(std::make_shared<FakeSubHelper>());
   MessageDeserializerPtr des(std::make_shared<MessageDeserializer>(helper, SerializedMessage(), std::shared_ptr<M_string>()));
 
   Barrier bar(2);
   helper->cb_ = [&bar](){waitForBarrier(&bar);};
-  queue.push(helper, des, false, VoidConstWPtr(), true);
-  queue.push(helper, des, false, VoidConstWPtr(), true);
-  std::thread t1(callThread, std::ref(queue));
-  std::thread t2(callThread, std::ref(queue));
+  queue->push(helper, des, false, VoidConstWPtr(), true);
+  queue->push(helper, des, false, VoidConstWPtr(), true);
+  std::thread t1(callThread, std::ref(*queue));
+  std::thread t2(callThread, std::ref(*queue));
   t1.join();
   t2.join();
 
@@ -266,20 +266,20 @@ void waitForASecond()
 
 TEST(SubscriptionQueue, nonConcurrentOrdering)
 {
-  SubscriptionQueue queue("blah", 0, false);
+  auto queue = std::make_shared<miniros::SubscriptionQueue>("blah", 0, false);
   FakeSubHelperPtr helper(std::make_shared<FakeSubHelper>());
   MessageDeserializerPtr des(std::make_shared<MessageDeserializer>(helper, SerializedMessage(), std::shared_ptr<M_string>()));
 
   helper->cb_ = waitForASecond;
-  queue.push(helper, des, false, VoidConstWPtr(), true);
-  queue.push(helper, des, false, VoidConstWPtr(), true);
-  std::thread t1(callThread, std::ref(queue));
-  std::thread t2(callThread, std::ref(queue));
+  queue->push(helper, des, false, VoidConstWPtr(), true);
+  queue->push(helper, des, false, VoidConstWPtr(), true);
+  std::thread t1(callThread, std::ref(*queue));
+  std::thread t2(callThread, std::ref(*queue));
   t1.join();
   t2.join();
 
   ASSERT_EQ(helper->calls_, 1);
-  queue.call();
+  queue->call();
   ASSERT_EQ(helper->calls_, 2);
 }
 

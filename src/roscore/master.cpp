@@ -103,13 +103,17 @@ void Master::setupBindings()
 
 Master::RpcValue Master::lookupService(const std::string& caller_id, const std::string& service, Connection*)
 {
-  ReturnStruct r = m_handler.lookupService(caller_id, service);
+  std::string uri = m_handler.lookupService(caller_id, service);
 
   RpcValue res = RpcValue::Array(3);;
-  res[0] = r.statusCode;
-  res[1] = r.statusMessage;
-  if (r.value)
-    res[2] = r.value;
+  if (uri.empty()) {
+    res[0] = -1;
+    res[1] = std::string("Failed to lookup service '" + service + "'");
+  } else {
+    res[0] = 1;
+    res[1] = std::string("rosrpc URI: [") + uri + "]";
+    res[3] = uri;
+  }
   return res;
 }
 

@@ -368,7 +368,7 @@ ServiceServer NodeHandle::advertiseService(AdvertiseServiceOptions& ops)
     }
   }
 
-  if (ServiceManager::instance()->advertiseService(ops))
+  if (getServiceManager()->advertiseService(ops))
   {
     ServiceServer srv(ops.service, *this);
 

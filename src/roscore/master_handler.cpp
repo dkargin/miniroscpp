@@ -39,7 +39,6 @@ std::list<std::string> MasterHandler::publisher_update_task(
   args[1] = topic;
   args[2] = l;
 
-
   uint32_t peer_port = 0;
   std::string peer_host;
   if (!miniros::network::splitURI(api, peer_host, peer_port)) {
@@ -57,22 +56,6 @@ std::list<std::string> MasterHandler::publisher_update_task(
   client->execute("publisherUpdate", args, result);
   // TODO: Do we need any return value?
   return {};
-}
-
-void MasterHandler::service_update_task(const std::string& api, const std::string& service, const std::string& uri)
-{
-  RpcValue args;
-  args[0] = "master";
-  args[1] = service;
-  args[2] = uri;
-#ifdef WTF
-  XmlRpcValue result = new XmlRpcValue(new XmlRpcValue(), new XmlRpcValue(), new XmlRpcValue(new XmlRpcValue())),
-              payload = new XmlRpcValue();
-
-  Ros_CSharp.master.host = api.Replace("http://", "").Replace("/", "").Split(':')[0];
-  Ros_CSharp.master.port = int.Parse(api.Replace("http://", "").Replace("/", "").Split(':')[1]);
-  Ros_CSharp.master.execute("publisherUpdate", args, result, payload, false);
-#endif
 }
 
 void MasterHandler::_shutdown(const std::string& reason)
@@ -259,20 +242,15 @@ void MasterHandler::_notify_service_update(const std::string& service, const std
 }
 
 ReturnStruct MasterHandler::registerService(const std::string& caller_id, const std::string& service,
-  const std::string& service_api, const std::string& caller_api, RpcConnection*)
+  const std::string& caller_api, const std::string& service_api, RpcConnection*)
 {
   m_regManager.register_service(service, caller_id, caller_api, service_api);
   return ReturnStruct(1, "Registered [" + caller_id + "] as provider of [" + service + "]", RpcValue(1));
 }
 
-ReturnStruct MasterHandler::lookupService(const std::string& caller_id, const std::string& service) const
+std::string MasterHandler::lookupService(const std::string& caller_id, const std::string& service) const
 {
-  std::string service_url = m_regManager.services.get_service_api(service);
-
-  if (!service_url.empty())
-    return ReturnStruct(1, "rosrpc URI: [" + service_url + "]", RpcValue(service_url));
-
-  return ReturnStruct(-1, "No provider");
+  return m_regManager.services.get_service_api(service);
 }
 
 ReturnStruct MasterHandler::unregisterService(
@@ -297,10 +275,9 @@ ReturnStruct MasterHandler::registerSubscriber(const std::string& caller_id, con
   rtn.statusMessage = ss.str();
   rtn.statusCode = 1;
 
-  rtn.value[0] = RpcValue();
+  rtn.value = RpcValue::Array(puburis.size());
   for (int i = 0; i < puburis.size(); i++) {
-    RpcValue tmp = new RpcValue(puburis[i]);
-    rtn.value[i] = tmp;
+    rtn.value[i] = puburis[i];
   }
   return rtn;
 }

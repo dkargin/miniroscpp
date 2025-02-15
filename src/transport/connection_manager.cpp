@@ -120,6 +120,7 @@ void ConnectionManager::shutdown()
   }
 
   poll_watcher_->disconnect();
+  poll_manager_.reset();
 
   clear(Connection::Destructing);
 }

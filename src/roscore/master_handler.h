@@ -48,8 +48,6 @@ public:
 
   std::list<std::string> publisher_update_task(const std::string& api, const std::string& topic, const std::vector<std::string>& pub_uris);
 
-  void service_update_task(const std::string& api, const std::string& service, const std::string& uri);
-
   void _shutdown(const std::string& reason="");
   void _ready(const std::string& _uri);
 
@@ -88,10 +86,10 @@ public:
 
   void _notify_service_update(const std::string& service, const std::string& service_api);
 
-  ReturnStruct registerService(const std::string& caller_id, const std::string &service, const std::string& service_api,
-    const std::string& caller_api, RpcConnection* conn);
+  ReturnStruct registerService(const std::string& caller_id, const std::string &service,
+    const std::string& caller_api, const std::string& service_api, RpcConnection* conn);
 
-  ReturnStruct lookupService(const std::string& caller_id, const std::string& service) const;
+  std::string lookupService(const std::string& caller_id, const std::string& service) const;
 
   ReturnStruct unregisterService(const std::string& caller_id, const std::string& service, const std::string& service_api);
 
