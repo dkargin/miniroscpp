@@ -64,12 +64,15 @@ target_link_libraries(some_executable miniros::roscxx miniros::bag_storage)
 target_include_directories(some_executable PRIVATE ${MINIROS_INCLUDE_GENERATED_DIRS})
 ```
 
+More detailed migration guide can be found at [Migration guide](docs/migration.md)
+
 # Current status #
 
 1. ROSBag C++ client is complete. It is an independent library. No boost or big external libraries are required.
 2. Ported ROS C++ client code to use only c++17.
 3. Ported rosbag play and record utilities.
 4. Added some tests from original ros_comm package. Though they do not work without some external rosmaster.
+5. **miniroscore** is pure C++ rewrite of **roscore**. **miniros::Master** can be embedded into user application.
 
 Missing things:
 
@@ -123,5 +126,5 @@ Miniros uses official [lz4](https://github.com/lz4/lz4.git)
 
 # License #
 
-This code is licenced under BSD-3 license.
-Original code was licenced under BSD-3 license as well.
+Most of miniros code is licenced under BSD-3 license, the same as original roscpp code.
+XmlRpc is included into codebase and has LGPL2 licence.
