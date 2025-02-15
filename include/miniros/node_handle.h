@@ -535,7 +535,9 @@ if (sub)  // Enter if subscriber is valid
                        const std::shared_ptr<T>& obj, const TransportHints& transport_hints = TransportHints())
   {
     SubscribeOptions ops;
-    auto wrapFn = [fp, obj](const M& msg){(obj->*fp)(msg);};
+    // We must not capture shared pointer in a functor. We track lifecycle of this object at opts.tracked_object instead.
+    const M* rawObj = obj.get();
+    auto wrapFn = [fp, rawObj](const M& msg){(rawObj->*fp)(msg);};
     ops.template initByFullCallbackType<M>(topic, queue_size, wrapFn);
     ops.tracked_object = obj;
     ops.transport_hints = transport_hints;
@@ -547,7 +549,9 @@ if (sub)  // Enter if subscriber is valid
                        const std::shared_ptr<T>& obj, const TransportHints& transport_hints = TransportHints())
   {
     SubscribeOptions ops;
-    auto wrapFn = [fp, obj](const M& msg){(obj->*fp)(msg);};
+    // We must not capture shared pointer in a functor. We track lifecycle of this object at opts.tracked_object instead.
+    const M* rawObj = obj.get();
+    auto wrapFn = [fp, rawObj](const M& msg){(rawObj->*fp)(msg);};
     ops.template initByFullCallbackType<M>(topic, queue_size, wrapFn);
     ops.tracked_object = obj;
     ops.transport_hints = transport_hints;
@@ -603,19 +607,25 @@ if (sub)  // Enter if subscriber is valid
                        const std::shared_ptr<T>& obj, const TransportHints& transport_hints = TransportHints())
   {
     SubscribeOptions ops;
-    auto wrapFn = [fp, obj](const std::shared_ptr<M const>& msg){(obj.get()->*fp)(msg);};
+    // We must not capture shared pointer in a functor. We track lifecycle of this object at opts.tracked_object instead.
+    T* rawObj = obj.get();
+    auto wrapFn = [fp, rawObj](const std::shared_ptr<M const>& msg){(rawObj->*fp)(msg);};
     ops.template init<M>(topic, queue_size, wrapFn);
     ops.tracked_object = obj;
     ops.transport_hints = transport_hints;
     return subscribe(ops);
   }
+
+  // Version for const method.
   template<class M, class T>
   Subscriber subscribe(const std::string& topic, uint32_t queue_size, 
                        void(T::*fp)(const std::shared_ptr<M const>&) const, 
                        const std::shared_ptr<T>& obj, const TransportHints& transport_hints = TransportHints())
   {
     SubscribeOptions ops;
-    auto wrapFn = [fp, obj](const std::shared_ptr<M const>& msg){(obj.get()->*fp)(msg);};
+    // We must not capture shared pointer in a functor. We track lifecycle of this object at opts.tracked_object instead.
+    const T* rawObj = obj.get();
+    auto wrapFn = [fp, rawObj](const std::shared_ptr<M const>& msg){(rawObj->*fp)(msg);};
     ops.template init<M>(topic, queue_size, wrapFn);
     ops.tracked_object = obj;
     ops.transport_hints = transport_hints;
@@ -1002,7 +1012,10 @@ if (service)  // Enter if advertised service is valid
   ServiceServer advertiseService(const std::string& service, bool(T::*srv_func)(MReq &, MRes &), const std::shared_ptr<T>& obj)
   {
     AdvertiseServiceOptions ops;
-    auto wrapFn = [obj, srv_func](MReq& req, MRes& res) { return (obj.get()->*srv_func)(req, res); };
+    // We must not capture shared pointer in a functor. We track lifecycle of this object at opts.tracked_object instead.
+    T* rawObj = obj.get();
+    assert(rawObj);
+    auto wrapFn = [rawObj, srv_func](MReq& req, MRes& res) { return (rawObj->*srv_func)(req, res); };
     ops.template init<MReq, MRes>(service, wrapFn);
     ops.tracked_object = obj;
     return advertiseService(ops);
@@ -1050,7 +1063,11 @@ if (service)  // Enter if advertised service is valid
   ServiceServer advertiseService(const std::string& service, bool(T::*srv_func)(ServiceEvent<MReq, MRes>&), const std::shared_ptr<T>& obj)
   {
     AdvertiseServiceOptions ops;
-    auto wrapFn = [obj, srv_func](ServiceEvent<MReq, MRes>& se) { return obj->*srv_func(se); };
+    // We must not capture shared pointer in a functor. We track lifecycle of this object at opts.tracked_object instead.
+    const T* rawObj = obj.get();
+    assert(rawObj);
+
+    auto wrapFn = [rawObj, srv_func](ServiceEvent<MReq, MRes>& se) { return (rawObj->*srv_func)(se); };
     ops.template initBySpecType<ServiceEvent<MReq, MRes> >(service, wrapFn);
     ops.tracked_object = obj;
     return advertiseService(ops);
@@ -1385,7 +1402,11 @@ if (service)  // Enter if advertised service is valid
   Timer createTimer(Duration period, void(T::*callback)(const TimerEvent&), const std::shared_ptr<T>& obj, 
                     bool oneshot = false, bool autostart = true) const
   {
-    auto wrapFn = [obj, callback](const TimerEvent& te) { (obj.get()->*callback)(te); };
+    // We must not capture shared pointer in a functor. We track lifecycle of this object at opts.tracked_object instead.
+    T* rawObj = obj.get();
+    assert(rawObj);
+
+    auto wrapFn = [rawObj, callback](const TimerEvent& te) { (rawObj->*callback)(te); };
     TimerOptions ops(period, wrapFn, 0);
     ops.tracked_object = obj;
     ops.oneshot = oneshot;
@@ -1545,6 +1566,7 @@ if (service)  // Enter if advertised service is valid
                                 const std::shared_ptr<T>& obj,
                                 bool oneshot = false, bool autostart = true) const
   {
+
     auto wrapFn = [obj, callback](const SteadyTimerEvent& te) { (obj.get()->*callback)(te); };
     SteadyTimerOptions ops(period, wrapFn, 0);
     ops.tracked_object = obj;

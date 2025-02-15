@@ -40,8 +40,6 @@
 #include "miniros/transport/network.h"
 #include "miniros/master_link.h"
 #include "miniros/transport/transport_tcp.h"
-#include "miniros/transport/transport_udp.h"
-#include "miniros/init.h"
 #include "miniros/transport/connection.h"
 
 #include "xmlrpcpp/XmlRpc.h"
@@ -134,7 +132,8 @@ bool ServiceManager::advertiseService(const AdvertiseServiceOptions& ops)
       return false;
     }
 
-    ServicePublicationPtr pub(std::make_shared<ServicePublication>(ops.service, ops.md5sum, ops.datatype, ops.req_datatype, ops.res_datatype, ops.helper, ops.callback_queue, ops.tracked_object));
+    ServicePublicationPtr pub = std::make_shared<ServicePublication>(ops.service, ops.md5sum, ops.datatype,
+      ops.req_datatype, ops.res_datatype, ops.helper, ops.callback_queue, ops.tracked_object);
     service_publications_.push_back(pub);
   }
 
