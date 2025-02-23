@@ -229,6 +229,51 @@ std::string parentNamespace(const std::string& name)
   return stripped_name.substr(0, last_pos);
 }
 
+Name::~Name() = default;
+
+void Name::clear()
+{
+  fullName.clear();
+  ns.clear();
+  nameView = {};
+}
+
+std::string Name::name() const
+{
+  return std::string(nameView.data(), nameView.size());
+}
+
+Error split(const std::string& path, Name& name)
+{
+  if (path.empty())
+    return Error::Ok;
+
+  name.clear();
+
+  name.fullName = path;
+  // Index of first symbol of current token.
+  size_t tokenStart = 0;
+
+  size_t i = 0;
+  for (;i < path.size(); i++) {
+    auto c = path[i];
+    if (!isValidCharInName(c))
+      return Error::InvalidValue;
+    if (c == '/') {
+      if (i > tokenStart) {
+        name.ns.push_back(std::string_view(&name.fullName[tokenStart], i - tokenStart));
+      }
+      tokenStart = i + 1;
+    }
+  }
+
+  if (i > tokenStart) {
+    name.nameView = std::string_view(&name.fullName[tokenStart], i - tokenStart);
+  }
+
+  return Error::Ok;
+}
+
 } // namespace names
 
 } // namespace miniros

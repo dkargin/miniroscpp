@@ -28,8 +28,11 @@
 #ifndef MINIROSCPP_NAMES_H
 #define MINIROSCPP_NAMES_H
 
+#include <string_view>
+
 #include "miniros/internal/forwards.h"
 #include "miniros/transport/common.h"
+#include "miniros/errors.h"
 
 namespace miniros
 {
@@ -44,6 +47,7 @@ namespace names
  * \brief Cleans a graph resource name: removes double slashes, trailing slash
  */
 MINIROS_DECL std::string clean(const std::string& name);
+
 /**
  * \brief Resolve a graph resource name into a fully qualified graph resource name
  *
@@ -54,6 +58,7 @@ MINIROS_DECL std::string clean(const std::string& name);
  * \throws InvalidNameException if the name passed is not a valid graph resource name
  */
 MINIROS_DECL std::string resolve(const std::string& name, bool remap = true);
+
 /**
  * \brief Resolve a graph resource name into a fully qualified graph resource name
  *
@@ -88,6 +93,28 @@ MINIROS_DECL const M_string& getUnresolvedRemappings();
  * \throws InvalidNameException if the name passed is not a valid graph resource name
  */
 MINIROS_DECL std::string parentNamespace(const std::string& name);
+
+/// Fully annotated name
+struct MINIROS_DECL Name {
+  /// Full name.
+  std::string fullName;
+
+  /// A chain of namespaces.
+  std::vector<std::string_view> ns;
+
+
+  ~Name();
+
+  void clear();
+
+  /// Get final name.
+  std::string name() const;
+
+  /// Name of parameter without a namespace.
+  std::string_view nameView;
+};
+
+MINIROS_DECL Error split(const std::string& path, Name& name);
 
 } // namespace names
 

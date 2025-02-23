@@ -85,8 +85,21 @@ TEST(Names, init_empty_node_name)
   EXPECT_THROW(miniros::init(argc, argv, ""), miniros::InvalidNameException);
 }
 
-int
-main(int argc, char** argv)
+TEST(Names, testSplit)
+{
+  names::Name name;
+
+  EXPECT_EQ(split("/a1/a2/a3/final", name), Error::Ok);
+
+  EXPECT_EQ(name.ns.size(), 3);
+  EXPECT_STREQ(name.name().c_str(), "final");
+
+  EXPECT_EQ(names::split("/a1/a2/a3/dangling/", name), Error::Ok);
+  EXPECT_EQ(name.ns.size(), 4);
+  EXPECT_TRUE(name.name().empty());
+}
+
+int main(int argc, char** argv)
 {
   testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
