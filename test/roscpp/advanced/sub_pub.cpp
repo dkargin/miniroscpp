@@ -111,7 +111,11 @@ TEST_F(Subscriptions, subPub)
   miniros::NodeHandle nh;
   miniros::Subscriber sub = nh.subscribe("roscpp/pubsub_test", 0, &Subscriptions::messageCallback, (Subscriptions*)this);
   ASSERT_TRUE(sub);
-  pub_ = nh.advertise<test_roscpp::TestArray>("roscpp/subpub_test", 0, boost::bind(&Subscriptions::subscriberCallback, this, boost::placeholders::_1));
+  //pub_ = nh.advertise<test_roscpp::TestArray>("roscpp/subpub_test", 0, boost::bind(&Subscriptions::subscriberCallback, this, boost::placeholders::_1));
+  pub_ = nh.advertise<test_roscpp::TestArray>("roscpp/subpub_test", 0,
+    [this](const miniros::SingleSubscriberPublisher& sp) {
+      this->subscriberCallback(sp);
+    });
   ASSERT_TRUE(pub_);
   miniros::Time t1(miniros::Time::now()+g_dt);
 
@@ -131,8 +135,7 @@ TEST_F(Subscriptions, subPub)
 
 #define USAGE "USAGE: sub_pub <count> <time>"
 
-int
-main(int argc, char** argv)
+int main(int argc, char** argv)
 {
   testing::InitGoogleTest(&argc, argv);
   miniros::init(argc, argv, "sub_pub");

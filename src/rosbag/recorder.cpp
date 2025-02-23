@@ -50,8 +50,7 @@
 #include <miniros/topic_tools/shape_shifter.h>
 
 #include "miniros/transport/network.h"
-#include "miniros/transport/xmlrpc_manager.h"
-// #include "xmlrpcpp/XmlRpc.h"
+#include "miniros/transport/rpc_manager.h"
 
 using std::cout;
 using std::endl;

@@ -31,7 +31,7 @@
 
 #include <miniros/ros.h>
 
-#include <test_roscpp/TestWithHeader.h>
+#include <test_roscpp/TestWithHeader.hxx>
 
 void callback(const test_roscpp::TestWithHeaderConstPtr&)
 {

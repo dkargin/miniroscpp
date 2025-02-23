@@ -269,7 +269,8 @@ TEST_F(Poller, read)
 
   char b = 0;
 
-  write(sockets_[1], &b, 1);
+  int ret = write(sockets_[1], &b, 1);
+  ASSERT_GT(ret, 0);
   poll_set_.update(1);
 
   ASSERT_EQ(sh.bytes_read_, 0);
@@ -278,12 +279,14 @@ TEST_F(Poller, read)
   poll_set_.update(1);
   ASSERT_EQ(sh.bytes_read_, 1);
 
-  write(sockets_[1], &b, 1);
+  ret = write(sockets_[1], &b, 1);
+  ASSERT_GT(ret, 0);
   poll_set_.update(1);
   ASSERT_EQ(sh.bytes_read_, 2);
 
   ASSERT_TRUE(poll_set_.delEvents(sh.socket_, POLLIN));
-  write(sockets_[1], &b, 1);
+  ret = write(sockets_[1], &b, 1);
+  ASSERT_GT(ret, 0);
   poll_set_.update(1);
   ASSERT_EQ(sh.bytes_read_, 2);
 

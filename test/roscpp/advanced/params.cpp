@@ -43,55 +43,57 @@
 #include <stdlib.h>
 
 #include "miniros/ros.h"
-#include <miniros/param.h>
+
+#include "master_fixture.h"
+#include "miniros/xmlrpcpp/XmlRpcValue.h"
 
 using namespace miniros;
 
-TEST(Params, allParamTypes)
+TEST_F(MasterFixture, allParamTypes)
 {
   std::string string_param;
-  EXPECT_TRUE( param::get( "string", string_param ) );
+  EXPECT_TRUE( master->get( "string", string_param ) );
   EXPECT_TRUE( string_param == "test" );
 
   int int_param = 0;
-  EXPECT_TRUE( param::get( "int", int_param ) );
+  EXPECT_TRUE( master->get( "int", int_param ) );
   EXPECT_TRUE( int_param == 10 );
 
   double double_param = 0.0;
-  EXPECT_TRUE( param::get( "double", double_param ) );
+  EXPECT_TRUE( master->get( "double", double_param ) );
   EXPECT_DOUBLE_EQ( double_param, 10.5 );
 
   bool bool_param = true;
-  EXPECT_TRUE( param::get( "bool", bool_param ) );
+  EXPECT_TRUE( master->get( "bool", bool_param ) );
   EXPECT_FALSE( bool_param );
 }
 
-TEST(Params, setThenGetString)
+TEST_F(MasterFixture, setThenGetString)
 {
-  param::set( "test_set_param", std::string("asdf") );
+  master->set( "test_set_param", std::string("asdf") );
   std::string param;
-  ASSERT_TRUE( param::get( "test_set_param", param ) );
+  ASSERT_TRUE( master->get( "test_set_param", param ) );
   ASSERT_STREQ( "asdf", param.c_str() );
   
   XmlRpc::XmlRpcValue v;
-  param::get("test_set_param", v);
+  master->get("test_set_param", v);
   ASSERT_EQ(v.getType(), XmlRpc::XmlRpcValue::TypeString);
 }
 
-TEST(Params, setThenGetStringCached)
+TEST_F(MasterFixture, setThenGetStringCached)
 {
   std::string param;
-  ASSERT_FALSE( param::getCached( "test_set_param_setThenGetStringCached", param) );
+  ASSERT_FALSE( master->getCached( "test_set_param_setThenGetStringCached", param) );
 
-  param::set( "test_set_param_setThenGetStringCached", std::string("asdf") );
+  master->set( "test_set_param_setThenGetStringCached", std::string("asdf") );
 
-  ASSERT_TRUE( param::getCached( "test_set_param_setThenGetStringCached", param) );
+  ASSERT_TRUE( master->getCached( "test_set_param_setThenGetStringCached", param) );
   ASSERT_STREQ( "asdf", param.c_str() );
 }
 
-TEST(Params, setThenGetStringCachedNodeHandle)
+TEST_F(MasterFixture, setThenGetStringCachedNodeHandle)
 {
-	NodeHandle nh;
+  NodeHandle nh;
   std::string param;
   ASSERT_FALSE( nh.getParamCached( "test_set_param_setThenGetStringCachedNodeHandle", param) );
 
@@ -101,127 +103,127 @@ TEST(Params, setThenGetStringCachedNodeHandle)
   ASSERT_STREQ( "asdf", param.c_str() );
 }
 
-TEST(Params, setThenGetNamespaceCached)
+TEST_F(MasterFixture, setThenGetNamespaceCached)
 {
   std::string stringParam;
   XmlRpc::XmlRpcValue structParam;
   const std::string ns = "test_set_param_setThenGetStringCached2";
-  ASSERT_FALSE(param::getCached(ns, stringParam));
+  ASSERT_FALSE(master->getCached(ns, stringParam));
 
-  param::set(ns, std::string("a"));
-  ASSERT_TRUE(param::getCached(ns, stringParam));
+  master->set(ns, std::string("a"));
+  ASSERT_TRUE(master->getCached(ns, stringParam));
   ASSERT_STREQ("a", stringParam.c_str());
 
-  param::set(ns + "/foo", std::string("b"));
-  ASSERT_TRUE(param::getCached(ns + "/foo", stringParam));
+  master->set(ns + "/foo", std::string("b"));
+  ASSERT_TRUE(master->getCached(ns + "/foo", stringParam));
   ASSERT_STREQ("b", stringParam.c_str());
-  ASSERT_TRUE(param::getCached(ns, structParam));
+  ASSERT_TRUE(master->getCached(ns, structParam));
   ASSERT_TRUE(structParam.hasMember("foo"));
   ASSERT_STREQ("b", static_cast<std::string>(structParam["foo"]).c_str());
 }
 
-TEST(Params, setThenGetCString)
+TEST_F(MasterFixture, setThenGetCString)
 {
-  param::set( "test_set_param", "asdf" );
+  master->set( "test_set_param", "asdf" );
   std::string param;
-  ASSERT_TRUE( param::get( "test_set_param", param ) );
+  ASSERT_TRUE( master->get( "test_set_param", param ) );
   ASSERT_STREQ( "asdf", param.c_str() );
 }
 
-TEST(Params, setThenGetInt)
+TEST_F(MasterFixture, setThenGetInt)
 {
-  param::set( "test_set_param", 42);
+  master->set( "test_set_param", 42);
   int param;
-  ASSERT_TRUE( param::get( "test_set_param", param ) );
+  ASSERT_TRUE( master->get( "test_set_param", param ) );
   ASSERT_EQ( 42, param );
   XmlRpc::XmlRpcValue v;
-  param::get("test_set_param", v);
+  master->get("test_set_param", v);
   ASSERT_EQ(v.getType(), XmlRpc::XmlRpcValue::TypeInt);
 }
 
-TEST(Params, unknownParam)
+TEST_F(MasterFixture, unknownParam)
 {
   std::string param;
-  ASSERT_FALSE( param::get( "this_param_really_should_not_exist", param ) );
+  ASSERT_FALSE( master->get( "this_param_really_should_not_exist", param ) );
 }
 
-TEST(Params, deleteParam)
+TEST_F(MasterFixture, deleteParam)
 {
-  param::set( "test_delete_param", "asdf" );
-  param::del( "test_delete_param" );
+  master->set( "test_delete_param", "asdf" );
+  master->del( "test_delete_param" );
   std::string param;
-  ASSERT_FALSE( param::get( "test_delete_param", param ) );
+  ASSERT_FALSE( master->get( "test_delete_param", param ) );
 }
 
-TEST(Params, hasParam)
+TEST_F(MasterFixture, hasParam)
 {
-  ASSERT_TRUE( param::has( "string" ) );
+  ASSERT_TRUE( master->has( "string" ) );
 }
 
-TEST(Params, setIntDoubleGetInt)
+TEST_F(MasterFixture, setIntDoubleGetInt)
 {
-  param::set("test_set_int_as_double", 1);
-  param::set("test_set_int_as_double", 3.0f);
+  master->set("test_set_int_as_double", 1);
+  master->set("test_set_int_as_double", 3.0f);
 
   int i = -1;
-  ASSERT_TRUE(param::get("test_set_int_as_double", i));
+  ASSERT_TRUE(master->get("test_set_int_as_double", i));
   ASSERT_EQ(3, i);
   double d = 0.0f;
-  ASSERT_TRUE(param::get("test_set_int_as_double", d));
+  ASSERT_TRUE(master->get("test_set_int_as_double", d));
   ASSERT_EQ(3.0, d);
 }
 
-TEST(Params, getIntAsDouble)
+TEST_F(MasterFixture, getIntAsDouble)
 {
-  param::set("int_param", 1);
+  master->set("int_param", 1);
   double d = 0.0;
-  ASSERT_TRUE(param::get("int_param", d));
+  ASSERT_TRUE(master->get("int_param", d));
   ASSERT_EQ(1.0, d);
 }
 
-TEST(Params, getDoubleAsInt)
+TEST_F(MasterFixture, getDoubleAsInt)
 {
-  param::set("double_param", 2.3);
+  master->set("double_param", 2.3);
   int i = -1;
-  ASSERT_TRUE(param::get("double_param", i));
+  ASSERT_TRUE(master->get("double_param", i));
   ASSERT_EQ(2, i);
 
-  param::set("double_param", 3.8);
+  master->set("double_param", 3.8);
   i = -1;
-  ASSERT_TRUE(param::get("double_param", i));
+  ASSERT_TRUE(master->get("double_param", i));
   ASSERT_EQ(4, i);
 }
 
-TEST(Params, searchParam)
+TEST_F(MasterFixture, searchParam)
 {
   std::string ns = "/a/b/c/d/e/f";
   std::string result;
 
-  param::set("/s_i", 1);
-  ASSERT_TRUE(param::search(ns, "s_i", result));
+  master->set("/s_i", 1);
+  ASSERT_TRUE(master->search(ns, "s_i", result));
   ASSERT_STREQ(result.c_str(), "/s_i");
-  param::del("/s_i");
+  master->del("/s_i");
 
-  param::set("/a/b/s_i", 1);
-  ASSERT_TRUE(param::search(ns, "s_i", result));
+  master->set("/a/b/s_i", 1);
+  ASSERT_TRUE(master->search(ns, "s_i", result));
   ASSERT_STREQ(result.c_str(), "/a/b/s_i");
-  param::del("/a/b/s_i");
+  master->del("/a/b/s_i");
 
-  param::set("/a/b/c/d/e/f/s_i", 1);
-  ASSERT_TRUE(param::search(ns, "s_i", result));
+  master->set("/a/b/c/d/e/f/s_i", 1);
+  ASSERT_TRUE(master->search(ns, "s_i", result));
   ASSERT_STREQ(result.c_str(), "/a/b/c/d/e/f/s_i");
-  param::del("/a/b/c/d/e/f/s_i");
+  master->del("/a/b/c/d/e/f/s_i");
 
   bool cont = true;
   while (!cont)
   {
-  	miniros::WallDuration(0.1).sleep();
+    miniros::WallDuration(0.1).sleep();
   }
 
-  ASSERT_FALSE(param::search(ns, "s_j", result));
+  ASSERT_FALSE(master->search(ns, "s_j", result));
 }
 
-TEST(Params, searchParamNodeHandle)
+TEST_F(MasterFixture, searchParamNodeHandle)
 {
   NodeHandle n("/a/b/c/d/e/f");
   std::string result;
@@ -244,7 +246,7 @@ TEST(Params, searchParamNodeHandle)
   ASSERT_FALSE(n.searchParam("s_j", result));
 }
 
-TEST(Params, searchParamNodeHandleWithRemapping)
+TEST_F(MasterFixture, searchParamNodeHandleWithRemapping)
 {
   M_string remappings;
   remappings["s_c"] = "s_b";
@@ -258,19 +260,19 @@ TEST(Params, searchParamNodeHandleWithRemapping)
 }
 
 // See ROS ticket #2381
-TEST(Params, getMissingXmlRpcValueParameterCachedTwice)
+TEST_F(MasterFixture, getMissingXmlRpcValueParameterCachedTwice)
 {
   XmlRpc::XmlRpcValue v;
-  ASSERT_FALSE(miniros::param::getCached("invalid_xmlrpcvalue_param", v));
-  ASSERT_FALSE(miniros::param::getCached("invalid_xmlrpcvalue_param", v));
+  ASSERT_FALSE(master->getCached("invalid_xmlrpcvalue_param", v));
+  ASSERT_FALSE(master->getCached("invalid_xmlrpcvalue_param", v));
 }
 
 // See ROS ticket #2353
-TEST(Params, doublePrecision)
+TEST_F(MasterFixture, doublePrecision)
 {
-  miniros::param::set("bar", 0.123456789123456789);
+  master->set("bar", 0.123456789123456789);
   double d;
-  ASSERT_TRUE(miniros::param::get("bar", d));
+  ASSERT_TRUE(master->get("bar", d));
   EXPECT_DOUBLE_EQ(d, 0.12345678912345678);
 }
 
@@ -280,7 +282,7 @@ std::vector<float> vec_f, vec_f2;
 std::vector<int> vec_i, vec_i2;
 std::vector<bool> vec_b, vec_b2;
 
-TEST(Params, vectorStringParam)
+TEST_F(MasterFixture, vectorStringParam)
 {
   const std::string param_name = "vec_str_param";
 
@@ -289,26 +291,26 @@ TEST(Params, vectorStringParam)
   vec_s.push_back("bar");
   vec_s.push_back("baz");
 
-  miniros::param::set(param_name, vec_s);
+  master->set(param_name, vec_s);
 
-  ASSERT_FALSE(miniros::param::get(param_name, vec_d));
-  ASSERT_FALSE(miniros::param::get(param_name, vec_f));
-  ASSERT_FALSE(miniros::param::get(param_name, vec_i));
-  ASSERT_FALSE(miniros::param::get(param_name, vec_b));
+  ASSERT_FALSE(master->get(param_name, vec_d));
+  ASSERT_FALSE(master->get(param_name, vec_f));
+  ASSERT_FALSE(master->get(param_name, vec_i));
+  ASSERT_FALSE(master->get(param_name, vec_b));
 
-  ASSERT_TRUE(miniros::param::get(param_name, vec_s2));
+  ASSERT_TRUE(master->get(param_name, vec_s2));
 
   ASSERT_EQ(vec_s.size(), vec_s2.size());
   ASSERT_TRUE(std::equal(vec_s.begin(), vec_s.end(), vec_s2.begin()));
 
   // Test empty vector
   vec_s.clear();
-  miniros::param::set(param_name, vec_s);
-  ASSERT_TRUE(miniros::param::get(param_name, vec_s2));
+  master->set(param_name, vec_s);
+  ASSERT_TRUE(master->get(param_name, vec_s2));
   ASSERT_EQ(vec_s.size(), vec_s2.size());
 }
 
-TEST(Params, vectorDoubleParam)
+TEST_F(MasterFixture, vectorDoubleParam)
 {
   const std::string param_name = "vec_double_param";
 
@@ -318,20 +320,20 @@ TEST(Params, vectorDoubleParam)
   vec_d.push_back(3.01);
   vec_d.push_back(7.01);
 
-  miniros::param::set(param_name, vec_d);
+  master->set(param_name, vec_d);
 
-  ASSERT_FALSE(miniros::param::get(param_name, vec_s));
-  ASSERT_TRUE(miniros::param::get(param_name, vec_i));
-  ASSERT_TRUE(miniros::param::get(param_name, vec_b));
-  ASSERT_TRUE(miniros::param::get(param_name, vec_f));
+  ASSERT_FALSE(master->get(param_name, vec_s));
+  ASSERT_TRUE(master->get(param_name, vec_i));
+  ASSERT_TRUE(master->get(param_name, vec_b));
+  ASSERT_TRUE(master->get(param_name, vec_f));
 
-  ASSERT_TRUE(miniros::param::get(param_name, vec_d2));
+  ASSERT_TRUE(master->get(param_name, vec_d2));
 
   ASSERT_EQ(vec_d.size(), vec_d2.size());
   ASSERT_TRUE(std::equal(vec_d.begin(), vec_d.end(), vec_d2.begin()));
 }
 
-TEST(Params, vectorFloatParam)
+TEST_F(MasterFixture, vectorFloatParam)
 {
   const std::string param_name = "vec_float_param";
 
@@ -341,23 +343,23 @@ TEST(Params, vectorFloatParam)
   vec_f.push_back(3);
   vec_f.push_back(3.01);
 
-  miniros::param::set(param_name, vec_f);
+  master->set(param_name, vec_f);
 
-  ASSERT_FALSE(miniros::param::get(param_name, vec_s));
-  ASSERT_TRUE(miniros::param::get(param_name, vec_i));
-  ASSERT_TRUE(miniros::param::get(param_name, vec_b));
-  ASSERT_TRUE(miniros::param::get(param_name, vec_d));
+  ASSERT_FALSE(master->get(param_name, vec_s));
+  ASSERT_TRUE(master->get(param_name, vec_i));
+  ASSERT_TRUE(master->get(param_name, vec_b));
+  ASSERT_TRUE(master->get(param_name, vec_d));
 
   ASSERT_EQ(vec_b[0],true);
   ASSERT_EQ(vec_b[1],false);
 
-  ASSERT_TRUE(miniros::param::get(param_name, vec_f2));
+  ASSERT_TRUE(master->get(param_name, vec_f2));
 
   ASSERT_EQ(vec_f.size(), vec_f2.size());
   ASSERT_TRUE(std::equal(vec_f.begin(), vec_f.end(), vec_f2.begin()));
 }
 
-TEST(Params, vectorIntParam)
+TEST_F(MasterFixture, vectorIntParam)
 {
   const std::string param_name = "vec_int_param";
 
@@ -367,23 +369,23 @@ TEST(Params, vectorIntParam)
   vec_i.push_back(1337);
   vec_i.push_back(2);
 
-  miniros::param::set(param_name, vec_i);
+  master->set(param_name, vec_i);
 
-  ASSERT_FALSE(miniros::param::get(param_name, vec_s));
-  ASSERT_TRUE(miniros::param::get(param_name, vec_d));
-  ASSERT_TRUE(miniros::param::get(param_name, vec_f));
-  ASSERT_TRUE(miniros::param::get(param_name, vec_b));
+  ASSERT_FALSE(master->get(param_name, vec_s));
+  ASSERT_TRUE(master->get(param_name, vec_d));
+  ASSERT_TRUE(master->get(param_name, vec_f));
+  ASSERT_TRUE(master->get(param_name, vec_b));
 
   ASSERT_EQ(vec_b[0],true);
   ASSERT_EQ(vec_b[1],false);
 
-  ASSERT_TRUE(miniros::param::get(param_name, vec_i2));
+  ASSERT_TRUE(master->get(param_name, vec_i2));
 
   ASSERT_EQ(vec_i.size(), vec_i2.size());
   ASSERT_TRUE(std::equal(vec_i.begin(), vec_i.end(), vec_i2.begin()));
 }
 
-TEST(Params, vectorBoolParam)
+TEST_F(MasterFixture, vectorBoolParam)
 {
   const std::string param_name = "vec_bool_param";
 
@@ -393,17 +395,17 @@ TEST(Params, vectorBoolParam)
   vec_b.push_back(true);
   vec_b.push_back(true);
 
-  miniros::param::set(param_name, vec_b);
+  master->set(param_name, vec_b);
 
-  ASSERT_FALSE(miniros::param::get(param_name, vec_s));
-  ASSERT_TRUE(miniros::param::get(param_name, vec_d));
-  ASSERT_TRUE(miniros::param::get(param_name, vec_f));
-  ASSERT_TRUE(miniros::param::get(param_name, vec_i));
+  ASSERT_FALSE(master->get(param_name, vec_s));
+  ASSERT_TRUE(master->get(param_name, vec_d));
+  ASSERT_TRUE(master->get(param_name, vec_f));
+  ASSERT_TRUE(master->get(param_name, vec_i));
 
   ASSERT_EQ(vec_i[0],1);
   ASSERT_EQ(vec_i[1],0);
 
-  ASSERT_TRUE(miniros::param::get(param_name, vec_b2));
+  ASSERT_TRUE(master->get(param_name, vec_b2));
 
   ASSERT_EQ(vec_b.size(), vec_b2.size());
   ASSERT_TRUE(std::equal(vec_b.begin(), vec_b.end(), vec_b2.begin()));
@@ -415,7 +417,7 @@ std::map<std::string,float> map_f, map_f2;
 std::map<std::string,int> map_i, map_i2;
 std::map<std::string,bool> map_b, map_b2;
 
-TEST(Params, mapStringParam)
+TEST_F(MasterFixture, mapStringParam)
 {
   const std::string param_name = "map_str_param";
 
@@ -424,20 +426,20 @@ TEST(Params, mapStringParam)
   map_s["b"] = "blueberry";
   map_s["c"] = "carrot";
 
-  miniros::param::set(param_name, map_s);
+  master->set(param_name, map_s);
 
-  ASSERT_FALSE(miniros::param::get(param_name, map_d));
-  ASSERT_FALSE(miniros::param::get(param_name, map_f));
-  ASSERT_FALSE(miniros::param::get(param_name, map_i));
-  ASSERT_FALSE(miniros::param::get(param_name, map_b));
+  ASSERT_FALSE(master->get(param_name, map_d));
+  ASSERT_FALSE(master->get(param_name, map_f));
+  ASSERT_FALSE(master->get(param_name, map_i));
+  ASSERT_FALSE(master->get(param_name, map_b));
 
-  ASSERT_TRUE(miniros::param::get(param_name, map_s2));
+  ASSERT_TRUE(master->get(param_name, map_s2));
 
   ASSERT_EQ(map_s.size(), map_s2.size());
   ASSERT_TRUE(std::equal(map_s.begin(), map_s.end(), map_s2.begin()));
 }
 
-TEST(Params, mapDoubleParam)
+TEST_F(MasterFixture, mapDoubleParam)
 {
   const std::string param_name = "map_double_param";
 
@@ -446,20 +448,20 @@ TEST(Params, mapDoubleParam)
   map_d["b"] = -0.123456789;
   map_d["c"] = 123456789;
 
-  miniros::param::set(param_name, map_d);
+  master->set(param_name, map_d);
 
-  ASSERT_FALSE(miniros::param::get(param_name, map_s));
-  ASSERT_TRUE(miniros::param::get(param_name, map_f));
-  ASSERT_TRUE(miniros::param::get(param_name, map_i));
-  ASSERT_TRUE(miniros::param::get(param_name, map_b));
+  ASSERT_FALSE(master->get(param_name, map_s));
+  ASSERT_TRUE(master->get(param_name, map_f));
+  ASSERT_TRUE(master->get(param_name, map_i));
+  ASSERT_TRUE(master->get(param_name, map_b));
 
-  ASSERT_TRUE(miniros::param::get(param_name, map_d2));
+  ASSERT_TRUE(master->get(param_name, map_d2));
 
   ASSERT_EQ(map_d.size(), map_d2.size());
   ASSERT_TRUE(std::equal(map_d.begin(), map_d.end(), map_d2.begin()));
 }
 
-TEST(Params, mapFloatParam)
+TEST_F(MasterFixture, mapFloatParam)
 {
   const std::string param_name = "map_float_param";
 
@@ -468,20 +470,20 @@ TEST(Params, mapFloatParam)
   map_f["b"] = -0.123456789;
   map_f["c"] = 123456789;
 
-  miniros::param::set(param_name, map_f);
+  master->set(param_name, map_f);
 
-  ASSERT_FALSE(miniros::param::get(param_name, map_s));
-  ASSERT_TRUE(miniros::param::get(param_name, map_d));
-  ASSERT_TRUE(miniros::param::get(param_name, map_i));
-  ASSERT_TRUE(miniros::param::get(param_name, map_b));
+  ASSERT_FALSE(master->get(param_name, map_s));
+  ASSERT_TRUE(master->get(param_name, map_d));
+  ASSERT_TRUE(master->get(param_name, map_i));
+  ASSERT_TRUE(master->get(param_name, map_b));
 
-  ASSERT_TRUE(miniros::param::get(param_name, map_f2));
+  ASSERT_TRUE(master->get(param_name, map_f2));
 
   ASSERT_EQ(map_f.size(), map_f2.size());
   ASSERT_TRUE(std::equal(map_f.begin(), map_f.end(), map_f2.begin()));
 }
 
-TEST(Params, mapIntParam)
+TEST_F(MasterFixture, mapIntParam)
 {
   const std::string param_name = "map_int_param";
 
@@ -490,20 +492,20 @@ TEST(Params, mapIntParam)
   map_i["b"] = -1;
   map_i["c"] = 1337;
 
-  miniros::param::set(param_name, map_i);
+  master->set(param_name, map_i);
 
-  ASSERT_FALSE(miniros::param::get(param_name, map_s));
-  ASSERT_TRUE(miniros::param::get(param_name, map_d));
-  ASSERT_TRUE(miniros::param::get(param_name, map_f));
-  ASSERT_TRUE(miniros::param::get(param_name, map_b));
+  ASSERT_FALSE(master->get(param_name, map_s));
+  ASSERT_TRUE(master->get(param_name, map_d));
+  ASSERT_TRUE(master->get(param_name, map_f));
+  ASSERT_TRUE(master->get(param_name, map_b));
 
-  ASSERT_TRUE(miniros::param::get(param_name, map_i2));
+  ASSERT_TRUE(master->get(param_name, map_i2));
 
   ASSERT_EQ(map_i.size(), map_i2.size());
   ASSERT_TRUE(std::equal(map_i.begin(), map_i.end(), map_i2.begin()));
 }
 
-TEST(Params, mapBoolParam)
+TEST_F(MasterFixture, mapBoolParam)
 {
   const std::string param_name = "map_bool_param";
 
@@ -512,38 +514,38 @@ TEST(Params, mapBoolParam)
   map_b["b"] = false;
   map_b["c"] = true;
 
-  miniros::param::set(param_name, map_b);
+  master->set(param_name, map_b);
 
-  ASSERT_FALSE(miniros::param::get(param_name, map_s));
-  ASSERT_TRUE(miniros::param::get(param_name, map_d));
-  ASSERT_TRUE(miniros::param::get(param_name, map_f));
-  ASSERT_TRUE(miniros::param::get(param_name, map_i));
+  ASSERT_FALSE(master->get(param_name, map_s));
+  ASSERT_TRUE(master->get(param_name, map_d));
+  ASSERT_TRUE(master->get(param_name, map_f));
+  ASSERT_TRUE(master->get(param_name, map_i));
 
   ASSERT_EQ(map_i["a"],1);
   ASSERT_EQ(map_i["b"],0);
 
-  ASSERT_TRUE(miniros::param::get(param_name, map_b2));
+  ASSERT_TRUE(master->get(param_name, map_b2));
 
   ASSERT_EQ(map_b.size(), map_b2.size());
   ASSERT_TRUE(std::equal(map_b.begin(), map_b.end(), map_b2.begin()));
 }
 
-TEST(Params, paramTemplateFunction)
+TEST_F(MasterFixture, paramTemplateFunction)
 {
-  EXPECT_EQ( param::param<std::string>( "string", "" ), "test" );
-  EXPECT_EQ( param::param<std::string>( "gnirts", "test" ), "test" );
+  EXPECT_EQ( master->param<std::string>( "string", "" ), "test" );
+  EXPECT_EQ( master->param<std::string>( "gnirts", "test" ), "test" );
 
-  EXPECT_EQ( param::param<int>( "int", 0 ), 10 );
-  EXPECT_EQ( param::param<int>( "tni", 10 ), 10 );
+  EXPECT_EQ( master->param<int>( "int", 0 ), 10 );
+  EXPECT_EQ( master->param<int>( "tni", 10 ), 10 );
 
-  EXPECT_DOUBLE_EQ( param::param<double>( "double", 0.0 ), 10.5 );
-  EXPECT_DOUBLE_EQ( param::param<double>( "elbuod", 10.5 ), 10.5 );
+  EXPECT_DOUBLE_EQ( master->param<double>( "double", 0.0 ), 10.5 );
+  EXPECT_DOUBLE_EQ( master->param<double>( "elbuod", 10.5 ), 10.5 );
 
-  EXPECT_EQ( param::param<bool>( "bool", true ), false );
-  EXPECT_EQ( param::param<bool>( "loob", true ), true );
+  EXPECT_EQ( master->param<bool>( "bool", true ), false );
+  EXPECT_EQ( master->param<bool>( "loob", true ), true );
 }
 
-TEST(Params, paramNodeHandleTemplateFunction)
+TEST_F(MasterFixture, paramNodeHandleTemplateFunction)
 {
   NodeHandle nh;
 
@@ -560,9 +562,9 @@ TEST(Params, paramNodeHandleTemplateFunction)
   EXPECT_EQ( nh.param<bool>( "loob", true ), true );
 }
 
-TEST(Params, getParamNames) {
+TEST_F(MasterFixture, getParamNames) {
   std::vector<std::string> test_params;
-  EXPECT_TRUE(miniros::param::getParamNames(test_params));
+  EXPECT_TRUE(master->getParamNames(test_params));
   EXPECT_LT(10u, test_params.size());
 }
 
@@ -577,8 +579,7 @@ TEST(Params, getParamCachedSetParamLoop) {
   }
 }
 
-int
-main(int argc, char** argv)
+int main(int argc, char** argv)
 {
   testing::InitGoogleTest(&argc, argv);
   miniros::init(argc, argv, "params");

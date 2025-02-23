@@ -34,7 +34,7 @@
 
 #include "miniros/init.h"
 #include "miniros/names.h"
-#include "miniros/transport/xmlrpc_manager.h"
+#include "miniros/transport/rpc_manager.h"
 #include "miniros/transport/poll_manager.h"
 #include "miniros/transport/connection_manager.h"
 #include "miniros/transport/topic_manager.h"
@@ -87,7 +87,7 @@ void init(const M_string& remappings);
 }
 
 CallbackQueuePtr g_global_queue;
-ROSOutAppender* g_rosout_appender;
+ROSOutAppender* g_rosout_appender = nullptr;
 static CallbackQueuePtr g_internal_callback_queue;
 
 static bool g_initialized = false;
@@ -157,7 +157,7 @@ void atexitCallback()
   }
 }
 
-void shutdownCallback(XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result)
+void shutdownCallback(const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result)
 {
   int num_params = 0;
   if (params.getType() == XmlRpc::XmlRpcValue::TypeArray)
@@ -277,12 +277,10 @@ void basicSigintHandler(int sig)
   miniros::requestShutdown();
 }
 
-void internalCallbackQueueThreadFunc()
+void internalCallbackQueueThreadFunc(CallbackQueuePtr queue)
 {
   setThreadName("ROS::internalCallbackQueue");
   disableAllSignalsInThisThread();
-
-  CallbackQueuePtr queue = getInternalCallbackQueue();
 
   while (!g_shutting_down)
   {
@@ -327,19 +325,30 @@ void start()
   PollManagerPtr pm = PollManager::instance();
   pm->addPollThreadWatcher(&g_shutdownWatcher);
 
-  XMLRPCManagerPtr rpcm = XMLRPCManager::instance();
+  XMLRPCManagerPtr rpcm = RPCManager::instance();
   rpcm->bind("shutdown", shutdownCallback);
 
   initInternalTimerManager();
 
   ConnectionManagerPtr connectionManager = ConnectionManager::instance();
+
   TopicManagerPtr topicManager = TopicManager::instance();
   ServiceManagerPtr serviceManager = ServiceManager::instance();
   topicManager->start(pm, g_master_link, connectionManager, rpcm);
   serviceManager->start(pm, g_master_link, connectionManager, rpcm);
-  connectionManager->start();
+
+  if (!connectionManager->start(pm)) {
+    // TODO: Probably exit and unroll initialization.
+  }
+
   pm->start();
-  rpcm->start();
+
+  if (!rpcm->start()) {
+    // TODO: We can arrive here only if we are completely unable to host TCP/http server.
+    MINIROS_ERROR("Failed to start RPCManager. Something is very wrong with TCP network");
+    shutdown();
+    return;
+  }
 
   if (!(g_init_options & init_options::NoSigintHandler))
   {
@@ -354,12 +363,14 @@ void start()
     miniros::console::register_appender(g_rosout_appender);
   }
 
+  auto internalCallbackQueue = getInternalCallbackQueue();
+
   if (g_shutting_down) goto end;
 
   {
     miniros::AdvertiseServiceOptions ops;
     ops.init<roscpp::GetLoggers>(names::resolve("~get_loggers"), getLoggers);
-    ops.callback_queue = getInternalCallbackQueue().get();
+    ops.callback_queue = internalCallbackQueue.get();
     serviceManager->advertiseService(ops);
   }
 
@@ -368,7 +379,7 @@ void start()
   {
     miniros::AdvertiseServiceOptions ops;
     ops.init<roscpp::SetLoggerLevel>(names::resolve("~set_logger_level"), setLoggerLevel);
-    ops.callback_queue = getInternalCallbackQueue().get();
+    ops.callback_queue = internalCallbackQueue.get();
     serviceManager->advertiseService(ops);
   }
 
@@ -378,7 +389,7 @@ void start()
   {
     miniros::AdvertiseServiceOptions ops;
     ops.init<roscpp::Empty>(names::resolve("~debug/close_all_connections"), closeAllConnections);
-    ops.callback_queue = getInternalCallbackQueue().get();
+    ops.callback_queue = internalCallbackQueue.get();
     serviceManager->advertiseService(ops);
   }
 
@@ -399,14 +410,14 @@ void start()
     {
       miniros::SubscribeOptions ops;
       ops.init<rosgraph_msgs::Clock>(names::resolve("/clock"), 1, clockCallback);
-      ops.callback_queue = getInternalCallbackQueue().get();
+      ops.callback_queue = internalCallbackQueue.get();
       topicManager->subscribe(ops);
     }
   }
 
   if (g_shutting_down) goto end;
 
-  g_internal_queue_thread = std::thread(internalCallbackQueueThreadFunc);
+  g_internal_queue_thread = std::thread(internalCallbackQueueThreadFunc, internalCallbackQueue);
   getGlobalCallbackQueue()->enable();
 
   MINIROS_DEBUG("Started node [%s], pid [%d], bound on [%s], xmlrpc port [%d], tcpros port [%d], using [%s] time", 
@@ -588,13 +599,15 @@ void shutdown()
   std::scoped_lock<std::recursive_mutex> lock(g_shutting_down_mutex);
   if (g_shutting_down)
     return;
-  else
-    g_shutting_down = true;
+
+  g_shutting_down = true;
 
   miniros::console::shutdown();
 
-  g_global_queue->disable();
-  g_global_queue->clear();
+  if (g_global_queue) {
+    g_global_queue->disable();
+    g_global_queue->clear();
+  }
 
   if (g_internal_queue_thread.get_id() != std::this_thread::get_id())
   {
@@ -603,7 +616,7 @@ void shutdown()
   }
   //miniros::console::deregister_appender(g_rosout_appender);
   delete g_rosout_appender;
-  g_rosout_appender = 0;
+  g_rosout_appender = nullptr;
 
   if (g_started)
   {
@@ -611,12 +624,17 @@ void shutdown()
     ServiceManager::instance()->shutdown();
     PollManager::instance()->shutdown();
     ConnectionManager::instance()->shutdown();
-    XMLRPCManager::instance()->shutdown();
+    RPCManager::instance()->shutdown();
   }
 
   g_started = false;
   g_ok = false;
   Time::shutdown();
+}
+
+MINIROS_DECL MasterLinkPtr getMasterLink()
+{
+  return g_master_link;
 }
 
 }

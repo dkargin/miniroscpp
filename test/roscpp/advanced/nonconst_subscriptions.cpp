@@ -41,7 +41,7 @@
 
 #include "miniros/ros.h"
 
-#include "test_roscpp/TestEmpty.h"
+#include "test_roscpp/TestEmpty.hxx"
 
 
 struct ConstHelper
@@ -71,7 +71,7 @@ TEST(NonConstSubscriptions, oneNonConstSubscriber)
   miniros::Subscriber sub = nh.subscribe("test", 0, &NonConstHelper::callback, &h);
   miniros::Publisher pub = nh.advertise<test_roscpp::TestEmpty>("test", 0);
 
-  test_roscpp::TestEmptyPtr msg(boost::make_shared<test_roscpp::TestEmpty>());
+  test_roscpp::TestEmptyPtr msg(std::make_shared<test_roscpp::TestEmpty>());
   pub.publish(msg);
   miniros::spinOnce();
 
@@ -88,7 +88,7 @@ TEST(NonConstSubscriptions, oneConstOneNonConst)
   miniros::Subscriber sub2 = nh.subscribe("test", 0, &ConstHelper::callback, &h2);
   miniros::Publisher pub = nh.advertise<test_roscpp::TestEmpty>("test", 0);
 
-  test_roscpp::TestEmptyPtr msg(boost::make_shared<test_roscpp::TestEmpty>());
+  test_roscpp::TestEmptyPtr msg(std::make_shared<test_roscpp::TestEmpty>());
   pub.publish(msg);
   miniros::spinOnce();
 
@@ -106,7 +106,7 @@ TEST(NonConstSubscriptions, twoNonConst)
   miniros::Subscriber sub2 = nh.subscribe("test", 0, &NonConstHelper::callback, &h2);
   miniros::Publisher pub = nh.advertise<test_roscpp::TestEmpty>("test", 0);
 
-  test_roscpp::TestEmptyPtr msg(boost::make_shared<test_roscpp::TestEmpty>());
+  test_roscpp::TestEmptyPtr msg(std::make_shared<test_roscpp::TestEmpty>());
   pub.publish(msg);
   miniros::spinOnce();
 
@@ -123,7 +123,7 @@ TEST(NonConstSubscriptions, twoConst)
   miniros::Subscriber sub2 = nh.subscribe("test", 0, &ConstHelper::callback, &h2);
   miniros::Publisher pub = nh.advertise<test_roscpp::TestEmpty>("test", 0);
 
-  test_roscpp::TestEmptyPtr msg(boost::make_shared<test_roscpp::TestEmpty>());
+  test_roscpp::TestEmptyPtr msg(std::make_shared<test_roscpp::TestEmpty>());
   pub.publish(msg);
   miniros::spinOnce();
 

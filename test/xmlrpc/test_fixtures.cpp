@@ -27,7 +27,7 @@
 
 using namespace XmlRpc;
 
-void Hello::execute(XmlRpcValue& params, XmlRpcValue& result)
+void Hello::execute(const XmlRpcValue& params, XmlRpcValue& result, XmlRpc::XmlRpcServerConnection*)
 {
   (void)params;
   std::unique_lock<std::mutex> lock(hello_mutex);

@@ -32,7 +32,7 @@
 #include "miniros/names.h"
 #include "miniros/this_node.h"
 #include "miniros/transport/network.h"
-#include "miniros/transport/xmlrpc_manager.h"
+#include "miniros/transport/rpc_manager.h"
 #include <miniros/console.h>
 #include <miniros/rosassert.h>
 
@@ -47,7 +47,7 @@ struct MasterLink::Internal {
   WallDuration retry_timeout;
 
   /// Local cache of parameters.
-  std::map<std::string, XmlRpc::XmlRpcValue> params;
+  std::map<std::string, RpcValue> params;
   std::mutex params_mutex;
   std::set<std::string> subscribed_params;
 
@@ -140,14 +140,14 @@ void MasterLink::setRetryTimeout(miniros::WallDuration timeout)
 
 bool MasterLink::check() const
 {
-  XmlRpc::XmlRpcValue args, result, payload;
+  RpcValue args, result, payload;
   args[0] = this_node::getName();
   return execute("getPid", args, result, payload, false);
 }
 
 bool MasterLink::getTopics(std::vector<TopicInfo>& topics) const
 {
-  XmlRpc::XmlRpcValue args, result, payload;
+  RpcValue args, result, payload;
   args[0] = this_node::getName();
   args[1] = ""; // TODO: Fix this
 
@@ -165,7 +165,7 @@ bool MasterLink::getTopics(std::vector<TopicInfo>& topics) const
 
 bool MasterLink::getNodes(std::vector<std::string>& nodes) const
 {
-  XmlRpc::XmlRpcValue args, result, payload;
+  RpcValue args, result, payload;
   args[0] = this_node::getName();
 
   if (!execute("getSystemState", args, result, payload, true)) {
@@ -175,7 +175,7 @@ bool MasterLink::getNodes(std::vector<std::string>& nodes) const
   std::set<std::string> node_set;
   for (int i = 0; i < payload.size(); ++i) {
     for (int j = 0; j < payload[i].size(); ++j) {
-      XmlRpc::XmlRpcValue val = payload[i][j][1];
+      RpcValue val = payload[i][j][1];
       for (int k = 0; k < val.size(); ++k) {
         std::string name = payload[i][j][1][k];
         node_set.insert(name);
@@ -189,14 +189,14 @@ bool MasterLink::getNodes(std::vector<std::string>& nodes) const
   return true;
 }
 
-bool MasterLink::execute(const std::string& method, const XmlRpc::XmlRpcValue& request, XmlRpc::XmlRpcValue& response,
-  XmlRpc::XmlRpcValue& payload, bool wait_for_master) const
+bool MasterLink::execute(const std::string& method, const RpcValue& request, RpcValue& response,
+  RpcValue& payload, bool wait_for_master) const
 {
   miniros::SteadyTime start_time = miniros::SteadyTime::now();
 
   std::string master_host = getHost();
   uint32_t master_port = getPort();
-  XMLRPCManagerPtr manager = XMLRPCManager::instance();
+  RPCManagerPtr manager = RPCManager::instance();
   if (!manager)
     return false;
   XmlRpc::XmlRpcClient* c = manager->getXMLRPCClient(master_host, master_port, "/");
@@ -272,14 +272,14 @@ void MasterLink::invalidateParentParams(const std::string& key)
   }
 }
 
-void MasterLink::set(const std::string& key, const XmlRpc::XmlRpcValue& v)
+void MasterLink::set(const std::string& key, const RpcValue& v)
 {
   if (!internal_)
     return;
 
   std::string mapped_key = miniros::names::resolve(key);
 
-  XmlRpc::XmlRpcValue params, result, payload;
+  RpcValue params, result, payload;
   params[0] = this_node::getName();
   params[1] = mapped_key;
   params[2] = v;
@@ -304,7 +304,7 @@ void MasterLink::set(const std::string& key, const std::string& s)
 {
   // construct xmlrpc_c::value object of the std::string and
   // call param::set(key, xmlvalue);
-  XmlRpc::XmlRpcValue v(s);
+  RpcValue v(s);
   set(key, v);
 }
 
@@ -313,25 +313,25 @@ void MasterLink::set(const std::string& key, const char* s)
   // construct xmlrpc_c::value object of the std::string and
   // call param::set(key, xmlvalue);
   std::string sxx = std::string(s);
-  XmlRpc::XmlRpcValue v(sxx);
+  RpcValue v(sxx);
   set(key, v);
 }
 
 void MasterLink::set(const std::string& key, double d)
 {
-  XmlRpc::XmlRpcValue v(d);
+  RpcValue v(d);
   set(key, v);
 }
 
 void MasterLink::set(const std::string& key, int i)
 {
-  XmlRpc::XmlRpcValue v(i);
+  RpcValue v(i);
   set(key, v);
 }
 
 void MasterLink::set(const std::string& key, bool b)
 {
-  XmlRpc::XmlRpcValue v(b);
+  RpcValue v(b);
   set(key, v);
 }
 
@@ -340,7 +340,7 @@ void MasterLink::setParamImpl(const std::string& key, const std::vector<T>& vec)
 {
   // Note: the XmlRpcValue starts off as "invalid" and assertArray turns it
   // into an array type with the given size
-  XmlRpc::XmlRpcValue xml_vec;
+  RpcValue xml_vec;
   xml_vec.setSize(vec.size());
 
   // Copy the contents into the XmlRpcValue
@@ -381,7 +381,7 @@ void MasterLink::setParamImpl(const std::string& key, const std::map<std::string
 {
   // Note: the XmlRpcValue starts off as "invalid" and assertStruct turns it
   // into a struct type
-  XmlRpc::XmlRpcValue xml_value;
+  RpcValue xml_value;
   xml_value.begin();
 
   // Copy the contents into the XmlRpcValue
@@ -419,7 +419,7 @@ void MasterLink::set(const std::string& key, const std::map<std::string, bool>& 
 
 bool MasterLink::has(const std::string& key)
 {
-  XmlRpc::XmlRpcValue params, result, payload;
+  RpcValue params, result, payload;
   params[0] = this_node::getName();
   params[1] = miniros::names::resolve(key);
   // params[1] = key;
@@ -446,7 +446,7 @@ bool MasterLink::del(const std::string& key)
     internal_->params.erase(mapped_key);
   }
 
-  XmlRpc::XmlRpcValue params, result, payload;
+  RpcValue params, result, payload;
   params[0] = this_node::getName();
   params[1] = mapped_key;
   // We don't loop here, because validateXmlrpcResponse() returns false
@@ -459,7 +459,7 @@ bool MasterLink::del(const std::string& key)
   return true;
 }
 
-bool MasterLink::getParamImpl(const std::string& key, XmlRpc::XmlRpcValue& v, bool use_cache)
+bool MasterLink::getParamImpl(const std::string& key, RpcValue& v, bool use_cache)
 {
   if (!internal_)
     return false;
@@ -486,9 +486,9 @@ bool MasterLink::getParamImpl(const std::string& key, XmlRpc::XmlRpcValue& v, bo
     } else {
       // parameter we've never seen before, register for update from the master
       if (internal_->subscribed_params.insert(mapped_key).second) {
-        XmlRpc::XmlRpcValue params, result, payload;
+        RpcValue params, result, payload;
         params[0] = this_node::getName();
-        params[1] = XMLRPCManager::instance()->getServerURI();
+        params[1] = RPCManager::instance()->getServerURI();
         params[2] = mapped_key;
 
         if (!this->execute("subscribeParam", params, result, payload, false)) {
@@ -503,7 +503,7 @@ bool MasterLink::getParamImpl(const std::string& key, XmlRpc::XmlRpcValue& v, bo
     }
   }
 
-  XmlRpc::XmlRpcValue params, result;
+  RpcValue params, result;
   params[0] = this_node::getName();
   params[1] = mapped_key;
 
@@ -525,10 +525,10 @@ bool MasterLink::getParamImpl(const std::string& key, XmlRpc::XmlRpcValue& v, bo
 
 bool MasterLink::getParamImpl(const std::string& key, std::string& s, bool use_cache)
 {
-  XmlRpc::XmlRpcValue v;
+  RpcValue v;
   if (!getParamImpl(key, v, use_cache))
     return false;
-  if (v.getType() != XmlRpc::XmlRpcValue::TypeString)
+  if (v.getType() != RpcValue::TypeString)
     return false;
   s = std::string(v);
   return true;
@@ -536,14 +536,14 @@ bool MasterLink::getParamImpl(const std::string& key, std::string& s, bool use_c
 
 bool MasterLink::getParamImpl(const std::string& key, double& d, bool use_cache)
 {
-  XmlRpc::XmlRpcValue v;
+  RpcValue v;
   if (!getParamImpl(key, v, use_cache)) {
     return false;
   }
 
-  if (v.getType() == XmlRpc::XmlRpcValue::TypeInt) {
+  if (v.getType() == RpcValue::TypeInt) {
     d = (int)v;
-  } else if (v.getType() != XmlRpc::XmlRpcValue::TypeDouble) {
+  } else if (v.getType() != RpcValue::TypeDouble) {
     return false;
   } else {
     d = v;
@@ -563,12 +563,12 @@ bool MasterLink::getParamImpl(const std::string& key, float& f, bool use_cache)
 
 bool MasterLink::getParamImpl(const std::string& key, int& i, bool use_cache)
 {
-  XmlRpc::XmlRpcValue v;
+  RpcValue v;
   if (!getParamImpl(key, v, use_cache)) {
     return false;
   }
 
-  if (v.getType() == XmlRpc::XmlRpcValue::TypeDouble) {
+  if (v.getType() == RpcValue::TypeDouble) {
     double d = v;
 
     if (fmod(d, 1.0) < 0.5) {
@@ -577,7 +577,7 @@ bool MasterLink::getParamImpl(const std::string& key, int& i, bool use_cache)
       d = ceil(d);
     }
     i = d;
-  } else if (v.getType() != XmlRpc::XmlRpcValue::TypeInt) {
+  } else if (v.getType() != RpcValue::TypeInt) {
     return false;
   } else {
     i = v;
@@ -588,10 +588,10 @@ bool MasterLink::getParamImpl(const std::string& key, int& i, bool use_cache)
 
 bool MasterLink::getParamImpl(const std::string& key, bool& b, bool use_cache)
 {
-  XmlRpc::XmlRpcValue v;
+  RpcValue v;
   if (!getParamImpl(key, v, use_cache))
     return false;
-  if (v.getType() != XmlRpc::XmlRpcValue::TypeBoolean)
+  if (v.getType() != RpcValue::TypeBoolean)
     return false;
   b = v;
   return true;
@@ -622,7 +622,7 @@ bool MasterLink::get(const std::string& key, bool& b)
   return getParamImpl(key, b, false);
 }
 
-bool MasterLink::get(const std::string& key, XmlRpc::XmlRpcValue& v)
+bool MasterLink::get(const std::string& key, RpcValue& v)
 {
   return getParamImpl(key, v, false);
 }
@@ -652,12 +652,12 @@ bool MasterLink::getCached(const std::string& key, bool& b)
   return getParamImpl(key, b, true);
 }
 
-bool MasterLink::getCached(const std::string& key, XmlRpc::XmlRpcValue& v)
+bool MasterLink::getCached(const std::string& key, RpcValue& v)
 {
   return getParamImpl(key, v, true);
 }
 
-template <class T> T xml_cast(XmlRpc::XmlRpcValue xml_value)
+template <class T> T xml_cast(MasterLink::RpcValue xml_value)
 {
   return static_cast<T>(xml_value);
 }
@@ -669,34 +669,34 @@ template <class T> bool xml_castable(int XmlType)
 
 template <> bool xml_castable<std::string>(int XmlType)
 {
-  return XmlType == XmlRpc::XmlRpcValue::TypeString;
+  return XmlType == MasterLink::RpcValue::TypeString;
 }
 
 template <> bool xml_castable<double>(int XmlType)
 {
-  return (XmlType == XmlRpc::XmlRpcValue::TypeDouble || XmlType == XmlRpc::XmlRpcValue::TypeInt ||
-          XmlType == XmlRpc::XmlRpcValue::TypeBoolean);
+  return (XmlType == MasterLink::RpcValue::TypeDouble || XmlType == MasterLink::RpcValue::TypeInt ||
+          XmlType == MasterLink::RpcValue::TypeBoolean);
 }
 
 template <> bool xml_castable<float>(int XmlType)
 {
-  return (XmlType == XmlRpc::XmlRpcValue::TypeDouble || XmlType == XmlRpc::XmlRpcValue::TypeInt ||
-          XmlType == XmlRpc::XmlRpcValue::TypeBoolean);
+  return (XmlType == MasterLink::RpcValue::TypeDouble || XmlType == MasterLink::RpcValue::TypeInt ||
+          XmlType == MasterLink::RpcValue::TypeBoolean);
 }
 
 template <> bool xml_castable<int>(int XmlType)
 {
-  return (XmlType == XmlRpc::XmlRpcValue::TypeDouble || XmlType == XmlRpc::XmlRpcValue::TypeInt ||
-          XmlType == XmlRpc::XmlRpcValue::TypeBoolean);
+  return (XmlType == MasterLink::RpcValue::TypeDouble || XmlType == MasterLink::RpcValue::TypeInt ||
+          XmlType == MasterLink::RpcValue::TypeBoolean);
 }
 
 template <> bool xml_castable<bool>(int XmlType)
 {
-  return (XmlType == XmlRpc::XmlRpcValue::TypeDouble || XmlType == XmlRpc::XmlRpcValue::TypeInt ||
-          XmlType == XmlRpc::XmlRpcValue::TypeBoolean);
+  return (XmlType == MasterLink::RpcValue::TypeDouble || XmlType == MasterLink::RpcValue::TypeInt ||
+          XmlType == MasterLink::RpcValue::TypeBoolean);
 }
 
-template <> double xml_cast(XmlRpc::XmlRpcValue xml_value)
+template <> double xml_cast(MasterLink::RpcValue xml_value)
 {
   using namespace XmlRpc;
   switch (xml_value.getType()) {
@@ -711,7 +711,7 @@ template <> double xml_cast(XmlRpc::XmlRpcValue xml_value)
   };
 }
 
-template <> float xml_cast(XmlRpc::XmlRpcValue xml_value)
+template <> float xml_cast(MasterLink::RpcValue xml_value)
 {
   using namespace XmlRpc;
   switch (xml_value.getType()) {
@@ -726,7 +726,7 @@ template <> float xml_cast(XmlRpc::XmlRpcValue xml_value)
   };
 }
 
-template <> int xml_cast(XmlRpc::XmlRpcValue xml_value)
+template <> int xml_cast(MasterLink::RpcValue xml_value)
 {
   using namespace XmlRpc;
   switch (xml_value.getType()) {
@@ -741,7 +741,7 @@ template <> int xml_cast(XmlRpc::XmlRpcValue xml_value)
   };
 }
 
-template <> bool xml_cast(XmlRpc::XmlRpcValue xml_value)
+template <> bool xml_cast(MasterLink::RpcValue xml_value)
 {
   using namespace XmlRpc;
   switch (xml_value.getType()) {
@@ -758,13 +758,13 @@ template <> bool xml_cast(XmlRpc::XmlRpcValue xml_value)
 
 template <class T> bool MasterLink::getParamImpl(const std::string& key, std::vector<T>& vec, bool cached)
 {
-  XmlRpc::XmlRpcValue xml_array;
+  RpcValue xml_array;
   if (!getParamImpl(key, xml_array, cached)) {
     return false;
   }
 
   // Make sure it's an array type
-  if (xml_array.getType() != XmlRpc::XmlRpcValue::TypeArray) {
+  if (xml_array.getType() != RpcValue::TypeArray) {
     return false;
   }
 
@@ -827,13 +827,13 @@ bool MasterLink::getCached(const std::string& key, std::vector<bool>& vec)
 
 template <class T> bool MasterLink::getParamImpl(const std::string& key, std::map<std::string, T>& map, bool cached)
 {
-  XmlRpc::XmlRpcValue xml_value;
+  RpcValue xml_value;
   if (!getParamImpl(key, xml_value, cached)) {
     return false;
   }
 
   // Make sure it's a struct type
-  if (xml_value.getType() != XmlRpc::XmlRpcValue::TypeStruct) {
+  if (xml_value.getType() != RpcValue::TypeStruct) {
     return false;
   }
 
@@ -894,13 +894,13 @@ bool MasterLink::getCached(const std::string& key, std::map<std::string, bool>& 
 
 bool MasterLink::getParamNames(std::vector<std::string>& keys)
 {
-  XmlRpc::XmlRpcValue params, result, payload;
+  RpcValue params, result, payload;
   params[0] = this_node::getName();
   if (!this->execute("getParamNames", params, result, payload, false)) {
     return false;
   }
   // Make sure it's an array type
-  if (result.getType() != XmlRpc::XmlRpcValue::TypeArray) {
+  if (result.getType() != RpcValue::TypeArray) {
     return false;
   }
   // Make sure it returned 3 elements
@@ -908,13 +908,13 @@ bool MasterLink::getParamNames(std::vector<std::string>& keys)
     return false;
   }
   // Get the actual parameter keys
-  XmlRpc::XmlRpcValue parameters = result[2];
+  RpcValue parameters = result[2];
   // Resize the output
   keys.resize(parameters.size());
 
   // Fill the output vector with the answer
   for (int i = 0; i < parameters.size(); ++i) {
-    if (parameters[i].getType() != XmlRpc::XmlRpcValue::TypeString) {
+    if (parameters[i].getType() != RpcValue::TypeString) {
       return false;
     }
     keys[i] = std::string(parameters[i]);
@@ -929,7 +929,7 @@ bool MasterLink::search(const std::string& key, std::string& result_out)
 
 bool MasterLink::search(const std::string& ns, const std::string& key, std::string& result_out)
 {
-  XmlRpc::XmlRpcValue params, result, payload;
+  RpcValue params, result, payload;
   params[0] = ns;
 
   // searchParam needs a separate form of remapping -- remapping on the unresolved name, rather than the
@@ -954,7 +954,7 @@ bool MasterLink::search(const std::string& ns, const std::string& key, std::stri
   return true;
 }
 
-void MasterLink::update(const std::string& key, const XmlRpc::XmlRpcValue& v)
+void MasterLink::update(const std::string& key, const RpcValue& v)
 {
   if (!internal_)
     return;
@@ -969,7 +969,7 @@ void MasterLink::update(const std::string& key, const XmlRpc::XmlRpcValue& v)
   invalidateParentParams(clean_key);
 }
 
-void MasterLink::paramUpdateCallback(XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result)
+void MasterLink::paramUpdateCallback(const RpcValue& params, RpcValue& result)
 {
   result[0] = 1;
   result[1] = std::string("");
@@ -1029,7 +1029,7 @@ void MasterLink::initParam(const M_string& remappings)
     }
   }
 
-  XMLRPCManager::instance()->bind("paramUpdate", [this](XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result) {
+  RPCManager::instance()->bind("paramUpdate", [this](const RpcValue& params, RpcValue& result) {
     return this->paramUpdateCallback(params, result);
   });
 }

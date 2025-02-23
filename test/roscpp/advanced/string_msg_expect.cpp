@@ -39,7 +39,7 @@
 #include <stdlib.h>
 
 #include "miniros/ros.h"
-#include "std_msgs/String.h"
+#include "std_msgs/String.hxx"
 
 std::string expect_what, on_topic;
 unsigned nseen = 0;

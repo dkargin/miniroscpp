@@ -71,10 +71,14 @@ ConnectionManager::~ConnectionManager()
   shutdown();
 }
 
-void ConnectionManager::start()
+bool ConnectionManager::start(PollManagerPtr pollManager)
 {
-  poll_manager_ = PollManager::instance();
+  assert(!poll_manager_);
 
+  poll_manager_ = pollManager;
+
+  if (!poll_manager_)
+    return false;
   poll_manager_->addPollThreadWatcher(poll_watcher_.get());
 
   // Bring up the TCP listener socket
@@ -84,10 +88,11 @@ void ConnectionManager::start()
     {
       this->tcprosAcceptConnection(transport);
     });
+
   if (!started)
   {
     MINIROS_FATAL("Listen on port [%d] failed", network::getTCPROSPort());
-    MINIROS_BREAK();
+    return false;
   }
 
   // Bring up the UDP listener socket
@@ -95,8 +100,9 @@ void ConnectionManager::start()
   if (!udpserver_transport_->createIncoming(0, true))
   {
     MINIROS_FATAL("Listen failed");
-    MINIROS_BREAK();
+    return false;
   }
+  return true;
 }
 
 void ConnectionManager::shutdown()
@@ -114,6 +120,7 @@ void ConnectionManager::shutdown()
   }
 
   poll_watcher_->disconnect();
+  poll_manager_.reset();
 
   clear(Connection::Destructing);
 }

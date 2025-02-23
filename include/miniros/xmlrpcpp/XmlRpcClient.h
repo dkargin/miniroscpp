@@ -44,7 +44,7 @@ namespace XmlRpc {
     XmlRpcClient(const char* host, int port, const char* uri=0);
 
     //! Destructor
-    virtual ~XmlRpcClient();
+    virtual ~XmlRpcClient() override;
 
     //! Execute the named procedure on the remote server.
     //!  @param method The name of the remote procedure to execute
@@ -67,12 +67,12 @@ namespace XmlRpc {
 
     // XmlRpcSource interface implementation
     //! Close the connection
-    virtual void close();
+    void close() override;
 
     //! Handle server responses. Called by the event dispatcher during execute.
     //!  @param eventType The type of event that occurred. 
     //!  @see XmlRpcDispatch::EventType
-    virtual unsigned handleEvent(unsigned eventType);
+    unsigned handleEvent(unsigned eventType) override;
 
   protected:
     // Execution processing helpers

@@ -36,7 +36,6 @@
 #include <string>
 #include <cstdio>
 #include <time.h>
-#include <stdlib.h>
 
 #include "miniros/ros.h"
 #include "miniros/single_subscriber_publisher.h"
@@ -78,7 +77,7 @@ int main(int argc, char** argv)
         pub.publish(msg);
         MINIROS_INFO("published message %d", i);
       }
-    });
+    }, {});
 
   miniros::spin();
 }

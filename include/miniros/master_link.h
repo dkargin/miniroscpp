@@ -67,6 +67,8 @@ public:
 
   ~MasterLink();
 
+  using RpcValue = XmlRpc::XmlRpcValue;
+
   /// Init connection to rosmaster.
   void initLink(const M_string& remappings);
 
@@ -83,8 +85,8 @@ public:
    *
    * @return true if call succeeds, false otherwise.
    */
-  MINIROS_DECL bool execute(const std::string& method, const XmlRpc::XmlRpcValue& request,
-    XmlRpc::XmlRpcValue& response, XmlRpc::XmlRpcValue& payload, bool wait_for_master) const;
+  MINIROS_DECL bool execute(const std::string& method, const RpcValue& request,
+    RpcValue& response, RpcValue& payload, bool wait_for_master) const;
 
   /** @brief Get the hostname where the master runs.
    *
@@ -145,7 +147,7 @@ public:
    * \param v The value to be inserted.
    * \throws InvalidNameException if the key is not a valid graph resource name
    */
-  MINIROS_DECL void set(const std::string& key, const XmlRpc::XmlRpcValue& v);
+  MINIROS_DECL void set(const std::string& key, const RpcValue& v);
 
   /** \brief Set a string value on the parameter server.
    *
@@ -325,7 +327,7 @@ public:
    * \return true if the parameter value was retrieved, false otherwise
    * \throws InvalidNameException if the key is not a valid graph resource name
    */
-  MINIROS_DECL bool get(const std::string& key, XmlRpc::XmlRpcValue& v);
+  MINIROS_DECL bool get(const std::string& key, RpcValue& v);
 
   /** \brief Get a string value from the parameter server, with local caching
    *
@@ -415,7 +417,7 @@ public:
    * \return true if the parameter value was retrieved, false otherwise
    * \throws InvalidNameException if the key is not a valid graph resource name
    */
-  MINIROS_DECL bool getCached(const std::string& key, XmlRpc::XmlRpcValue& v);
+  MINIROS_DECL bool getCached(const std::string& key, RpcValue& v);
 
   /** \brief Get a string vector value from the parameter server.
    *
@@ -774,10 +776,10 @@ public:
   }
 
 protected:
-  bool getParamImpl(const std::string& key, XmlRpc::XmlRpcValue& v, bool use_cache);
+  bool getParamImpl(const std::string& key, RpcValue& v, bool use_cache);
   void invalidateParentParams(const std::string& key);
-  void update(const std::string& key, const XmlRpc::XmlRpcValue& v);
-  void paramUpdateCallback(XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result);
+  void update(const std::string& key, const RpcValue& v);
+  void paramUpdateCallback(const RpcValue& params, RpcValue& result);
 
   template <class T>
   void setParamImpl(const std::string& key, const std::vector<T>& vec);

@@ -5,7 +5,7 @@
 #include <miniros/init.h>
 #include <miniros/node_handle.h>
 
-#include <std_msgs/Int8MultiArray.h>
+#include <std_msgs/Int8MultiArray.hxx>
 
 #include <stdio.h>
 

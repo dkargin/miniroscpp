@@ -31,9 +31,11 @@
 
 #include <gtest/gtest.h>
 #include <miniros/ros.h>
-#include <miniros/callback_queue.h>
+#include <miniros/init.h>
 
-#include "test_roscpp/TestArray.h"
+#include <miniros/transport/callback_queue.h>
+
+#include "test_roscpp/TestArray.hxx"
 
 uint32_t g_pub_count = 0;
 

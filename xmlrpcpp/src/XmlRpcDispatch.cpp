@@ -1,3 +1,7 @@
+#include <cassert>
+#include <cmath>
+#include <errno.h>
+#include <sys/timeb.h>
 
 #include "xmlrpcpp/XmlRpcDispatch.h"
 #include "xmlrpcpp/XmlRpcSource.h"
@@ -5,9 +9,6 @@
 
 #include "miniros/rostime.h"
 
-#include <math.h>
-#include <errno.h>
-#include <sys/timeb.h>
 
 #if defined(_WINDOWS)
 # include <winsock2.h>
@@ -44,15 +45,13 @@ XmlRpcDispatch::~XmlRpcDispatch()
 
 // Monitor this source for the specified events and call its event handler
 // when the event occurs
-void
-XmlRpcDispatch::addSource(XmlRpcSource* source, unsigned mask)
+void XmlRpcDispatch::addSource(XmlRpcSource* source, unsigned mask)
 {
   _sources.push_back(MonitoredSource(source, mask));
 }
 
 // Stop monitoring this source. Does not close the source.
-void
-XmlRpcDispatch::removeSource(XmlRpcSource* source)
+void XmlRpcDispatch::removeSource(XmlRpcSource* source)
 {
   for (SourceList::iterator it=_sources.begin(); it!=_sources.end(); ++it)
     if (it->getSource() == source)
@@ -64,8 +63,7 @@ XmlRpcDispatch::removeSource(XmlRpcSource* source)
 
 
 // Modify the types of events to watch for on this source
-void
-XmlRpcDispatch::setSourceEvents(XmlRpcSource* source, unsigned eventMask)
+void XmlRpcDispatch::setSourceEvents(XmlRpcSource* source, unsigned eventMask)
 {
   for (SourceList::iterator it=_sources.begin(); it!=_sources.end(); ++it)
     if (it->getSource() == source)
@@ -78,8 +76,7 @@ XmlRpcDispatch::setSourceEvents(XmlRpcSource* source, unsigned eventMask)
 
 
 // Watch current set of sources and process events
-void
-XmlRpcDispatch::work(double timeout)
+void XmlRpcDispatch::work(double timeout)
 {
   // Loosely based on `man select` > Correspondence between select() and poll() notifications
   // and cloudius-systems/osv#35, cloudius-systems/osv@b53d39a using poll to emulate select
@@ -102,7 +99,7 @@ XmlRpcDispatch::work(double timeout)
   int timeout_ms = static_cast<int>(floor(timeout * 1000.));
 
   // Only work while there is something to monitor
-  while (_sources.size() > 0) {
+  while (!_sources.empty()) {
 
     // Construct the sets of descriptors we are interested in
     const unsigned source_cnt = _sources.size();
@@ -182,11 +179,12 @@ XmlRpcDispatch::work(double timeout)
     {
       SourceList closeList = _sources;
       _sources.clear();
-      for (SourceList::iterator it=closeList.begin(); it!=closeList.end(); ++it) {
-	XmlRpcSource *src = it->getSource();
-        src->close();
+      for (MonitoredSource& ms: closeList) {
+        XmlRpcSource* src = ms.getSource();
+        assert(src);
+        if (src)
+          src->close();
       }
-
       _doClear = false;
     }
 
@@ -208,8 +206,7 @@ XmlRpcDispatch::exit()
 }
 
 // Clear all sources from the monitored sources list
-void
-XmlRpcDispatch::clear()
+void XmlRpcDispatch::clear()
 {
   if (_inWork)
     _doClear = true;  // Finish reporting current events before clearing
@@ -223,8 +220,7 @@ XmlRpcDispatch::clear()
 }
 
 
-double
-XmlRpcDispatch::getTime()
+double XmlRpcDispatch::getTime()
 {
 #ifdef USE_FTIME
   struct timeb	tbuff;

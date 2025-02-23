@@ -369,8 +369,7 @@ XmlRpcClient::writeRequest()
 
 
 // Read the header from the response
-bool
-XmlRpcClient::readHeader()
+bool XmlRpcClient::readHeader()
 {
   // Read available data
   if ( ! XmlRpcSocket::nbRead(this->getfd(), _header, &_eof) ||

@@ -29,12 +29,14 @@
 
 #include <sstream>
 
-#include "miniros/transport/xmlrpc_manager.h"
-#include "miniros/transport/network.h"
 #include "miniros/master_link.h"
 #include "miniros/rosassert.h"
 #include "miniros/transport/file_log.h"
 #include "miniros/transport/io.h"
+#include "miniros/transport/network.h"
+#include "miniros/transport/rpc_manager.h"
+
+#include <xmlrpcpp/XmlRpcServerConnection.h>
 
 using namespace XmlRpc;
 
@@ -71,23 +73,42 @@ XmlRpc::XmlRpcValue responseBool(int code, const std::string& msg, bool response
 }
 }
 
+/// Wrapper for regular callback functor.
 class XMLRPCCallWrapper : public XmlRpcServerMethod
 {
 public:
   XMLRPCCallWrapper(const std::string& function_name, const XMLRPCFunc& cb, XmlRpcServer *s)
   : XmlRpcServerMethod(function_name, s)
-  , name_(function_name)
-  , func_(cb)
+  , m_func(cb)
   { }
 
-  void execute(XmlRpcValue &params, XmlRpcValue &result)
+  void execute(const XmlRpcValue &params, XmlRpcValue &result, XmlRpcServerConnection* connection) override
   {
-    func_(params, result);
+    if (m_func)
+      m_func(params, result);
   }
 
 private:
-  std::string name_;
-  XMLRPCFunc func_;
+  XMLRPCFunc m_func;
+};
+
+/// Wrapper for extended callback functor.
+class XMLRPCCallWrapperEx : public XmlRpcServerMethod
+{
+public:
+  XMLRPCCallWrapperEx(const std::string& function_name, const XMLRPCFuncEx& cb, XmlRpcServer *s)
+  : XmlRpcServerMethod(function_name, s)
+  , m_func(cb)
+  { }
+
+  void execute(const XmlRpcValue &params, XmlRpcValue &result, XmlRpcServerConnection* connection) override
+  {
+    if (m_func)
+      m_func(params, result, connection);
+  }
+
+private:
+  XMLRPCFuncEx m_func;
 };
 
 void getPid(const XmlRpcValue& params, XmlRpcValue& result)
@@ -98,33 +119,33 @@ void getPid(const XmlRpcValue& params, XmlRpcValue& result)
 
 const miniros::WallDuration CachedXmlRpcClient::s_zombie_time_(30.0); // reap after 30 seconds
 
-const XMLRPCManagerPtr& XMLRPCManager::instance()
+const RPCManagerPtr& RPCManager::instance()
 {
-  static XMLRPCManagerPtr xmlrpc_manager = std::make_shared<XMLRPCManager>();
+  static RPCManagerPtr xmlrpc_manager = std::make_shared<RPCManager>();
   return xmlrpc_manager;
 }
 
-XMLRPCManager::XMLRPCManager()
+RPCManager::RPCManager()
 : port_(0)
 , shutting_down_(false)
 , unbind_requested_(false)
 {
 }
 
-XMLRPCManager::~XMLRPCManager()
+RPCManager::~RPCManager()
 {
   shutdown();
 }
 
-void XMLRPCManager::start()
+bool RPCManager::start(int port)
 {
+  MINIROS_INFO_NAMED("RPCManager", "Starting manager at port %d", port);
   shutting_down_ = false;
-  port_ = 0;
   bind("getPid", getPid);
 
-  bool bound = server_.bindAndListen(0);
-  (void) bound;
-  MINIROS_ASSERT(bound);
+  if (!server_.bindAndListen(port))
+    return false;
+
   port_ = server_.get_port();
   MINIROS_ASSERT(port_ != 0);
 
@@ -132,10 +153,11 @@ void XMLRPCManager::start()
   ss << "http://" << network::getHost() << ":" << port_ << "/";
   uri_ = ss.str();
 
-  server_thread_ = std::thread(&XMLRPCManager::serverThreadFunc, this);
+  server_thread_ = std::thread(&RPCManager::serverThreadFunc, this);
+  return true;
 }
 
-void XMLRPCManager::shutdown()
+void RPCManager::shutdown()
 {
   if (shutting_down_)
   {
@@ -152,8 +174,7 @@ void XMLRPCManager::shutdown()
   {
     std::scoped_lock<std::mutex> lock(clients_mutex_);
 
-    for (V_CachedXmlRpcClient::iterator i = clients_.begin();
-         i != clients_.end();)
+    for (auto i = clients_.begin(); i != clients_.end();)
     {
       if (!i->in_use_)
       {
@@ -179,8 +200,8 @@ void XMLRPCManager::shutdown()
   functions_.clear();
 
   {
-    S_ASyncXMLRPCConnection::iterator it = connections_.begin();
-    S_ASyncXMLRPCConnection::iterator end = connections_.end();
+    auto it = connections_.begin();
+    auto end = connections_.end();
     for (; it != end; ++it)
     {
       (*it)->removeFromDispatch(server_.get_dispatch());
@@ -200,7 +221,7 @@ void XMLRPCManager::shutdown()
   }
 }
 
-bool XMLRPCManager::validateXmlrpcResponse(const std::string& method, XmlRpcValue &response,
+bool RPCManager::validateXmlrpcResponse(const std::string& method, XmlRpcValue &response,
                                     XmlRpcValue &payload)
 {
   if (response.getType() != XmlRpcValue::TypeArray)
@@ -248,7 +269,7 @@ bool XMLRPCManager::validateXmlrpcResponse(const std::string& method, XmlRpcValu
   return true;
 }
 
-void XMLRPCManager::serverThreadFunc()
+void RPCManager::serverThreadFunc()
 {
   disableAllSignalsInThisThread();
   setThreadName("XMLRPCManager");
@@ -257,8 +278,8 @@ void XMLRPCManager::serverThreadFunc()
   {
     {
       std::scoped_lock<std::mutex> lock(added_connections_mutex_);
-      S_ASyncXMLRPCConnection::iterator it = added_connections_.begin();
-      S_ASyncXMLRPCConnection::iterator end = added_connections_.end();
+      auto it = added_connections_.begin();
+      auto end = added_connections_.end();
       for (; it != end; ++it)
       {
         (*it)->addToDispatch(server_.get_dispatch());
@@ -285,21 +306,17 @@ void XMLRPCManager::serverThreadFunc()
     }
 
     {
-      S_ASyncXMLRPCConnection::iterator it = connections_.begin();
-      S_ASyncXMLRPCConnection::iterator end = connections_.end();
-      for (; it != end; ++it)
+      for (auto& connection: connections_)
       {
-        if ((*it)->check())
-        {
-          removeASyncConnection(*it);
-        }
+        if (connection->check())
+          removeASyncConnection(connection);
       }
     }
 
     {
       std::scoped_lock<std::mutex> lock(removed_connections_mutex_);
-      S_ASyncXMLRPCConnection::iterator it = removed_connections_.begin();
-      S_ASyncXMLRPCConnection::iterator end = removed_connections_.end();
+      auto it = removed_connections_.begin();
+      auto end = removed_connections_.end();
       for (; it != end; ++it)
       {
         (*it)->removeFromDispatch(server_.get_dispatch());
@@ -311,15 +328,14 @@ void XMLRPCManager::serverThreadFunc()
   }
 }
 
-XmlRpcClient* XMLRPCManager::getXMLRPCClient(const std::string &host, const int port, const std::string &uri)
+XmlRpcClient* RPCManager::getXMLRPCClient(const std::string &host, const int port, const std::string &uri)
 {
   // go through our vector of clients and grab the first available one
-  XmlRpcClient *c = NULL;
+  XmlRpcClient *c = nullptr;
 
   std::scoped_lock<std::mutex> lock(clients_mutex_);
 
-  for (V_CachedXmlRpcClient::iterator i = clients_.begin();
-       !c && i != clients_.end(); )
+  for (auto i = clients_.begin(); !c && i != clients_.end(); )
   {
     if (!i->in_use_)
     {
@@ -366,12 +382,11 @@ XmlRpcClient* XMLRPCManager::getXMLRPCClient(const std::string &host, const int 
   return c;
 }
 
-void XMLRPCManager::releaseXMLRPCClient(XmlRpcClient *c)
+void RPCManager::releaseXMLRPCClient(XmlRpcClient *c)
 {
   std::scoped_lock<std::mutex> lock(clients_mutex_);
 
-  for (V_CachedXmlRpcClient::iterator i = clients_.begin();
-       i != clients_.end(); ++i)
+  for (auto i = clients_.begin(); i != clients_.end(); ++i)
   {
     if (c == i->client_)
     {
@@ -391,19 +406,19 @@ void XMLRPCManager::releaseXMLRPCClient(XmlRpcClient *c)
   }
 }
 
-void XMLRPCManager::addASyncConnection(const ASyncXMLRPCConnectionPtr& conn)
+void RPCManager::addASyncConnection(const ASyncXMLRPCConnectionPtr& conn)
 {
   std::scoped_lock<std::mutex> lock(added_connections_mutex_);
   added_connections_.insert(conn);
 }
 
-void XMLRPCManager::removeASyncConnection(const ASyncXMLRPCConnectionPtr& conn)
+void RPCManager::removeASyncConnection(const ASyncXMLRPCConnectionPtr& conn)
 {
   std::scoped_lock<std::mutex> lock(removed_connections_mutex_);
   removed_connections_.insert(conn);
 }
 
-bool XMLRPCManager::bind(const std::string& function_name, const XMLRPCFunc& cb)
+bool RPCManager::bind(const std::string& function_name, const XMLRPCFunc& cb)
 {
   std::scoped_lock<std::mutex> lock(functions_mutex_);
   if (functions_.find(function_name) != functions_.end())
@@ -420,7 +435,25 @@ bool XMLRPCManager::bind(const std::string& function_name, const XMLRPCFunc& cb)
   return true;
 }
 
-void XMLRPCManager::unbind(const std::string& function_name)
+bool RPCManager::bindEx(const std::string& function_name, const XMLRPCFuncEx& cb, void* object)
+{
+  std::scoped_lock<std::mutex> lock(functions_mutex_);
+  if (functions_.find(function_name) != functions_.end())
+  {
+    return false;
+  }
+
+  FunctionInfo info;
+  info.name = function_name;
+  info.functionEx = cb;
+  info.wrapper.reset(new XMLRPCCallWrapperEx(function_name, cb, &server_));
+  info.object = object;
+  functions_[function_name] = info;
+
+  return true;
+}
+
+void RPCManager::unbind(const std::string& function_name)
 {
   unbind_requested_ = true;
   std::scoped_lock<std::mutex> lock(functions_mutex_);
@@ -428,7 +461,28 @@ void XMLRPCManager::unbind(const std::string& function_name)
   unbind_requested_ = false;
 }
 
-bool XMLRPCManager::isShuttingDown() const
+size_t RPCManager::unbind(const void* object)
+{
+  if (!object)
+    return 0;
+  unbind_requested_ = true;
+  std::scoped_lock<std::mutex> lock(functions_mutex_);
+  std::vector<std::string> keysToRemove;
+  for (const auto& [key, info]: functions_) {
+    if (info.object == object) {
+      keysToRemove.push_back(key);
+    }
+  }
+
+  for (const auto& key: keysToRemove) {
+    functions_.erase(key);
+  }
+
+  unbind_requested_ = false;
+  return keysToRemove.size();
+}
+
+bool RPCManager::isShuttingDown() const
 {
   return shutting_down_;
 }

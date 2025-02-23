@@ -31,7 +31,7 @@
 
 #include <miniros/ros.h>
 
-#include <test_roscpp/TestEmpty.h>
+#include <test_roscpp/TestEmpty.hxx>
 
 #define ASSERT_THROWS(expr) \
   try \

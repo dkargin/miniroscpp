@@ -43,35 +43,47 @@
 #include <stdlib.h>
 
 #include "miniros/ros.h"
-#include <miniros/param.h>
 #include <miniros/names.h>
+#include <miniros/master_link.h>
 
-TEST(roscpp, parameterRemapping)
+class MasterLink : public testing::Test
+{
+public:
+  void SetUp() override
+  {
+    master = miniros::getMasterLink();
+  }
+
+  miniros::MasterLinkPtr master;
+};
+
+
+TEST_F(MasterLink, parameterRemapping)
 {
   std::string param;
   ASSERT_STREQ(miniros::names::resolve("test_full").c_str(), "/b/test_full");
-  ASSERT_TRUE(miniros::param::get("test_full", param));
+  ASSERT_TRUE(master->get("test_full", param));
   ASSERT_STREQ(miniros::names::resolve("/a/test_full").c_str(), "/b/test_full");
-  ASSERT_TRUE(miniros::param::get("/a/test_full", param));
+  ASSERT_TRUE(master->get("/a/test_full", param));
 
   ASSERT_STREQ(miniros::names::resolve("test_local").c_str(), "/a/test_local2");
-  ASSERT_TRUE(miniros::param::get("test_local", param));
+  ASSERT_TRUE(master->get("test_local", param));
   ASSERT_STREQ(miniros::names::resolve("/a/test_local").c_str(), "/a/test_local2");
-  ASSERT_TRUE(miniros::param::get("/a/test_local", param));
+  ASSERT_TRUE(master->get("/a/test_local", param));
 
   ASSERT_STREQ(miniros::names::resolve("test_relative").c_str(), "/b/test_relative");
-  ASSERT_TRUE(miniros::param::get("test_relative", param));
+  ASSERT_TRUE(master->get("test_relative", param));
   ASSERT_STREQ(miniros::names::resolve("/a/test_relative").c_str(), "/b/test_relative");
-  ASSERT_TRUE(miniros::param::get("/a/test_relative", param));
+  ASSERT_TRUE(master->get("/a/test_relative", param));
 }
 
-TEST(roscpp, nodeNameRemapping)
+TEST_F(MasterLink, nodeNameRemapping)
 {
   std::string node_name = miniros::this_node::getName();
   ASSERT_STREQ(node_name.c_str(), "/a/name_remapped_with_ns");
 }
-int
-main(int argc, char** argv)
+
+int main(int argc, char** argv)
 {
   testing::InitGoogleTest(&argc, argv);
   miniros::init( argc, argv, "name_remapping_with_ns" );

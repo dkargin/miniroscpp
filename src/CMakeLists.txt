@@ -1,6 +1,3 @@
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
 add_subdirectory(replacements)
 
 # Injecting flags for debug.
@@ -118,57 +115,74 @@ endif()
 
 
 set(transport_SRC
+    shape_shifter.cpp
+    observer.cpp
+
+    transport/callback_queue.cpp
+    transport/common.cpp
+    transport/connection.cpp
+    transport/connection_manager.cpp
+    transport/init.cpp
+    transport/intraprocess_subscriber_link.cpp
+    transport/intraprocess_publisher_link.cpp
+    transport/internal_timer_manager.cpp
+    transport/io.cpp
+
+    transport/file_log.cpp
     transport/master_link.cpp
-  transport/network.cpp
-  transport/subscriber.cpp
-  transport/common.cpp
-  transport/publisher_link.cpp
-  transport/service_publication.cpp
-  transport/connection.cpp
-  transport/single_subscriber_publisher.cpp
+    transport/message_deserializer.cpp
+
+    transport/names.cpp
+    transport/network.cpp
+    transport/node_handle.cpp
+    transport/poll_manager.cpp
+    transport/poll_set.cpp
+    transport/publication.cpp
+    transport/publisher.cpp
+    transport/publisher_link.cpp
+    transport/rpc_manager.cpp
+    transport/rosout_appender.cpp
+
+    transport/service.cpp
+
+    transport/service_client.cpp
+    transport/service_client_link.cpp
+
+    transport/service_publication.cpp
+    transport/service_manager.cpp
     transport/service_server.cpp
-  transport/wall_timer.cpp
-  transport/xmlrpc_manager.cpp
-  transport/publisher.cpp
-  transport/timer.cpp
-  transport/io.cpp
-  transport/names.cpp
-  transport/topic.cpp
-  transport/topic_manager.cpp
-  transport/poll_manager.cpp
-  transport/publication.cpp
-  transport/statistics.cpp
-  transport/intraprocess_subscriber_link.cpp
-  transport/intraprocess_publisher_link.cpp
-  transport/callback_queue.cpp
-  transport/service_server_link.cpp
-  transport/service_client.cpp
-  transport/node_handle.cpp
-  transport/connection_manager.cpp
-  transport/file_log.cpp
-  transport/transport/transport.cpp
-  transport/transport/transport_udp.cpp
-  transport/transport/transport_tcp.cpp
-  transport/subscriber_link.cpp
-  transport/service_client_link.cpp
-  transport/transport_publisher_link.cpp
-  transport/transport_subscriber_link.cpp
-  transport/service_manager.cpp
-  transport/rosout_appender.cpp
-  transport/init.cpp
-  transport/subscription.cpp
-  transport/subscription_queue.cpp
-  transport/spinner.cpp
-  transport/internal_timer_manager.cpp
-  transport/message_deserializer.cpp
-  transport/poll_set.cpp
-  transport/service.cpp
-  transport/this_node.cpp
-  transport/steady_timer.cpp
-  shape_shifter.cpp
-  observer.cpp
-  tf2/transform_broadcaster.cpp
+    transport/service_server_link.cpp
+
+    transport/single_subscriber_publisher.cpp
+    transport/spinner.cpp
+    transport/statistics.cpp
+    transport/steady_timer.cpp
+
+    transport/subscriber.cpp
+    transport/subscriber_link.cpp
+    transport/subscription.cpp
+    transport/subscription_queue.cpp
+
+    transport/timer.cpp
+    transport/this_node.cpp
+    transport/topic.cpp
+    transport/topic_manager.cpp
+    transport/transport/transport.cpp
+    transport/transport/transport_udp.cpp
+    transport/transport/transport_tcp.cpp
+    transport/transport_publisher_link.cpp
+    transport/transport_subscriber_link.cpp
+
+    transport/wall_timer.cpp
+    tf2/transform_broadcaster.cpp
   )
+
+# minimaster contains core rosmaster API. It can be embedded to some other apps.
+set(master_SRC
+    roscore/master.cpp
+    roscore/master_handler.cpp
+    roscore/registrations.cpp
+    roscore/registration_manager.cpp)
 
 if (MINIROS_USE_SYSTEM_PROGRAM_OPTIONS)
     find_package(Boost REQUIRED COMPONENTS program_options)
@@ -181,22 +195,23 @@ target_include_directories(miniros_time
     $<BUILD_INTERFACE:${MINIROS_INCLUDE_DIRS}>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
 )
+target_link_libraries(miniros_time PUBLIC ${CMAKE_THREAD_LIBS_INIT})
 
 set_property(TARGET miniros_time PROPERTY POSITION_INDEPENDENT_CODE ON)
 add_library(miniros::time ALIAS miniros_time)
 
 
 if (MINIROS_BUILD_SHARED_LIBS)
-  add_library(roscxx SHARED ${cpp_common_SRC} ${transport_SRC})
+  add_library(roscxx SHARED ${cpp_common_SRC} ${transport_SRC} ${master_SRC})
 else()
-  add_library(roscxx ${cpp_common_SRC} ${transport_SRC})
+  add_library(roscxx ${cpp_common_SRC} ${transport_SRC} ${master_SRC})
 endif()
 
 set_property(TARGET roscxx PROPERTY CXX_STANDARD 17)
 
-target_link_libraries(roscxx PRIVATE xmlrpcpp rt stdc++fs ${console_bridge_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
-
-target_link_libraries(roscxx PUBLIC miniros::time)
+target_link_libraries(roscxx
+    PUBLIC miniros::time
+    PRIVATE xmlrpcpp rt stdc++fs ${console_bridge_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
 
 target_compile_definitions(roscxx PRIVATE rostime_EXPORTS miniros_EXPORTS)
 
@@ -206,6 +221,10 @@ target_include_directories(roscxx PRIVATE
     ${MINIROS_INCLUDE_ROOT}
     ${MINIROS_INCLUDE_GENERATED_DIRS}
 )
+
+add_executable(miniroscore roscore/miniroscore.cpp)
+target_link_libraries(miniroscore roscxx xmlrpcpp impl::program_options)
+target_include_directories(miniroscore PRIVATE ${MINIROS_INCLUDE_ROOT})
 
 set(bag_storage_SRC
     rosbag_storage/bag_player.cpp
@@ -224,9 +243,9 @@ set(bag_storage_SRC
 )
 
 if (MINIROS_BUILD_SHARED_LIBS)
-	add_library(bag_storage SHARED ${bag_storage_SRC})
+  add_library(bag_storage SHARED ${bag_storage_SRC})
 else ()
-	add_library(bag_storage ${bag_storage_SRC})
+  add_library(bag_storage ${bag_storage_SRC})
 endif()
 
 target_include_directories(bag_storage PRIVATE ${MINIROS_INCLUDE_DIRS} ${rosbag_INCLUDE})
@@ -267,4 +286,10 @@ else ()
 endif()
 
 set(MINIROS_LIBRARY roscxx PARENT_SCOPE)
-set(MINIROS_EXPORT roscxx bag_storage miniros_time ${rosbag_INTERNAL_LIBS} ${rosbag_APPS} PARENT_SCOPE)
+set(MINIROS_EXPORT
+    roscxx bag_storage
+    miniros_time
+    miniroscore
+    ${rosbag_INTERNAL_LIBS}
+    ${rosbag_APPS}
+    PARENT_SCOPE)

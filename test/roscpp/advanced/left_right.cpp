@@ -38,10 +38,9 @@
 #include <fstream>
 
 #include <time.h>
-#include <stdlib.h>
 
 #include "miniros/ros.h"
-#include "std_msgs/String.h"
+#include "std_msgs/String.hxx"
 
 int
 main(int argc, char** argv)

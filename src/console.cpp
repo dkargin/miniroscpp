@@ -837,8 +837,7 @@ void print(FilterBase* filter, void* logger_handle, Level level,
   g_printing_thread_id = std::thread::id();
 }
 
-typedef std::vector<LogLocation*> V_LogLocation;
-V_LogLocation g_log_locations;
+std::vector<LogLocation*> g_log_locations;
 std::mutex g_locations_mutex;
 
 void registerLogLocation(LogLocation* loc)
@@ -888,13 +887,8 @@ void notifyLoggerLevelsChanged()
 {
   std::scoped_lock<std::mutex> lock(g_locations_mutex);
 
-  V_LogLocation::iterator it = g_log_locations.begin();
-  V_LogLocation::iterator end = g_log_locations.end();
-  for ( ; it != end; ++it )
-  {
-    LogLocation* loc = *it;
+  for (LogLocation* loc: g_log_locations)
     checkLogLocationEnabledNoLock(loc);
-  }
 }
 
 void initializeSafe()

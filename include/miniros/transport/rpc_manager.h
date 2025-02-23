@@ -41,7 +41,6 @@
 
 #include <miniros/rostime.h>
 
-
 namespace miniros
 {
 
@@ -50,6 +49,9 @@ namespace miniros
  */
 namespace xmlrpc
 {
+
+class XmlRpcServerConnection;
+
 MINIROS_DECL XmlRpc::XmlRpcValue responseStr(int code, const std::string& msg, const std::string& response);
 MINIROS_DECL XmlRpc::XmlRpcValue responseInt(int code, const std::string& msg, int response);
 MINIROS_DECL XmlRpc::XmlRpcValue responseBool(int code, const std::string& msg, bool response);
@@ -87,18 +89,26 @@ public:
   static const miniros::WallDuration s_zombie_time_; // how long before it is toasted
 };
 
-class XMLRPCManager;
-typedef std::shared_ptr<XMLRPCManager> XMLRPCManagerPtr;
+class RPCManager;
+typedef std::shared_ptr<RPCManager> RPCManagerPtr;
 
-typedef std::function<void(XmlRpc::XmlRpcValue&, XmlRpc::XmlRpcValue&)> XMLRPCFunc;
+// Compact RPC callback function.
+typedef std::function<void(const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result)> XMLRPCFunc;
 
-class MINIROS_DECL XMLRPCManager
+// Extended RPC callback function.
+typedef std::function<int (const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result, XmlRpc::XmlRpcServerConnection* conn)> XMLRPCFuncEx;
+
+
+class MINIROS_DECL RPCManager
 {
 public:
-  static const XMLRPCManagerPtr& instance();
+  using RpcValue = XmlRpc::XmlRpcValue;
+  using RpcConnection = XmlRpc::XmlRpcServerConnection;
 
-  XMLRPCManager();
-  ~XMLRPCManager();
+  static const RPCManagerPtr& instance();
+
+  RPCManager();
+  ~RPCManager();
 
   /** @brief Validate an XML/RPC response
    *
@@ -110,14 +120,13 @@ public:
    *
    * @todo Consider making this private.
    */
-  bool validateXmlrpcResponse(const std::string& method, 
-			      XmlRpc::XmlRpcValue &response, XmlRpc::XmlRpcValue &payload);
+  bool validateXmlrpcResponse(const std::string& method, RpcValue &response, RpcValue &payload);
 
   /**
    * @brief Get the xmlrpc server URI of this node
    */
-  inline const std::string& getServerURI() const { return uri_; }
-  inline uint32_t getServerPort() const { return port_; }
+  const std::string& getServerURI() const { return uri_; }
+  uint32_t getServerPort() const { return port_; }
 
   XmlRpc::XmlRpcClient* getXMLRPCClient(const std::string& host, const int port, const std::string& uri);
   void releaseXMLRPCClient(XmlRpc::XmlRpcClient* c);
@@ -125,10 +134,80 @@ public:
   void addASyncConnection(const ASyncXMLRPCConnectionPtr& conn);
   void removeASyncConnection(const ASyncXMLRPCConnectionPtr& conn);
 
+  /// Bind regular callback method.
   bool bind(const std::string& function_name, const XMLRPCFunc& cb);
+
+  /// Bind extended callback.
+  /// @param function_name - name of function to bind
+  /// @param cb - callback functor
+  /// @param object - attached object
+  bool bindEx(const std::string& function_name, const XMLRPCFuncEx& cb, void* object = nullptr);
+
+  template <class Object>
+  bool bindEx0(const std::string& function_name,
+    Object* object, RpcValue (Object::*method)(RpcConnection* conn))
+  {
+    return bindEx(function_name, [=](const RpcValue& param, RpcValue& result, RpcConnection* conn) {
+      result = (object->*method)(conn);
+      return 0;
+    }, object);
+  }
+
+  template <class Object, class T0>
+  bool bindEx1(const std::string& function_name,
+    Object* object, RpcValue (Object::*method)(const T0& arg0, RpcConnection* conn))
+  {
+    return bindEx(function_name, [=](const RpcValue& param, RpcValue& result, RpcConnection* conn) {
+      T0 arg0 = param[0].as<T0>();
+      result = (object->*method)(arg0, conn);
+      return 0;
+    }, object);
+  }
+
+  template <class Object, class T0, class T1>
+  bool bindEx2(const std::string& function_name,Object* object, RpcValue (Object::*method)(const T0& arg0, const T1& arg1, RpcConnection* conn))
+  {
+    return bindEx(function_name, [=](const RpcValue& param, RpcValue& result, RpcConnection* conn) {
+      T0 arg0 = param[0].as<T0>();
+      T1 arg1 = param[1].as<T1>();
+      result = (object->*method)(arg0, arg1, conn);
+      return 0;
+    }, object);
+  }
+
+  template <class Object, class T0, class T1, class T2>
+  bool bindEx3(const std::string& function_name,Object* object,
+    RpcValue (Object::*method)(const T0& arg0, const T1& arg1, const T2& arg2, RpcConnection* conn))
+  {
+    return bindEx(function_name, [=](const RpcValue& param, RpcValue& result, RpcConnection* conn) {
+      T0 arg0 = param[0].as<T0>();
+      T1 arg1 = param[1].as<T1>();
+      T2 arg2 = param[2].as<T2>();
+      result = (object->*method)(arg0, arg1, arg2, conn);
+      return 0;
+    }, object);
+  }
+
+  template <class Object, class T0, class T1, class T2, class T3>
+  bool bindEx4(const std::string& function_name, Object* object,
+    RpcValue (Object::*method)(const T0& arg0, const T1& arg1, const T2& arg2, const T3& arg3, RpcConnection* conn))
+  {
+    return bindEx(function_name, [=](const RpcValue& param, RpcValue& result, RpcConnection* conn) {
+      T0 arg0 = param[0].as<T0>();
+      T1 arg1 = param[1].as<T1>();
+      T2 arg2 = param[2].as<T2>();
+      T3 arg3 = param[3].as<T3>();
+      result = (object->*method)(arg0, arg1, arg2, arg3, conn);
+      return 0;
+    }, object);
+  }
+
   void unbind(const std::string& function_name);
 
-  void start();
+  /// Unbind all callbacks, associated with specific object.
+  size_t unbind(const void* object);
+
+  NODISCARD bool start(int port = 0);
   void shutdown();
 
   bool isShuttingDown() const;
@@ -164,12 +243,18 @@ private:
   struct FunctionInfo
   {
     std::string name;
+    /// Regular callback.
     XMLRPCFunc function;
-    XMLRPCCallWrapperPtr wrapper;
+    /// Extended callback.
+    XMLRPCFuncEx functionEx;
+    /// Object to be tracked.
+    void* object = nullptr;
+
+    std::shared_ptr<XmlRpc::XmlRpcServerMethod> wrapper;
   };
-  typedef std::map<std::string, FunctionInfo> M_StringToFuncInfo;
+
   std::mutex functions_mutex_;
-  M_StringToFuncInfo functions_;
+  std::map<std::string, FunctionInfo> functions_;
 
   std::atomic_bool unbind_requested_;
 };

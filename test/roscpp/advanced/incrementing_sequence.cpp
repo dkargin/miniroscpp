@@ -39,7 +39,7 @@
 #include <stdlib.h>
 
 #include "miniros/ros.h"
-#include <test_roscpp/TestWithHeader.h>
+#include <test_roscpp/TestWithHeader.hxx>
 
 using namespace miniros;
 using namespace test_roscpp;

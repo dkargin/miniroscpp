@@ -159,10 +159,9 @@ XmlRpcServer::bindAndListen(int port, int backlog /*= 5*/)
 
 
 // Process client requests for the specified time
-void 
-XmlRpcServer::work(double msTime)
+void XmlRpcServer::work(double msTime)
 {
-  XmlRpcUtil::log(2, "XmlRpcServer::work: waiting for a connection");
+  XmlRpcUtil::log(4, "XmlRpcServer::work: waiting for a connection");
   if(_accept_error && _disp.getTime() > _accept_retry_time_sec) {
     _disp.addSource(this, XmlRpcDispatch::ReadableEvent);
   }
@@ -173,8 +172,7 @@ XmlRpcServer::work(double msTime)
 
 // Handle input on the server socket by accepting the connection
 // and reading the rpc request.
-unsigned
-XmlRpcServer::handleEvent(unsigned)
+unsigned XmlRpcServer::handleEvent(unsigned)
 {
   return acceptConnection();
 }
@@ -182,8 +180,7 @@ XmlRpcServer::handleEvent(unsigned)
 
 // Accept a client connection request and create a connection to
 // handle method calls from the client.
-unsigned
-XmlRpcServer::acceptConnection()
+unsigned XmlRpcServer::acceptConnection()
 {
   int s = XmlRpcSocket::accept(this->getfd());
   XmlRpcUtil::log(2, "XmlRpcServer::acceptConnection: socket %d", s);
@@ -313,12 +310,12 @@ class ListMethods : public XmlRpcServerMethod
 public:
   ListMethods(XmlRpcServer* s) : XmlRpcServerMethod(LIST_METHODS, s) {}
 
-  void execute(XmlRpcValue&, XmlRpcValue& result)
+  void execute(const XmlRpcValue&, XmlRpcValue& result, XmlRpcServerConnection* /*conn*/) override
   {
     _server->listMethods(result);
   }
 
-  std::string help() { return std::string("List all methods available on a server as an array of strings"); }
+  std::string help() const override { return std::string("List all methods available on a server as an array of strings"); }
 };
 
 
@@ -328,25 +325,24 @@ class MethodHelp : public XmlRpcServerMethod
 public:
   MethodHelp(XmlRpcServer* s) : XmlRpcServerMethod(METHOD_HELP, s) {}
 
-  void execute(XmlRpcValue& params, XmlRpcValue& result)
+  void execute(const XmlRpcValue& params, XmlRpcValue& result, XmlRpcServerConnection* /*conn*/) override
   {
     if (params[0].getType() != XmlRpcValue::TypeString)
       throw XmlRpcException(METHOD_HELP + ": Invalid argument type");
 
-    XmlRpcServerMethod* m = _server->findMethod(params[0]);
+    XmlRpcServerMethod* m = _server->findMethod(params[0].as<std::string>());
     if ( ! m)
       throw XmlRpcException(METHOD_HELP + ": Unknown method name");
 
     result = m->help();
   }
 
-  std::string help() { return std::string("Retrieve the help string for a named method"); }
+  std::string help() const override { return std::string("Retrieve the help string for a named method"); }
 };
 
     
 // Specify whether introspection is enabled or not. Default is enabled.
-void 
-XmlRpcServer::enableIntrospection(bool enabled)
+void XmlRpcServer::enableIntrospection(bool enabled)
 {
   if (_introspectionEnabled == enabled)
     return;
@@ -372,8 +368,7 @@ XmlRpcServer::enableIntrospection(bool enabled)
 }
 
 
-void
-XmlRpcServer::listMethods(XmlRpcValue& result)
+void XmlRpcServer::listMethods(XmlRpcValue& result)
 {
   int i = 0;
   result.setSize(_methods.size()+1);

@@ -30,16 +30,13 @@
 // Advertise a service, then crash horribly and leaving a "zombie service"
 // behind. Needed for service_call_zombie test.
 
+#include <chrono>
 #include <miniros/ros.h>
 #include <test_roscpp/TestStringString.hxx>
 
-#include <stdlib.h>
-#ifdef _WIN32
-# include <windows.h>
-#endif
+#include <thread>
 
-bool srvCallback(test_roscpp::TestStringString::Request &,
-                 test_roscpp::TestStringString::Response &res)
+bool srvCallback(test_roscpp::TestStringString::Request&, test_roscpp::TestStringString::Response& res)
 {
   res.str = "B";
   return true;
@@ -47,23 +44,17 @@ bool srvCallback(test_roscpp::TestStringString::Request &,
 
 int main(int argc, char** argv)
 {
-	miniros::init(argc, argv, "dying_node");
+  miniros::init(argc, argv, "dying_node");
 
-	miniros::NodeHandle nh;
-	miniros::ServiceServer srv = nh.advertiseService("phantom_service", srvCallback);
+  miniros::NodeHandle nh;
+  miniros::ServiceServer srv = nh.advertiseService("phantom_service", srvCallback);
 
-	// Allow for some time for registering on the master
-	for(int i = 0; i < 10; ++i)
-	{
-		miniros::spinOnce();
+  // Allow for some time for registering on the master
+  for (int i = 0; i < 10; ++i) {
+    miniros::spinOnce();
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  }
 
-#ifndef _WIN32
-		usleep(100*1000);
-#else
-		Sleep(100);
-#endif
-	}
-
-	// Exit immediately without calling any atexit hooks
-	_Exit(0);
+  // Exit immediately without calling any atexit hooks
+  _Exit(0);
 }

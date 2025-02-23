@@ -43,20 +43,20 @@
 #include <stdlib.h>
 
 #include <miniros/ros.h>
-#include <miniros/param.h>
+#include "master_fixture.h"
 
-TEST(namespaces, param)
+TEST_F(MasterFixture, param)
 {
   std::string param;
-  ASSERT_TRUE( miniros::param::get( "parent", param ) );
+  ASSERT_TRUE( master->get( "parent", param ) );
   MINIROS_INFO("parent=%s", param.c_str());
   ASSERT_EQ(param, ":ROS_NAMESPACE:parent");
 }
 
-TEST(namespaces, localParam)
+TEST_F(MasterFixture, localParam)
 {
   std::string param;
-  ASSERT_TRUE( miniros::param::get( "~/local", param ) );
+  ASSERT_TRUE( master->get( "~/local", param ) );
   MINIROS_INFO("~/local=%s", param.c_str());
   ASSERT_EQ(param, ":ROS_NAMESPACE:NODE_NAME:local");
 
@@ -67,21 +67,21 @@ TEST(namespaces, localParam)
   ASSERT_STREQ(param2.c_str(), ":ROS_NAMESPACE:NODE_NAME:local");
 }
 
-TEST(namespaces, globalParam)
+TEST_F(MasterFixture, globalParam)
 {
   std::string param;
-  ASSERT_TRUE( miniros::param::get( "/global", param ) );
+  ASSERT_TRUE( master->get( "/global", param ) );
   ASSERT_EQ(param, ":global");
 }
 
-TEST(namespaces, otherNamespaceParam)
+TEST_F(MasterFixture, otherNamespaceParam)
 {
   std::string param;
-  ASSERT_TRUE( miniros::param::get( "/other_namespace/param", param ) );
+  ASSERT_TRUE( master->get( "/other_namespace/param", param ) );
   ASSERT_EQ(param, ":other_namespace:param");
 }
 
-TEST(namespaces, name)
+TEST_F(MasterFixture, name)
 {
   std::string name = miniros::this_node::getName();
   ASSERT_EQ(name, "/ROS_NAMESPACE/NODE_NAME");
@@ -89,8 +89,7 @@ TEST(namespaces, name)
   ASSERT_EQ(nspace, "/ROS_NAMESPACE");
 }
 
-int
-main(int argc, char** argv)
+int main(int argc, char** argv)
 {
   testing::InitGoogleTest(&argc, argv);
   miniros::init( argc, argv, "namespaces" );

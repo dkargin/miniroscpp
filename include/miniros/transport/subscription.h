@@ -33,7 +33,7 @@
 #include "miniros/header.h"
 #include "miniros/internal/forwards.h"
 #include "miniros/transport/transport_hints.h"
-#include "miniros/transport/xmlrpc_manager.h"
+#include "miniros/transport/rpc_manager.h"
 #include "miniros/transport/statistics.h"
 #include "xmlrpcpp/XmlRpc.h"
 

@@ -35,7 +35,7 @@ public:
 
   virtual ~Hello() {}
 
-  void execute(XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result);
+  void execute(const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result, XmlRpc::XmlRpcServerConnection*) override;
 
   std::mutex hello_mutex;
 };

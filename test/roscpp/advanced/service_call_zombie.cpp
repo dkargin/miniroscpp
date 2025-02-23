@@ -36,11 +36,9 @@
 #include <gtest/gtest.h>
 
 #include "miniros/ros.h"
-#include "miniros/time.h"
 #include "miniros/service.h"
-#include "miniros/connection.h"
 #include "miniros/service_client.h"
-#include <test_roscpp/TestStringString.h>
+#include <test_roscpp/TestStringString.hxx>
 
 #include <stdio.h>
 
@@ -57,8 +55,7 @@ TEST(SrvCall, callPhantomService)
   }
 }
 
-int
-main(int argc, char** argv)
+int main(int argc, char** argv)
 {
   testing::InitGoogleTest(&argc, argv);
 

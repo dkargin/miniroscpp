@@ -205,6 +205,11 @@ MINIROS_DECL std::string getROSArg(int argc, const char* const* argv, const std:
  */
 MINIROS_DECL void removeROSArgs(int argc, const char* const* argv, V_string& args_out);
 
+/**
+ * \brief Get pointer to MasterLink
+ */
+MINIROS_DECL MasterLinkPtr getMasterLink();
+
 }
 
 #endif

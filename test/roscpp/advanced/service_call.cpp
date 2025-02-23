@@ -39,10 +39,10 @@
 
 #include "miniros/ros.h"
 #include "miniros/service.h"
-#include "miniros/connection.h"
+#include "miniros/transport/connection.h"
 #include "miniros/service_client.h"
-#include <test_roscpp/TestStringString.h>
-#include <test_roscpp/BadTestStringString.h>
+#include <test_roscpp/TestStringString.hxx>
+#include <test_roscpp/BadTestStringString.hxx>
 
 TEST(SrvCall, callSrv)
 {

@@ -40,7 +40,9 @@
 
 #include "miniros/ros.h"
 
-#include "xmlrpcpp/XmlRpc.h"
+#include "miniros/master_link.h"
+
+#include <miniros/transport/topic_manager.h>
 
 using namespace XmlRpc;
 
@@ -62,7 +64,9 @@ int setenv(const char *name, const char *value, int overwrite)
 
 TEST(CheckMaster, checkMaster)
 {
-  ASSERT_EQ(miniros::master::check(), g_should_exist);
+  miniros::MasterLink master_link;
+
+  ASSERT_EQ(master_link.check(), g_should_exist);
 }
 
 int main(int argc, char** argv)

@@ -36,7 +36,7 @@
 
 #include <gtest/gtest.h>
 #include "miniros/ros.h"
-#include "test_roscpp/TestStringString.h"
+#include "test_roscpp/TestStringString.hxx"
 
 #include <vector>
 
@@ -82,12 +82,23 @@ TEST(ServiceCallbackTypes, compile)
   std::vector<miniros::ServiceServer> srvs;
   srvs.push_back(n.advertiseService("add_two_ints", add));
   srvs.push_back(n.advertiseService("add_two_ints2", add2));
-  srvs.push_back(n.advertiseService<miniros::ServiceEvent<test_roscpp::TestStringString::Request, test_roscpp::TestStringString::Response> >("add_two_ints3", boost::bind(add3, boost::placeholders::_1, std::string("blah"))));
+  //srvs.push_back(n.advertiseService<miniros::ServiceEvent<test_roscpp::TestStringString::Request, test_roscpp::TestStringString::Response> >("add_two_ints3", boost::bind(add3, boost::placeholders::_1, std::string("blah"))));
+  srvs.push_back(n.advertiseService<miniros::ServiceEvent<test_roscpp::TestStringString::Request, test_roscpp::TestStringString::Response> >("add_two_ints3",
+    [](miniros::ServiceEvent<test_roscpp::TestStringString::Request, test_roscpp::TestStringString::Response>& r) {
+      return add3(r, std::string("blah"));
+    }));
 
+
+  // TODO: Probably this signature is no different from previous test. And since boost::bind is not used, both of them
+  // use trivial lambda for a call.
   A a;
   srvs.push_back(n.advertiseService("add_two_ints10", &A::add, &a));
   srvs.push_back(n.advertiseService("add_two_ints11", &A::add2, &a));
-  srvs.push_back(n.advertiseService<miniros::ServiceEvent<test_roscpp::TestStringString::Request, test_roscpp::TestStringString::Response> >("add_two_ints12", boost::bind(&A::add3, &a, boost::placeholders::_1, std::string("blah"))));
+  //srvs.push_back(n.advertiseService<miniros::ServiceEvent<test_roscpp::TestStringString::Request, test_roscpp::TestStringString::Response> >("add_two_ints12", boost::bind(&A::add3, &a, boost::placeholders::_1, std::string("blah"))));
+  srvs.push_back(n.advertiseService<miniros::ServiceEvent<test_roscpp::TestStringString::Request, test_roscpp::TestStringString::Response> >("add_two_ints12",
+    [&a](miniros::ServiceEvent<test_roscpp::TestStringString::Request, test_roscpp::TestStringString::Response>& r) {
+      return a.add3(r, std::string("blah"));
+    }));
 }
 
 int main(int argc, char **argv)

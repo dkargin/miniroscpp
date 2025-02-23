@@ -52,6 +52,12 @@ namespace XmlRpc {
   std::string XmlRpcValue::_doubleFormat("%.16g");
 
 
+  XmlRpcValue XmlRpcValue::Array(int size)
+  {
+    XmlRpcValue value;
+    value.setSize(size);
+    return value;
+  }
 
   // Clean up
   void XmlRpcValue::invalidate()
@@ -85,6 +91,12 @@ namespace XmlRpc {
       }
     }
     else if (_type != t)
+      throw XmlRpcException("type error");
+  }
+
+  void XmlRpcValue::assertType(Type t) const
+  {
+    if (_type != t)
       throw XmlRpcException("type error");
   }
 

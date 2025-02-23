@@ -1,15 +1,20 @@
+#include <cassert>
+#include <cstring>
+#include <cstdlib>
+
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
 #include "xmlrpcpp/XmlRpcServerConnection.h"
 
-#include "xmlrpcpp/XmlRpcSocket.h"
 #include "xmlrpcpp/XmlRpc.h"
+#include "xmlrpcpp/XmlRpcSocket.h"
+
 #ifndef MAKEDEPEND
 # include <stdio.h>
-# include <stdlib.h>
 #ifndef _WINDOWS
-	# include <strings.h>
+# include <strings.h>
 #endif
-# include <string.h>
 #endif
 
 using namespace XmlRpc;
@@ -28,33 +33,95 @@ const char XmlRpcServerConnection::PARAMS[] = "params";
 const char XmlRpcServerConnection::FAULTCODE[] = "faultCode";
 const char XmlRpcServerConnection::FAULTSTRING[] = "faultString";
 
+NetAddress::~NetAddress()
+{
+  reset();
+}
 
+void NetAddress::reset()
+{
+  if (rawAddress) {
+    free(rawAddress);
+    rawAddress = nullptr;
+  }
+  address = "";
+  port = 0;
+  type = Type::AddressInvalid;
+}
+
+/// Fills in local address from socket.
+bool readLocalAddressv4(int sockfd, NetAddress& address)
+{
+  sockaddr_in my_addr;
+  // Get my ip address and port
+  memset(&my_addr, 0, sizeof(my_addr));
+  socklen_t len = sizeof(my_addr);
+  if (getsockname(sockfd, (sockaddr*) &my_addr, &len) != 0)
+    return false;
+
+  char ipBuffer[255];
+  if (!inet_ntop(AF_INET, &my_addr.sin_addr, ipBuffer, sizeof(ipBuffer)))
+    return false;
+  address.address = ipBuffer;
+  address.port = ntohs(my_addr.sin_port);
+  address.type = NetAddress::AddressIPv4;
+  sockaddr_in* outAddr = static_cast<sockaddr_in*>(malloc(sizeof(sockaddr_in)));
+  address.rawAddress = outAddr;
+  memcpy(outAddr, &my_addr, sizeof(sockaddr_in));
+  return true;
+}
+
+/// Fills in remote address from socket.
+bool readRemoteAddressv4(int sockfd, NetAddress& address)
+{
+  sockaddr_in my_addr;
+  // Get my ip address and port
+  memset(&my_addr, 0, sizeof(my_addr));
+  socklen_t len = sizeof(my_addr);
+  if (getpeername(sockfd, (sockaddr*) &my_addr, &len) != 0)
+    return false;
+
+  char ipBuffer[255];
+  if (!inet_ntop(AF_INET, &my_addr.sin_addr, ipBuffer, sizeof(ipBuffer)))
+    return false;
+  address.address = ipBuffer;
+  address.port = ntohs(my_addr.sin_port);
+  address.type = NetAddress::AddressIPv4;
+  sockaddr_in* outAddr = static_cast<sockaddr_in*>(malloc(sizeof(sockaddr_in)));
+  address.rawAddress = outAddr;
+  memcpy(outAddr, &my_addr, sizeof(sockaddr_in));
+  return true;
+}
 
 // The server delegates handling client requests to a serverConnection object.
 XmlRpcServerConnection::XmlRpcServerConnection(int fd, XmlRpcServer* server, bool deleteOnClose /*= false*/) :
   XmlRpcSource(fd, deleteOnClose)
 {
-  XmlRpcUtil::log(2,"XmlRpcServerConnection: new socket %d.", fd);
   _server = server;
   _connectionState = READ_HEADER;
-  _contentLength = 0;
   _bytesWritten = 0;
   _keepAlive = true;
+  if (fd) {
+    readRemoteAddressv4(fd, _netAddress);
+  }
+
+  if (_netAddress.valid())
+    XmlRpcUtil::log(2,"XmlRpcServerConnection: new socket %d from %s:%d", fd, _netAddress.address.c_str(), _netAddress.port);
+  else
+    XmlRpcUtil::log(2,"XmlRpcServerConnection: new socket %d from unknown endpoint", fd);
 }
 
 
 XmlRpcServerConnection::~XmlRpcServerConnection()
 {
-  XmlRpcUtil::log(4,"XmlRpcServerConnection dtor.");
+  XmlRpcUtil::log(2,"XmlRpcServerConnection(%d) dtor.", _fd);
   _server->removeConnection(this);
 }
-
 
 // Handle input on the server socket by accepting the connection
 // and reading the rpc request. Return true to continue to monitor
 // the socket for events, false to remove it from the dispatcher.
-unsigned
-XmlRpcServerConnection::handleEvent(unsigned /*eventType*/)
+unsigned XmlRpcServerConnection::handleEvent(unsigned /*eventType*/)
 {
   if (_connectionState == READ_HEADER)
     if ( ! readHeader()) return 0;
@@ -69,44 +136,111 @@ XmlRpcServerConnection::handleEvent(unsigned /*eventType*/)
         ? XmlRpcDispatch::WritableEvent : XmlRpcDispatch::ReadableEvent;
 }
 
+void HttpFrame::reset()
+{
+  header = "";
+  request = "";
+  fields.clear();
+  requestType = {};
+  requestUrl = {};
+  requestHttpVersion = {};
+}
 
-bool
-XmlRpcServerConnection::readHeader()
+bool XmlRpcServerConnection::readHeader()
 {
   // Read available data
   bool eof;
-  if ( ! XmlRpcSocket::nbRead(this->getfd(), _header, &eof)) {
+  if ( ! XmlRpcSocket::nbRead(this->getfd(), _httpFrame.header, &eof)) {
     // Its only an error if we already have read some data
-    if (_header.length() > 0)
-      XmlRpcUtil::error("XmlRpcServerConnection::readHeader: error while reading header (%s).",XmlRpcSocket::getErrorMsg().c_str());
+    if (_httpFrame.header.length() > 0)
+      XmlRpcUtil::error("XmlRpcServerConnection(%d)::readHeader: error while reading header (%s).", _fd, XmlRpcSocket::getErrorMsg().c_str());
     return false;
   }
 
-  XmlRpcUtil::log(4, "XmlRpcServerConnection::readHeader: read %d bytes.", _header.length());
-  char *hp = (char*)_header.c_str();  // Start of header
-  char *ep = hp + _header.length();   // End of string
-  char *bp = 0;                       // Start of body
-  char *lp = 0;                       // Start of content-length value
-  char *kp = 0;                       // Start of connection value
+  XmlRpcUtil::log(4, "XmlRpcServerConnection(%d)::readHeader: read %d bytes.", _fd, _httpFrame.header.length());
+  const char *hp = _httpFrame.header.c_str();  // Start of header
+  const char *ep = hp + _httpFrame.header.length();   // End of string
+  const char *bp = nullptr;                 // Start of body
+  const char *lp = nullptr;                 // Start of content-length value
+  const char *kp = nullptr;                 // Start of connection value
 
-  for (char *cp = hp; (bp == 0) && (cp < ep); ++cp) {
-	if ((ep - cp > 16) && (strncasecmp(cp, "Content-length: ", 16) == 0))
-	  lp = cp + 16;
-	else if ((ep - cp > 12) && (strncasecmp(cp, "Connection: ", 12) == 0))
-	  kp = cp + 12;
-	else if ((ep - cp > 4) && (strncmp(cp, "\r\n\r\n", 4) == 0))
-	  bp = cp + 4;
-	else if ((ep - cp > 2) && (strncmp(cp, "\n\n", 2) == 0))
-	  bp = cp + 2;
+  HttpFrame::ParserState state = HttpFrame::ParseRequest;
+  std::string_view fieldName;
+  std::string_view fieldValue;
+
+  const char* tokenStart = hp;
+
+  for (const char *cp = hp; (bp == 0) && (cp < ep);) {
+    if (state == HttpFrame::ParseRequest) {
+      if (strncmp(cp, "\r\n", 2) == 0) {
+        _httpFrame.requestHttpVersion = std::string_view(tokenStart, cp - tokenStart);
+        cp += 2;
+        tokenStart = cp;
+        state = HttpFrame::ParseFieldName;
+        continue;
+      } if (_httpFrame.requestType.empty() && *cp == ' ') {
+        _httpFrame.requestType = std::string_view(tokenStart, cp - tokenStart);
+        tokenStart = cp + 1;
+      } else if (_httpFrame.requestUrl.empty() && *cp == ' ') {
+        _httpFrame.requestUrl = std::string_view(tokenStart, cp - tokenStart);
+        tokenStart = cp + 1;
+      } else {
+        // Error?
+      }
+    }
+    else if (state == HttpFrame::ParseFieldName) {
+      assert(tokenStart != nullptr);
+      if (tokenStart == cp) {
+        if (strncasecmp(cp, "Content-length: ", 16) == 0) {
+          lp = cp + 16;
+        } else if (strncasecmp(cp, "Connection: ", 12) == 0) {
+          kp = cp + 12;
+        }
+
+        if ((ep - cp > 4) && (strncmp(cp, "\r\n\r\n", 4) == 0))
+          bp = cp + 4;
+        else if ((ep - cp > 2) && (strncmp(cp, "\n\n", 2) == 0))
+          bp = cp + 2;
+      }
+
+      if (*cp == ':') {
+        state = HttpFrame::ParseFieldValue;
+        fieldName = std::string_view(tokenStart, cp - tokenStart);
+        cp++;
+        tokenStart = cp;
+        continue;
+      }
+
+      if (strncmp(cp, "\n\n", 2) == 0 || strncmp(cp, "\r\n", 2) == 0) {
+        state = HttpFrame::ParseBody;
+        cp += 2;
+        tokenStart = cp;
+        bp = cp;
+        continue;
+      }
+    } else if (state == HttpFrame::ParseFieldValue) {
+      assert(tokenStart != nullptr);
+      if (strncmp(cp, "\r\n", 2) == 0) {
+        fieldValue = std::string_view(tokenStart, cp - tokenStart);
+        _httpFrame.fields.push_back({fieldName, fieldValue});
+        cp += 2;
+        tokenStart = cp;
+        state = HttpFrame::ParseFieldName;
+        continue;
+      }
+    } else
+      break;
+    cp++;
   }
 
   // If we haven't gotten the entire header yet, return (keep reading)
-  if (bp == 0) {
-    // EOF in the middle of a request is an error, otherwise its ok
+  if (!bp) {
+    // EOF in the middle of a request is an error, otherwise it is ok
     if (eof) {
-      XmlRpcUtil::log(4, "XmlRpcServerConnection::readHeader: EOF");
-      if (_header.length() > 0)
-        XmlRpcUtil::error("XmlRpcServerConnection::readHeader: EOF while reading header");
+      if (_httpFrame.header.length() > 0)
+        XmlRpcUtil::error("XmlRpcServerConnection(%d)::readHeader: EOF while reading header", _fd);
+      else
+        XmlRpcUtil::log(4, "XmlRpcServerConnection(%d)::readHeader: EOF", _fd);
       return false;   // Either way we close the connection
     }
     
@@ -114,54 +248,53 @@ XmlRpcServerConnection::readHeader()
   }
 
   // Decode content length
-  if (lp == 0) {
-    XmlRpcUtil::error("XmlRpcServerConnection::readHeader: No Content-length specified");
+  if (!lp) {
+    XmlRpcUtil::error("XmlRpcServerConnection(%d)::readHeader: No Content-length specified", _fd);
     return false;   // We could try to figure it out by parsing as we read, but for now...
   }
 
-  _contentLength = atoi(lp);
-  if (_contentLength <= 0) {
-    XmlRpcUtil::error("XmlRpcServerConnection::readHeader: Invalid Content-length specified (%d).", _contentLength);
+  _httpFrame.contentLength = atoi(lp);
+  if (_httpFrame.contentLength <= 0) {
+    XmlRpcUtil::error("XmlRpcServerConnection(%d)::readHeader: Invalid Content-length specified (%d).", _fd, _httpFrame.contentLength);
     return false;
   }
-  	
-  XmlRpcUtil::log(3, "XmlRpcServerConnection::readHeader: specified content length is %d.", _contentLength);
 
   // Otherwise copy non-header data to request buffer and set state to read request.
-  _request = bp;
+  _httpFrame.request = bp;
 
   // Parse out any interesting bits from the header (HTTP version, connection)
   _keepAlive = true;
-  if (_header.find("HTTP/1.0") != std::string::npos) {
+  if (_httpFrame.header.find("HTTP/1.0") != std::string::npos) {
     if (kp == 0 || strncasecmp(kp, "keep-alive", 10) != 0)
       _keepAlive = false;           // Default for HTTP 1.0 is to close the connection
   } else {
     if (kp != 0 && strncasecmp(kp, "close", 5) == 0)
       _keepAlive = false;
   }
-  XmlRpcUtil::log(3, "KeepAlive: %d", _keepAlive);
 
+  XmlRpcUtil::log(3, "XmlRpcServerConnection(%d)::readHeader: ContentLength=%d, KeepAlive=%d", _fd, _httpFrame.contentLength, _keepAlive);
 
-  _header = ""; 
   _connectionState = READ_REQUEST;
   return true;    // Continue monitoring this source
 }
 
-bool
-XmlRpcServerConnection::readRequest()
+bool XmlRpcServerConnection::readRequest()
 {
   // If we dont have the entire request yet, read available data
-  if (int(_request.length()) < _contentLength) {
+  const int requestLength = static_cast<int>(_httpFrame.request.length());
+  if (requestLength < _httpFrame.contentLength) {
     bool eof;
-    if ( ! XmlRpcSocket::nbRead(this->getfd(), _request, &eof)) {
-      XmlRpcUtil::error("XmlRpcServerConnection::readRequest: read error (%s).",XmlRpcSocket::getErrorMsg().c_str());
+    if ( ! XmlRpcSocket::nbRead(this->getfd(), _httpFrame.request, &eof)) {
+      XmlRpcUtil::error("XmlRpcServerConnection(%d)::readRequest: read error (%s).", _fd, XmlRpcSocket::getErrorMsg().c_str());
+      _httpFrame.reset();
       return false;
     }
 
     // If we haven't gotten the entire request yet, return (keep reading)
-    if (int(_request.length()) < _contentLength) {
+    if (requestLength < _httpFrame.contentLength) {
       if (eof) {
-        XmlRpcUtil::error("XmlRpcServerConnection::readRequest: EOF while reading request");
+        XmlRpcUtil::error("XmlRpcServerConnection(%d)::readRequest: EOF while reading request", _fd);
+        _httpFrame.reset();
         return false;   // Either way we close the connection
       }
       return true;
@@ -169,8 +302,7 @@ XmlRpcServerConnection::readRequest()
   }
 
   // Otherwise, parse and dispatch the request
-  XmlRpcUtil::log(3, "XmlRpcServerConnection::readRequest read %d bytes.", _request.length());
-  //XmlRpcUtil::log(5, "XmlRpcServerConnection::readRequest:\n%s\n", _request.c_str());
+  XmlRpcUtil::log(3, "XmlRpcServerConnection(%d)::readRequest read %d bytes.", _fd, _httpFrame.request.length());
 
   _connectionState = WRITE_RESPONSE;
 
@@ -178,29 +310,28 @@ XmlRpcServerConnection::readRequest()
 }
 
 
-bool
-XmlRpcServerConnection::writeResponse()
+bool XmlRpcServerConnection::writeResponse()
 {
   if (_response.length() == 0) {
     executeRequest();
     _bytesWritten = 0;
+
     if (_response.length() == 0) {
-      XmlRpcUtil::error("XmlRpcServerConnection::writeResponse: empty response.");
+      XmlRpcUtil::error("XmlRpcServerConnection(%d)::writeResponse: empty response.", _fd);
       return false;
     }
   }
 
   // Try to write the response
   if ( ! XmlRpcSocket::nbWrite(this->getfd(), _response, &_bytesWritten)) {
-    XmlRpcUtil::error("XmlRpcServerConnection::writeResponse: write error (%s).",XmlRpcSocket::getErrorMsg().c_str());
+    XmlRpcUtil::error("XmlRpcServerConnection(%d)::writeResponse: write error (%s).", _fd, XmlRpcSocket::getErrorMsg().c_str());
     return false;
   }
-  XmlRpcUtil::log(3, "XmlRpcServerConnection::writeResponse: wrote %d of %d bytes.", _bytesWritten, _response.length());
+  XmlRpcUtil::log(3, "XmlRpcServerConnection(%d)::writeResponse: wrote %d of %d bytes.", _fd, _bytesWritten, _response.length());
 
   // Prepare to read the next request
-  if (_bytesWritten == int(_response.length())) {
-    _header = "";
-    _request = "";
+  if (_bytesWritten == static_cast<int>(_response.length())) {
+    _httpFrame.reset();
     _response = "";
     _connectionState = READ_HEADER;
   }
@@ -214,7 +345,7 @@ XmlRpcServerConnection::executeRequest()
 {
   XmlRpcValue params, resultValue;
   std::string methodName = parseRequest(params);
-  XmlRpcUtil::log(2, "XmlRpcServerConnection::executeRequest: server calling method '%s'", 
+  XmlRpcUtil::log(2, "XmlRpcServerConnection(%d)::executeRequest: server calling method '%s'", _fd,
                     methodName.c_str());
 
   try {
@@ -226,7 +357,7 @@ XmlRpcServerConnection::executeRequest()
       generateResponse(resultValue.toXml());
 
   } catch (const XmlRpcException& fault) {
-    XmlRpcUtil::log(2, "XmlRpcServerConnection::executeRequest: fault %s.",
+    XmlRpcUtil::log(2, "XmlRpcServerConnection(%d)::executeRequest(%d): fault %s.", _fd,
                     fault.getMessage().c_str()); 
     generateFaultResponse(fault.getMessage(), fault.getCode());
   }
@@ -238,17 +369,18 @@ XmlRpcServerConnection::parseRequest(XmlRpcValue& params)
 {
   int offset = 0;   // Number of chars parsed from the request
 
-  std::string methodName = XmlRpcUtil::parseTag(METHODNAME_TAG, _request, &offset);
+  const auto& request = _httpFrame.request;
+  std::string methodName = XmlRpcUtil::parseTag(METHODNAME_TAG, request, &offset);
 
-  if (methodName.size() > 0 && XmlRpcUtil::findTag(PARAMS_TAG, _request, &offset))
+  if (methodName.size() > 0 && XmlRpcUtil::findTag(PARAMS_TAG, request, &offset))
   {
     int nArgs = 0;
-    while (XmlRpcUtil::nextTagIs(PARAM_TAG, _request, &offset)) {
-      params[nArgs++] = XmlRpcValue(_request, &offset);
-      (void) XmlRpcUtil::nextTagIs(PARAM_ETAG, _request, &offset);
+    while (XmlRpcUtil::nextTagIs(PARAM_TAG, request, &offset)) {
+      params[nArgs++] = XmlRpcValue(request, &offset);
+      (void) XmlRpcUtil::nextTagIs(PARAM_ETAG, request, &offset);
     }
 
-    (void) XmlRpcUtil::nextTagIs(PARAMS_ETAG, _request, &offset);
+    (void) XmlRpcUtil::nextTagIs(PARAMS_ETAG, request, &offset);
   }
 
   return methodName;
@@ -263,7 +395,7 @@ XmlRpcServerConnection::executeMethod(const std::string& methodName,
 
   if ( ! method) return false;
 
-  method->execute(params, result);
+  method->execute(params, result, this);
 
   // Ensure a valid result value
   if ( ! result.valid())
@@ -335,7 +467,7 @@ XmlRpcServerConnection::generateResponse(std::string const& resultXml)
   std::string header = generateHeader(body);
 
   _response = header + body;
-  XmlRpcUtil::log(5, "XmlRpcServerConnection::generateResponse:\n%s\n", _response.c_str()); 
+  XmlRpcUtil::log(5, "XmlRpcServerConnection(%d)::generateResponse:\n%s\n", _fd, _response.c_str());
 }
 
 // Prepend http headers

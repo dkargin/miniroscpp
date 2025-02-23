@@ -184,7 +184,7 @@ void Subscription::addLocalConnection(const PublicationPtr& pub)
 
   MINIROS_DEBUG("Creating intraprocess link for topic [%s]", name_.c_str());
 
-  IntraProcessPublisherLinkPtr pub_link(std::make_shared<IntraProcessPublisherLink>(shared_from_this(), XMLRPCManager::instance()->getServerURI(), transport_hints_));
+  IntraProcessPublisherLinkPtr pub_link(std::make_shared<IntraProcessPublisherLink>(shared_from_this(), RPCManager::instance()->getServerURI(), transport_hints_));
   IntraProcessSubscriberLinkPtr sub_link(std::make_shared<IntraProcessSubscriberLink>(pub));
   pub_link->setPublisher(sub_link);
   sub_link->setSubscriber(pub_link);
@@ -309,7 +309,7 @@ bool Subscription::pubUpdate(const V_string& new_pubs)
   for (V_PublisherLink::iterator i = subtractions.begin(); i != subtractions.end(); ++i)
   {
 	const PublisherLinkPtr& link = *i;
-    if (link->getPublisherXMLRPCURI() != XMLRPCManager::instance()->getServerURI())
+    if (link->getPublisherXMLRPCURI() != RPCManager::instance()->getServerURI())
     {
       MINIROS_DEBUG("Disconnecting from publisher [%s] of topic [%s] at [%s]",
                         link->getCallerID().c_str(), name_.c_str(), link->getPublisherXMLRPCURI().c_str());
@@ -325,13 +325,13 @@ bool Subscription::pubUpdate(const V_string& new_pubs)
             i != additions.end(); ++i)
   {
     // this function should never negotiate a self-subscription
-    if (XMLRPCManager::instance()->getServerURI() != *i)
+    if (RPCManager::instance()->getServerURI() != *i)
     {
       retval &= negotiateConnection(*i);
     }
     else
     {
-      MINIROS_DEBUG("Skipping myself (%s, %s)", name_.c_str(), XMLRPCManager::instance()->getServerURI().c_str());
+      MINIROS_DEBUG("Skipping myself (%s, %s)", name_.c_str(), RPCManager::instance()->getServerURI().c_str());
     }
   }
 
@@ -423,7 +423,7 @@ bool Subscription::negotiateConnection(const std::string& xmlrpc_uri)
   // destruction.
   PendingConnectionPtr conn(std::make_shared<PendingConnection>(c, udp_transport, shared_from_this(), xmlrpc_uri));
 
-  XMLRPCManager::instance()->addASyncConnection(conn);
+  RPCManager::instance()->addASyncConnection(conn);
   // Put this connection on the list that we'll look at later.
   {
     std::scoped_lock<std::mutex> pending_connections_lock(pending_connections_mutex_);
@@ -464,7 +464,7 @@ void Subscription::pendingConnectionDone(const PendingConnectionPtr& conn, XmlRp
   udp_transport = conn->getUDPTransport();
 
   XmlRpc::XmlRpcValue proto;
-  if(!XMLRPCManager::instance()->validateXmlrpcResponse("requestTopic", result, proto))
+  if(!RPCManager::instance()->validateXmlrpcResponse("requestTopic", result, proto))
   {
   	MINIROS_DEBUG("Failed to contact publisher [%s:%d] for topic [%s]",
               peer_host.c_str(), peer_port, name_.c_str());

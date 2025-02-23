@@ -34,6 +34,7 @@
  */
 
 #include <string>
+#include <memory>
 
 #include <gtest/gtest.h>
 
@@ -58,7 +59,7 @@ struct Msg
 };
 typedef std::shared_ptr<Msg const> MsgConstPtr;
 
-namespace ros
+namespace miniros
 {
 namespace message_traits
 {
@@ -125,7 +126,7 @@ struct Msg2
 };
 typedef std::shared_ptr<Msg2 const> Msg2ConstPtr;
 
-namespace ros
+namespace miniros
 {
 namespace message_traits
 {
@@ -259,7 +260,7 @@ TEST(IntraprocessSubscriptions, noCopyAndDifferentRTTI)
   miniros::Subscriber sub2 = nh.subscribe("test", 0, messageCallback2);
   miniros::Publisher pub = nh.advertise<Msg2>("test", 0);
 
-  Msg2ConstPtr msg(boost::make_shared<Msg2>());
+  Msg2ConstPtr msg(std::make_shared<Msg2>());
 
   while (pub.getNumSubscribers() == 0)
   {
