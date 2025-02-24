@@ -70,7 +70,7 @@ TEST_P(Base64Test, Decode) {
   EXPECT_EQ(expected, out);
 }
 
-INSTANTIATE_TEST_CASE_P(MultilineTest, Base64Test, ::testing::Values(
+INSTANTIATE_TEST_SUITE_P(MultilineTest, Base64Test, ::testing::Values(
         Base64TestData({0}, "AA==\n"),
         Base64TestData({1, 2}, "AQI=\n"),
         Base64TestData({1, 2, 3}, "AQID\n"),
@@ -133,7 +133,7 @@ TEST_P(Base64ErrorTest, DecodeErrors) {
   // FIXME(future work): decode does not report error on garbage input
 }
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     Multiline,
     Base64ErrorTest,
     ::testing::Values(// Tests on incomplete data.
