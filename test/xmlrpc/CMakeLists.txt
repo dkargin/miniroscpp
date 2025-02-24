@@ -2,10 +2,10 @@ include_directories(${MINIROS_INCLUDE_ROOT})
 include_directories(${MINIROS_XMLRPCPP_B64_INCLUDE_DIR})
 
 miniros_add_test(xmlrpcvalue_base64 xmlrpcvalue_base64.cpp)
-target_link_libraries(xmlrpcvalue_base64 xmlrpcpp)
+target_link_libraries(xmlrpcvalue_base64 roscxx)
 
 miniros_add_test(test_base64 test_base64.cpp)
-target_link_libraries(test_base64 xmlrpcpp)
+target_link_libraries(test_base64 roscxx)
 
 if(WIN32)
   # On Windows, gtest can be built as shared (dll) or static (lib),
@@ -16,17 +16,17 @@ if(WIN32)
 endif()
 
 add_library(test_fixtures STATIC test_fixtures.cpp)
-target_link_libraries(test_fixtures xmlrpcpp roscxx ${GTEST_LIBRARIES})
+target_link_libraries(test_fixtures roscxx ${GTEST_LIBRARIES})
 set_target_properties(test_fixtures PROPERTIES EXCLUDE_FROM_ALL TRUE)
 
 miniros_add_test(HelloTest HelloTest.cpp)
-target_link_libraries(HelloTest xmlrpcpp)
+target_link_libraries(HelloTest roscxx)
 
 miniros_add_test(test_dispatch_live test_dispatch_live.cpp)
-target_link_libraries(test_dispatch_live xmlrpcpp test_fixtures)
+target_link_libraries(test_dispatch_live roscxx test_fixtures)
 
 miniros_add_test(test_ulimit test_ulimit.cpp)
-target_link_libraries(test_ulimit xmlrpcpp test_fixtures)
+target_link_libraries(test_ulimit roscxx test_fixtures)
 
 add_library(mock_socket STATIC mock_socket.cpp)
 target_link_libraries(mock_socket ${GTEST_LIBRARIES})
@@ -35,13 +35,13 @@ set_target_properties(mock_socket PROPERTIES EXCLUDE_FROM_ALL TRUE)
 # Some tests rely on replacing system calls (like write/read) by a mock versions.
 # But we must include actual sources to make this replacement happen.
 miniros_add_test(test_client test_client.cpp
-  ${XMLRPCPP_SRC_ROOT}/src/XmlRpcClient.cpp
-  ${XMLRPCPP_SRC_ROOT}/src/XmlRpcValue.cpp
-  ${XMLRPCPP_SRC_ROOT}/src/XmlRpcUtil.cpp
-  ${XMLRPCPP_SRC_ROOT}/src/XmlRpcDispatch.cpp
-  ${XMLRPCPP_SRC_ROOT}/src/XmlRpcSource.cpp
-  ${XMLRPCPP_SRC_ROOT}/libb64/src/cdecode.c
-  ${XMLRPCPP_SRC_ROOT}/libb64/src/cencode.c)
+  ${XMLRPC_SRC_ROOT}/XmlRpcClient.cpp
+  ${XMLRPC_SRC_ROOT}/XmlRpcValue.cpp
+  ${XMLRPC_SRC_ROOT}/XmlRpcUtil.cpp
+  ${XMLRPC_SRC_ROOT}/XmlRpcDispatch.cpp
+  ${XMLRPC_SRC_ROOT}/XmlRpcSource.cpp
+  ${XMLRPC_SRC_ROOT}/cdecode.c
+  ${XMLRPC_SRC_ROOT}/cencode.c)
 
 target_link_libraries(test_client mock_socket)
 if(WIN32)
@@ -54,11 +54,11 @@ if(WIN32)
 endif()
 
 miniros_add_test(test_dispatch test_dispatch.cpp
-  ${XMLRPCPP_SRC_ROOT}/src/XmlRpcDispatch.cpp
-  ${XMLRPCPP_SRC_ROOT}/src/XmlRpcSource.cpp
-  ${XMLRPCPP_SRC_ROOT}/src/XmlRpcUtil.cpp
-  ${XMLRPCPP_SRC_ROOT}/libb64/src/cdecode.c
-  ${XMLRPCPP_SRC_ROOT}/libb64/src/cencode.c)
+  ${XMLRPC_SRC_ROOT}/XmlRpcDispatch.cpp
+  ${XMLRPC_SRC_ROOT}/XmlRpcSource.cpp
+  ${XMLRPC_SRC_ROOT}/XmlRpcUtil.cpp
+  ${XMLRPC_SRC_ROOT}/cdecode.c
+  ${XMLRPC_SRC_ROOT}/cencode.c)
 
 if(WIN32)
   # build everything from source, undefine MINIROS_BUILD_SHARED_LIBS to eliminate the dllimport/dllexport attributes
@@ -79,8 +79,8 @@ endif()
 
 if(NOT WIN32)
   add_executable(test_socket test_socket.cpp test_system_mocks.c
-    ${XMLRPCPP_SRC_ROOT}/src/XmlRpcSocket.cpp
-    ${XMLRPCPP_SRC_ROOT}/src/XmlRpcUtil.cpp
+    ${XMLRPC_SRC_ROOT}/XmlRpcSocket.cpp
+    ${XMLRPC_SRC_ROOT}/XmlRpcUtil.cpp
   )
 
   if(APPLE)
@@ -100,10 +100,10 @@ if(NOT WIN32)
 endif()
 
 miniros_add_test(TestValues TestValues.cpp)
-target_link_libraries(TestValues xmlrpcpp)
+target_link_libraries(TestValues roscxx)
 
 miniros_add_test(test_util test_util.cpp)
-target_link_libraries(test_util xmlrpcpp)
+target_link_libraries(test_util roscxx)
 
 miniros_add_test(TestXml TestXml.cpp)
-target_link_libraries(TestXml xmlrpcpp)
+target_link_libraries(TestXml roscxx)

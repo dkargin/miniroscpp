@@ -3,13 +3,11 @@
 #include "xmlrpcpp/XmlRpcException.h"
 #include "xmlrpcpp/XmlRpcUtil.h"
 
-#include <b64/encode.h>
-#include <b64/decode.h>
+#include "b64/encode.h"
+#include "b64/decode.h"
 
 #ifndef MAKEDEPEND
-# include <iostream>
 # include <ostream>
-# include <stdlib.h>
 # include <stdio.h>
 #endif
 
@@ -496,7 +494,7 @@ namespace XmlRpc {
     // might reserve too much, we'll shrink later
     _value.asBinary = new BinaryData(base64DecodedSize(encoded_size), '\0');
 
-    base64::decoder decoder;
+    base64::Decoder decoder;
     std::size_t size = decoder.decode(&valueXml[*offset], encoded_size, &(*_value.asBinary)[0]);
     _value.asBinary->resize(size);
 
@@ -514,7 +512,7 @@ namespace XmlRpc {
     // might reserve too much, we'll shrink later
     xml.resize(xml.size() + base64EncodedSize(_value.asBinary->size()));
 
-    base64::encoder encoder;
+    base64::Encoder encoder;
     offset += encoder.encode(_value.asBinary->data(), _value.asBinary->size(), &xml[offset]);
     offset += encoder.encode_end(&xml[offset]);
     xml.resize(offset);
@@ -632,7 +630,7 @@ namespace XmlRpc {
         {
           std::stringstream buffer;
           buffer.write(_value.asBinary->data(), _value.asBinary->size());
-          base64::encoder encoder;
+          base64::Encoder encoder;
           encoder.encode(buffer, os);
           break;
         }

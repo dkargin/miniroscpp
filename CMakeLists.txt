@@ -88,12 +88,11 @@ if (WIN32)
   add_definitions(-D_CRT_SECURE_NO_WARNINGS)
 endif()
 
-set(XMLRPCPP_SRC_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/xmlrpcpp)
+set(XMLRPC_SRC_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/src/xmlrpc)
 
 find_package(Threads REQUIRED)
 
 add_subdirectory(external)
-add_subdirectory(xmlrpcpp)
 add_subdirectory(src)
 
 if (catkin_FOUND)

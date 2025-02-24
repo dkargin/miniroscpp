@@ -113,6 +113,19 @@ if (MINIROS_ROSBAG_USE_OPENSSL_ENCRYPTION)
 	endif()
 endif()
 
+set(XMLRPC_SRC
+    xmlrpc/XmlRpcClient.cpp
+    xmlrpc/XmlRpcDispatch.cpp
+    xmlrpc/XmlRpcServer.cpp
+    xmlrpc/XmlRpcServerConnection.cpp
+    xmlrpc/XmlRpcServerMethod.cpp
+    xmlrpc/XmlRpcSocket.cpp
+    xmlrpc/XmlRpcSource.cpp
+    xmlrpc/XmlRpcUtil.cpp
+    xmlrpc/XmlRpcValue.cpp
+    xmlrpc/b64decode.cpp
+    xmlrpc/b64encode.cpp
+)
 
 set(transport_SRC
     shape_shifter.cpp
@@ -189,29 +202,16 @@ if (MINIROS_USE_SYSTEM_PROGRAM_OPTIONS)
     add_library(impl::program_options ALIAS Boost::program_options)
 endif ()
 
-add_library(miniros_time STATIC ${rostime_SRC})
-target_include_directories(miniros_time
-  PUBLIC
-    $<BUILD_INTERFACE:${MINIROS_INCLUDE_DIRS}>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
-)
-target_link_libraries(miniros_time PUBLIC ${CMAKE_THREAD_LIBS_INIT})
-
-set_property(TARGET miniros_time PROPERTY POSITION_INDEPENDENT_CODE ON)
-add_library(miniros::time ALIAS miniros_time)
-
-
 if (MINIROS_BUILD_SHARED_LIBS)
-  add_library(roscxx SHARED ${cpp_common_SRC} ${transport_SRC} ${master_SRC})
+  add_library(roscxx SHARED ${cpp_common_SRC} ${transport_SRC} ${master_SRC} ${rostime_SRC} ${XMLRPC_SRC})
 else()
-  add_library(roscxx ${cpp_common_SRC} ${transport_SRC} ${master_SRC})
+  add_library(roscxx ${cpp_common_SRC} ${transport_SRC} ${master_SRC} ${rostime_SRC} ${XMLRPC_SRC})
 endif()
 
 set_property(TARGET roscxx PROPERTY CXX_STANDARD 17)
 
 target_link_libraries(roscxx
-    PUBLIC miniros::time
-    PRIVATE xmlrpcpp rt stdc++fs ${console_bridge_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
+    PRIVATE rt stdc++fs ${console_bridge_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
 
 target_compile_definitions(roscxx PRIVATE rostime_EXPORTS miniros_EXPORTS)
 
@@ -223,7 +223,7 @@ target_include_directories(roscxx PRIVATE
 )
 
 add_executable(miniroscore roscore/miniroscore.cpp)
-target_link_libraries(miniroscore roscxx xmlrpcpp impl::program_options)
+target_link_libraries(miniroscore roscxx impl::program_options)
 target_include_directories(miniroscore PRIVATE ${MINIROS_INCLUDE_ROOT})
 
 set(bag_storage_SRC
@@ -252,7 +252,7 @@ target_include_directories(bag_storage PRIVATE ${MINIROS_INCLUDE_DIRS} ${rosbag_
 target_compile_definitions(bag_storage PRIVATE rosbag_EXPORTS rosbag_storage_EXPORTS roslz4_EXPORTS)
 
 set_property(TARGET bag_storage PROPERTY CXX_STANDARD 17)
-target_link_libraries(bag_storage PRIVATE ${ENCRYPT_LIBRARIES} ${rosbag_INTERNAL_LIBS} ${rosbag_EXTERNAL_LIBS} miniros_time roscxx)
+target_link_libraries(bag_storage PRIVATE ${ENCRYPT_LIBRARIES} ${rosbag_INTERNAL_LIBS} ${rosbag_EXTERNAL_LIBS} roscxx)
 
 
 if (MINIROS_BUILD_ROSBAG_APPS)
@@ -288,7 +288,6 @@ endif()
 set(MINIROS_LIBRARY roscxx PARENT_SCOPE)
 set(MINIROS_EXPORT
     roscxx bag_storage
-    miniros_time
     miniroscore
     ${rosbag_INTERNAL_LIBS}
     ${rosbag_APPS}

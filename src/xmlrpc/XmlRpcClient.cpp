@@ -6,7 +6,6 @@
 #include "xmlrpcpp/XmlRpcValue.h"
 
 #include <stdio.h>
-#include <stdlib.h>
 #ifndef _WINDOWS
 	# include <strings.h>
 #endif
