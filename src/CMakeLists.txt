@@ -1,6 +1,21 @@
 add_subdirectory(replacements)
 
-# Injecting flags for debug.
+
+if (PkgConfig_FOUND)
+  pkg_check_modules(PKG_LIBS REQUIRED libsystemd)
+  if (PKG_LIBS_FOUND)
+    set(LIBSYSTEMD_FOUND TRUE)
+  else()
+    set(LIBSYSTEMD_FOUND FALSE)
+  endif()
+else ()
+  set(LIBSYSTEMD_FOUND FALSE)
+endif()
+
+if (LIBSYSTEMD_FOUND AND MINIROS_USE_LIBSYSTEMD)
+  message(STATUS "Will enable systemd support")
+  set(HAVE_LIBSYSTEMD TRUE)
+endif()
 
 # execinfo.h is needed for backtrace on glibc systems
 CHECK_INCLUDE_FILE(execinfo.h HAVE_EXECINFO_H)
@@ -11,9 +26,7 @@ CHECK_FUNCTION_EXISTS(backtrace HAVE_GLIBC_BACKTRACE)
 
 # Not everybody has <ifaddrs.h> (e.g., embedded arm-linux)
 CHECK_INCLUDE_FILES(ifaddrs.h HAVE_IFADDRS_H)
-# Not everybody has trunc (e.g., Windows, embedded arm-linux)
-CHECK_FUNCTION_EXISTS(trunc HAVE_TRUNC)
-# Not everybody has epoll (e.g., Windows, BSD, embedded arm-linux) 
+# Not everybody has epoll (e.g., Windows, BSD, embedded arm-linux)
 CHECK_CXX_SYMBOL_EXISTS(epoll_wait "sys/epoll.h" HAVE_EPOLL)
 
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/internal_config.h.in" internal_config.h)
@@ -131,6 +144,7 @@ set(transport_SRC
     shape_shifter.cpp
     observer.cpp
 
+    transport/advertise_service_options.cpp
     transport/callback_queue.cpp
     transport/common.cpp
     transport/connection.cpp
@@ -211,7 +225,7 @@ endif()
 set_property(TARGET roscxx PROPERTY CXX_STANDARD 17)
 
 target_link_libraries(roscxx
-    PRIVATE rt stdc++fs ${console_bridge_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
+    PRIVATE rt stdc++fs ${console_bridge_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} ${PKG_LIBS_LIBRARIES})
 
 target_compile_definitions(roscxx PRIVATE rostime_EXPORTS miniros_EXPORTS)
 
@@ -222,7 +236,10 @@ target_include_directories(roscxx PRIVATE
     ${MINIROS_INCLUDE_GENERATED_DIRS}
 )
 
+find_package(PkgConfig QUIET)
+
 add_executable(miniroscore roscore/miniroscore.cpp)
+
 target_link_libraries(miniroscore roscxx impl::program_options)
 target_include_directories(miniroscore PRIVATE ${MINIROS_INCLUDE_ROOT})
 

@@ -36,11 +36,13 @@
 #define ROSCPP_POLL_SET_H
 
 #include <vector>
+#include <map>
+#include <functional>
+#include <mutex>
+
 #include "io.h"
 #include "common.h"
 
-#include <functional>
-#include <mutex>
 
 namespace miniros
 {

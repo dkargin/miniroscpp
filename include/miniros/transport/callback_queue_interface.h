@@ -35,7 +35,9 @@
 #ifndef ROSCPP_CALLBACK_QUEUE_INTERFACE_H
 #define ROSCPP_CALLBACK_QUEUE_INTERFACE_H
 
-#include "common.h"
+#include <memory>
+
+#include "miniros/macros.h"
 #include "miniros/types.h"
 
 namespace miniros

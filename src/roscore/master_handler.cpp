@@ -22,7 +22,7 @@ MasterHandler::MasterHandler(RPCManagerPtr rpcManager)
   :m_rpcManager(rpcManager)
 {}
 
-std::list<std::string> MasterHandler::publisher_update_task(
+std::vector<std::string> MasterHandler::publisher_update_task(
   const std::string& api, const std::string& topic, const std::vector<std::string>& pub_uris)
 {
   MINIROS_DEBUG_NAMED("rosmaster", "publisher_update_task");

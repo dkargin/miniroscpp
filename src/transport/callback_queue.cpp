@@ -33,9 +33,7 @@
  */
 
 // Make sure we use CLOCK_MONOTONIC for the condition variable wait_for if not Apple.
-#ifndef __APPLE__
-#define BOOST_THREAD_HAS_CONDATTR_SET_CLOCK_MONOTONIC
-#endif
+#include <functional>
 
 #include "miniros/transport/callback_queue.h"
 #include "miniros/rosassert.h"

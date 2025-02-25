@@ -5,9 +5,11 @@
 #ifndef MINIROS_ERRORS_H
 #define MINIROS_ERRORS_H
 
+#include "miniros/macros.h"
+
 namespace miniros {
 
-struct Error {
+struct MINIROS_DECL Error {
   enum Error_t {
     /// Everything is ok.
     Ok,
@@ -15,8 +17,12 @@ struct Error {
     NoMaster,
     /// Input value is invalid.
     InvalidValue,
-
+    /// Some generic system error,
+    SystemError,
+    /// Not implemented yet.
     NotImplemented,
+    /// Implementation is disabled or not available for platform.
+    NotSupported,
   };
 
   Error(Error_t c) : code(c)

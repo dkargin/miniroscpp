@@ -34,14 +34,17 @@
 /*****************************************************************************
 ** Ifdefs
 *****************************************************************************/
-#ifndef ROSCPP_IO_H_
-#define ROSCPP_IO_H_
+#ifndef MINIROSCPP_IO_H_
+#define MINIROSCPP_IO_H_
 
 /*****************************************************************************
 ** Includes
 *****************************************************************************/
 
+#include <memory>
 #include <string>
+#include <vector>
+
 #include "common.h"
 
 #ifdef WIN32
@@ -212,5 +215,5 @@ inline void close_signal_pair(signal_fd_t signal_pair[2]) {
 
 } // namespace miniros
 
-#endif /* ROSCPP_IO_H_ */
+#endif /* MINIROSCPP_IO_H_ */
 

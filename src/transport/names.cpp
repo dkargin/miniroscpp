@@ -25,15 +25,11 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "miniros/names.h"
-#include "miniros/this_node.h"
-#include "miniros/transport/file_log.h"
-
-#include <miniros/console.h>
-#include <miniros/rosassert.h>
-
 #include <cstring>
 #include <sstream>
+
+#include "miniros/names.h"
+#include "miniros/this_node.h"
 
 namespace miniros
 {
@@ -145,7 +141,7 @@ std::string resolve(const std::string& ns, const std::string& name, bool _remap)
   std::string error;
   if (!validate(name, error))
   {
-  	throw InvalidNameException(error);
+    throw InvalidNameException(error);
   }
 
   if (name.empty())

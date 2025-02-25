@@ -7,12 +7,11 @@
 
 #include <string>
 #include <vector>
-#include <list>
-#include <functional>
 
 #include "xmlrpcpp/XmlRpcValue.h"
 
 #include "miniros/names.h"
+
 #include "registration_manager.h"
 
 namespace XmlRpc {
@@ -46,7 +45,7 @@ public:
 
   MasterHandler(RPCManagerPtr rpcManager);
 
-  std::list<std::string> publisher_update_task(const std::string& api, const std::string& topic, const std::vector<std::string>& pub_uris);
+  std::vector<std::string> publisher_update_task(const std::string& api, const std::string& topic, const std::vector<std::string>& pub_uris);
 
   void _shutdown(const std::string& reason="");
   void _ready(const std::string& _uri);
