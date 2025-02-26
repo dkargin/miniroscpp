@@ -102,19 +102,40 @@ struct MINIROS_DECL Name {
   /// A chain of namespaces.
   std::vector<std::string_view> ns;
 
+  Name();
+  Name(const Name& other);
 
   ~Name();
 
   void clear();
 
+  /// Get number of elements in a path.
+  /// It will take into account all path elements and a final name.
+  size_t size() const;
+
+  /// Return string element.
+  std::string str(int i) const;
+
+  /// Return string view element.
+  std::string_view view(int i) const;
+
   /// Get final name.
   std::string name() const;
 
+  Error fromPath(const std::string& path);
+
+  friend MINIROS_DECL bool operator == (const Name& a, const Name& b);
+  friend MINIROS_DECL bool operator != (const Name& a, const Name& b);
+
+protected:
   /// Name of parameter without a namespace.
-  std::string_view nameView;
+  std::string_view m_lastName;
+
+  /// This is an absolute path.
+  bool m_absolute = false;
 };
 
-MINIROS_DECL Error split(const std::string& path, Name& name);
+
 
 } // namespace names
 

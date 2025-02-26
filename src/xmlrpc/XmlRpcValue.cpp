@@ -57,6 +57,14 @@ namespace XmlRpc {
     return value;
   }
 
+  XmlRpcValue XmlRpcValue::Dict()
+  {
+    XmlRpcValue value;
+
+    value.assertStruct();
+    return value;
+  }
+
   // Clean up
   void XmlRpcValue::invalidate()
   {
@@ -208,6 +216,10 @@ namespace XmlRpc {
     return !(*this == other);
   }
 
+  bool XmlRpcValue::isPrimitive() const
+  {
+    return _type != TypeStruct && _type != TypeArray && _type != TypeInvalid;
+  }
 
   // Works for strings, binary data, arrays, and structs.
   int XmlRpcValue::size() const
@@ -227,6 +239,16 @@ namespace XmlRpc {
   bool XmlRpcValue::hasMember(const std::string& name) const
   {
     return _type == TypeStruct && _value.asStruct->find(name) != _value.asStruct->end();
+  }
+
+  bool XmlRpcValue::eraseMember(const std::string& key)
+  {
+    if (_type != TypeStruct)
+      return false;
+
+    if (_value.asStruct->erase(key))
+      return true;
+    return false;
   }
 
   // Set the value from xml. The chars at *offset into valueXml 

@@ -6,6 +6,8 @@
 #define MINIROS_MASTER_H
 
 #include "master_handler.h"
+#include "parameter_storage.h"
+
 #include "miniros/transport/rpc_manager.h"
 
 /*
@@ -222,8 +224,13 @@ public:
 protected:
   int m_port = -1;
   std::string m_host;
-  MasterHandler m_handler;
+
   std::shared_ptr<RPCManager> m_manager;
+
+  RegistrationManager m_regManager;
+
+  MasterHandler m_handler;
+  ParameterStorage m_parameterStorage;
 };
 
 } // namespace master

@@ -20,7 +20,7 @@ bool RegistrationManager::reverse_lookup(const std::string& caller_api) const
   return true;
 }
 
-std::shared_ptr<NodeRef> RegistrationManager::getNode(const std::string& node) const
+std::shared_ptr<NodeRef> RegistrationManager::getNodeByName(const std::string& node) const
 {
   auto it = nodes.find(node);
   if (it != nodes.end())

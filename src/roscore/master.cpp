@@ -8,7 +8,7 @@ namespace miniros {
 namespace master {
 
 Master::Master(std::shared_ptr<RPCManager> manager)
-  : m_handler(manager)
+  : m_handler(manager, &m_regManager), m_parameterStorage(&m_regManager)
 {
   m_manager = manager;
   // TODO: Read environment.
@@ -42,7 +42,7 @@ bool Master::start()
   if (!m_manager->start(m_port))
     return false;
 
-  m_handler.setParam("master", "/run_id", RpcValue());
+  m_parameterStorage.setParam("master", "/run_id", RpcValue());
 
   MINIROS_DEBUG("Master startup complete.");
   return true;
@@ -286,7 +286,7 @@ Master::RpcValue Master::hasParam(const std::string& caller_id, const std::strin
   RpcValue res = RpcValue::Array(3);
   res[0] = 1;
   res[1] = "hasParam";
-  res[2] = m_handler.hasParam(caller_id, topic);
+  res[2] = m_parameterStorage.hasParam(caller_id, topic);
   return res;
 }
 
@@ -296,7 +296,7 @@ Master::RpcValue Master::setParam(
   RpcValue res = RpcValue::Array(3);
   res[0] = 1;
   res[1] = "setParam";
-  m_handler.setParam(caller_api, key, value);
+  m_parameterStorage.setParam(caller_api, key, value);
   res[2] = std::string("parameter ") + key + std::string(" set");
   return res;
 }
@@ -304,7 +304,7 @@ Master::RpcValue Master::setParam(
 Master::RpcValue Master::getParam(const std::string& caller_id, const std::string& topic, Connection*)
 {
   RpcValue res = RpcValue::Array(3);
-  RpcValue value = m_handler.getParam(caller_id, topic);
+  RpcValue value = m_parameterStorage.getParam(caller_id, topic);
   if (!value) {
     res[0] = 0;
     res[1] = std::string("Parameter ") + topic + std::string(" is not set");
@@ -316,15 +316,17 @@ Master::RpcValue Master::getParam(const std::string& caller_id, const std::strin
   return res;
 }
 
-Master::RpcValue Master::deleteParam(const std::string& caller_d, const std::string& key, Connection*)
+Master::RpcValue Master::deleteParam(const std::string& caller_id, const std::string& key, Connection*)
 {
-  throw std::runtime_error("NOT IMPLEMENTED YET!");
-  // RpcValue parm = new RpcValue(), result = new RpcValue(), payload = new RpcValue();
-  // parm.Set(0, this_node.Name);
-  // parm.Set(1, mapped_key);
-  // if (!master.execute("deleteParam", parm, ref result, ref payload, false))
-  //     return false;
-  // return true;
+  RpcValue res = RpcValue::Array(3);
+  res[0] = 1;
+  res[2] = 0;
+  if (m_parameterStorage.deleteParam(caller_id, key)) {
+    res[1] = "deleteParam success";
+  } else {
+    res[1] = "deleteParam param not found";
+  }
+  return res;
 }
 
 Master::RpcValue Master::getParamNames(const std::string& caller_id, Connection*)
@@ -335,7 +337,7 @@ Master::RpcValue Master::getParamNames(const std::string& caller_id, Connection*
 
   RpcValue response;
   int index = 0;
-  for (std::string s : m_handler.getParamNames(caller_id)) {
+  for (std::string s : m_parameterStorage.getParamNames(caller_id)) {
     response[index++] = s;
   }
 
@@ -385,38 +387,6 @@ Master::RpcValue Master::requestTopic(
 Master::RpcValue Master::publisherUpdate(
   const std::string& caller_id, const std::string& topic, const RpcValue& publishers, Connection*)
 {
-  // throw std::runtime_error("NOT IMPLEMENTED YET!");
-  // mlRpcValue parm = RpcValue.Create(ref parms);
-  // List<string> pubs = new List<string>();
-  // for (int idx = 0; idx < parm[2].Size; idx++)
-  //     pubs.Add(parm[2][idx].Get<string>());
-  // if (pubUpdate(parm[1].Get<string>(), pubs))
-  //     m_manager->responseInt(1, "", 0)(result);
-  // else
-  //{
-  //     EDB.WriteLine("Unknown Error");
-  //     m_manager->responseInt(0, "Unknown Error or something", 0)(result);
-  // }
-
-  // EDB.WriteLine("TopicManager is updating publishers for " + topic);
-  // Subscription sub = null;
-  // lock (subs_mutex)
-  //{
-  //     if (shutting_down) return false;
-  //     foreach (Subscription s in subscriptions)
-  //     {
-  //         if (s.name != topic || s.IsDropped)
-  //             continue;
-  //         sub = s;
-  //         break;
-  //     }
-  // }
-  // if (sub != null)
-  //     return sub.pubUpdate(pubs);
-  // else
-  //     EDB.WriteLine("got a request for updating publishers of topic " + topic +
-  //                   ", but I don't have any subscribers to that topic.");
-  // return false;
   return {};
 }
 

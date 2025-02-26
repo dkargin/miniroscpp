@@ -209,7 +209,9 @@ set(master_SRC
     roscore/master.cpp
     roscore/master_handler.cpp
     roscore/registrations.cpp
-    roscore/registration_manager.cpp)
+    roscore/registration_manager.cpp
+    roscore/parameter_storage.cpp
+)
 
 if (MINIROS_USE_SYSTEM_PROGRAM_OPTIONS)
     find_package(Boost REQUIRED COMPONENTS program_options)

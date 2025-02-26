@@ -25,6 +25,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <cassert>
 #include <cstring>
 #include <sstream>
 
@@ -225,28 +226,48 @@ std::string parentNamespace(const std::string& name)
   return stripped_name.substr(0, last_pos);
 }
 
+Name::Name() = default;
+
+Name::Name(const Name& other)
+{
+  fullName = other.fullName;
+  ns.reserve(other.ns.size());
+  for (const auto& element: other.ns) {
+    int index = element.data() - other.fullName.data();
+    assert(index >= 0);
+    if (index < 0)
+      continue;
+    ns.emplace_back(&fullName[index], element.size());
+  }
+
+  if (!other.m_lastName.empty()) {
+    int index = m_lastName.data() - other.fullName.data();
+    m_lastName = std::string_view(fullName.data() + index, other.m_lastName.size());
+  }
+}
+
 Name::~Name() = default;
 
 void Name::clear()
 {
   fullName.clear();
   ns.clear();
-  nameView = {};
+  m_lastName = {};
 }
 
 std::string Name::name() const
 {
-  return std::string(nameView.data(), nameView.size());
+  return std::string(m_lastName.data(), m_lastName.size());
 }
 
-Error split(const std::string& path, Name& name)
+Error Name::fromPath(const std::string& path)
 {
   if (path.empty())
     return Error::Ok;
 
-  name.clear();
+  clear();
 
-  name.fullName = path;
+  fullName = path;
   // Index of first symbol of current token.
   size_t tokenStart = 0;
 
@@ -257,17 +278,66 @@ Error split(const std::string& path, Name& name)
       return Error::InvalidValue;
     if (c == '/') {
       if (i > tokenStart) {
-        name.ns.push_back(std::string_view(&name.fullName[tokenStart], i - tokenStart));
+        ns.push_back(std::string_view(&fullName[tokenStart], i - tokenStart));
       }
       tokenStart = i + 1;
     }
   }
 
   if (i > tokenStart) {
-    name.nameView = std::string_view(&name.fullName[tokenStart], i - tokenStart);
+    m_lastName = std::string_view(&fullName[tokenStart], i - tokenStart);
   }
 
   return Error::Ok;
+}
+
+size_t Name::size() const
+{
+  size_t s = ns.size();
+  if (!m_lastName.empty())
+    s++;
+  return s;
+}
+
+
+/// Return string element.
+std::string Name::str(int i) const
+{
+  auto v = this->view(i);
+  return std::string(v.data(), v.size());
+}
+
+/// Return string view element.
+std::string_view Name::view(int i) const
+{
+  if (i == ns.size())
+    return m_lastName;
+  if (i < ns.size())
+    return ns[i];
+  return {};
+}
+
+bool operator == (const Name& a, const Name& b)
+{
+  if (a.ns.size() != b.ns.size())
+    return false;
+  for (size_t i = 0; i < a.ns.size(); i++) {
+    if (a.ns[i] != b.ns[i])
+      return false;
+  }
+  return a.m_lastName == b.m_lastName;
+}
+
+bool operator != (const Name& a, const Name& b)
+{
+  if (a.ns.size() != b.ns.size())
+    return true;
+
+  for (size_t i = 0; i < a.ns.size(); i++) {
+    if (a.ns[i] != b.ns[i])
+      return true;
+  }
+  return a.m_lastName != b.m_lastName;
 }
 
 } // namespace names
