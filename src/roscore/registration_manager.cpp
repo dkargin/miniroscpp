@@ -4,6 +4,8 @@
 
 #include "registration_manager.h"
 
+#include <console.h>
+
 namespace miniros {
 namespace master {
 
@@ -131,6 +133,8 @@ std::shared_ptr<NodeRef> RegistrationManager::registerNodeApi(const std::string&
       return node_ref;
     } else {
       bumped_api = node_ref->api;
+      MINIROS_WARN_NAMED("reg", "New node registered with name=\"%s\" api=%s", caller_id.c_str(), caller_api.c_str());
+      // TODO: Send signal to make this node shut down.
       // thread_pool.queue_task(bumped_api, shutdown_node_task, (bumped_api, caller_id, "new node registered with same
       // name"))
     }

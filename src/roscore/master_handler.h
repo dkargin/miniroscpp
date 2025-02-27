@@ -42,24 +42,13 @@ public:
   void _shutdown(const std::string& reason="");
   void _ready(const std::string& _uri);
 
-  bool _ok() const;
-
-  void shutdown(const std::string& caller_id, const std::string& msg = "");
-
   std::string getUri(const std::string& caller_id) const;
 
   int getPid(const std::string& caller_id) const;
 
-  int _notify_param_subscribers(const std::map<std::string, std::pair<std::string, RpcValue>>& updates);
-
-  void _param_update_task(const std::string& caller_id, const std::string& caller_api,
-      const std::string& param_key, const RpcValue& param_value);
-
   void _notify_topic_subscribers(const std::string& topic,
     const std::vector<std::string>& pub_uris,
     const std::vector<std::string>& sub_uris);
-
-  void _notify_service_update(const std::string& service, const std::string& service_api);
 
   ReturnStruct registerService(const std::string& caller_id, const std::string &service,
     const std::string& caller_api, const std::string& service_api, RpcConnection* conn);

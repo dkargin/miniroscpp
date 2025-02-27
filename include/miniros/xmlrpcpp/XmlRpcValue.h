@@ -168,6 +168,17 @@ namespace XmlRpc {
     //! Write the value (no xml encoding)
     std::ostream& write(std::ostream& os) const;
 
+    struct JsonState {
+      // Current offset.
+      int offset = 0;
+    };
+
+    struct JsonSettings {
+      int tabs = 2;
+    };
+
+    std::ostream& writeJson(std::ostream& os, JsonState& state, const JsonSettings& settings) const;
+
     // Formatting
     //! Return the format used to write double values.
     static std::string const& getDoubleFormat() { return _doubleFormat; }

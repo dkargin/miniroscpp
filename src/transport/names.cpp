@@ -367,6 +367,19 @@ std::string_view Path::view(int i) const
   return {};
 }
 
+bool Path::startsWith(const Path& other) const
+{
+  if (isAbsolute() != other.isAbsolute())
+    return false;
+  if (other.size() > size())
+    return false;
+  for (int i = 0; i < other.size(); i++) {
+    if (view(i) != other.view(i))
+      return false;
+  }
+  return true;
+}
+
 bool operator == (const Path& a, const Path& b)
 {
   if (a.m_ns.size() != b.m_ns.size())

@@ -22,15 +22,19 @@ public:
   using RpcValue = XmlRpc::XmlRpcValue;
 
   ParameterStorage(RegistrationManager* regManager);
-  ~ParameterStorage();
+  virtual ~ParameterStorage();
 
-  int deleteParam(const std::string& caller_id, const std::string& key);
+  bool deleteParam(const std::string& caller_id, const std::string& key);
 
   Error setParam(const std::string& caller_id, const std::string& key, const RpcValue& value);
 
   RpcValue getParam(const std::string& caller_id, const std::string& key) const;
 
-  void computeParamUpdates(const Registrations& paramSubscribers, const std::string& caller_id, const std::string& key, const RpcValue& value);
+  /// Notify all listeners about change in parameter tree.
+  /// @param fullPath - path to node with change.
+  /// @param ptr - reference value. It will be null if value is removed.
+  /// @returns error code
+  Error notifyParamUpdates(const std::string& fullPath, const RpcValue* ptr);
 
   /// Searches for parameter.
   std::string searchParam(const std::string& ns, const std::string& key);
@@ -46,6 +50,10 @@ public:
   std::vector<std::string> getParamNames(const std::string& caller_id);
 
   void dropListener(std::shared_ptr<NodeRef> listener);
+
+  /// Dumps parameters as a json to a file.
+  /// Thread unsafe.
+  void dumpParamStateUnsafe(const char* file) const;
 
   /// Look for a parameter.
   /// No thread locks are used.

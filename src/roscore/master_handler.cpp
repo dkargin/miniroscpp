@@ -70,15 +70,6 @@ void MasterHandler::_ready(const std::string& _uri)
   uri = _uri;
 }
 
-bool MasterHandler::_ok() const
-{
-  return !done;
-}
-
-void MasterHandler::shutdown(const std::string& caller_id, const std::string& msg)
-{
-}
-
 std::string MasterHandler::getUri(const std::string& caller_id) const
 {
   return uri;
@@ -87,16 +78,6 @@ std::string MasterHandler::getUri(const std::string& caller_id) const
 int MasterHandler::getPid(const std::string& caller_id) const
 {
   return getpid();
-}
-
-int MasterHandler::_notify_param_subscribers(const std::map<std::string, std::pair<std::string, RpcValue>>& updates)
-{
-  return 1;
-}
-
-void MasterHandler::_param_update_task(const std::string& caller_id, const std::string& caller_api,
-  const std::string& param_key, const RpcValue& param_value)
-{
 }
 
 void MasterHandler::_notify_topic_subscribers(const std::string& topic,
@@ -109,10 +90,6 @@ void MasterHandler::_notify_topic_subscribers(const std::string& topic,
   for (const std::string& node_api: sub_uris) {
     publisher_update_task(node_api, topic, pub_uris);
   }
-}
-
-void MasterHandler::_notify_service_update(const std::string& service, const std::string& service_api)
-{
 }
 
 ReturnStruct MasterHandler::registerService(const std::string& caller_id, const std::string& service,

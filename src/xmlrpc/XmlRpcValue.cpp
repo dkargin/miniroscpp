@@ -681,9 +681,103 @@ namespace XmlRpc {
           os << ']';
           break;
         }
-      
     }
     
+    return os;
+  }
+
+  std::ostream& writePad(std::ostream& os, int num, char padding=' ')
+  {
+    for (int i=0; i<num; ++i) {
+      os << padding;
+    }
+    return os;
+  }
+
+  std::ostream& XmlRpcValue::writeJson(std::ostream& os, JsonState& state, const JsonSettings& settings) const
+  {
+    /*
+    *{
+      "first_name": "John",
+      "last_name": "Smith",
+      "is_alive": true,
+      "age": 27,
+      "address": {
+        "street_address": "21 2nd Street",
+        "city": "New York",
+        "state": "NY",
+        "postal_code": "10021-3100"
+      },
+     */
+    switch (_type) {
+      default:           break;
+      case TypeStruct:
+      {
+        os << '{' << std::endl;
+        state.offset += settings.tabs;
+        ValueStruct::const_iterator it;
+        for (it=_value.asStruct->begin(); it!=_value.asStruct->end(); ++it)
+        {
+          if (state.offset)
+            writePad(os, state.offset);
+          if (it!=_value.asStruct->begin())
+            os << ',';
+          os << "\"" << it->first << "\": ";
+          it->second.writeJson(os, state, settings);
+        }
+        state.offset -= settings.tabs;
+        os << '}' << std::endl;
+        break;
+      }
+      case TypeArray:
+      {
+        size_t s = _value.asArray->size();
+        bool smallArray = (s == 1);
+        os << '[';
+        if (!smallArray) {
+          os << std::endl;
+          state.offset += settings.tabs;
+        }
+        for (size_t i=0; i<s; ++i)
+        {
+          if (i > 0)
+            os << ", ";
+          if (!smallArray) {
+            os << std::endl;
+            writePad(os, state.offset);
+          }
+          _value.asArray->at(i).writeJson(os, state, settings);
+        }
+        if (!smallArray) {
+          os << std::endl;
+          state.offset -= settings.tabs;
+        }
+        os << ']';
+        break;
+      }
+      case TypeBoolean:  os << (_value.asBool ? "true" : "false"); break;
+      case TypeInt:      os << _value.asInt; break;
+      case TypeDouble:   os << _value.asDouble; break;
+      case TypeString:   os << "\"" << *_value.asString << "\""; break;
+      case TypeDateTime:
+      {
+        struct tm* t = _value.asTime;
+        char buf[20];
+        std::snprintf(buf, sizeof(buf)-1, "%4d%02d%02dT%02d:%02d:%02d",
+          t->tm_year,t->tm_mon,t->tm_mday,t->tm_hour,t->tm_min,t->tm_sec);
+        buf[sizeof(buf)-1] = 0;
+        os << buf;
+        break;
+      }
+      case TypeBase64:
+      {
+        std::stringstream buffer;
+        buffer.write(_value.asBinary->data(), _value.asBinary->size());
+        base64::Encoder encoder;
+        encoder.encode(buffer, os);
+        break;
+      }
+    } //switch
     return os;
   }
 

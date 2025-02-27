@@ -131,6 +131,9 @@ struct MINIROS_DECL Path {
 
   bool isAbsolute() const;
 
+  /// Check if this path starts with 'other' path.
+  bool startsWith(const Path& other) const;
+
   friend MINIROS_DECL bool operator == (const Path& a, const Path& b);
   friend MINIROS_DECL bool operator != (const Path& a, const Path& b);
   friend MINIROS_DECL bool operator < (const Path& a, const Path& b);

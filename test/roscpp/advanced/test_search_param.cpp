@@ -42,8 +42,6 @@ TEST_F(MasterFixture, search_test_A)
   miniros::NodeHandle nh;
   master->set("A", "right one!");
 
-  nh.setParam("A", "rignt one!");
-
   std::string result;
 
   // Sanity check with getParam
