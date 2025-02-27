@@ -31,7 +31,7 @@
 
 #include "miniros/master_link.h"
 #include "miniros/rosassert.h"
-#include "miniros/transport/file_log.h"
+#include "miniros/file_log.h"
 #include "miniros/transport/io.h"
 #include "miniros/transport/network.h"
 #include "miniros/transport/rpc_manager.h"

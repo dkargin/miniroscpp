@@ -25,8 +25,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ROSCPP_XMLRPC_MANAGER_H
-#define ROSCPP_XMLRPC_MANAGER_H
+#ifndef MINIROS_XMLRPC_MANAGER_H
+#define MINIROS_XMLRPC_MANAGER_H
 
 #include <string>
 #include <set>
@@ -35,7 +35,7 @@
 #include <mutex>
 #include <atomic>
 
-#include "common.h"
+#include "miniros/common.h"
 // TODO: Move it to impl section
 #include "miniros/xmlrpcpp/XmlRpc.h"
 
@@ -294,6 +294,6 @@ private:
   std::atomic_bool unbind_requested_;
 };
 
-}
+} // namespace miniros
 
-#endif
+#endif // MINIROS_XMLRPC_MANAGER_H

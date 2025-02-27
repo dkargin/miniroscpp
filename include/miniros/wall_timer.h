@@ -25,10 +25,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ROSCPP_WALL_TIMER_H
-#define ROSCPP_WALL_TIMER_H
+#ifndef MINIROS_WALL_TIMER_H
+#define MINIROS_WALL_TIMER_H
 
-#include "transport/common.h"
 #include "internal/forwards.h"
 #include "wall_timer_options.h"
 
@@ -127,4 +126,4 @@ private:
 
 }
 
-#endif
+#endif // MINIROS_WALL_TIMER_H

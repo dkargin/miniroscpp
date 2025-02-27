@@ -25,10 +25,10 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ROSCPP_SUBSCRIBER_HANDLE_H
-#define ROSCPP_SUBSCRIBER_HANDLE_H
+#ifndef MINIROS_SUBSCRIBER_HANDLE_H
+#define MINIROS_SUBSCRIBER_HANDLE_H
 
-#include "miniros/transport/common.h"
+#include "miniros/common.h"
 #include "miniros/internal/forwards.h"
 #include "miniros/transport/subscription_callback_helper.h"
 
@@ -116,6 +116,6 @@ typedef std::vector<Subscriber> V_Subscriber;
 
 }
 
-#endif // ROSCPP_PUBLISHER_HANDLE_H
+#endif // MINIROS_SUBSCRIBER_HANDLE_H
 
 

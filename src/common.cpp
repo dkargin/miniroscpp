@@ -32,7 +32,7 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "miniros/transport/common.h"
+#include "miniros/common.h"
 
 #include <random>
 #include <sstream>
@@ -206,6 +206,7 @@ static std::mt19937                    gen(rd());
 static std::uniform_int_distribution<> dis(0, 15);
 static std::uniform_int_distribution<> dis2(8, 11);
 
+/// code is taken from https://stackoverflow.com/questions/24365331/how-can-i-generate-uuid-in-c-without-using-boost-library
 std::string generatePseudoUuid() {
   std::stringstream ss;
   int i;

@@ -25,12 +25,11 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ROSCPP_ADVERTISE_OPTIONS_H
-#define ROSCPP_ADVERTISE_OPTIONS_H
+#ifndef MINIROS_ADVERTISE_OPTIONS_H
+#define MINIROS_ADVERTISE_OPTIONS_H
 
 #include "miniros/internal/forwards.h"
 #include "miniros/traits/message_traits.h"
-#include "common.h"
 
 namespace miniros
 {
@@ -159,7 +158,6 @@ struct MINIROS_DECL AdvertiseOptions
   }
 };
 
+} // namespace miniros
 
-}
-
-#endif
+#endif // MINIROS_ADVERTISE_OPTIONS_H

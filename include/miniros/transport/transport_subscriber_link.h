@@ -28,10 +28,12 @@
 #ifndef MINIROSCPP_TRANSPORT_SUBSCRIBER_LINK_H
 #define MINIROSCPP_TRANSPORT_SUBSCRIBER_LINK_H
 
+#include <mutex>
+#include <queue>
+
 #include "common.h"
 #include "subscriber_link.h"
 
-#include <mutex>
 
 namespace miniros
 {

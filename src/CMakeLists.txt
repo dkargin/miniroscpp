@@ -42,7 +42,9 @@ set(cpp_common_SRC
     debug.cpp
     header.cpp
     console.cpp
+    common.cpp
     console_print.cpp
+    file_log.cpp
     serialization.cpp)
 
 set(rosbag_SRC "")
@@ -146,7 +148,6 @@ set(transport_SRC
 
     transport/advertise_service_options.cpp
     transport/callback_queue.cpp
-    transport/common.cpp
     transport/connection.cpp
     transport/connection_manager.cpp
     transport/init.cpp
@@ -155,7 +156,6 @@ set(transport_SRC
     transport/internal_timer_manager.cpp
     transport/io.cpp
 
-    transport/file_log.cpp
     transport/master_link.cpp
     transport/message_deserializer.cpp
 

@@ -42,7 +42,7 @@
 #include "miniros/master_link.h"
 #include "miniros/this_node.h"
 #include "miniros/transport/network.h"
-#include "miniros/transport/file_log.h"
+#include "miniros/file_log.h"
 #include "miniros/transport/callback_queue.h"
 #include "miniros/transport/rosout_appender.h"
 #include "miniros/transport/subscribe_options.h"

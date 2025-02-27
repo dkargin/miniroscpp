@@ -38,7 +38,7 @@
 #include "miniros/transport/transport_tcp.h"
 #include "miniros/transport/poll_set.h"
 #include "miniros/header.h"
-#include "miniros/transport/file_log.h"
+#include "miniros/file_log.h"
 #include <miniros/rosassert.h>
 #include <sstream>
 #include <cstring>

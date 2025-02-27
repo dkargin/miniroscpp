@@ -30,7 +30,7 @@
 #include "internal_config.h"
 
 #include "miniros/transport/network.h"
-#include "miniros/transport/file_log.h"
+#include "miniros/file_log.h"
 #include "miniros/internal/exceptions.h"
 #include "miniros/transport/io.h"     // cross-platform headers needed
 #include <miniros/console.h>

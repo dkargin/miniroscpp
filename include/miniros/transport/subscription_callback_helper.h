@@ -29,16 +29,15 @@
 #define ROSCPP_SUBSCRIPTION_CALLBACK_HELPER_H
 
 #include <typeinfo>
+#include <type_traits>
 
-#include "common.h"
+#include "miniros/common.h"
 #include "miniros/internal/forwards.h"
 #include "miniros/transport/parameter_adapter.h"
 #include "miniros/traits/message_traits.h"
-#include "miniros/traits/builtin_message_traits.h"
 #include "miniros/serialization.h"
 #include "miniros/message_event.h"
 
-#include <type_traits>
 
 namespace miniros
 {

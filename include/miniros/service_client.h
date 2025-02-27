@@ -29,7 +29,7 @@
 #define ROSCPP_SERVICE_CLIENT_H
 
 #include "miniros/internal/forwards.h"
-#include "miniros/transport/common.h"
+#include "miniros/common.h"
 #include "miniros/traits/service_traits.h"
 #include "miniros/serialization.h"
 

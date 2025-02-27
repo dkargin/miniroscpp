@@ -29,9 +29,7 @@
 #define ROSCPP_SERVICE_CLIENT_LINK_H
 
 #include "miniros/macros.h"
-#include "miniros/transport/common.h"
-
-#include <queue>
+#include "miniros/common.h"
 
 namespace miniros
 {

@@ -25,11 +25,11 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ROSCPP_SERVICE_MESSAGE_HELPER_H
-#define ROSCPP_SERVICE_MESSAGE_HELPER_H
+#ifndef MINIROS_SERVICE_MESSAGE_HELPER_H
+#define MINIROS_SERVICE_MESSAGE_HELPER_H
 
 #include "miniros/internal/forwards.h"
-#include "common.h"
+#include "miniros/common.h"
 #include "miniros/traits/message_traits.h"
 #include "miniros/traits/service_traits.h"
 #include "miniros/serialization.h"
@@ -189,4 +189,4 @@ private:
 
 }
 
-#endif // ROSCPP_SERVICE_MESSAGE_HELPER_H
+#endif // MINIROS_SERVICE_MESSAGE_HELPER_H

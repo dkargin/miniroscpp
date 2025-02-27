@@ -25,11 +25,13 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ROSCPP_PUBLICATION_H
-#define ROSCPP_PUBLICATION_H
+#ifndef MINIROS_PUBLICATION_H
+#define MINIROS_PUBLICATION_H
 
 #include "miniros/internal/forwards.h"
 #include "miniros/transport/advertise_options.h"
+#include "miniros/serialized_message.h"
+
 #include "xmlrpcpp/XmlRpc.h"
 
 #include <mutex>
@@ -43,7 +45,9 @@ typedef std::shared_ptr<SubscriberLink> SubscriberLinkPtr;
 typedef std::vector<SubscriberLinkPtr> V_SubscriberLink;
 
 /**
- * \brief A Publication manages an advertised topic
+ * \brief A Publication manages an advertised topic.
+ *
+ * IT is an internal class. It is not intended for external usage.
  */
 class MINIROS_DECL Publication
 {
@@ -182,6 +186,6 @@ private:
   std::mutex publish_queue_mutex_;
 };
 
-}
+} // namespace miniros
 
-#endif // ROSCPP_PUBLICATION_H
+#endif // MINIROS_PUBLICATION_H

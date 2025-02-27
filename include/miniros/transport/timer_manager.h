@@ -37,8 +37,7 @@
 
 #include "miniros/internal/forwards.h"
 #include "miniros/rostime.h"
-#include "miniros/transport/file_log.h"
-#include "miniros/rosassert.h"
+#include "miniros/file_log.h"
 #include "miniros/transport/callback_queue_interface.h"
 
 namespace miniros

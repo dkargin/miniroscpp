@@ -40,7 +40,7 @@
 #include "miniros/transport/service_manager.h"
 #include "miniros/transport/transport.h"
 #include "miniros/this_node.h"
-#include "miniros/transport/file_log.h"
+#include "miniros/file_log.h"
 
 #include <sstream>
 

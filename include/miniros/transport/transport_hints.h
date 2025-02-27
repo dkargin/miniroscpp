@@ -25,10 +25,10 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ROSCPP_TRANSPORT_HINTS_H
-#define ROSCPP_TRANSPORT_HINTS_H
+#ifndef MINIROS_TRANSPORT_HINTS_H
+#define MINIROS_TRANSPORT_HINTS_H
 
-#include "common.h"
+#include "miniros/common.h"
 #include "miniros/internal/forwards.h"
 
 namespace miniros
@@ -162,6 +162,6 @@ private:
   M_string options_;
 };
 
-}
+} // namespace miniros
 
-#endif
+#endif// MINIROS_TRANSPORT_HINTS_H

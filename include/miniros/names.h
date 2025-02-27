@@ -31,7 +31,7 @@
 #include <string_view>
 
 #include "miniros/internal/forwards.h"
-#include "miniros/transport/common.h"
+#include "miniros/common.h"
 #include "miniros/errors.h"
 
 namespace miniros

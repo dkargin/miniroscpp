@@ -25,10 +25,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ROSCPP_WALL_TIMER_OPTIONS_H
-#define ROSCPP_WALL_TIMER_OPTIONS_H
+#ifndef MINIROS_WALL_TIMER_OPTIONS_H
+#define MINIROS_WALL_TIMER_OPTIONS_H
 
-#include "transport/common.h"
 #include "miniros/internal/forwards.h"
 
 namespace miniros
@@ -79,8 +78,6 @@ struct MINIROS_DECL WallTimerOptions
   bool autostart;
 };
 
-
 }
 
-#endif
-
+#endif // MINIROS_WALL_TIMER_OPTIONS_H

@@ -29,7 +29,8 @@
 #define ROSCPP_SUBSCRIPTION_H
 
 #include <queue>
-#include "miniros/transport/common.h"
+
+#include "miniros/common.h"
 #include "miniros/header.h"
 #include "miniros/internal/forwards.h"
 #include "miniros/transport/transport_hints.h"

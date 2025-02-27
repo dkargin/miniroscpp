@@ -26,7 +26,7 @@
  */
 
 #include "miniros/transport/poll_manager.h"
-#include "miniros/transport/common.h"
+#include "miniros/common.h"
 
 #include <mutex>
 #include <signal.h>

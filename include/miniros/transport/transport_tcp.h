@@ -32,16 +32,17 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ROSCPP_TRANSPORT_TCP_H
-#define ROSCPP_TRANSPORT_TCP_H
-
-#include <miniros/types.h>
-#include "transport.h"
+#ifndef MINIROS_TRANSPORT_TCP_H
+#define MINIROS_TRANSPORT_TCP_H
 
 #include <mutex>
 
+#include <miniros/types.h>
+#include <miniros/common.h>
+
+#include "transport.h"
+
 #include <miniros/transport/io.h>
-#include <miniros/transport/common.h>
 
 namespace miniros
 {
@@ -168,5 +169,5 @@ private:
 
 }
 
-#endif // ROSCPP_TRANSPORT_TCP_H
+#endif // MINIROS_TRANSPORT_TCP_H
 
