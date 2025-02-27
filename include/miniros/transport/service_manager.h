@@ -28,8 +28,8 @@
 #ifndef ROSCPP_SERVICE_MANAGER_H
 #define ROSCPP_SERVICE_MANAGER_H
 
-#include "internal/forwards.h"
-#include "common.h"
+#include "miniros/internal/forwards.h"
+#include "miniros/common.h"
 #include "advertise_service_options.h"
 #include "service_client_options.h"
 

@@ -36,7 +36,7 @@
 #define ROSCPP_ROSOUT_APPENDER_H
 
 #include <miniros/message_forward.h>
-#include "common.h"
+#include "miniros/common.h"
 
 #include <mutex>
 #include <condition_variable>

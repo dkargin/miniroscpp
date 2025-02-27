@@ -28,17 +28,16 @@
 #ifndef ROSCPP_POLL_MANAGER_H
 #define ROSCPP_POLL_MANAGER_H
 
+#include <atomic>
+#include <thread>
+
 #include "miniros/macros.h"
 #include "miniros/internal/forwards.h"
 #include "miniros/internal/observer.h"
 
-#include <atomic>
-
 #include "poll_set.h"
-#include "common.h"
+#include "miniros/common.h"
 
-#include <thread>
-#include <mutex>
 
 namespace miniros
 {

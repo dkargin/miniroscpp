@@ -7,8 +7,10 @@
 #include <atomic>
 
 #include "master.h"
+#include "rosout.h"
 
-#include <xmlrpcpp/XmlRpcUtil.h>
+#include "miniros/transport/callback_queue.h"
+#include "miniros/xmlrpcpp/XmlRpcUtil.h"
 
 /// This define is injected in replacements/CMakeLists.txt
 #ifdef USE_LOCAL_PROGRAM_OPTIONS
@@ -28,7 +30,7 @@ void systemSignalHandler(int signal) {
   }
 }
 
-int main(int argc, const char * argv[]) {
+int main(int argc, const char ** argv) {
   std::signal(SIGINT, systemSignalHandler);
 
   po::options_description desc("Allowed options");
@@ -36,6 +38,7 @@ int main(int argc, const char * argv[]) {
   desc.add_options()
     ("help,h", "produce help message")
     ("xmlrpc_log", po::value<int>()->default_value(1), "Verbosity level of XmlRpc logging")
+    ("rosout", po::value<bool>()->default_value(true), "Enable rosout log aggregator")
     ;
 
   po::variables_map vm;
@@ -65,17 +68,30 @@ int main(int argc, const char * argv[]) {
   auto rpcManager = miniros::RPCManager::instance();
   miniros::master::Master master(rpcManager);
 
+  bool useRosout = vm.count("rosout") && vm["rosout"].as<bool>();
   if (vm.count("xmlrpc_log")) {
     int level = vm["xmlrpc_log"].as<int>();
     XmlRpc::setVerbosity(level);
   }
 
   master.start();
-  // TODO: subsribe to rosout and publish to rosout_agg.
 
+  std::unique_ptr<miniros::master::Rosout> r;
+  if (useRosout) {
+    int argc_ = 1;
+    char** argv_ = const_cast<char**>(argv);
+    miniros::init(argc_, argv_, "rosout", miniros::init_options::NoRosout | miniros::init_options::NoSigintHandler);
+  }
+
+  miniros::CallbackQueue* callbackQueue = miniros::getGlobalCallbackQueue();
+  if (!callbackQueue) {
+    return EXIT_FAILURE;
+  }
   miniros::notifyNodeStarted();
+
+  miniros::WallDuration period(0.02);
   while (!g_sigintReceived && master.ok()) {
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    callbackQueue->callAvailable(period);
   }
 
   miniros::notifyNodeExiting();

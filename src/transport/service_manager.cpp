@@ -42,9 +42,9 @@
 #include "miniros/transport/transport_tcp.h"
 #include "miniros/transport/connection.h"
 
-#include "xmlrpcpp/XmlRpc.h"
+#include "miniros/xmlrpcpp/XmlRpc.h"
 
-#include <miniros/console.h>
+#include "miniros/console.h"
 
 using namespace XmlRpc; // A battle to be fought later
 using namespace std; // sigh

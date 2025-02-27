@@ -36,13 +36,12 @@
 #define MINIROS_TRANSPORT_CONNECTION_H
 
 #include <atomic>
-#include <thread>
 #include <mutex>
 
 #include "miniros/header.h"
 #include "miniros/internal/observer.h"
 
-#include "common.h"
+#include "miniros/common.h"
 
 #define READ_BUFFER_SIZE (1024*64)
 

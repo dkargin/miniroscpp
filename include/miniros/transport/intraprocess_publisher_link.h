@@ -29,7 +29,7 @@
 #define ROSCPP_INTRAPROCESS_PUBLISHER_LINK_H
 
 #include "publisher_link.h"
-#include "common.h"
+#include "miniros/common.h"
 
 #include <mutex>
 

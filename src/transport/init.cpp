@@ -48,7 +48,7 @@
 #include "miniros/transport/subscribe_options.h"
 #include "miniros/transport/transport_tcp.h"
 #include "miniros/transport/internal_timer_manager.h"
-#include "xmlrpcpp/XmlRpcSocket.h"
+#include "miniros/xmlrpcpp/XmlRpcSocket.h"
 
 // Standard ROS services.
 #include "roscpp/GetLoggers.hxx"

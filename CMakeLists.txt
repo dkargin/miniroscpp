@@ -36,10 +36,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
 
-include_directories(include)
-
 set(MINIROS_INCLUDE_DIRS ${CMAKE_CURRENT_BINARY_DIR})
-set(MINIROS_XMLRPCPP_B64_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/xmlrpcpp/libb64/include")
 
 set(CMAKE_DEBUG_POSTFIX d)
 
@@ -48,9 +45,7 @@ set(MINIROS_INCLUDE_GENERATED_DIRS
     CACHE PATH "Path to MiniROS generated messages")
 
 # Root include path for helper libraries like xmlrpc
-set(MINIROS_INCLUDE_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/include/miniros)
-
-set(MINIROS_INCLUDE_TRANSPORT ${CMAKE_CURRENT_SOURCE_DIR}/include/transport)
+set(MINIROS_INCLUDE_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 # Checking if miniros is added as a submodule
 get_directory_property(hasParent PARENT_DIRECTORY)
@@ -89,6 +84,7 @@ if (WIN32)
   add_definitions(-D_CRT_SECURE_NO_WARNINGS)
 endif()
 
+# This path is needed in tests for xmlrpc.
 set(XMLRPC_SRC_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/src/xmlrpc)
 
 find_package(Threads REQUIRED)

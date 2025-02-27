@@ -32,7 +32,7 @@
 #include "miniros/transport/advertise_options.h"
 #include "miniros/serialized_message.h"
 
-#include "xmlrpcpp/XmlRpc.h"
+#include "miniros/xmlrpcpp/XmlRpcValue.h"
 
 #include <mutex>
 #include <vector>

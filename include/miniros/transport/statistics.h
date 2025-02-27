@@ -28,13 +28,14 @@
 #ifndef ROSCPP_STATISTICS_H
 #define ROSCPP_STATISTICS_H
 
+#include <map>
+
 #include "miniros/internal/forwards.h"
 #include "poll_set.h"
-#include "common.h"
-#include "publisher.h"
-#include <miniros/rostime.h>
+#include "miniros/common.h"
+#include "miniros/publisher.h"
+#include "miniros/rostime.h"
 #include "subscription_callback_helper.h"
-#include <map>
 
 namespace miniros
 {

@@ -1,5 +1,6 @@
 include_directories(${MINIROS_INCLUDE_ROOT})
-include_directories(${MINIROS_XMLRPCPP_B64_INCLUDE_DIR})
+# This path is needed for xmlrpc includes
+include_directories(${MINIROS_INCLUDE_ROOT}/miniros)
 
 miniros_add_test(xmlrpcvalue_base64 xmlrpcvalue_base64.cpp)
 target_link_libraries(xmlrpcvalue_base64 roscxx)

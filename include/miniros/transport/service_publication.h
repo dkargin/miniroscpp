@@ -29,11 +29,10 @@
 #define ROSCPP_SERVICE_PUBLICATION_H
 
 #include "miniros/transport/service_callback_helper.h"
-#include "common.h"
-#include "xmlrpcpp/XmlRpc.h"
+#include "miniros/common.h"
+#include "miniros/xmlrpcpp/XmlRpc.h"
 
 #include <vector>
-#include <queue>
 #include <mutex>
 
 namespace miniros
