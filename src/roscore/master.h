@@ -57,10 +57,10 @@ public:
   ///  - caller_id (str)   - ROS caller ID
   ///  - service (str)     - Fully-qualified name of service
   ///  - service_api (str) - ROSRPC Service URI
-  ///  -  caller_api (str)  - XML-RPC URI of caller node
+  ///  - caller_api (str)  - XML-RPC URI of caller node
   /// Returns (int, str, int) - (code, statusMessage, ignore)
-  RpcValue registerService(const std::string& caller_id, const std::string& service, const std::string& caller_api,
-    const std::string& service_api, Connection*);
+  RpcValue registerService(const std::string& caller_id, const std::string& service,
+    const std::string& service_api, const std::string& caller_api, Connection*);
 
   RpcValue unregisterService(
     const std::string& caller_id, const std::string& service, const std::string& service_api, Connection*);
@@ -231,7 +231,7 @@ protected:
   int m_port = -1;
   std::string m_host;
 
-  std::shared_ptr<RPCManager> m_manager;
+  std::shared_ptr<RPCManager> m_rpcManager;
 
   RegistrationManager m_regManager;
 

@@ -711,28 +711,47 @@ namespace XmlRpc {
      */
     switch (_type) {
       default:           break;
+      case TypeInvalid:
+        os << "null";
+        break;
       case TypeStruct:
       {
-        os << '{' << std::endl;
+        bool smallDict = (this->size() < 2);
+        if (!state.sameline)
+          writePad(os, state.offset);
+        os << '{';
+        if (!smallDict)
+          os << std::endl;
         state.offset += settings.tabs;
         ValueStruct::const_iterator it;
+        /*
+         * "var" : { "var2" : 1 },
+         */
         for (it=_value.asStruct->begin(); it!=_value.asStruct->end(); ++it)
         {
-          if (state.offset)
+          // Adding comma from previous line.
+          if (it != _value.asStruct->begin())
+            os << ',' << std::endl;
+          if (!smallDict)
             writePad(os, state.offset);
-          if (it!=_value.asStruct->begin())
-            os << ',';
           os << "\"" << it->first << "\": ";
+          bool same = state.sameline;
+          state.sameline = true;
           it->second.writeJson(os, state, settings);
+          state.sameline = same;
         }
+        if (!smallDict)
+          os << std::endl;
         state.offset -= settings.tabs;
-        os << '}' << std::endl;
+        if (!smallDict)
+          writePad(os, state.offset);
+        os << '}';
         break;
       }
       case TypeArray:
       {
         size_t s = _value.asArray->size();
-        bool smallArray = (s == 1);
+        bool smallArray = (s < 2);
         os << '[';
         if (!smallArray) {
           os << std::endl;
@@ -741,9 +760,8 @@ namespace XmlRpc {
         for (size_t i=0; i<s; ++i)
         {
           if (i > 0)
-            os << ", ";
+            os << ", " << std::endl;
           if (!smallArray) {
-            os << std::endl;
             writePad(os, state.offset);
           }
           _value.asArray->at(i).writeJson(os, state, settings);
@@ -752,6 +770,8 @@ namespace XmlRpc {
           os << std::endl;
           state.offset -= settings.tabs;
         }
+        if (!smallArray)
+          writePad(os, state.offset);
         os << ']';
         break;
       }

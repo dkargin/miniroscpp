@@ -483,7 +483,8 @@ void init(const M_string& remappings, const std::string& name, uint32_t options)
 #endif
     check_ipv6_environment();
     network::init(remappings);
-    g_master_link.reset(new MasterLink());
+    auto rpcManager = RPCManager::instance();
+    g_master_link.reset(new MasterLink(rpcManager));
     g_master_link->initLink(remappings);
     // names:: namespace is initialized by this_node
     this_node::init(name, remappings, options);

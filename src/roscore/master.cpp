@@ -2,6 +2,7 @@
 // Created by dkargin on 2/11/25.
 //
 
+#include "miniros/transport/network.h"
 #include "master.h"
 
 namespace miniros {
@@ -10,7 +11,7 @@ namespace master {
 Master::Master(std::shared_ptr<RPCManager> manager)
   : m_handler(manager, &m_regManager), m_parameterStorage(&m_regManager)
 {
-  m_manager = manager;
+  m_rpcManager = manager;
   // TODO: Read environment.
   // split the URI (if it's valid) into host and port
   // if (!network.splitURI(ROS.ROS_MASTER_URI, ref _host, ref _port))
@@ -19,18 +20,23 @@ Master::Master(std::shared_ptr<RPCManager> manager)
     m_port = 11311;
     MINIROS_WARN("Invalid XMLRPC uri. Using ROS_MASTER_URI=http://%s:%d", m_host.c_str(), m_port);
   }
+
+  m_parameterStorage.paramUpdateFn =
+    [this] (const std::shared_ptr<NodeRef>& nr, const std::string& fullPath, const RpcValue* value) {
+      this->m_handler.sendToNode(nr, "paramUpdate", fullPath, value ? *value : RpcValue::Dict());
+    };
 }
 
 Master::~Master()
 {
-  if (m_manager) {
-    m_manager->unbind(this);
+  if (m_rpcManager) {
+    m_rpcManager->unbind(this);
   }
 }
 
 bool Master::start()
 {
-  if (!m_manager) {
+  if (!m_rpcManager) {
     MINIROS_ERROR("No RPC Manager was attached");
     return false;
   }
@@ -39,10 +45,13 @@ bool Master::start()
 
   setupBindings();
 
-  if (!m_manager->start(m_port))
+  if (!m_rpcManager->start(m_port))
     return false;
 
-  m_parameterStorage.setParam("master", "/run_id", RpcValue());
+  // It was done in roslaunch by calling generate_run_id() function.
+  // It should be uuid.uuid1()
+  std::string uuid = generatePseudoUuid();
+  m_parameterStorage.setParam("master", "/run_id", uuid);
 
   MINIROS_DEBUG("Master startup complete.");
   return true;
@@ -50,57 +59,51 @@ bool Master::start()
 
 void Master::stop()
 {
-  if (m_manager)
-    m_manager->shutdown();
+  if (m_rpcManager)
+    m_rpcManager->shutdown();
 }
 
 bool Master::ok() const
 {
-  return m_manager && !m_manager->isShuttingDown();
+  return m_rpcManager && !m_rpcManager->isShuttingDown();
 }
 
 void Master::setupBindings()
 {
-  m_manager->bindEx4("registerPublisher", this, &Master::registerPublisher);
-  m_manager->bindEx3("unregisterPublisher", this, &Master::unregisterPublisher);
-  m_manager->bindEx4("registerSubscriber", this, &Master::registerSubscriber);
-  m_manager->bindEx3("unregisterSubscriber", this, &Master::unregisterSubscriber);
-  m_manager->bindEx2("getPublishedTopics", this, &Master::getPublishedTopics);
-  m_manager->bindEx1("getTopicTypes", this, &Master::getTopicTypes);
-  m_manager->bindEx1("getSystemState", this, &Master::getSystemState);
+  // Core master part.
+  m_rpcManager->bindEx4("registerPublisher", this, &Master::registerPublisher);
+  m_rpcManager->bindEx3("unregisterPublisher", this, &Master::unregisterPublisher);
+  m_rpcManager->bindEx4("registerSubscriber", this, &Master::registerSubscriber);
+  m_rpcManager->bindEx3("unregisterSubscriber", this, &Master::unregisterSubscriber);
+  m_rpcManager->bindEx2("getPublishedTopics", this, &Master::getPublishedTopics);
+  m_rpcManager->bindEx1("getTopicTypes", this, &Master::getTopicTypes);
+  m_rpcManager->bindEx1("getSystemState", this, &Master::getSystemState);
 
-  m_manager->bindEx2("lookupService", this, &Master::lookupService);
-  m_manager->bindEx3("unregisterService", this, &Master::unregisterService);
-  m_manager->bindEx4("registerService", this, &Master::registerService);
+  m_rpcManager->bindEx2("lookupService", this, &Master::lookupService);
+  m_rpcManager->bindEx3("unregisterService", this, &Master::unregisterService);
+  m_rpcManager->bindEx4("registerService", this, &Master::registerService);
+  m_rpcManager->bindEx2("lookupNode", this, &Master::lookupNode);
 
-  m_manager->bindEx2("hasParam", this, &Master::hasParam);
-  m_manager->bindEx3("setParam", this, &Master::setParam);
-  m_manager->bindEx2("getParam", this, &Master::getParam);
-  m_manager->bindEx2("deleteParam", this, &Master::deleteParam);
-  m_manager->bindEx2("searchParam", this, &Master::searchParam);
+  // Rosparam part.
+  m_rpcManager->bindEx2("hasParam", this, &Master::hasParam);
+  m_rpcManager->bindEx3("setParam", this, &Master::setParam);
+  m_rpcManager->bindEx2("getParam", this, &Master::getParam);
+  m_rpcManager->bindEx2("deleteParam", this, &Master::deleteParam);
+  m_rpcManager->bindEx2("searchParam", this, &Master::searchParam);
+  m_rpcManager->bindEx3("subscribeParam", this, &Master::subscribeParam);
+  m_rpcManager->bindEx3("unsubscribeParam", this, &Master::unsubscribeParam);
+  m_rpcManager->bindEx1("getParamNames", this, &Master::getParamNames);
 
-  // master_node.bind("subscribeParam", tobind(new Func<std::string, std::string, std::string, std::string,
-  // RpcValue>(subscribeParam)));
-  m_manager->bindEx1("getParamNames", this, &Master::getParamNames);
-
-  m_manager->bindEx2("lookupNode", this, &Master::lookupNode);
-
-  // master_node.bind("Time", tobind(new Func<std::string, std::string, std::string, std::string, RpcValue>(Time)));
-  // master_node.bind("Duration", tobind(new Func<std::string, std::string, std::string, std::string,
-  // RpcValue>(Duration))); master_node.bind("get_rostime", tobind(new Func<std::string, std::string, std::string,
-  // std::string, RpcValue>(get_rostime))); master_node.bind("get_time", tobind(new Func<std::string, std::string,
-  // std::string, std::string, RpcValue>(get_time)));
-
-  // roscore is also a publisher/subsriber.
+  // roscore is also a publisher/subsriber node.
   // TODO: Probably it should be moved elsewhere.
-  m_manager->bindEx1("getPublications", this, &Master::getPublications);
-  m_manager->bindEx1("getSubscriptions", this, &Master::getSubscriptions);
-  m_manager->bindEx3("requestTopic", this, &Master::requestTopic);
-  m_manager->bindEx3("publisherUpdate", this, &Master::publisherUpdate);
-  m_manager->bindEx3("paramUpdate", this, &Master::paramUpdate);
-  m_manager->bindEx1("getBusStats", this, &Master::getBusStats);
-  m_manager->bindEx1("getBusInfo", this, &Master::getBusInfo);
-  m_manager->bindEx1("getPid", this, &Master::getPid);
+  m_rpcManager->bindEx1("getPublications", this, &Master::getPublications);
+  m_rpcManager->bindEx1("getSubscriptions", this, &Master::getSubscriptions);
+  m_rpcManager->bindEx3("requestTopic", this, &Master::requestTopic);
+  m_rpcManager->bindEx3("publisherUpdate", this, &Master::publisherUpdate);
+  m_rpcManager->bindEx3("paramUpdate", this, &Master::paramUpdate);
+  m_rpcManager->bindEx1("getBusStats", this, &Master::getBusStats);
+  m_rpcManager->bindEx1("getBusInfo", this, &Master::getBusInfo);
+  m_rpcManager->bindEx1("getPid", this, &Master::getPid);
 }
 
 Master::RpcValue Master::lookupService(const std::string& caller_id, const std::string& service, Connection*)
@@ -120,7 +123,7 @@ Master::RpcValue Master::lookupService(const std::string& caller_id, const std::
 }
 
 Master::RpcValue Master::registerService(const std::string& caller_id, const std::string& service,
-  const std::string& caller_api, const std::string& service_api, Connection* conn)
+  const std::string& service_api, const std::string& caller_api, Connection* conn)
 {
   ReturnStruct r = m_handler.registerService(caller_id, service, service_api, caller_api, conn);
 
@@ -352,7 +355,8 @@ Master::RpcValue Master::subscribeParam(const std::string& caller_id, const std:
   RpcValue res = RpcValue::Array(3);
   res[0] = 1;
   res[1] = "subscribeParam done";
-  res[2] = m_parameterStorage.subscribeParam(caller_id, caller_api, key);
+  const RpcValue* val = m_parameterStorage.subscribeParam(caller_id, caller_api, key);
+  res[2] = val ? *val : RpcValue::Dict();
   return res;
 }
 
@@ -399,7 +403,6 @@ Master::RpcValue Master::getPublications(const std::string& caller_id, Connectio
 
   for (int i = 0; i < current.size(); i++) {
     RpcValue pub;
-    // TODO: Expect problems here
     pub[0] = current[i][0];
     pub[1] = current[i][1];
     response[i] = pub;

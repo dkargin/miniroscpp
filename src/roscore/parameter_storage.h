@@ -34,7 +34,10 @@ public:
   /// @param fullPath - path to node with change.
   /// @param ptr - reference value. It will be null if value is removed.
   /// @returns error code
-  Error notifyParamUpdates(const std::string& fullPath, const RpcValue* ptr);
+  Error checkParamUpdates(const std::string& fullPath, const RpcValue* ptr);
+
+  /// Callback is invoked when parameter is updated.
+  std::function<void (const std::shared_ptr<NodeRef>& nr, const std::string& fullPath, const RpcValue* value)> paramUpdateFn;
 
   /// Searches for parameter.
   std::string searchParam(const std::string& ns, const std::string& key);

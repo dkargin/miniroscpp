@@ -171,6 +171,7 @@ namespace XmlRpc {
     struct JsonState {
       // Current offset.
       int offset = 0;
+      bool sameline = false;
     };
 
     struct JsonSettings {

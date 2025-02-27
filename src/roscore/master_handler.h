@@ -7,7 +7,7 @@
 
 #include <string>
 #include <vector>
-#include <mutex>
+#include <atomic>
 
 #include "xmlrpcpp/XmlRpcValue.h"
 #include "miniros/names.h"
@@ -29,7 +29,6 @@ class MINIROS_DECL MasterHandler
 {
 protected:
   std::string uri;
-  bool done = false;
 
 public:
   using RpcValue = XmlRpc::XmlRpcValue;
@@ -37,10 +36,8 @@ public:
 
   MasterHandler(RPCManagerPtr rpcManager, RegistrationManager* regManager);
 
-  std::vector<std::string> publisher_update_task(const std::string& api, const std::string& topic, const std::vector<std::string>& pub_uris);
-
-  void _shutdown(const std::string& reason="");
-  void _ready(const std::string& _uri);
+  /// Sens command/update to a node.
+  Error sendToNode(const std::shared_ptr<NodeRef>& nr, const char* method, const RpcValue& arg1, const RpcValue& arg2 = {});
 
   std::string getUri(const std::string& caller_id) const;
 
@@ -50,8 +47,8 @@ public:
     const std::vector<std::string>& pub_uris,
     const std::vector<std::string>& sub_uris);
 
-  ReturnStruct registerService(const std::string& caller_id, const std::string &service,
-    const std::string& caller_api, const std::string& service_api, RpcConnection* conn);
+  ReturnStruct registerService(const std::string& caller_id, const std::string& service,
+    const std::string& service_api, const std::string& caller_api, RpcConnection* conn);
 
   std::string lookupService(const std::string& caller_id, const std::string& service) const;
 

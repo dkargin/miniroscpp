@@ -31,7 +31,7 @@ bool ParameterStorage::deleteParam(const std::string& caller_id, const std::stri
   std::scoped_lock<std::mutex> m_lock(m_parameterLock);
   if (fullKey == "/") {
     m_parameterRoot = RpcValue::Dict();
-    notifyParamUpdates(fullKey, nullptr);
+    checkParamUpdates(fullKey, nullptr);
     return true;
   }
 
@@ -41,7 +41,7 @@ bool ParameterStorage::deleteParam(const std::string& caller_id, const std::stri
   auto p = findParameter(path, false);
   if (p.first && p.second) {
     p.second->eraseMember(path.name());
-    notifyParamUpdates(fullKey, nullptr);
+    checkParamUpdates(fullKey, nullptr);
     return true;
   }
 
@@ -153,7 +153,7 @@ Error ParameterStorage::setParam(const std::string& caller_id, const std::string
   if (fullKey == "/") {
     if (value.getType() == RpcValue::TypeStruct) {
       m_parameterRoot = value;
-      notifyParamUpdates(fullKey, &m_parameterRoot);
+      checkParamUpdates(fullKey, &m_parameterRoot);
     } else {
       MINIROS_ERROR_NAMED("rosparam", "setParam %s - cannot set root of parameter tree to non-dictionary", ss.str().c_str());
       return Error::InvalidValue;
@@ -166,13 +166,13 @@ Error ParameterStorage::setParam(const std::string& caller_id, const std::string
     if (!param)
       return Error::ParameterNotFound;
     *param = value;
-    notifyParamUpdates(fullKey, param);
+    checkParamUpdates(fullKey, param);
   }
 
   return Error::Ok;
 }
 
-Error ParameterStorage::notifyParamUpdates(const std::string& fullKey, const RpcValue* ptr)
+Error ParameterStorage::checkParamUpdates(const std::string& fullKey, const RpcValue* ptr)
 {
   /*
    * Case1: simple param was changed. key = /node/param2/strValue1
@@ -185,6 +185,9 @@ Error ParameterStorage::notifyParamUpdates(const std::string& fullKey, const Rpc
    *  subscribers:
    *    /node/param2
    */
+  this->dumpParamStateUnsafe("params.json");
+  if (m_parameterListeners.empty() || !paramUpdateFn)
+    return Error::Ok;
   names::Path path;
   if (auto err = path.fromString(fullKey); err != Error::Ok)
     return err;
@@ -198,22 +201,18 @@ Error ParameterStorage::notifyParamUpdates(const std::string& fullKey, const Rpc
     //  Subscriber /a/b/c/d/e
     // Case2: subscriber listens to variable upper in the hierarchy.
     for (const auto& [subPath, nodes]: m_parameterListeners) {
-      if (subPath.startsWith(path)) {
-        // TODO: Notify
-      }
-      else if (path.startsWith(subPath)) {
-        // TODO: Notify.
+      if (subPath.startsWith(path) || path.startsWith(subPath)) {
+        for (auto& node: nodes)
+          paramUpdateFn(node, subPath.fullPath(), ptr);
       }
     }
   }
   else {
     // Parameter is removed/updated, or it was an elementary value.
     for (const auto& [subPath, nodes]: m_parameterListeners) {
-      if (subPath.startsWith(path)) {
-        // TODO: Notify
-      }
-      else if (path.startsWith(subPath)) {
-        // TODO: Notify.
+      if (subPath.startsWith(path) || path.startsWith(subPath)) {
+        for (auto& node: nodes)
+          paramUpdateFn(node, subPath.fullPath(), ptr);
       }
     }
   }

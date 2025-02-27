@@ -24,10 +24,47 @@ MasterHandler::MasterHandler(RPCManagerPtr rpcManager, RegistrationManager* regM
 {
 }
 
-std::vector<std::string> MasterHandler::publisher_update_task(
-  const std::string& api, const std::string& topic, const std::vector<std::string>& pub_uris)
+Error MasterHandler::sendToNode(const std::shared_ptr<NodeRef>& nr, const char* method, const RpcValue& arg1, const RpcValue& arg2)
 {
-  MINIROS_DEBUG_NAMED("rosmaster", "publisher_update_task");
+  if (!nr)
+    return Error::InvalidValue;
+
+  RpcValue args;
+  args[0] = "master";
+  args[1] = arg1;
+  args[2] = arg2;
+
+  uint32_t peer_port = 0;
+  std::string peer_host;
+  if (!miniros::network::splitURI(nr->api, peer_host, peer_port)) {
+    MINIROS_ERROR_NAMED("handler", "Failed to splitURI of node \"%s\"", nr->api.c_str());
+    return Error::InvalidURI;
+  }
+
+  XmlRpc::XmlRpcClient* client = m_rpcManager->getXMLRPCClient(peer_host, peer_port, nr->api);
+  if (!client) {
+    MINIROS_ERROR_NAMED("handler", "Failed to create client to notify node \"%s\"", nr->api.c_str());
+    return Error::SystemError;
+  }
+
+  RpcValue result;
+  if (!client->execute(method, args, result))
+    return Error::SystemError;
+  return Error::Ok;
+}
+
+std::string MasterHandler::getUri(const std::string& caller_id) const
+{
+  return uri;
+}
+
+int MasterHandler::getPid(const std::string& caller_id) const
+{
+  return getpid();
+}
+
+/*
+*MINIROS_DEBUG_NAMED("rosmaster", "publisher_update_task");
   RpcValue l;
   l[0] = api;
   l[1] = "";
@@ -56,30 +93,8 @@ std::vector<std::string> MasterHandler::publisher_update_task(
 
   RpcValue result;
   client->execute("publisherUpdate", args, result);
-  // TODO: Do we need any return value?
   return {};
-}
-
-void MasterHandler::_shutdown(const std::string& reason)
-{
-  // TODO:THREADING
-  done = true;
-}
-void MasterHandler::_ready(const std::string& _uri)
-{
-  uri = _uri;
-}
-
-std::string MasterHandler::getUri(const std::string& caller_id) const
-{
-  return uri;
-}
-
-int MasterHandler::getPid(const std::string& caller_id) const
-{
-  return getpid();
-}
-
+ */
 void MasterHandler::_notify_topic_subscribers(const std::string& topic,
   const std::vector<std::string>& pub_uris,
   const std::vector<std::string>& sub_uris)
@@ -88,12 +103,22 @@ void MasterHandler::_notify_topic_subscribers(const std::string& topic,
     return;
 
   for (const std::string& node_api: sub_uris) {
-    publisher_update_task(node_api, topic, pub_uris);
+    std::shared_ptr<NodeRef> nr = m_regManager->getNodeByAPI(node_api);
+
+    RpcValue l;
+    l[0] = nr->api;
+    l[1] = "";
+    for (int i = 0; i < pub_uris.size(); i++) {
+      RpcValue ll(pub_uris[i]);
+      l[i + 1] = ll;
+    }
+
+    sendToNode(nr, "publisherUpdate", topic, l);
   }
 }
 
 ReturnStruct MasterHandler::registerService(const std::string& caller_id, const std::string& service,
-  const std::string& caller_api, const std::string& service_api, RpcConnection*)
+    const std::string& service_api, const std::string& caller_api, RpcConnection*)
 {
   m_regManager->register_service(service, caller_id, caller_api, service_api);
   return ReturnStruct(1, "Registered [" + caller_id + "] as provider of [" + service + "]", RpcValue(1));

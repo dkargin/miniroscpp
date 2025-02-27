@@ -37,6 +37,9 @@ class XmlRpcValue;
 }
 
 namespace miniros {
+
+class RPCManager;
+
 /**
  * \brief Contains information retrieved from the master about a topic
  */
@@ -63,7 +66,7 @@ struct MINIROS_DECL TopicInfo {
  */
 class MINIROS_DECL MasterLink {
 public:
-  MasterLink();
+  MasterLink(const std::shared_ptr<RPCManager>& rpcManager);
 
   ~MasterLink();
 

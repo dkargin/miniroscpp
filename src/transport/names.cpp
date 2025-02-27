@@ -240,19 +240,19 @@ Path::Path() = default;
 
 Path::Path(const Path& other)
 {
-  m_fullName = other.m_fullName;
+  m_fullPath = other.m_fullPath;
   m_ns.reserve(other.m_ns.size());
   for (const auto& element: other.m_ns) {
-    int index = element.data() - other.m_fullName.data();
+    int index = element.data() - other.m_fullPath.data();
     assert(index >= 0);
     if (index < 0)
       continue;
-    m_ns.emplace_back(&m_fullName[index], element.size());
+    m_ns.emplace_back(&m_fullPath[index], element.size());
   }
 
   if (!other.m_lastName.empty()) {
-    int index = m_lastName.data() - other.m_fullName.data();
-    m_lastName = std::string_view(m_fullName.data() + index, other.m_lastName.size());
+    int index = other.m_lastName.data() - other.m_fullPath.data();
+    m_lastName = std::string_view(m_fullPath.data() + index, other.m_lastName.size());
   }
 }
 
@@ -260,7 +260,7 @@ Path::~Path() = default;
 
 void Path::clear()
 {
-  m_fullName.clear();
+  m_fullPath.clear();
   m_ns.clear();
   m_lastName = {};
 }
@@ -277,7 +277,7 @@ Error Path::fromString(const std::string& path)
 
   clear();
 
-  m_fullName = path;
+  m_fullPath = path;
   // Index of first symbol of current token.
   size_t tokenStart = 0;
 
@@ -293,14 +293,14 @@ Error Path::fromString(const std::string& path)
       return Error::InvalidValue;
     if (c == '/') {
       if (i > tokenStart) {
-        m_ns.push_back(std::string_view(&m_fullName[tokenStart], i - tokenStart));
+        m_ns.push_back(std::string_view(&m_fullPath[tokenStart], i - tokenStart));
       }
       tokenStart = i + 1;
     }
   }
 
   if (i > tokenStart) {
-    m_lastName = std::string_view(&m_fullName[tokenStart], i - tokenStart);
+    m_lastName = std::string_view(&m_fullPath[tokenStart], i - tokenStart);
   }
 
   return Error::Ok;
@@ -331,7 +331,7 @@ std::string Path::right(int i) const
   int pos = size() - i;
   auto v = view(pos);
 
-  const auto* end = &m_fullName[0] + m_fullName.size();
+  const auto* end = &m_fullPath[0] + m_fullPath.size();
   size_t leftLen = end - v.data();
   std::string s = std::string(v.data(), leftLen);
   if (pos == 0 && isAbsolute())
@@ -342,13 +342,13 @@ std::string Path::right(int i) const
 std::string Path::left(int i) const
 {
   if (i >= size())
-    return m_fullName;
+    return m_fullPath;
 
   auto v = view(i);
 
   const auto* end = v.data();
-  size_t len = end - m_fullName.data();
-  return std::string(m_fullName.data(), len);
+  size_t len = end - m_fullPath.data();
+  return std::string(m_fullPath.data(), len);
 }
 
 bool Path::isAbsolute() const
@@ -380,6 +380,12 @@ bool Path::startsWith(const Path& other) const
   return true;
 }
 
+const std::string& Path::fullPath() const
+{
+  return m_fullPath;
+}
+
+
 bool operator == (const Path& a, const Path& b)
 {
   if (a.m_ns.size() != b.m_ns.size())
@@ -405,7 +411,7 @@ bool operator != (const Path& a, const Path& b)
 
 bool operator < (const Path& a, const Path& b)
 {
-  return a.m_fullName < b.m_fullName;
+  return a.m_fullPath < b.m_fullPath;
 }
 
 } // namespace names
