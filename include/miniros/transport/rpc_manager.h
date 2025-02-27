@@ -148,7 +148,14 @@ public:
     Object* object, RpcValue (Object::*method)(RpcConnection* conn))
   {
     return bindEx(function_name, [=](const RpcValue& param, RpcValue& result, RpcConnection* conn) {
-      result = (object->*method)(conn);
+      try {
+        result = (object->*method)(conn);
+      } catch (XmlRpc::XmlRpcException ex) {
+        result = RpcValue::Array(3);
+        result[0] = 0;
+        result[1] = ex.getMessage();
+        result[2] = ex.getCode();
+      }
       return 0;
     }, object);
   }
@@ -158,8 +165,15 @@ public:
     Object* object, RpcValue (Object::*method)(const T0& arg0, RpcConnection* conn))
   {
     return bindEx(function_name, [=](const RpcValue& param, RpcValue& result, RpcConnection* conn) {
-      T0 arg0 = param[0].as<T0>();
-      result = (object->*method)(arg0, conn);
+      try {
+        T0 arg0 = param[0].as<T0>();
+        result = (object->*method)(arg0, conn);
+      } catch (XmlRpc::XmlRpcException ex) {
+        result = RpcValue::Array(3);
+        result[0] = 0;
+        result[1] = ex.getMessage();
+        result[2] = ex.getCode();
+      }
       return 0;
     }, object);
   }
@@ -168,9 +182,16 @@ public:
   bool bindEx2(const std::string& function_name,Object* object, RpcValue (Object::*method)(const T0& arg0, const T1& arg1, RpcConnection* conn))
   {
     return bindEx(function_name, [=](const RpcValue& param, RpcValue& result, RpcConnection* conn) {
-      T0 arg0 = param[0].as<T0>();
-      T1 arg1 = param[1].as<T1>();
-      result = (object->*method)(arg0, arg1, conn);
+      try {
+        T0 arg0 = param[0].as<T0>();
+        T1 arg1 = param[1].as<T1>();
+        result = (object->*method)(arg0, arg1, conn);
+      } catch (XmlRpc::XmlRpcException ex) {
+        result = RpcValue::Array(3);
+        result[0] = 0;
+        result[1] = ex.getMessage();
+        result[2] = ex.getCode();
+      }
       return 0;
     }, object);
   }
@@ -180,10 +201,17 @@ public:
     RpcValue (Object::*method)(const T0& arg0, const T1& arg1, const T2& arg2, RpcConnection* conn))
   {
     return bindEx(function_name, [=](const RpcValue& param, RpcValue& result, RpcConnection* conn) {
-      T0 arg0 = param[0].as<T0>();
-      T1 arg1 = param[1].as<T1>();
-      T2 arg2 = param[2].as<T2>();
-      result = (object->*method)(arg0, arg1, arg2, conn);
+      try {
+        T0 arg0 = param[0].as<T0>();
+        T1 arg1 = param[1].as<T1>();
+        T2 arg2 = param[2].as<T2>();
+        result = (object->*method)(arg0, arg1, arg2, conn);
+      } catch (XmlRpc::XmlRpcException ex) {
+        result = RpcValue::Array(3);
+        result[0] = 0;
+        result[1] = ex.getMessage();
+        result[2] = ex.getCode();
+      }
       return 0;
     }, object);
   }
@@ -193,11 +221,18 @@ public:
     RpcValue (Object::*method)(const T0& arg0, const T1& arg1, const T2& arg2, const T3& arg3, RpcConnection* conn))
   {
     return bindEx(function_name, [=](const RpcValue& param, RpcValue& result, RpcConnection* conn) {
-      T0 arg0 = param[0].as<T0>();
-      T1 arg1 = param[1].as<T1>();
-      T2 arg2 = param[2].as<T2>();
-      T3 arg3 = param[3].as<T3>();
-      result = (object->*method)(arg0, arg1, arg2, arg3, conn);
+      try {
+        T0 arg0 = param[0].as<T0>();
+        T1 arg1 = param[1].as<T1>();
+        T2 arg2 = param[2].as<T2>();
+        T3 arg3 = param[3].as<T3>();
+        result = (object->*method)(arg0, arg1, arg2, arg3, conn);
+      } catch (XmlRpc::XmlRpcException ex) {
+        result = RpcValue::Array(3);
+        result[0] = 0;
+        result[1] = ex.getMessage();
+        result[2] = ex.getCode();
+      }
       return 0;
     }, object);
   }

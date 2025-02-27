@@ -106,7 +106,7 @@ namespace XmlRpc {
       throw XmlRpcException("type error");
   }
 
-  void XmlRpcValue::assertArray(int size) const
+  void XmlRpcValue::assertArrayConst(int size) const
   {
     if (_type != TypeArray)
       throw XmlRpcException("type error: expected an array");
@@ -127,7 +127,7 @@ namespace XmlRpc {
       throw XmlRpcException("type error: expected an array");
   }
 
-  void XmlRpcValue::assertStruct() const
+  void XmlRpcValue::assertStructConst() const
   {
     if (_type != TypeStruct)
       throw XmlRpcException("type error: expected a struct");
