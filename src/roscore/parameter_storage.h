@@ -32,11 +32,14 @@ public:
 
   void computeParamUpdates(const Registrations& paramSubscribers, const std::string& caller_id, const std::string& key, const RpcValue& value);
 
-  //std::string searchParam(const std::string& caller_id, const std::string& key) const;
+  /// Searches for parameter.
+  std::string searchParam(const std::string& ns, const std::string& key);
 
-  RpcValue subscribeParam(const std::string& caller_id, const std::string& caller_api, const std::string& key);
+  /// Subscribes to a parameter or a subtree.
+  /// @returns pointer to corresponding value.
+  const RpcValue* subscribeParam(const std::string& caller_id, const std::string& caller_api, const std::string& key);
 
-  ReturnStruct unsubscribeParam(const std::string& caller_id, const std::string& caller_api, const std::string &key);
+  bool unsubscribeParam(const std::string& caller_id, const std::string& caller_api, const std::string &key);
 
   bool hasParam(const std::string& caller_id, const std::string& key) const;
 
@@ -48,15 +51,15 @@ public:
   /// No thread locks are used.
   /// @param name - annotated path to parameter
   /// @param create - create parameters if they not exist.
-  /// @returns pointer to parameter.
-  RpcValue* findParameter(const names::Name& name, bool create) const;
+  /// @returns a pair with pointer to parameter and pointer to its owner.
+  std::pair<RpcValue*, RpcValue*> findParameter(const names::Path& name, bool create) const;
 
 protected:
   /// Collection of all parameters.
   RpcValue m_parameterRoot;
 
   /// Maps parameter path to a subscriber node.
-  std::map<std::string, std::set<std::shared_ptr<NodeRef>>> m_parameterListeners;
+  std::map<names::Path, std::set<std::shared_ptr<NodeRef>>> m_parameterListeners;
 
   /// Guards access to parameter data.
   mutable std::mutex m_parameterLock;

@@ -84,6 +84,11 @@ MINIROS_DECL std::string remap(const std::string& name);
  */
 MINIROS_DECL bool validate(const std::string& name, std::string& error);
 
+/** Check if name is a private namespace */
+MINIROS_DECL bool isPrivate(const std::string& key);
+
+MINIROS_DECL bool isGlobal(const std::string& key);
+
 MINIROS_DECL const M_string& getRemappings();
 MINIROS_DECL const M_string& getUnresolvedRemappings();
 
@@ -95,17 +100,11 @@ MINIROS_DECL const M_string& getUnresolvedRemappings();
 MINIROS_DECL std::string parentNamespace(const std::string& name);
 
 /// Fully annotated name
-struct MINIROS_DECL Name {
-  /// Full name.
-  std::string fullName;
+struct MINIROS_DECL Path {
+  Path();
+  Path(const Path& other);
 
-  /// A chain of namespaces.
-  std::vector<std::string_view> ns;
-
-  Name();
-  Name(const Name& other);
-
-  ~Name();
+  ~Path();
 
   void clear();
 
@@ -122,10 +121,19 @@ struct MINIROS_DECL Name {
   /// Get final name.
   std::string name() const;
 
-  Error fromPath(const std::string& path);
+  /// Get a name from position [i, end]
+  std::string right(int i) const;
 
-  friend MINIROS_DECL bool operator == (const Name& a, const Name& b);
-  friend MINIROS_DECL bool operator != (const Name& a, const Name& b);
+  /// Get a path [0, i)
+  std::string left(int i) const;
+
+  Error fromString(const std::string& path);
+
+  bool isAbsolute() const;
+
+  friend MINIROS_DECL bool operator == (const Path& a, const Path& b);
+  friend MINIROS_DECL bool operator != (const Path& a, const Path& b);
+  friend MINIROS_DECL bool operator < (const Path& a, const Path& b);
 
 protected:
   /// Name of parameter without a namespace.
@@ -133,9 +141,14 @@ protected:
 
   /// This is an absolute path.
   bool m_absolute = false;
+  bool m_private = false;
+
+  /// Full name.
+  std::string m_fullName;
+
+  /// A chain of namespaces.
+  std::vector<std::string_view> m_ns;
 };
-
-
 
 } // namespace names
 

@@ -77,6 +77,8 @@ void Master::setupBindings()
   m_manager->bindEx3("setParam", this, &Master::setParam);
   m_manager->bindEx2("getParam", this, &Master::getParam);
   m_manager->bindEx2("deleteParam", this, &Master::deleteParam);
+  m_manager->bindEx2("searchParam", this, &Master::searchParam);
+
   // master_node.bind("subscribeParam", tobind(new Func<std::string, std::string, std::string, std::string,
   // RpcValue>(subscribeParam)));
   m_manager->bindEx1("getParamNames", this, &Master::getParamNames);
@@ -305,7 +307,7 @@ Master::RpcValue Master::getParam(const std::string& caller_id, const std::strin
 {
   RpcValue res = RpcValue::Array(3);
   RpcValue value = m_parameterStorage.getParam(caller_id, topic);
-  if (!value) {
+  if (!value.valid()) {
     res[0] = 0;
     res[1] = std::string("Parameter ") + topic + std::string(" is not set");
   } else {
@@ -328,6 +330,43 @@ Master::RpcValue Master::deleteParam(const std::string& caller_id, const std::st
   }
   return res;
 }
+
+Master::RpcValue Master::searchParam(const std::string& caller_id, const std::string& key, Connection*)
+{
+  RpcValue res = RpcValue::Array(3);
+  std::string foundKey = m_parameterStorage.searchParam(caller_id, key);
+  if (!foundKey.empty()) {
+    res[0] = 1;
+    res[1] = "searchParam success";
+  } else {
+    res[0] = 0;
+    res[1] = "searchParam param not found";
+  }
+  res[2] = foundKey;
+  return res;
+}
+
+Master::RpcValue Master::subscribeParam(const std::string& caller_id, const std::string& caller_api,
+  const std::string& key, Connection*)
+{
+  RpcValue res = RpcValue::Array(3);
+  res[0] = 1;
+  res[1] = "subscribeParam done";
+  res[2] = m_parameterStorage.subscribeParam(caller_id, caller_api, key);
+  return res;
+}
+
+Master::RpcValue Master::unsubscribeParam(const std::string& caller_id, const std::string& caller_api,
+  const std::string& key, Connection*)
+{
+  RpcValue res = RpcValue::Array(3);
+  res[0] = 1;
+  res[1] = "unsubscribeParam done";
+  if (m_parameterStorage.unsubscribeParam(caller_id, caller_api, key))
+    res[2] = 1;
+  return res;
+}
+
 
 Master::RpcValue Master::getParamNames(const std::string& caller_id, Connection*)
 {

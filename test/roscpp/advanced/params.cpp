@@ -583,6 +583,15 @@ int main(int argc, char** argv)
 {
   testing::InitGoogleTest(&argc, argv);
   miniros::init(argc, argv, "params");
+
+  // These parameters were set by a rostest/roslaunch.
+  // We set these manually to mimic behaviour of original test without roslaunch.
+  auto master = miniros::getMasterLink();
+  master->set("string", "test");
+  master->set("int", 10);
+  master->set("double", 10.5);
+  master->set("bool", false);
+
   miniros::NodeHandle nh;
 
   return RUN_ALL_TESTS();

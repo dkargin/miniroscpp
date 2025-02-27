@@ -87,16 +87,37 @@ TEST(Names, init_empty_node_name)
 
 TEST(Names, testSplit)
 {
-  names::Name name;
+  names::Path name;
 
-  EXPECT_EQ(split("/a1/a2/a3/final", name), Error::Ok);
+  EXPECT_EQ(name.fromString("/a1/a2/a3/final"), Error::Ok);
 
-  EXPECT_EQ(name.ns.size(), 3);
+  EXPECT_EQ(name.size(), 4);
   EXPECT_STREQ(name.name().c_str(), "final");
 
-  EXPECT_EQ(names::split("/a1/a2/a3/dangling/", name), Error::Ok);
-  EXPECT_EQ(name.ns.size(), 4);
+  EXPECT_EQ(name.fromString("/a1/a2/a3/dangling/"), Error::Ok);
+  EXPECT_EQ(name.size(), 4);
   EXPECT_TRUE(name.name().empty());
+}
+
+TEST(Names, testExtraction)
+{
+  const std::string srcPath = "/a1/a2/a3/a4/final";
+  names::Path name;
+
+  name.fromString(srcPath);
+
+  std::string left = name.left(3);
+
+  EXPECT_STREQ(left.c_str(), "/a1/a2/a3/");
+
+  std::string right3 = name.right(3);
+  EXPECT_STREQ(right3.c_str(), "a3/a4/final");
+
+  std::string right1 = name.right(1);
+  EXPECT_STREQ(right1.c_str(), "final");
+
+  std::string rightA = name.right(name.size());
+  EXPECT_STREQ(rightA.c_str(), srcPath.c_str());
 }
 
 int main(int argc, char** argv)
