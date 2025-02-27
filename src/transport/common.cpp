@@ -109,12 +109,14 @@ struct SmartFd {
 
 /// Portable version of systemd notifier.
 static int portableSystemdNotify(const char *message) {
+
   union sockaddr_union {
     struct sockaddr sa;
     struct sockaddr_un sun;
-  } socket_addr = {
-    .sun.sun_family = AF_UNIX,
-  };
+  } socket_addr = {};
+
+  socket_addr.sun.sun_family = AF_UNIX;
+
   size_t path_length, message_length;
   SmartFd fd;
 
