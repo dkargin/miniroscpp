@@ -73,10 +73,12 @@ int main(int argc, const char * argv[]) {
   master.start();
   // TODO: subsribe to rosout and publish to rosout_agg.
 
+  miniros::notifyNodeStarted();
   while (!g_sigintReceived && master.ok()) {
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
   }
 
+  miniros::notifyNodeExiting();
   master.stop();
 
   return EXIT_SUCCESS;

@@ -37,6 +37,7 @@
 #include <cstdlib>
 #include <cstdio>
 #include <cerrno>
+#include <cstring>
 #include <cassert>
 #include <sys/types.h>
 
@@ -52,6 +53,17 @@
 
 #include <signal.h>
 
+#include "internal_config.h"
+
+#ifdef MINIROS_USE_LIBSYSTEMD
+
+#include <sys/socket.h>
+#include <sys/un.h>
+
+#ifdef HAVE_LIBSYSTEMD
+#include <systemd/sd-daemon.h>
+#endif
+#endif
 namespace miniros {
 
 void disableAllSignalsInThisThread()
@@ -71,8 +83,7 @@ void disableAllSignalsInThisThread()
 // Following advice at https://stackoverflow.com/questions/10121560/stdthread-naming-your-thread
 void setThreadName(const char* threadName) {
 #if defined(WIN32)
-
-	// TODO: Implement.
+  // TODO: Implement.
 #elif defined(__linux__)
   prctl(PR_SET_NAME, threadName,0,0,0);
 #else
@@ -80,5 +91,113 @@ void setThreadName(const char* threadName) {
   pthread_setname_np(handle, threadName);
 #endif
 }
+
+#ifdef MINIROS_USE_LIBSYSTEMD
+
+struct SmartFd {
+  int fd = -1;
+
+  ~SmartFd()
+  {
+    if (fd >= 0) {
+      close(fd);
+    }
+  }
+
+  operator int() const { return fd;}
+};
+
+/// Portable version of systemd notifier.
+static int portableSystemdNotify(const char *message) {
+
+  union sockaddr_union {
+    struct sockaddr sa;
+    struct sockaddr_un sun;
+  } socket_addr = {};
+
+  socket_addr.sun.sun_family = AF_UNIX;
+
+  size_t path_length, message_length;
+  SmartFd fd;
+
+  const char *socket_path;
+
+  /* Verify the argument first */
+  if (!message)
+    return -EINVAL;
+
+  message_length = strlen(message);
+  if (message_length == 0)
+    return -EINVAL;
+
+  /* If the variable is not set, the protocol is a noop */
+  socket_path = getenv("NOTIFY_SOCKET");
+  if (!socket_path)
+    return 0; /* Not set? Nothing to do */
+
+  /* Only AF_UNIX is supported, with path or abstract sockets */
+  if (socket_path[0] != '/' && socket_path[0] != '@')
+    return -EAFNOSUPPORT;
+
+  path_length = strlen(socket_path);
+  /* Ensure there is room for NUL byte */
+  if (path_length >= sizeof(socket_addr.sun.sun_path))
+    return -E2BIG;
+
+  memcpy(socket_addr.sun.sun_path, socket_path, path_length);
+
+  /* Support for abstract socket */
+  if (socket_addr.sun.sun_path[0] == '@')
+    socket_addr.sun.sun_path[0] = 0;
+
+  fd.fd = socket(AF_UNIX, SOCK_DGRAM|SOCK_CLOEXEC, 0);
+  if (fd < 0)
+    return -errno;
+
+  if (connect(fd, &socket_addr.sa, offsetof(struct sockaddr_un, sun_path) + path_length) != 0)
+    return -errno;
+
+  ssize_t written = write(fd, message, message_length);
+  if (written != (ssize_t) message_length)
+    return written < 0 ? -errno : -EPROTO;
+
+  return 1; /* Notified! */
+}
+
+#endif
+/// Sends signal to systemd.
+/// More info can be found at:
+/// https://www.freedesktop.org/software/systemd/man/latest/sd_notify.html#
+Error systemdNotify(const char* status)
+{
+#ifdef HAVE_LIBSYSTEMD
+  if (sd_notify(0, status) != 0) {
+    return Error::SystemError;
+  }
+  return Error::Ok;
+#else
+  if (portableSystemdNotify(status))
+    return Error::Ok;
+  return Error::SystemError;
+#endif
+  return Error::NotImplemented;
+}
+
+Error notifyNodeStarted()
+{
+#ifdef MINIROS_USE_LIBSYSTEMD
+  return systemdNotify("READY=1");
+#endif
+  return Error::NotSupported;
+}
+
+Error notifyNodeExiting()
+{
+#ifdef MINIROS_USE_LIBSYSTEMD
+  return systemdNotify("READY=1");
+#endif
+  return Error::NotSupported;
+}
+
 
 } // namespace miniros

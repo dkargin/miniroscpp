@@ -6,6 +6,8 @@
 #define MINIROS_MASTER_H
 
 #include "master_handler.h"
+#include "parameter_storage.h"
+
 #include "miniros/transport/rpc_manager.h"
 
 /*
@@ -133,17 +135,23 @@ public:
   ///  - key (str) - Parameter name.
   ///  - value (XMLRPCLegalValue) - Parameter value.
   /// Returns (int, str, int) (code, statusMessage, ignore)
-  RpcValue setParam(const std::string& caller_api, const std::string& topic, const RpcValue& value, Connection* /*conn*/);
+  RpcValue setParam(const std::string& caller_api, const std::string& key, const RpcValue& value, Connection* /*conn*/);
 
   /// Retrieve a value for an existing parameter, if it exists.
-  RpcValue getParam(const std::string& caller_id, const std::string& topic, Connection*);
+  RpcValue getParam(const std::string& caller_id, const std::string& key, Connection*);
 
   /// Delete a parameter, if it exists
   /// Parameters:
   ///  - caller_id (str) - ROS caller ID
   ///  - key (str) - Parameter name.
   /// Returns (int, str, int) - (code, statusMessage, ignore)
-  RpcValue deleteParam(const std::string& caller_d, const std::string& key, Connection*);
+  RpcValue deleteParam(const std::string& caller_id, const std::string& key, Connection*);
+
+  RpcValue searchParam(const std::string& caller_id, const std::string& key, Connection*);
+
+  RpcValue subscribeParam(const std::string& caller_id, const std::string& caller_api, const std::string& key, Connection*);
+  RpcValue unsubscribeParam(const std::string& caller_id, const std::string& caller_api, const std::string& key, Connection*);
+
 
   RpcValue getParamNames(const std::string& caller_id, Connection*);
 
@@ -222,8 +230,13 @@ public:
 protected:
   int m_port = -1;
   std::string m_host;
-  MasterHandler m_handler;
+
   std::shared_ptr<RPCManager> m_manager;
+
+  RegistrationManager m_regManager;
+
+  MasterHandler m_handler;
+  ParameterStorage m_parameterStorage;
 };
 
 } // namespace master

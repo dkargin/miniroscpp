@@ -180,10 +180,7 @@ private:
   // This works around a problem with the OSX linker that causes the static variable declared by
   // ROS_ERROR to error with missing symbols when it's used directly in the templated call() method above
   // This for some reason only showed up in the rxtools package
-  void deserializeFailed(const std::exception& e)
-  {
-    MINIROS_ERROR("Exception thrown while while deserializing service call: %s", e.what());
-  }
+  void deserializeFailed(const std::exception& e);
 
   struct Impl
   {

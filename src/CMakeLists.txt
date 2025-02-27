@@ -1,6 +1,21 @@
 add_subdirectory(replacements)
 
-# Injecting flags for debug.
+
+if (PkgConfig_FOUND)
+  pkg_check_modules(PKG_LIBS REQUIRED libsystemd)
+  if (PKG_LIBS_FOUND)
+    set(LIBSYSTEMD_FOUND TRUE)
+  else()
+    set(LIBSYSTEMD_FOUND FALSE)
+  endif()
+else ()
+  set(LIBSYSTEMD_FOUND FALSE)
+endif()
+
+if (LIBSYSTEMD_FOUND AND MINIROS_USE_LIBSYSTEMD)
+  message(STATUS "Will enable systemd support")
+  set(HAVE_LIBSYSTEMD TRUE)
+endif()
 
 # execinfo.h is needed for backtrace on glibc systems
 CHECK_INCLUDE_FILE(execinfo.h HAVE_EXECINFO_H)
@@ -11,9 +26,7 @@ CHECK_FUNCTION_EXISTS(backtrace HAVE_GLIBC_BACKTRACE)
 
 # Not everybody has <ifaddrs.h> (e.g., embedded arm-linux)
 CHECK_INCLUDE_FILES(ifaddrs.h HAVE_IFADDRS_H)
-# Not everybody has trunc (e.g., Windows, embedded arm-linux)
-CHECK_FUNCTION_EXISTS(trunc HAVE_TRUNC)
-# Not everybody has epoll (e.g., Windows, BSD, embedded arm-linux) 
+# Not everybody has epoll (e.g., Windows, BSD, embedded arm-linux)
 CHECK_CXX_SYMBOL_EXISTS(epoll_wait "sys/epoll.h" HAVE_EPOLL)
 
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/internal_config.h.in" internal_config.h)
@@ -113,11 +126,25 @@ if (MINIROS_ROSBAG_USE_OPENSSL_ENCRYPTION)
 	endif()
 endif()
 
+set(XMLRPC_SRC
+    xmlrpc/XmlRpcClient.cpp
+    xmlrpc/XmlRpcDispatch.cpp
+    xmlrpc/XmlRpcServer.cpp
+    xmlrpc/XmlRpcServerConnection.cpp
+    xmlrpc/XmlRpcServerMethod.cpp
+    xmlrpc/XmlRpcSocket.cpp
+    xmlrpc/XmlRpcSource.cpp
+    xmlrpc/XmlRpcUtil.cpp
+    xmlrpc/XmlRpcValue.cpp
+    xmlrpc/b64decode.cpp
+    xmlrpc/b64encode.cpp
+)
 
 set(transport_SRC
     shape_shifter.cpp
     observer.cpp
 
+    transport/advertise_service_options.cpp
     transport/callback_queue.cpp
     transport/common.cpp
     transport/connection.cpp
@@ -182,36 +209,25 @@ set(master_SRC
     roscore/master.cpp
     roscore/master_handler.cpp
     roscore/registrations.cpp
-    roscore/registration_manager.cpp)
+    roscore/registration_manager.cpp
+    roscore/parameter_storage.cpp
+)
 
 if (MINIROS_USE_SYSTEM_PROGRAM_OPTIONS)
     find_package(Boost REQUIRED COMPONENTS program_options)
     add_library(impl::program_options ALIAS Boost::program_options)
 endif ()
 
-add_library(miniros_time STATIC ${rostime_SRC})
-target_include_directories(miniros_time
-  PUBLIC
-    $<BUILD_INTERFACE:${MINIROS_INCLUDE_DIRS}>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
-)
-target_link_libraries(miniros_time PUBLIC ${CMAKE_THREAD_LIBS_INIT})
-
-set_property(TARGET miniros_time PROPERTY POSITION_INDEPENDENT_CODE ON)
-add_library(miniros::time ALIAS miniros_time)
-
-
 if (MINIROS_BUILD_SHARED_LIBS)
-  add_library(roscxx SHARED ${cpp_common_SRC} ${transport_SRC} ${master_SRC})
+  add_library(roscxx SHARED ${cpp_common_SRC} ${transport_SRC} ${master_SRC} ${rostime_SRC} ${XMLRPC_SRC})
 else()
-  add_library(roscxx ${cpp_common_SRC} ${transport_SRC} ${master_SRC})
+  add_library(roscxx ${cpp_common_SRC} ${transport_SRC} ${master_SRC} ${rostime_SRC} ${XMLRPC_SRC})
 endif()
 
 set_property(TARGET roscxx PROPERTY CXX_STANDARD 17)
 
 target_link_libraries(roscxx
-    PUBLIC miniros::time
-    PRIVATE xmlrpcpp rt stdc++fs ${console_bridge_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
+    PRIVATE rt stdc++fs ${console_bridge_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} ${PKG_LIBS_LIBRARIES})
 
 target_compile_definitions(roscxx PRIVATE rostime_EXPORTS miniros_EXPORTS)
 
@@ -222,8 +238,11 @@ target_include_directories(roscxx PRIVATE
     ${MINIROS_INCLUDE_GENERATED_DIRS}
 )
 
+find_package(PkgConfig QUIET)
+
 add_executable(miniroscore roscore/miniroscore.cpp)
-target_link_libraries(miniroscore roscxx xmlrpcpp impl::program_options)
+
+target_link_libraries(miniroscore roscxx impl::program_options)
 target_include_directories(miniroscore PRIVATE ${MINIROS_INCLUDE_ROOT})
 
 set(bag_storage_SRC
@@ -252,7 +271,7 @@ target_include_directories(bag_storage PRIVATE ${MINIROS_INCLUDE_DIRS} ${rosbag_
 target_compile_definitions(bag_storage PRIVATE rosbag_EXPORTS rosbag_storage_EXPORTS roslz4_EXPORTS)
 
 set_property(TARGET bag_storage PROPERTY CXX_STANDARD 17)
-target_link_libraries(bag_storage PRIVATE ${ENCRYPT_LIBRARIES} ${rosbag_INTERNAL_LIBS} ${rosbag_EXTERNAL_LIBS} miniros_time roscxx)
+target_link_libraries(bag_storage PRIVATE ${ENCRYPT_LIBRARIES} ${rosbag_INTERNAL_LIBS} ${rosbag_EXTERNAL_LIBS} roscxx)
 
 
 if (MINIROS_BUILD_ROSBAG_APPS)
@@ -288,7 +307,6 @@ endif()
 set(MINIROS_LIBRARY roscxx PARENT_SCOPE)
 set(MINIROS_EXPORT
     roscxx bag_storage
-    miniros_time
     miniroscore
     ${rosbag_INTERNAL_LIBS}
     ${rosbag_APPS}

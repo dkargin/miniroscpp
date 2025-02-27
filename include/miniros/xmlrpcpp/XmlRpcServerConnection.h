@@ -111,7 +111,7 @@ public:
   // XmlRpcSource interface implementation
   //! Handle IO on the client connection socket.
   //!   @param eventType Type of IO event that occurred. @see XmlRpcDispatch::EventType.
-  virtual unsigned handleEvent(unsigned eventType);
+  unsigned handleEvent(unsigned eventType) override;
 
   const NetAddress& getClientAddress() const;
 

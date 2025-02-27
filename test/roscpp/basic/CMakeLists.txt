@@ -1,20 +1,22 @@
 set(CMAKE_CXX_STANDARD 17)
 include_directories(${MINIROS_INCLUDE_TRANSPORT})
 
-miniros_add_test(miniroscpp-test_version test_version.cpp)
-miniros_add_test(miniroscpp-test_header test_header.cpp)
-miniros_add_test(miniroscpp-test_poll_set test_poll_set.cpp)
+set(TEST_GROUP basic)
+
+miniros_add_test(${TEST_GROUP}-test_version test_version.cpp)
+miniros_add_test(${TEST_GROUP}-test_header test_header.cpp)
+miniros_add_test(${TEST_GROUP}-test_poll_set test_poll_set.cpp)
 
 if(WIN32)
-  target_link_libraries(miniroscpp-test_poll_set ws2_32)
+  target_link_libraries(${TEST_GROUP}-test_poll_set ws2_32)
 endif()
 
-miniros_add_test(miniroscpp-test_transport_tcp test_transport_tcp.cpp)
-miniros_add_test(miniroscpp-test_subscription_queue test_subscription_queue.cpp)
-miniros_add_test(miniroscpp-test_callback_queue test_callback_queue.cpp)
-miniros_add_test(miniroscpp-test_names test_names.cpp)
-miniros_add_test(miniroscpp-test_args test_args.cpp)
-miniros_add_test(miniroscpp-test_observer test_observer.cpp)
+miniros_add_test(${TEST_GROUP}-test_transport_tcp test_transport_tcp.cpp)
+miniros_add_test(${TEST_GROUP}-test_subscription_queue test_subscription_queue.cpp)
+miniros_add_test(${TEST_GROUP}-test_callback_queue test_callback_queue.cpp)
+miniros_add_test(${TEST_GROUP}-test_names test_names.cpp)
+miniros_add_test(${TEST_GROUP}-test_args test_args.cpp)
+miniros_add_test(${TEST_GROUP}-test_observer test_observer.cpp)
 
 if(catkin_FOUND AND CATKIN_ENABLE_TESTING)
   message(STATUS "Trying to find rostest for more complex testing")
@@ -127,7 +129,7 @@ if (CATKIN_FOUND AND ROSTEST_FOUND)
   add_rostest(launch/search_param.xml)
 
   add_rostest(launch/stamped_topic_statistics_with_empty_timestamp.xml)
-  add_rostest(launch/topic_statistic_frequency.xml DEPENDENCIES miniroscpp-publisher_rate miniroscpp-subscriber miniroscpp-topic_statistic_frequency)
+  add_rostest(launch/topic_statistic_frequency.xml DEPENDENCIES ${TEST_GROUP}-publisher_rate ${TEST_GROUP}-subscriber ${TEST_GROUP}-topic_statistic_frequency)
 
   # Test spinners
   add_rostest(launch/spinners.xml)

@@ -34,7 +34,8 @@ public:
 
   bool reverse_lookup(const std::string& caller_api) const;
 
-  std::shared_ptr<NodeRef> getNode(const std::string& nodeName) const;
+  /// Find node by its name.
+  std::shared_ptr<NodeRef> getNodeByName(const std::string& nodeName) const;
 
   void _register(Registrations& r, const std::string& key, const std::string& caller_id, const std::string& caller_api,
     const std::string& service_api = "");

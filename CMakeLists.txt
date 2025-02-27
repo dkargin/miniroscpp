@@ -30,6 +30,7 @@ option(MINIROS_BUILD_TESTS "Build tests" ${MINIROS_ADDITIONAL_COMPONENTS})
 option(MINIROS_BUILD_SHARED_LIBS "Build shared version of miniros" ON)
 option(MINIROS_ROSBAG_USE_GPGME_ENCRYPTION "Use GPGME encryption support" OFF)
 option(MINIROS_ROSBAG_USE_OPENSSL_ENCRYPTION "Use openssl encryption for rosbag" OFF)
+option(MINIROS_USE_LIBSYSTEMD "Signal systemd when node has actually started" ON)
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
@@ -88,12 +89,11 @@ if (WIN32)
   add_definitions(-D_CRT_SECURE_NO_WARNINGS)
 endif()
 
-set(XMLRPCPP_SRC_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/xmlrpcpp)
+set(XMLRPC_SRC_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/src/xmlrpc)
 
 find_package(Threads REQUIRED)
 
 add_subdirectory(external)
-add_subdirectory(xmlrpcpp)
 add_subdirectory(src)
 
 if (catkin_FOUND)

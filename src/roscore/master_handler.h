@@ -7,13 +7,13 @@
 
 #include <string>
 #include <vector>
-#include <list>
-#include <functional>
+#include <mutex>
 
 #include "xmlrpcpp/XmlRpcValue.h"
-
 #include "miniros/names.h"
+
 #include "registration_manager.h"
+#include "parameter_storage.h"
 
 namespace XmlRpc {
 class XmlRpcServerConnection;
@@ -35,18 +35,9 @@ public:
   using RpcValue = XmlRpc::XmlRpcValue;
   using RpcConnection = XmlRpc::XmlRpcServerConnection;
 
-  /// Instance of parameter.
-  struct Parameter {
-    RpcValue value;
-    bool save = false;
+  MasterHandler(RPCManagerPtr rpcManager, RegistrationManager* regManager);
 
-    Parameter() = default;
-    explicit Parameter(const RpcValue& _value) : value(_value) {}
-  };
-
-  MasterHandler(RPCManagerPtr rpcManager);
-
-  std::list<std::string> publisher_update_task(const std::string& api, const std::string& topic, const std::vector<std::string>& pub_uris);
+  std::vector<std::string> publisher_update_task(const std::string& api, const std::string& topic, const std::vector<std::string>& pub_uris);
 
   void _shutdown(const std::string& reason="");
   void _ready(const std::string& _uri);
@@ -58,22 +49,6 @@ public:
   std::string getUri(const std::string& caller_id) const;
 
   int getPid(const std::string& caller_id) const;
-
-  int deleteParam(const std::string& caller_id, const std::string& key);
-
-  void setParam(const std::string& caller_id, const std::string& key, const RpcValue& value);
-
-  RpcValue getParam(const std::string& caller_id, const std::string& key) const;
-
-  std::string searchParam(const std::string& caller_id, const std::string& key) const;
-
-  RpcValue subscribeParam(const std::string& caller_id, const std::string& caller_api, const std::string& key);
-
-  ReturnStruct unsubscribeParam(const std::string& caller_id, const std::string& caller_api, const std::string &key);
-
-  bool hasParam(const std::string& caller_id, const std::string& key) const;
-
-  std::vector<std::string> getParamNames(const std::string& caller_id);
 
   int _notify_param_subscribers(const std::map<std::string, std::pair<std::string, RpcValue>>& updates);
 
@@ -121,16 +96,12 @@ public:
   SystemState getSystemState(const std::string& caller_id) const;
 
 protected:
-  RegistrationManager m_regManager;
+  RegistrationManager* m_regManager;
 
   RPCManagerPtr m_rpcManager;
 
-  /// Collection of all parameters.
-  std::map<std::string, Parameter> m_parameters;
-
   /// Maps topicName to type md5.
   std::map<std::string, std::string> m_topicTypes;
-
 };
 
 } // namespace master

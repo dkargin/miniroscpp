@@ -28,23 +28,22 @@
 #ifndef MINIROSCPP_COMMON_H
 #define MINIROSCPP_COMMON_H
 
-#include <stdint.h>
-#include <assert.h>
-#include <stddef.h>
-#include <string>
-#include <map>
+/// This file contains some very common includes.
 
 #include "miniros/rosassert.h"
 #include "miniros/internal/forwards.h"
 #include "miniros/serialized_message.h"
+#include "miniros/errors.h"
 
 namespace miniros
 {
 
-typedef std::map<std::string, std::string> M_string;
-
 void disableAllSignalsInThisThread();
 void setThreadName(const char* name);
+
+/// Notify system that node has successfully started.
+Error notifyNodeStarted();
+Error notifyNodeExiting();
 
 }
 

@@ -25,6 +25,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "miniros/console.h"
 #include "miniros/service_client.h"
 #include "miniros/transport/service_server_link.h"
 #include "miniros/transport/connection.h"
@@ -208,6 +209,11 @@ std::string ServiceClient::getService()
   }
 
   return "";
+}
+
+void ServiceClient::deserializeFailed(const std::exception& e)
+{
+  MINIROS_ERROR("Exception thrown while while deserializing service call: %s", e.what());
 }
 
 }

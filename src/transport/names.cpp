@@ -25,15 +25,12 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "miniros/names.h"
-#include "miniros/this_node.h"
-#include "miniros/transport/file_log.h"
-
-#include <miniros/console.h>
-#include <miniros/rosassert.h>
-
+#include <cassert>
 #include <cstring>
 #include <sstream>
+
+#include "miniros/names.h"
+#include "miniros/this_node.h"
 
 namespace miniros
 {
@@ -62,6 +59,16 @@ bool isValidCharInName(char c)
   }
 
   return false;
+}
+
+bool isPrivate(const std::string& key)
+{
+  return !key.empty() && key[0] == '~';
+}
+
+bool isGlobal(const std::string& key)
+{
+  return !key.empty() && key[0] == '/';
 }
 
 bool validate(const std::string& name, std::string& error)
@@ -145,7 +152,7 @@ std::string resolve(const std::string& ns, const std::string& name, bool _remap)
   std::string error;
   if (!validate(name, error))
   {
-  	throw InvalidNameException(error);
+    throw InvalidNameException(error);
   }
 
   if (name.empty())
@@ -227,6 +234,165 @@ std::string parentNamespace(const std::string& name)
   else if (last_pos == 0)
     return "/";
   return stripped_name.substr(0, last_pos);
+}
+
+Path::Path() = default;
+
+Path::Path(const Path& other)
+{
+  m_fullName = other.m_fullName;
+  m_ns.reserve(other.m_ns.size());
+  for (const auto& element: other.m_ns) {
+    int index = element.data() - other.m_fullName.data();
+    assert(index >= 0);
+    if (index < 0)
+      continue;
+    m_ns.emplace_back(&m_fullName[index], element.size());
+  }
+
+  if (!other.m_lastName.empty()) {
+    int index = m_lastName.data() - other.m_fullName.data();
+    m_lastName = std::string_view(m_fullName.data() + index, other.m_lastName.size());
+  }
+}
+
+Path::~Path() = default;
+
+void Path::clear()
+{
+  m_fullName.clear();
+  m_ns.clear();
+  m_lastName = {};
+}
+
+std::string Path::name() const
+{
+  return std::string(m_lastName.data(), m_lastName.size());
+}
+
+Error Path::fromString(const std::string& path)
+{
+  if (path.empty())
+    return Error::Ok;
+
+  clear();
+
+  m_fullName = path;
+  // Index of first symbol of current token.
+  size_t tokenStart = 0;
+
+  if (path[0] == '/')
+    m_absolute = true;
+  else if (path[0] == '~')
+    m_private = true;
+
+  size_t i = 0;
+  for (;i < path.size(); i++) {
+    auto c = path[i];
+    if (!isValidCharInName(c))
+      return Error::InvalidValue;
+    if (c == '/') {
+      if (i > tokenStart) {
+        m_ns.push_back(std::string_view(&m_fullName[tokenStart], i - tokenStart));
+      }
+      tokenStart = i + 1;
+    }
+  }
+
+  if (i > tokenStart) {
+    m_lastName = std::string_view(&m_fullName[tokenStart], i - tokenStart);
+  }
+
+  return Error::Ok;
+}
+
+size_t Path::size() const
+{
+  size_t s = m_ns.size();
+  if (!m_lastName.empty())
+    s++;
+  return s;
+}
+
+/// Return string element.
+std::string Path::str(int i) const
+{
+  auto v = this->view(i);
+  return std::string(v.data(), v.size());
+}
+
+std::string Path::right(int i) const
+{
+  if (i > size())
+    return "";
+  if (i == 0)
+    return "";
+
+  int pos = size() - i;
+  auto v = view(pos);
+
+  const auto* end = &m_fullName[0] + m_fullName.size();
+  size_t leftLen = end - v.data();
+  std::string s = std::string(v.data(), leftLen);
+  if (pos == 0 && isAbsolute())
+     return std::string("/") + s;
+  return s;
+}
+
+std::string Path::left(int i) const
+{
+  if (i >= size())
+    return m_fullName;
+
+  auto v = view(i);
+
+  const auto* end = v.data();
+  size_t len = end - m_fullName.data();
+  return std::string(m_fullName.data(), len);
+}
+
+bool Path::isAbsolute() const
+{
+  return m_absolute;
+}
+
+
+/// Return string view element.
+std::string_view Path::view(int i) const
+{
+  if (i == m_ns.size())
+    return m_lastName;
+  if (i < m_ns.size())
+    return m_ns[i];
+  return {};
+}
+
+bool operator == (const Path& a, const Path& b)
+{
+  if (a.m_ns.size() != b.m_ns.size())
+    return false;
+  for (size_t i = 0; i < a.m_ns.size(); i++) {
+    if (a.m_ns[i] != b.m_ns[i])
+      return false;
+  }
+  return a.m_lastName == b.m_lastName;
+}
+
+bool operator != (const Path& a, const Path& b)
+{
+  if (a.m_ns.size() != b.m_ns.size())
+    return true;
+
+  for (size_t i = 0; i < a.m_ns.size(); i++) {
+    if (a.m_ns[i] != b.m_ns[i])
+      return true;
+  }
+  return a.m_lastName != b.m_lastName;
+}
+
+bool operator < (const Path& a, const Path& b)
+{
+  return a.m_fullName < b.m_fullName;
 }
 
 } // namespace names

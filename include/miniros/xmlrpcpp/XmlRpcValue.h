@@ -89,6 +89,9 @@ namespace XmlRpc {
     /// Creates array of specified size.
     NODISCARD static XmlRpcValue Array(int size);
 
+    /// Creates a dictionary object.
+    NODISCARD static XmlRpcValue Dict();
+
     //! Erase the current value
     void clear() { invalidate(); }
 
@@ -141,6 +144,9 @@ namespace XmlRpc {
     //! Return the type of the value stored. \see Type.
     Type const &getType() const { return _type; }
 
+    /// Check if value is a primitive type.
+    bool isPrimitive() const;
+
     //! Return the size for string, base64, array, and struct values.
     int size() const;
 
@@ -149,6 +155,9 @@ namespace XmlRpc {
 
     //! Check for the existence of a struct member by name.
     bool hasMember(const std::string& name) const;
+
+    //! Erase member of a struct.
+    bool eraseMember(const std::string& key);
 
     //! Decode xml. Destroys any existing value.
     bool fromXml(std::string const& valueXml, int* offset);

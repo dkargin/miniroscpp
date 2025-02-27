@@ -23,8 +23,8 @@
 
 #include <gtest/gtest.h>
 
-#include <b64/encode.h>
-#include <b64/decode.h>
+#include "b64/encode.h"
+#include "b64/decode.h"
 
 // Test Data for a Base64 encode/decode test
 class Base64TestData {
@@ -44,7 +44,7 @@ TEST_P(Base64Test, Encode) {
   std::stringstream is;
   is.write(&data[0], data.size());
   std::stringstream os;
-  base64::encoder encoder;
+  base64::Encoder encoder;
   encoder.encode(is, os);
 
   std::string expected = GetParam().encoded;
@@ -60,7 +60,7 @@ TEST_P(Base64Test, Decode) {
   std::vector<char> out;
   out.resize(encoded_size);
 
-  base64::decoder decoder;
+  base64::Decoder decoder;
   const int size = decoder.decode(in.c_str(), encoded_size, out.data());
   ASSERT_LE(0, size);
   out.resize(size);
@@ -70,7 +70,7 @@ TEST_P(Base64Test, Decode) {
   EXPECT_EQ(expected, out);
 }
 
-INSTANTIATE_TEST_CASE_P(MultilineTest, Base64Test, ::testing::Values(
+INSTANTIATE_TEST_SUITE_P(MultilineTest, Base64Test, ::testing::Values(
         Base64TestData({0}, "AA==\n"),
         Base64TestData({1, 2}, "AQI=\n"),
         Base64TestData({1, 2, 3}, "AQID\n"),
@@ -123,7 +123,7 @@ TEST_P(Base64ErrorTest, DecodeErrors) {
   std::vector<char> out;
   out.resize(encoded_size);
 
-  base64::decoder decoder;
+  base64::Decoder decoder;
   const int size = decoder.decode(in.c_str(), encoded_size, out.data());
   // Assert that size is greater or equal to 0, to make sure that the follow-up
   // resize will always succeed.
@@ -133,7 +133,7 @@ TEST_P(Base64ErrorTest, DecodeErrors) {
   // FIXME(future work): decode does not report error on garbage input
 }
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     Multiline,
     Base64ErrorTest,
     ::testing::Values(// Tests on incomplete data.
