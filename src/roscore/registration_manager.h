@@ -6,6 +6,7 @@
 #define MINIROS_REGISTRATION_MANAGER_H
 
 #include <memory>
+#include <mutex>
 
 #include "registrations.h"
 
@@ -24,12 +25,6 @@ public:
   Registrations services;
   Registrations param_subscribers;
 
-  /// <summary>
-  /// Param 1 = caller_id
-  /// Param 2 = NodeRef
-  /// </summary>
-  std::map<std::string, std::shared_ptr<NodeRef>> nodes;
-
   RegistrationManager();
 
   bool reverse_lookup(const std::string& caller_api) const;
@@ -37,10 +32,16 @@ public:
   /// Find node by its name.
   std::shared_ptr<NodeRef> getNodeByName(const std::string& nodeName) const;
 
+  /// Find node by an API URI.
+  std::shared_ptr<NodeRef> getNodeByAPI(const std::string& nodeName) const;
+
+  /// Register or update node API.
+  std::shared_ptr<NodeRef> registerNodeApi(const std::string& caller_id, const std::string& caller_api, bool& rtn);
+
   void _register(Registrations& r, const std::string& key, const std::string& caller_id, const std::string& caller_api,
     const std::string& service_api = "");
 
-  ReturnStruct _unregister(Registrations& r, const std::string& key, const std::string& caller_id,
+  ReturnStruct unregisterObject(Registrations& r, const std::string& key, const std::string& caller_id,
     const std::string& caller_api, const std::string& service_api = "");
 
   void register_service(const std::string& service, const std::string& caller_id, const std::string& caller_api,
@@ -60,7 +61,11 @@ public:
 
   ReturnStruct unregister_param_subscriber(const std::string& param, const std::string& caller_id, const std::string& caller_api);
 
-  std::shared_ptr<NodeRef> registerNodeApi(const std::string& caller_id, const std::string& caller_api, bool& rtn);
+protected:
+  mutable std::mutex m_guard;
+
+  /// Maps node name/id to a ref.
+  std::map<std::string, std::shared_ptr<NodeRef>> m_nodes;
 };
 
 } // namespace master

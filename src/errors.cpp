@@ -20,6 +20,10 @@ const char* Error::toString() const {
       return "Not implemented";
     case Error::NotSupported:
       return "Not supported";
+    case Error::ParameterNotFound:
+      return "Parameter not found";
+   case Error::InvalidURI:
+     return "Invalid URI";
   }
   return "Unknown error";
 }

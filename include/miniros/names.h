@@ -127,9 +127,15 @@ struct MINIROS_DECL Path {
   /// Get a path [0, i)
   std::string left(int i) const;
 
+  /// Returns a string with a full original path.
+  const std::string& fullPath() const;
+
   Error fromString(const std::string& path);
 
   bool isAbsolute() const;
+
+  /// Check if this path starts with 'other' path.
+  bool startsWith(const Path& other) const;
 
   friend MINIROS_DECL bool operator == (const Path& a, const Path& b);
   friend MINIROS_DECL bool operator != (const Path& a, const Path& b);
@@ -143,8 +149,8 @@ protected:
   bool m_absolute = false;
   bool m_private = false;
 
-  /// Full name.
-  std::string m_fullName;
+  /// Full path.
+  std::string m_fullPath;
 
   /// A chain of namespaces.
   std::vector<std::string_view> m_ns;

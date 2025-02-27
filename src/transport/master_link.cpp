@@ -41,6 +41,8 @@
 namespace miniros {
 
 struct MasterLink::Internal {
+  std::shared_ptr<RPCManager> rpcManager;
+
   uint32_t port = 0;
   std::string host;
   std::string uri;
@@ -54,11 +56,13 @@ struct MasterLink::Internal {
 #if defined(__APPLE__)
   std::mutex xmlrpc_call_mutex;
 #endif
+
+  Internal(const std::shared_ptr<RPCManager>& rpcManager) : rpcManager(rpcManager) {}
 };
 
-MasterLink::MasterLink() : internal_(nullptr)
+MasterLink::MasterLink(const std::shared_ptr<RPCManager>& rpcManager) : internal_(nullptr)
 {
-  internal_ = new Internal();
+  internal_ = new Internal(rpcManager);
 }
 
 MasterLink::~MasterLink()
@@ -192,11 +196,13 @@ bool MasterLink::getNodes(std::vector<std::string>& nodes) const
 bool MasterLink::execute(const std::string& method, const RpcValue& request, RpcValue& response,
   RpcValue& payload, bool wait_for_master) const
 {
+  if (!internal_)
+    return false;
   miniros::SteadyTime start_time = miniros::SteadyTime::now();
 
   std::string master_host = getHost();
   uint32_t master_port = getPort();
-  RPCManagerPtr manager = RPCManager::instance();
+  RPCManagerPtr manager = internal_->rpcManager;
   if (!manager)
     return false;
   XmlRpc::XmlRpcClient* c = manager->getXMLRPCClient(master_host, master_port, "/");
@@ -488,7 +494,7 @@ bool MasterLink::getParamImpl(const std::string& key, RpcValue& v, bool use_cach
       if (internal_->subscribed_params.insert(mapped_key).second) {
         RpcValue params, result, payload;
         params[0] = this_node::getName();
-        params[1] = RPCManager::instance()->getServerURI();
+        params[1] = internal_->rpcManager->getServerURI();
         params[2] = mapped_key;
 
         if (!this->execute("subscribeParam", params, result, payload, false)) {
@@ -1029,9 +1035,12 @@ void MasterLink::initParam(const M_string& remappings)
     }
   }
 
-  RPCManager::instance()->bind("paramUpdate", [this](const RpcValue& params, RpcValue& result) {
-    return this->paramUpdateCallback(params, result);
-  });
+  if (internal_->rpcManager) {
+    internal_->rpcManager->bind("paramUpdate",
+      [this](const RpcValue& params, RpcValue& result) {
+        return paramUpdateCallback(params, result);
+      });
+  }
 }
 
 } // namespace miniros

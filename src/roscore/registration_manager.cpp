@@ -4,6 +4,8 @@
 
 #include "registration_manager.h"
 
+#include <console.h>
+
 namespace miniros {
 namespace master {
 
@@ -22,9 +24,20 @@ bool RegistrationManager::reverse_lookup(const std::string& caller_api) const
 
 std::shared_ptr<NodeRef> RegistrationManager::getNodeByName(const std::string& node) const
 {
-  auto it = nodes.find(node);
-  if (it != nodes.end())
+  std::scoped_lock<std::mutex> lock(m_guard);
+  auto it = m_nodes.find(node);
+  if (it != m_nodes.end())
     return it->second;
+  return {};
+}
+
+std::shared_ptr<NodeRef> RegistrationManager::getNodeByAPI(const std::string& api) const
+{
+  std::scoped_lock<std::mutex> lock(m_guard);
+  for (auto it = m_nodes.begin(); it != m_nodes.end(); it++) {
+    if (it->second->api == api)
+      return it->second;
+  }
   return {};
 }
 
@@ -47,18 +60,20 @@ void RegistrationManager::_register(Registrations& r, const std::string& key, co
   r.registerObj(key, caller_id, caller_api, service_api);
 }
 
-ReturnStruct RegistrationManager::_unregister(Registrations& r, const std::string& key,
+ReturnStruct RegistrationManager::unregisterObject(Registrations& r, const std::string& key,
   const std::string& caller_id, const std::string& caller_api, const std::string& service_api)
 {
+  std::scoped_lock<std::mutex> lock(m_guard);
+
   ReturnStruct ret;
-  if (nodes.count(caller_id)) {
-    auto node_ref = nodes[caller_id];
+  if (m_nodes.count(caller_id)) {
+    auto node_ref = m_nodes[caller_id];
     ret = r.unregisterObj(key, caller_id, caller_api, service_api);
     if (ret.statusCode == 1) {
       node_ref->remove(r.type(), key);
     }
     if (node_ref->is_empty()) {
-      nodes.erase(caller_id);
+      m_nodes.erase(caller_id);
     }
   } else {
     std::stringstream ss;
@@ -96,33 +111,34 @@ ReturnStruct RegistrationManager::unregister_service(const std::string& service,
   const std::string& service_api)
 {
   std::string caller_api = "";
-  return _unregister(services, service, caller_id, caller_api, service_api);
-  // return new ReturnStruct(ret, msg);
+  return unregisterObject(services, service, caller_id, caller_api, service_api);
 }
 
 ReturnStruct RegistrationManager::unregister_subscriber(const std::string& topic, const std::string& caller_id,
   const std::string& caller_api)
 {
-  return _unregister(subscribers, topic, caller_id, caller_api);
+  return unregisterObject(subscribers, topic, caller_id, caller_api);
 }
 
 ReturnStruct RegistrationManager::unregister_publisher(const std::string& topic, const std::string& caller_id,
   const std::string& caller_api)
 {
-  return _unregister(publishers, topic, caller_id, caller_api);
+  return unregisterObject(publishers, topic, caller_id, caller_api);
 }
 
 ReturnStruct RegistrationManager::unregister_param_subscriber(const std::string& param, const std::string& caller_id,
   const std::string& caller_api)
 {
-  return _unregister(param_subscribers, param, caller_id, caller_api);
+  return unregisterObject(param_subscribers, param, caller_id, caller_api);
 }
 
 std::shared_ptr<NodeRef> RegistrationManager::registerNodeApi(const std::string& caller_id, const std::string& caller_api, bool& rtn)
 {
+  std::scoped_lock<std::mutex> lock(m_guard);
+
   std::shared_ptr<NodeRef> node_ref;
-  if (nodes.count(caller_id))
-    node_ref = nodes[caller_id];
+  if (m_nodes.count(caller_id))
+    node_ref = m_nodes[caller_id];
 
   std::string bumped_api = "";
   if (node_ref) {
@@ -131,13 +147,15 @@ std::shared_ptr<NodeRef> RegistrationManager::registerNodeApi(const std::string&
       return node_ref;
     } else {
       bumped_api = node_ref->api;
+      MINIROS_WARN_NAMED("reg", "New node registered with name=\"%s\" api=%s", caller_id.c_str(), caller_api.c_str());
+      // TODO: Send signal to make this node shut down.
       // thread_pool.queue_task(bumped_api, shutdown_node_task, (bumped_api, caller_id, "new node registered with same
       // name"))
     }
   }
 
   node_ref.reset(new NodeRef(caller_id, caller_api));
-  nodes[caller_id] = node_ref;
+  m_nodes[caller_id] = node_ref;
 
   rtn = !bumped_api.empty();
   return node_ref;

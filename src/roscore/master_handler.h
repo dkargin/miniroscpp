@@ -7,7 +7,7 @@
 
 #include <string>
 #include <vector>
-#include <mutex>
+#include <atomic>
 
 #include "xmlrpcpp/XmlRpcValue.h"
 #include "miniros/names.h"
@@ -29,7 +29,6 @@ class MINIROS_DECL MasterHandler
 {
 protected:
   std::string uri;
-  bool done = false;
 
 public:
   using RpcValue = XmlRpc::XmlRpcValue;
@@ -37,32 +36,19 @@ public:
 
   MasterHandler(RPCManagerPtr rpcManager, RegistrationManager* regManager);
 
-  std::vector<std::string> publisher_update_task(const std::string& api, const std::string& topic, const std::vector<std::string>& pub_uris);
-
-  void _shutdown(const std::string& reason="");
-  void _ready(const std::string& _uri);
-
-  bool _ok() const;
-
-  void shutdown(const std::string& caller_id, const std::string& msg = "");
+  /// Sens command/update to a node.
+  Error sendToNode(const std::shared_ptr<NodeRef>& nr, const char* method, const RpcValue& arg1, const RpcValue& arg2 = {});
 
   std::string getUri(const std::string& caller_id) const;
 
   int getPid(const std::string& caller_id) const;
 
-  int _notify_param_subscribers(const std::map<std::string, std::pair<std::string, RpcValue>>& updates);
-
-  void _param_update_task(const std::string& caller_id, const std::string& caller_api,
-      const std::string& param_key, const RpcValue& param_value);
-
   void _notify_topic_subscribers(const std::string& topic,
     const std::vector<std::string>& pub_uris,
     const std::vector<std::string>& sub_uris);
 
-  void _notify_service_update(const std::string& service, const std::string& service_api);
-
-  ReturnStruct registerService(const std::string& caller_id, const std::string &service,
-    const std::string& caller_api, const std::string& service_api, RpcConnection* conn);
+  ReturnStruct registerService(const std::string& caller_id, const std::string& service,
+    const std::string& service_api, const std::string& caller_api, RpcConnection* conn);
 
   std::string lookupService(const std::string& caller_id, const std::string& service) const;
 

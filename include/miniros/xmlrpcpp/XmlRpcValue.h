@@ -124,18 +124,18 @@ namespace XmlRpc {
       return static_cast<T>(*this);
     }
 
-    XmlRpcValue const& operator[](int i) const { assertArray(i+1); return _value.asArray->at(i); }
+    XmlRpcValue const& operator[](int i) const { assertArrayConst(i+1); return _value.asArray->at(i); }
     XmlRpcValue& operator[](int i)             { assertArray(i+1); return _value.asArray->at(i); }
-    XmlRpcValue& operator[](std::string const& k) const { assertStruct(); return (*_value.asStruct)[k]; }
+    XmlRpcValue& operator[](std::string const& k) const { assertStructConst(); return (*_value.asStruct)[k]; }
     XmlRpcValue& operator[](std::string const& k) { assertStruct(); return (*_value.asStruct)[k]; }
-    XmlRpcValue& operator[](const char* k) const { assertStruct(); std::string s(k); return (*_value.asStruct)[s]; }
+    XmlRpcValue& operator[](const char* k) const { assertStructConst(); std::string s(k); return (*_value.asStruct)[s]; }
     XmlRpcValue& operator[](const char* k) { assertStruct(); std::string s(k); return (*_value.asStruct)[s]; }
 
     iterator begin() {assertStruct(); return (*_value.asStruct).begin(); }
     iterator end() {assertStruct(); return (*_value.asStruct).end(); }
 
-    const_iterator begin() const {assertStruct(); return (*_value.asStruct).begin(); }
-    const_iterator end() const {assertStruct(); return (*_value.asStruct).end(); }
+    const_iterator begin() const {assertStructConst(); return (*_value.asStruct).begin(); }
+    const_iterator end() const {assertStructConst(); return (*_value.asStruct).end(); }
 
     // Accessors
     //! Return true if the value has been set to something.
@@ -168,6 +168,18 @@ namespace XmlRpc {
     //! Write the value (no xml encoding)
     std::ostream& write(std::ostream& os) const;
 
+    struct JsonState {
+      // Current offset.
+      int offset = 0;
+      bool sameline = false;
+    };
+
+    struct JsonSettings {
+      int tabs = 2;
+    };
+
+    std::ostream& writeJson(std::ostream& os, JsonState& state, const JsonSettings& settings) const;
+
     // Formatting
     //! Return the format used to write double values.
     static std::string const& getDoubleFormat() { return _doubleFormat; }
@@ -182,9 +194,9 @@ namespace XmlRpc {
     // Type checking
     void assertTypeOrInvalid(Type t);
     void assertType(Type t) const;
-    void assertArray(int size) const;
+    void assertArrayConst(int size) const;
     void assertArray(int size);
-    void assertStruct() const;
+    void assertStructConst() const;
     void assertStruct();
 
     // XML decoding

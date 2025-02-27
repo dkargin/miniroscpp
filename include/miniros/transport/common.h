@@ -29,6 +29,7 @@
 #define MINIROSCPP_COMMON_H
 
 /// This file contains some very common includes.
+#include <string>
 
 #include "miniros/rosassert.h"
 #include "miniros/internal/forwards.h"
@@ -38,12 +39,14 @@
 namespace miniros
 {
 
-void disableAllSignalsInThisThread();
-void setThreadName(const char* name);
+MINIROS_DECL void disableAllSignalsInThisThread();
+MINIROS_DECL void setThreadName(const char* name);
 
 /// Notify system that node has successfully started.
-Error notifyNodeStarted();
-Error notifyNodeExiting();
+MINIROS_DECL Error notifyNodeStarted();
+MINIROS_DECL Error notifyNodeExiting();
+
+MINIROS_DECL std::string generatePseudoUuid();
 
 }
 

@@ -42,6 +42,7 @@
 
 #include "miniros/master_link.h"
 
+#include <miniros/transport/rpc_manager.h>
 #include <miniros/transport/topic_manager.h>
 
 using namespace XmlRpc;
@@ -64,8 +65,7 @@ int setenv(const char *name, const char *value, int overwrite)
 
 TEST(CheckMaster, checkMaster)
 {
-  miniros::MasterLink master_link;
-
+  miniros::MasterLink master_link(miniros::RPCManager::instance());
   ASSERT_EQ(master_link.check(), g_should_exist);
 }
 

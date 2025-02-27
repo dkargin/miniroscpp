@@ -2,6 +2,8 @@
 // Created by dkargin on 2/25/25.
 //
 
+#include <fstream>
+
 #include "registration_manager.h"
 #include "parameter_storage.h"
 
@@ -21,7 +23,7 @@ ParameterStorage::~ParameterStorage()
   m_regManager = nullptr;
 }
 
-int ParameterStorage::deleteParam(const std::string& caller_id, const std::string& key)
+bool ParameterStorage::deleteParam(const std::string& caller_id, const std::string& key)
 {
   MINIROS_INFO_NAMED("rosparam", "deleteParam %s from %s", key.c_str(), caller_id.c_str());
   std::string fullKey = miniros::names::resolve(caller_id, key, false);
@@ -29,7 +31,8 @@ int ParameterStorage::deleteParam(const std::string& caller_id, const std::strin
   std::scoped_lock<std::mutex> m_lock(m_parameterLock);
   if (fullKey == "/") {
     m_parameterRoot = RpcValue::Dict();
-    return 1;
+    checkParamUpdates(fullKey, nullptr);
+    return true;
   }
 
   names::Path path;
@@ -38,10 +41,11 @@ int ParameterStorage::deleteParam(const std::string& caller_id, const std::strin
   auto p = findParameter(path, false);
   if (p.first && p.second) {
     p.second->eraseMember(path.name());
+    checkParamUpdates(fullKey, nullptr);
+    return true;
   }
 
-  // TODO: Notify.
-  return 1;
+  return false;
 }
 
 std::string ParameterStorage::searchParam(const std::string& ns, const std::string& key)
@@ -94,8 +98,8 @@ std::string ParameterStorage::searchParam(const std::string& ns, const std::stri
   names::Path keyPath;
   keyPath.fromString(key);
   std::string key_ns = keyPath.str(0);
-  if (hasParam("",  ns + "/" + key_ns)) {
-    return ns + "/" + key;
+  if (hasParam(ns, key_ns)) {
+    return names::resolve(ns, key, false);
   }
 
   std::vector<std::string> allParams = this->getParamNames("");
@@ -135,20 +139,6 @@ std::string ParameterStorage::searchParam(const std::string& ns, const std::stri
   return {};
 }
 
-
-/*  def set_param(self, key, value, notify_task=None, caller_id=None):
-        Set the parameter in the parameter dictionary.
-        """
-        @param key: parameter key
-        @type  key: str
-        @param value: parameter value
-        @param notify_task: function to call with subscriber updates. updates is of the form
-        [(subscribers, param_key, param_value)*]. The empty dictionary represents an unset parameter.
-        @type  notify_task: fn(updates)
-        @param caller_id: the caller id
-        @type caller_id: str
-        """
-*/
 Error ParameterStorage::setParam(const std::string& caller_id, const std::string& key, const RpcValue& value)
 {
   std::stringstream ss;
@@ -163,29 +153,29 @@ Error ParameterStorage::setParam(const std::string& caller_id, const std::string
   if (fullKey == "/") {
     if (value.getType() == RpcValue::TypeStruct) {
       m_parameterRoot = value;
-      // TODO: Notify all listeners.
+      checkParamUpdates(fullKey, &m_parameterRoot);
     } else {
       MINIROS_ERROR_NAMED("rosparam", "setParam %s - cannot set root of parameter tree to non-dictionary", ss.str().c_str());
       return Error::InvalidValue;
     }
   } else {
     names::Path name;
-    name.fromString(fullKey);
+    if (auto err = name.fromString(fullKey); !err)
+      return err;
     RpcValue* param = findParameter(name, true).first;
     if (!param)
-      return Error::InvalidValue;
+      return Error::ParameterNotFound;
     *param = value;
-    return Error::Ok;
+    checkParamUpdates(fullKey, param);
   }
-  // TODO: Notify
+
   return Error::Ok;
 }
 
-void ParameterStorage::computeParamUpdates(const Registrations& paramSubscribers,
-  const std::string& caller_id, const std::string& key, const RpcValue& value)
+Error ParameterStorage::checkParamUpdates(const std::string& fullKey, const RpcValue* ptr)
 {
   /*
-   * key = /node/param2/strValue1
+   * Case1: simple param was changed. key = /node/param2/strValue1
    * storage:
    *  /node
    *    param1
@@ -195,74 +185,39 @@ void ParameterStorage::computeParamUpdates(const Registrations& paramSubscribers
    *  subscribers:
    *    /node/param2
    */
+  this->dumpParamStateUnsafe("params.json");
+  if (m_parameterListeners.empty() || !paramUpdateFn)
+    return Error::Ok;
+  names::Path path;
+  if (auto err = path.fromString(fullKey); err != Error::Ok)
+    return err;
 
-/*
-def compute_param_updates(subscribers, param_key, param_value, caller_id_to_ignore=None):
-    """
-    Compute subscribers that should be notified based on the parameter update
-    @param subscribers: parameter subscribers
-    @type  subscribers: Registrations
-    @param param_key: parameter key
-    @type  param_key: str
-    @param param_value: parameter value
-    @type  param_value: str
-    @param caller_id_to_ignore: the caller to ignore
-    @type caller_id_to_ignore: str
-    """
+  // Subscriber /a/b
+  // Updated:  /a/b/c/d
+  if (ptr && ptr->getType() == RpcValue::TypeStruct) {
+    // This is big dictionary update.
+    // Case1: subscriber listens to internal variable.
+    //  Updated: /a/b/c
+    //  Subscriber /a/b/c/d/e
+    // Case2: subscriber listens to variable upper in the hierarchy.
+    for (const auto& [subPath, nodes]: m_parameterListeners) {
+      if (subPath.startsWith(path) || path.startsWith(subPath)) {
+        for (auto& node: nodes)
+          paramUpdateFn(node, subPath.fullPath(), ptr);
+      }
+    }
+  }
+  else {
+    // Parameter is removed/updated, or it was an elementary value.
+    for (const auto& [subPath, nodes]: m_parameterListeners) {
+      if (subPath.startsWith(path) || path.startsWith(subPath)) {
+        for (auto& node: nodes)
+          paramUpdateFn(node, subPath.fullPath(), ptr);
+      }
+    }
+  }
 
-    # logic correct for both updates and deletions
-
-    if not subscribers:
-        return []
-
-    # end with a trailing slash to optimize startswith check from
-    # needing an extra equals check
-    if param_key != SEP:
-        param_key = canonicalize_name(param_key) + SEP
-
-    # compute all the updated keys
-    if type(param_value) == dict:
-        all_keys = _compute_all_keys(param_key, param_value)
-    else:
-        all_keys = None
-
-    updates = []
-
-    # subscriber gets update if anything in the subscribed namespace is updated or if its deleted
-    for sub_key in subscribers.iterkeys():
-        ns_key = sub_key
-        if ns_key[-1] != SEP:
-            ns_key = sub_key + SEP
-        if param_key.startswith(ns_key):
-            node_apis = subscribers[sub_key]
-            if caller_id_to_ignore is not None:
-                node_apis = [
-                    (caller_id, caller_api)
-                    for (caller_id, caller_api) in node_apis
-                    if caller_id != caller_id_to_ignore]
-            updates.append((node_apis, param_key, param_value))
-        elif all_keys is not None and ns_key.startswith(param_key) \
-             and not sub_key in all_keys:
-            # parameter was deleted
-            node_apis = subscribers[sub_key]
-            updates.append((node_apis, sub_key, {}))
-
-    # add updates for exact matches within tree
-    if all_keys is not None:
-        # #586: iterate over parameter tree for notification
-        for key in all_keys:
-            if key in subscribers:
-                # compute actual update value
-                sub_key = key[len(param_key):]
-                namespaces = [x for x in sub_key.split(SEP) if x]
-                val = param_value
-                for ns in namespaces:
-                    val = val[ns]
-
-                updates.append((subscribers[key], key, val))
-
-    return updates
-*/
+  return Error::Ok;
 }
 
 std::pair<ParameterStorage::RpcValue*, ParameterStorage::RpcValue*> ParameterStorage::findParameter(const names::Path& name, bool create) const
@@ -405,6 +360,15 @@ std::vector<std::string> ParameterStorage::getParamNames(const std::string& call
   std::scoped_lock<std::mutex> lock(m_parameterLock);
   depthFirstWalk(m_parameterRoot, names, stack);
   return names;
+}
+
+void ParameterStorage::dumpParamStateUnsafe(const char* file) const
+{
+  std::ofstream out(file);
+
+  RpcValue::JsonState jstate;
+  RpcValue::JsonSettings jsettings;
+  m_parameterRoot.writeJson(out, jstate, jsettings);
 }
 
 

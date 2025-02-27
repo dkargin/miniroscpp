@@ -85,7 +85,7 @@ TEST(Names, init_empty_node_name)
   EXPECT_THROW(miniros::init(argc, argv, ""), miniros::InvalidNameException);
 }
 
-TEST(Names, testSplit)
+TEST(Names, testBasic)
 {
   names::Path name;
 
@@ -97,6 +97,23 @@ TEST(Names, testSplit)
   EXPECT_EQ(name.fromString("/a1/a2/a3/dangling/"), Error::Ok);
   EXPECT_EQ(name.size(), 4);
   EXPECT_TRUE(name.name().empty());
+
+
+  names::Path path2;
+  path2.fromString("/a1/a2");
+  EXPECT_TRUE(name.startsWith(path2));
+
+  path2.fromString("/a1/a2/");
+  EXPECT_TRUE(name.startsWith(path2));
+
+  path2.fromString("/a1/a2/a3/dangling/");
+  EXPECT_TRUE(name.startsWith(path2));
+
+  path2.fromString("/a1/a2/a3/dangling/df/fs");
+  EXPECT_FALSE(name.startsWith(path2));
+
+  path2.fromString("/a1/a2/b1");
+  EXPECT_FALSE(name.startsWith(path2));
 }
 
 TEST(Names, testExtraction)

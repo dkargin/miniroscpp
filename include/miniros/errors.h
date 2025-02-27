@@ -23,6 +23,10 @@ struct MINIROS_DECL Error {
     NotImplemented,
     /// Implementation is disabled or not available for platform.
     NotSupported,
+    /// Parameter was not found,
+    ParameterNotFound,
+    /// URI is invalid.
+    InvalidURI,
   };
 
   Error(Error_t c) : code(c)

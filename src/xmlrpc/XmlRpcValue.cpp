@@ -106,7 +106,7 @@ namespace XmlRpc {
       throw XmlRpcException("type error");
   }
 
-  void XmlRpcValue::assertArray(int size) const
+  void XmlRpcValue::assertArrayConst(int size) const
   {
     if (_type != TypeArray)
       throw XmlRpcException("type error: expected an array");
@@ -127,7 +127,7 @@ namespace XmlRpc {
       throw XmlRpcException("type error: expected an array");
   }
 
-  void XmlRpcValue::assertStruct() const
+  void XmlRpcValue::assertStructConst() const
   {
     if (_type != TypeStruct)
       throw XmlRpcException("type error: expected a struct");
@@ -681,9 +681,123 @@ namespace XmlRpc {
           os << ']';
           break;
         }
-      
     }
     
+    return os;
+  }
+
+  std::ostream& writePad(std::ostream& os, int num, char padding=' ')
+  {
+    for (int i=0; i<num; ++i) {
+      os << padding;
+    }
+    return os;
+  }
+
+  std::ostream& XmlRpcValue::writeJson(std::ostream& os, JsonState& state, const JsonSettings& settings) const
+  {
+    /*
+    *{
+      "first_name": "John",
+      "last_name": "Smith",
+      "is_alive": true,
+      "age": 27,
+      "address": {
+        "street_address": "21 2nd Street",
+        "city": "New York",
+        "state": "NY",
+        "postal_code": "10021-3100"
+      },
+     */
+    switch (_type) {
+      default:           break;
+      case TypeInvalid:
+        os << "null";
+        break;
+      case TypeStruct:
+      {
+        bool smallDict = (this->size() < 2);
+        if (!state.sameline)
+          writePad(os, state.offset);
+        os << '{';
+        if (!smallDict)
+          os << std::endl;
+        state.offset += settings.tabs;
+        ValueStruct::const_iterator it;
+        /*
+         * "var" : { "var2" : 1 },
+         */
+        for (it=_value.asStruct->begin(); it!=_value.asStruct->end(); ++it)
+        {
+          // Adding comma from previous line.
+          if (it != _value.asStruct->begin())
+            os << ',' << std::endl;
+          if (!smallDict)
+            writePad(os, state.offset);
+          os << "\"" << it->first << "\": ";
+          bool same = state.sameline;
+          state.sameline = true;
+          it->second.writeJson(os, state, settings);
+          state.sameline = same;
+        }
+        if (!smallDict)
+          os << std::endl;
+        state.offset -= settings.tabs;
+        if (!smallDict)
+          writePad(os, state.offset);
+        os << '}';
+        break;
+      }
+      case TypeArray:
+      {
+        size_t s = _value.asArray->size();
+        bool smallArray = (s < 2);
+        os << '[';
+        if (!smallArray) {
+          os << std::endl;
+          state.offset += settings.tabs;
+        }
+        for (size_t i=0; i<s; ++i)
+        {
+          if (i > 0)
+            os << ", " << std::endl;
+          if (!smallArray) {
+            writePad(os, state.offset);
+          }
+          _value.asArray->at(i).writeJson(os, state, settings);
+        }
+        if (!smallArray) {
+          os << std::endl;
+          state.offset -= settings.tabs;
+        }
+        if (!smallArray)
+          writePad(os, state.offset);
+        os << ']';
+        break;
+      }
+      case TypeBoolean:  os << (_value.asBool ? "true" : "false"); break;
+      case TypeInt:      os << _value.asInt; break;
+      case TypeDouble:   os << _value.asDouble; break;
+      case TypeString:   os << "\"" << *_value.asString << "\""; break;
+      case TypeDateTime:
+      {
+        struct tm* t = _value.asTime;
+        char buf[20];
+        std::snprintf(buf, sizeof(buf)-1, "%4d%02d%02dT%02d:%02d:%02d",
+          t->tm_year,t->tm_mon,t->tm_mday,t->tm_hour,t->tm_min,t->tm_sec);
+        buf[sizeof(buf)-1] = 0;
+        os << buf;
+        break;
+      }
+      case TypeBase64:
+      {
+        std::stringstream buffer;
+        buffer.write(_value.asBinary->data(), _value.asBinary->size());
+        base64::Encoder encoder;
+        encoder.encode(buffer, os);
+        break;
+      }
+    } //switch
     return os;
   }
 
