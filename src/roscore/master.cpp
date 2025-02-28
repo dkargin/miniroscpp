@@ -34,6 +34,11 @@ Master::~Master()
   }
 }
 
+std::string Master::getUri() const
+{
+  return std::string("http://") + m_host + ":" + std::to_string(m_port);
+}
+
 bool Master::start()
 {
   if (!m_rpcManager) {
@@ -93,17 +98,6 @@ void Master::setupBindings()
   m_rpcManager->bindEx3("subscribeParam", this, &Master::subscribeParam);
   m_rpcManager->bindEx3("unsubscribeParam", this, &Master::unsubscribeParam);
   m_rpcManager->bindEx1("getParamNames", this, &Master::getParamNames);
-
-  // roscore is also a publisher/subsriber node.
-  // TODO: Probably it should be moved elsewhere.
-  m_rpcManager->bindEx1("getPublications", this, &Master::getPublications);
-  m_rpcManager->bindEx1("getSubscriptions", this, &Master::getSubscriptions);
-  m_rpcManager->bindEx3("requestTopic", this, &Master::requestTopic);
-  m_rpcManager->bindEx3("publisherUpdate", this, &Master::publisherUpdate);
-  m_rpcManager->bindEx3("paramUpdate", this, &Master::paramUpdate);
-  m_rpcManager->bindEx1("getBusStats", this, &Master::getBusStats);
-  m_rpcManager->bindEx1("getBusInfo", this, &Master::getBusInfo);
-  m_rpcManager->bindEx1("getPid", this, &Master::getPid);
 }
 
 Master::RpcValue Master::lookupService(const std::string& caller_id, const std::string& service, Connection*)
@@ -386,95 +380,6 @@ Master::RpcValue Master::getParamNames(const std::string& caller_id, Connection*
 
   res[2] = response;
   return res;
-}
-
-
-// This is SlaveAPI request to node.
-Master::RpcValue Master::getPublications(const std::string& caller_id, Connection*)
-{
-  RpcValue res = RpcValue::Array(3);
-  res[0] = 1;
-  res[1] = "publications";
-
-  RpcValue response;
-
-  // response.Size = 0;
-  auto current = m_handler.getPublishedTopics(caller_id, "");
-
-  for (int i = 0; i < current.size(); i++) {
-    RpcValue pub;
-    pub[0] = current[i][0];
-    pub[1] = current[i][1];
-    response[i] = pub;
-  }
-  res[2] = response;
-  return res;
-}
-
-// This is SlaveAPI request to node.
-Master::RpcValue Master::getSubscriptions(const std::string& caller_id, Connection*)
-{
-  throw std::runtime_error("NOT IMPLEMENTED YET!");
-}
-
-// This is SlaveAPI request to node.
-Master::RpcValue Master::requestTopic(
-  const std::string& caller_id, const std::string& topic, const RpcValue& protocols, Connection*)
-{
-  throw std::runtime_error("NOT IMPLEMENTED YET!");
-  return {};
-}
-
-// This is SlaveAPI request to node.
-Master::RpcValue Master::publisherUpdate(
-  const std::string& caller_id, const std::string& topic, const RpcValue& publishers, Connection*)
-{
-  return {};
-}
-
-// This is SlaveAPI request to node.
-Master::RpcValue Master::paramUpdate(
-  const std::string& caller_id, const std::string& key, const RpcValue& value, Connection*)
-{
-  // TODO: Implement
-  RpcValue result = RpcValue::Array(3);
-  result[0] = 0;
-  result[1] = "Not implemented yet";
-  result[2] = 0;
-  return result;
-}
-
-// This is SlaveAPI request to node.
-Master::RpcValue Master::getBusStats(const std::string& caller_id, Connection* conn)
-{
-  // TODO: Implement
-  RpcValue result = RpcValue::Array(3);
-  result[0] = 0;
-  result[1] = "Not implemented yet";
-  result[2] = 0;
-  return result;
-}
-
-// This is SlaveAPI request to node.
-Master::RpcValue Master::getBusInfo(const std::string& caller_id, Connection* conn)
-{
-  // TODO: Implement
-  RpcValue result = RpcValue::Array(3);
-  result[0] = 0;
-  result[1] = "Not implemented yet";
-  result[2] = 0;
-  return result;
-}
-
-// This is SlaveAPI request to node.
-Master::RpcValue Master::getPid(const std::string& caller_id, Connection* conn)
-{
-  MINIROS_INFO("getPid from %s", caller_id.c_str());
-  RpcValue result = RpcValue::Array(3);
-  result[0] = 1;
-  result[1] = "Master PID";
-  result[2] = m_handler.getPid(caller_id);
-  return result;
 }
 
 } // namespace master

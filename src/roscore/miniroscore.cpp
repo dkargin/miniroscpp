@@ -5,12 +5,15 @@
 #include <cstdlib>
 #include <csignal>
 #include <atomic>
+#include <filesystem>
 
 #include "master.h"
 #include "rosout.h"
 
 #include "miniros/transport/callback_queue.h"
 #include "miniros/xmlrpcpp/XmlRpcUtil.h"
+
+#include "miniros/common.h"
 
 /// This define is injected in replacements/CMakeLists.txt
 #ifdef USE_LOCAL_PROGRAM_OPTIONS
@@ -39,6 +42,7 @@ int main(int argc, const char ** argv) {
     ("help,h", "produce help message")
     ("xmlrpc_log", po::value<int>()->default_value(1), "Verbosity level of XmlRpc logging")
     ("rosout", po::value<bool>()->default_value(true), "Enable rosout log aggregator")
+    ("dir", po::value<std::string>(), "Path to working directory")
     ;
 
   po::variables_map vm;
@@ -65,8 +69,15 @@ int main(int argc, const char ** argv) {
     return EXIT_SUCCESS;
   }
 
-  auto rpcManager = miniros::RPCManager::instance();
-  miniros::master::Master master(rpcManager);
+  if (vm.count("dir")) {
+    std::string wd = vm["dir"].as<std::string>();
+
+    if (!miniros::makeDirectory(wd))
+      return EXIT_FAILURE;
+
+    if (!miniros::changeCurrentDirectory(wd))
+      return EXIT_FAILURE;
+  }
 
   bool useRosout = vm.count("rosout") && vm["rosout"].as<bool>();
   if (vm.count("xmlrpc_log")) {
@@ -74,19 +85,34 @@ int main(int argc, const char ** argv) {
     XmlRpc::setVerbosity(level);
   }
 
+  MINIROS_INFO("Creating RPCManager");
+
+  // Standalone RPC manger for rosmaster.
+  auto masterRpcManager = std::make_shared<miniros::RPCManager>();
+
+  MINIROS_INFO("Creating Master object");
+  miniros::master::Master master(masterRpcManager);
+
+  MINIROS_INFO("Starting Master thread");
   master.start();
 
   std::unique_ptr<miniros::master::Rosout> r;
   if (useRosout) {
-    int argc_ = 1;
-    char** argv_ = const_cast<char**>(argv);
-    miniros::init(argc_, argv_, "rosout", miniros::init_options::NoRosout | miniros::init_options::NoSigintHandler);
+    std::map<std::string, std::string> remappings;
+
+    remappings["__master"] = master.getUri();
+
+    MINIROS_INFO("Creating Rosout object");
+    miniros::init(remappings, "rosout", miniros::init_options::NoRosout | miniros::init_options::NoSigintHandler);
+    r.reset(new miniros::master::Rosout());
   }
 
   miniros::CallbackQueue* callbackQueue = miniros::getGlobalCallbackQueue();
   if (!callbackQueue) {
     return EXIT_FAILURE;
   }
+
+  MINIROS_INFO("All components have started");
   miniros::notifyNodeStarted();
 
   miniros::WallDuration period(0.02);
@@ -94,8 +120,13 @@ int main(int argc, const char ** argv) {
     callbackQueue->callAvailable(period);
   }
 
+  MINIROS_INFO("Exiting main loop");
+
   miniros::notifyNodeExiting();
+  r.reset();
   master.stop();
+
+  MINIROS_INFO("All done");
 
   return EXIT_SUCCESS;
 }

@@ -50,6 +50,8 @@ public:
   /// Setup RPC callbacks.
   void setupBindings();
 
+  std::string getUri() const;
+
   RpcValue lookupService(const std::string& caller_id, const std::string& service, Connection*);
 
   /// Register the caller as a provider of the specified service.
@@ -152,81 +154,7 @@ public:
   RpcValue subscribeParam(const std::string& caller_id, const std::string& caller_api, const std::string& key, Connection*);
   RpcValue unsubscribeParam(const std::string& caller_id, const std::string& caller_api, const std::string& key, Connection*);
 
-
   RpcValue getParamNames(const std::string& caller_id, Connection*);
-
-  /// SlaveAPI
-
-  /// Retrieve a list of topics that this node publishes.
-  /// Parameters
-  ///  - caller_id (str) - ROS caller ID.
-  /// Returns (int, str, [ [str, str] ]) - (code, statusMessage, topicList)
-  ///  topicList is a list of topics published by this node and is of the form
-  ///  [ [topic1, topicType1]...[topicN, topicTypeN] ]
-  RpcValue getPublications(const std::string& caller_id, Connection*);
-
-  /// Retrieve a list of topics that this node subscribes to
-  ///  getSubscriptions(caller_id)
-  /// Parameters:
-  ///  - caller_id (str) - ROS caller ID.
-  /// Returns (int, str, [ [str, str] ]) - (code, statusMessage, topicList)
-  /// topicList is a list of topics this node subscribes to and is of the form
-  /// [ [topic1, topicType1]...[topicN, topicTypeN] ]
-  RpcValue getSubscriptions(const std::string& caller_id, Connection*);
-
-  /// Publisher node API method called by a subscriber node. This requests that source allocate a channel
-  /// for communication. Subscriber provides a list of desired protocols for communication.
-  /// Publisher returns the selected protocol along with any additional params required for establishing connection.
-  /// For example, for a TCP/IP-based connection, the source node may return a port number of TCP/IP server.
-  ///
-  /// Parameters:
-  ///  - caller_id (str) - ROS caller ID.
-  ///  - topic (str) Topic name.
-  ///  - protocols ([ [str, !XMLRPCLegalValue*] ]) List of desired protocols for communication in order of preference.
-  ///    Each protocol is a list of the form [ProtocolName, ProtocolParam1, ProtocolParam2...N]
-  /// Returns (int, str, [str, !XMLRPCLegalValue*] ) (code, statusMessage, protocolParams)
-  /// protocolParams may be an empty list if there are no compatible protocols.
-  RpcValue requestTopic(const std::string& caller_id, const std::string& topic, const RpcValue& protocols, Connection*);
-
-  /// Callback from master of current publisher list for specified topic.
-  /// Parameters:
-  /// - caller_id (str) ROS caller ID.
-  /// - topic (str) Topic name.
-  /// - publishers ([str]) List of current publishers for topic in the form of XMLRPC URIs
-  /// Returns (int, str, int) (code, statusMessage, ignore)
-  RpcValue publisherUpdate(
-    const std::string& caller_id, const std::string& topic, const RpcValue& publishers, Connection*);
-
-  /// Retrieve transport/topic statistics.
-  /// Parameters:
-  ///  - caller_id (str) ROS caller ID.
-  /// Returns (int, str, [XMLRPCLegalValue*]) (code, statusMessage, stats)
-  ///  stats is of the form [publishStats, subscribeStats, serviceStats] where
-  ///  publishStats: [[topicName, messageDataSent, pubConnectionData]...]
-  ///    \ pubConnectionData: [connectionId, bytesSent, numSent, connected]*
-  ///  subscribeStats: [[topicName, subConnectionData]...]
-  ///    \ subConnectionData: [connectionId, bytesReceived, numReceived, dropEstimate, connected]*
-  ///  serviceStats: (proposed) [numRequests, bytesReceived, bytesSent]
-  ///  dropEstimate: -1 if no estimate.
-  RpcValue getBusStats(const std::string& caller_id, Connection* conn);
-
-  /// Retrieve transport/topic connection information.
-  /// Parameters:
-  ///  - caller_id (str) - ROS caller ID.
-  /// Returns (int, str, [XMLRPCLegalValue*]) (code, statusMessage, busInfo)
-  /// busInfo is of the form: [[connectionId1, destinationId1, direction1, transport1, topic1, connected1]... ]
-  ///  connectionId is defined by the node and is opaque.
-  ///  destinationId is the XMLRPC URI of the destination.
-  ///  direction is one of 'i', 'o', or 'b' (in, out, both).
-  ///  transport is the transport type (e.g. 'TCPROS').
-  ///  topic is the topic name.
-  ///  connected1 indicates connection status. Note that this field is only provided by slaves written
-  ///   in Python at the moment (cf. rospy/masterslave.py in _TopicImpl.get_stats_info() vs. roscpp/publication.cpp
-  /// in Publication::getInfo()).
-  RpcValue getBusInfo(const std::string& caller_id, Connection* conn);
-
-  RpcValue getPid(const std::string& caller_id, Connection* conn);
-
 protected:
   int m_port = -1;
   std::string m_host;

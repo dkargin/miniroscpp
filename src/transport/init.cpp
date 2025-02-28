@@ -293,12 +293,12 @@ bool isStarted()
   return g_started;
 }
 
-void start()
+Error start()
 {
   std::scoped_lock<std::mutex> lock(g_start_mutex);
   if (g_started)
   {
-    return;
+    return Error::Ok;
   }
 
   g_shutdown_requested = false;
@@ -338,16 +338,18 @@ void start()
   serviceManager->start(pm, g_master_link, connectionManager, rpcm);
 
   if (!connectionManager->start(pm)) {
-    // TODO: Probably exit and unroll initialization.
+    MINIROS_ERROR("Failed to start ConnectionManager. Something is very wrong with TCP network");
+    shutdown();
+    return Error::SystemError;
   }
 
   pm->start();
 
   if (!rpcm->start()) {
-    // TODO: We can arrive here only if we are completely unable to host TCP/http server.
+    // We can arrive here only if we are completely unable to host TCP/http server.
     MINIROS_ERROR("Failed to start RPCManager. Something is very wrong with TCP network");
     shutdown();
-    return;
+    return Error::SystemError;
   }
 
   if (!(g_init_options & init_options::NoSigintHandler))
@@ -433,6 +435,8 @@ end:
   {
     std::scoped_lock<std::recursive_mutex> lock(g_shutting_down_mutex);
   }
+
+  return Error::Ok;
 }
 
 void check_ipv6_environment() {
