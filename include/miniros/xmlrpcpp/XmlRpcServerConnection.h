@@ -9,6 +9,8 @@
 
 #include <string>
 
+#include "miniros/transport/http_tools.h"
+
 #include "xmlrpcpp/XmlRpcValue.h"
 #include "xmlrpcpp/XmlRpcSource.h"
 #include "xmlrpcpp/XmlRpcDecl.h"
@@ -18,72 +20,6 @@ namespace XmlRpc {
 // The server waits for client connections and provides methods
 class XmlRpcServer;
 class XmlRpcServerMethod;
-
-/// Intermediate storage for HTTP data.
-struct HttpFrame {
-  enum ParserState {
-    ParseRequest, ParseFieldName, ParseFieldValue, ParseBody, ParseInvalid
-  };
-
-  /// Current state of a parser.
-  ParserState state = ParseInvalid;
-
-  /// Request headers.
-  std::string header;
-
-  /// Number of bytes expected in the request body (parsed from header).
-  int contentLength = 0;
-
-  /// Request body.
-  std::string request;
-
-  /// Raw request type: {GET, POST, PUT, ...}
-  std::string_view requestType;
-
-  /// Request URL
-  std::string_view requestUrl;
-
-  /// HTTP Version.
-  std::string_view requestHttpVersion;
-
-  /// HTTP Field.
-  struct Field {
-    std::string_view name;
-    std::string_view value;
-  };
-
-  /// Parsed fields.
-  std::vector<Field> fields;
-
-  /// Reset all fields
-  void reset();
-};
-
-/// Network address.
-struct XMLRPCPP_DECL NetAddress {
-  enum Type {
-    AddressInvalid, AddressIPv4, AddressIPv6
-  };
-
-  Type type = AddressInvalid;
-
-  /// String representation of network address.
-  std::string address;
-
-  /// Network port.
-  int port = 0;
-
-  /// Pointer to actual address implementation.
-  void* rawAddress = nullptr;
-
-  ~NetAddress();
-
-  /// Reset internal address.
-  void reset();
-
-  /// Check if address is valid.
-  bool valid() const { return type != AddressInvalid; }
-};
 
 //! A class to handle XML RPC requests from a particular client
 class XMLRPCPP_DECL XmlRpcServerConnection : public XmlRpcSource {
@@ -113,7 +49,7 @@ public:
   //!   @param eventType Type of IO event that occurred. @see XmlRpcDispatch::EventType.
   unsigned handleEvent(unsigned eventType) override;
 
-  const NetAddress& getClientAddress() const;
+  const miniros::net::NetAddress& getClientAddress() const;
 
 protected:
 
@@ -147,9 +83,9 @@ protected:
   ServerConnectionState _connectionState;
 
   /// Address of endpoint.
-  NetAddress _netAddress;
+  miniros::net::NetAddress _netAddress;
 
-  HttpFrame _httpFrame;
+  miniros::net::HttpFrame _httpFrame;
 
   // Response
   std::string _response;

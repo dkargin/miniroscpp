@@ -155,6 +155,7 @@ set(transport_SRC
     transport/intraprocess_publisher_link.cpp
     transport/internal_timer_manager.cpp
     transport/io.cpp
+    transport/http_tools.cpp
 
     transport/master_link.cpp
     transport/message_deserializer.cpp

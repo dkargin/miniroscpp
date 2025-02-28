@@ -5,7 +5,6 @@
 
 namespace XmlRpc {
 
-
   XmlRpcSource::XmlRpcSource(int fd /*= -1*/, bool deleteOnClose /*= false*/) 
     : _fd(fd), _deleteOnClose(deleteOnClose), _keepOpen(false)
   {
