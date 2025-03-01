@@ -229,7 +229,11 @@ endif()
 set_property(TARGET roscxx PROPERTY CXX_STANDARD 17)
 
 target_link_libraries(roscxx
-    PRIVATE rt stdc++fs ${console_bridge_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} ${PKG_LIBS_LIBRARIES})
+  PRIVATE
+    rt stdc++fs ${console_bridge_LIBRARIES} ${PKG_LIBS_LIBRARIES}
+  PUBLIC
+    ${CMAKE_THREAD_LIBS_INIT}
+)
 
 target_compile_definitions(roscxx PRIVATE rostime_EXPORTS miniros_EXPORTS)
 
@@ -278,40 +282,20 @@ target_compile_definitions(bag_storage PRIVATE rosbag_EXPORTS rosbag_storage_EXP
 set_property(TARGET bag_storage PROPERTY CXX_STANDARD 17)
 target_link_libraries(bag_storage PRIVATE ${ENCRYPT_LIBRARIES} ${rosbag_INTERNAL_LIBS} ${rosbag_EXTERNAL_LIBS} roscxx)
 
-if (MINIROS_BUILD_ROSBAG_APPS)
-    # Common library for rosbag applications.
-    add_library(bag_app STATIC
-        rosbag/player.cpp
-        rosbag/recorder.cpp
-        rosbag/time_translator.cpp
-    )
-    target_link_libraries(bag_app bag_storage roscxx ${CMAKE_THREAD_LIBS_INIT})
-    target_include_directories(bag_app PRIVATE ${MINIROS_INCLUDE_DIRS} ${MINIROS_INCLUDE_GENERATED_DIRS})
-
-    # ROSBag recorder app
-    add_executable(record rosbag/record.cpp)
-    target_link_libraries(record PRIVATE bag_app impl::program_options)
-    target_include_directories(record PRIVATE ${MINIROS_INCLUDE_DIRS} ${MINIROS_INCLUDE_GENERATED_DIRS})
-
-    # ROSBag player app.
-    add_executable(play rosbag/play.cpp)
-    target_link_libraries(play PRIVATE bag_app impl::program_options)
-    target_include_directories(play PRIVATE ${MINIROS_INCLUDE_DIRS} ${MINIROS_INCLUDE_GENERATED_DIRS})
-
-    # ROSBag encryptor
-    add_executable(encrypt rosbag/encrypt.cpp)
-    target_link_libraries(encrypt bag_app impl::program_options)
-    target_include_directories(encrypt PRIVATE ${MINIROS_INCLUDE_DIRS} ${MINIROS_INCLUDE_GENERATED_DIRS})
-
-    set(rosbag_APPS record play encrypt)
-else ()
-    set(rosbag_APPS)
-endif()
+add_executable(minibag
+    rosbag/main.cpp
+    rosbag/player.cpp
+    rosbag/recorder.cpp
+    rosbag/time_translator.cpp
+)
+target_link_libraries(minibag bag_storage roscxx impl::program_options)
+target_include_directories(minibag PRIVATE ${MINIROS_INCLUDE_DIRS} ${MINIROS_INCLUDE_GENERATED_DIRS})
 
 set(MINIROS_LIBRARY roscxx PARENT_SCOPE)
 set(MINIROS_EXPORT
-    roscxx bag_storage
+    roscxx
+    bag_storage
     miniroscore
+    minibag
     ${rosbag_INTERNAL_LIBS}
-    ${rosbag_APPS}
     PARENT_SCOPE)
