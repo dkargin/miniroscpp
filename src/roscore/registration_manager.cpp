@@ -4,7 +4,7 @@
 
 #include "registration_manager.h"
 
-#include <console.h>
+#include "miniros/console.h"
 
 namespace miniros {
 namespace master {

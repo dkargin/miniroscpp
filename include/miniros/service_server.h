@@ -25,11 +25,11 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ROSCPP_SERVICE_HANDLE_H
-#define ROSCPP_SERVICE_HANDLE_H
+#ifndef MINIROS_SERVICE_HANDLE_H
+#define MINIROS_SERVICE_HANDLE_H
 
 #include "miniros/internal/forwards.h"
-#include "transport/common.h"
+#include "miniros/common.h"
 
 namespace miniros
 {
@@ -107,6 +107,6 @@ typedef std::vector<ServiceServer> V_ServiceServer;
 
 }
 
-#endif // ROSCPP_SERVICE_HANDLE_H
+#endif // MINIROS_SERVICE_HANDLE_H
 
 

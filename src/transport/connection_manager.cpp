@@ -34,10 +34,8 @@
 #include "miniros/transport/service_client_link.h"
 #include "miniros/transport/transport_tcp.h"
 #include "miniros/transport/transport_udp.h"
-#include "miniros/transport/file_log.h"
+#include "miniros/file_log.h"
 #include "miniros/transport/network.h"
-
-#include <miniros/rosassert.h>
 
 namespace miniros
 {

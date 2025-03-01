@@ -32,8 +32,8 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ROSCPP_POLL_SET_H
-#define ROSCPP_POLL_SET_H
+#ifndef MINIROS_POLL_SET_H
+#define MINIROS_POLL_SET_H
 
 #include <vector>
 #include <map>
@@ -41,7 +41,8 @@
 #include <mutex>
 
 #include "io.h"
-#include "common.h"
+
+#include "miniros/common.h"
 
 
 namespace miniros
@@ -155,4 +156,4 @@ private:
 
 }
 
-#endif // ROSCPP_POLL_SET_H
+#endif // MINIROS_POLL_SET_H

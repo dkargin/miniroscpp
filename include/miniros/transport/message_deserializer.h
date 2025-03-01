@@ -25,14 +25,15 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ROSCPP_MESSAGE_DESERIALIZER_H
-#define ROSCPP_MESSAGE_DESERIALIZER_H
+#ifndef MINIROS_MESSAGE_DESERIALIZER_H
+#define MINIROS_MESSAGE_DESERIALIZER_H
+
+#include <mutex>
 
 #include "miniros/internal/forwards.h"
-#include "common.h"
+#include "miniros/common.h"
 
 #include <miniros/serialized_message.h>
-#include <mutex>
 
 namespace miniros
 {
@@ -60,5 +61,5 @@ typedef std::shared_ptr<MessageDeserializer> MessageDeserializerPtr;
 
 }
 
-#endif // ROSCPP_MESSAGE_DESERIALIZER_H
+#endif // MINIROS_MESSAGE_DESERIALIZER_H
 

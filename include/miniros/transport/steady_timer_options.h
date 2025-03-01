@@ -25,10 +25,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ROSCPP_STEADY_TIMER_OPTIONS_H
-#define ROSCPP_STEADY_TIMER_OPTIONS_H
+#ifndef MINIROS_STEADY_TIMER_OPTIONS_H
+#define MINIROS_STEADY_TIMER_OPTIONS_H
 
-#include "common.h"
 #include "miniros/internal/forwards.h"
 
 namespace miniros
@@ -79,8 +78,7 @@ struct MINIROS_DECL SteadyTimerOptions
   bool autostart;
 };
 
-
 }
 
-#endif
+#endif // MINIROS_STEADY_TIMER_OPTIONS_H
 

@@ -29,13 +29,14 @@
 #define ROSCPP_SUBSCRIPTION_H
 
 #include <queue>
-#include "miniros/transport/common.h"
+
+#include "miniros/common.h"
 #include "miniros/header.h"
 #include "miniros/internal/forwards.h"
 #include "miniros/transport/transport_hints.h"
 #include "miniros/transport/rpc_manager.h"
 #include "miniros/transport/statistics.h"
-#include "xmlrpcpp/XmlRpc.h"
+#include "miniros/xmlrpcpp/XmlRpcValue.h"
 
 #include <mutex>
 

@@ -31,12 +31,12 @@
 
 #include "miniros/master_link.h"
 #include "miniros/rosassert.h"
-#include "miniros/transport/file_log.h"
+#include "miniros/file_log.h"
 #include "miniros/transport/io.h"
 #include "miniros/transport/network.h"
 #include "miniros/transport/rpc_manager.h"
 
-#include <xmlrpcpp/XmlRpcServerConnection.h>
+#include "miniros/xmlrpcpp/XmlRpcServerConnection.h"
 
 using namespace XmlRpc;
 
@@ -45,14 +45,6 @@ namespace miniros
 
 namespace xmlrpc
 {
-XmlRpc::XmlRpcValue responseStr(int code, const std::string& msg, const std::string& response)
-{
-  XmlRpc::XmlRpcValue v;
-  v[0] = code;
-  v[1] = msg;
-  v[2] = response;
-  return v;
-}
 
 XmlRpc::XmlRpcValue responseInt(int code, const std::string& msg, int response)
 {
@@ -63,14 +55,6 @@ XmlRpc::XmlRpcValue responseInt(int code, const std::string& msg, int response)
   return v;
 }
 
-XmlRpc::XmlRpcValue responseBool(int code, const std::string& msg, bool response)
-{
-  XmlRpc::XmlRpcValue v;
-  v[0] = int(code);
-  v[1] = msg;
-  v[2] = XmlRpc::XmlRpcValue(response);
-  return v;
-}
 }
 
 /// Wrapper for regular callback functor.
@@ -139,6 +123,11 @@ RPCManager::~RPCManager()
 
 bool RPCManager::start(int port)
 {
+  if (server_thread_.joinable()) {
+    MINIROS_INFO_NAMED("RPCManager", "Manager is running at port %d", port_);
+    return true;
+  }
+
   MINIROS_INFO_NAMED("RPCManager", "Starting manager at port %d", port);
   shutting_down_ = false;
   bind("getPid", getPid);

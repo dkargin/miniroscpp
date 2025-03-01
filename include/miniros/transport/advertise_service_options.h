@@ -25,13 +25,13 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ROSCPP_ADVERTISE_SERVICE_OPTIONS_H
-#define ROSCPP_ADVERTISE_SERVICE_OPTIONS_H
+#ifndef MINIROS_ADVERTISE_SERVICE_OPTIONS_H
+#define MINIROS_ADVERTISE_SERVICE_OPTIONS_H
 
 #include "miniros/transport/service_callback_helper.h"
 #include "miniros/traits/service_traits.h"
 #include "miniros/traits/message_traits.h"
-#include "common.h"
+#include "miniros/common.h"
 
 namespace miniros
 {
@@ -155,9 +155,6 @@ protected:
   static void reportMismatchServiceMd5(const char* service);
 };
 
+} // namespace miniros
 
-
-}
-
-#endif
-
+#endif // MINIROS_ADVERTISE_SERVICE_OPTIONS_H

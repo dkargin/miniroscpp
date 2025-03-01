@@ -25,10 +25,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ROSCPP_TIMER_OPTIONS_H
-#define ROSCPP_TIMER_OPTIONS_H
+#ifndef MINIROS_TIMER_OPTIONS_H
+#define MINIROS_TIMER_OPTIONS_H
 
-#include "transport/common.h"
 #include "miniros/internal/forwards.h"
 
 namespace miniros

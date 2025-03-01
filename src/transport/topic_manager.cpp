@@ -41,7 +41,7 @@
 #include "miniros/transport/transport_tcp.h"
 #include "miniros/transport/transport_udp.h"
 
-#include "xmlrpcpp/XmlRpc.h"
+#include "miniros/xmlrpcpp/XmlRpc.h"
 
 #include <miniros/console.h>
 #include <sstream>

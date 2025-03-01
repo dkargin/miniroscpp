@@ -32,7 +32,7 @@
 *  POSSIBILITY OF SUCH DAMAGE.
 ********************************************************************/
 
-#include <topic_tools/shape_shifter.h>
+#include <miniros/topic_tools/shape_shifter.h>
 
 namespace miniros {
 

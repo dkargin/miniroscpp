@@ -13,7 +13,7 @@
 #include <cassert>
 #include <sstream>
 
-#include "xmlrpcpp/XmlRpcValue.h"
+#include "miniros/xmlrpcpp/XmlRpcValue.h"
 
 namespace XmlRpc {
 class XmlRpcClient;

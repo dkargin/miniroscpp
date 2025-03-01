@@ -35,7 +35,7 @@
 #define MINIROS_PACKAGE_NAME "poll_set"
 
 #include "miniros/transport/poll_set.h"
-#include "miniros/transport/file_log.h"
+#include "miniros/file_log.h"
 
 #include "miniros/transport/transport.h"
 

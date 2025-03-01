@@ -40,7 +40,7 @@
 #include "miniros/console.h"
 #include "miniros/rosassert.h"
 
-#include "miniros/transport/common.h"
+#include "miniros/common.h"
 #include "miniros/types.h"
 #include "miniros/node_handle.h"
 #include "miniros/publisher.h"

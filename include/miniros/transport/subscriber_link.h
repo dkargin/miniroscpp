@@ -28,11 +28,10 @@
 #ifndef ROSCPP_SUBSCRIBER_LINK_H
 #define ROSCPP_SUBSCRIBER_LINK_H
 
-#include "miniros/transport/common.h"
+#include "miniros/common.h"
 #include "miniros/macros.h"
 
 #include <memory>
-#include <queue>
 
 namespace miniros
 {

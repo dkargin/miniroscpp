@@ -36,9 +36,8 @@
 
 #include "miniros/transport/connection.h"
 #include "miniros/transport/transport.h"
-#include "miniros/transport/file_log.h"
-
-#include <miniros/rosassert.h>
+#include "miniros/file_log.h"
+#include "miniros/rosassert.h"
 
 #include <sstream>
 #include <cstring>

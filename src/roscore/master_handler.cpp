@@ -8,7 +8,7 @@
 
 #include "master_handler.h"
 
-#include <transport/rpc_manager.h>
+#include "miniros/transport/rpc_manager.h"
 #include "miniros/transport/network.h"
 
 namespace miniros {

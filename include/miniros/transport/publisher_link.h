@@ -28,10 +28,9 @@
 #ifndef ROSCPP_PUBLISHER_LINK_H
 #define ROSCPP_PUBLISHER_LINK_H
 
-#include <queue>
 #include <memory>
 
-#include "miniros/transport/common.h"
+#include "miniros/common.h"
 #include "miniros/transport/transport_hints.h"
 #include "miniros/header.h"
 

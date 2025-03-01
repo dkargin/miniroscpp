@@ -37,6 +37,7 @@
 
 #include "miniros/internal/forwards.h"
 #include "miniros/spinner.h"
+#include "miniros/errors.h"
 
 
 namespace miniros
@@ -171,7 +172,7 @@ MINIROS_DECL void requestShutdown();
  * the node has not already been started.  If you would like to prevent the automatic shutdown caused by the last
  * NodeHandle going out of scope, call this before any NodeHandle has been created (e.g. immediately after init())
  */
-MINIROS_DECL void start();
+MINIROS_DECL Error start();
 /**
  * \brief Returns whether or not the node has been started through miniros::start()
  */

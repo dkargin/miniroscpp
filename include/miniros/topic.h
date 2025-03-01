@@ -32,10 +32,10 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ROSCPP_TOPIC_H
-#define ROSCPP_TOPIC_H
+#ifndef MINIROS_TOPIC_H
+#define MINIROS_TOPIC_H
 
-#include "transport/common.h"
+#include "miniros/common.h"
 #include "node_handle.h"
 
 namespace miniros
@@ -150,4 +150,4 @@ std::shared_ptr<M const> waitForMessage(const std::string& topic, miniros::NodeH
 } // namespace topic
 } // namespace miniros
 
-#endif // ROSCPP_TOPIC_H
+#endif // MINIROS_TOPIC_H

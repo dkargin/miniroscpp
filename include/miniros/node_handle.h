@@ -45,7 +45,6 @@
 #include "miniros/wall_timer_options.h"
 #include "miniros/spinner.h"
 #include "miniros/init.h"
-#include "transport/common.h"
 
 namespace XmlRpc
 {

@@ -25,11 +25,10 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <mutex>
+
 #include "miniros/internal/forwards.h"
 #include "connection.h"
-#include "common.h"
-
-#include <mutex>
 
 namespace miniros
 {

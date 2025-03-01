@@ -32,13 +32,13 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ROSCPP_CALLBACK_QUEUE_H
-#define ROSCPP_CALLBACK_QUEUE_H
+#ifndef MINIROS_CALLBACK_QUEUE_H
+#define MINIROS_CALLBACK_QUEUE_H
 
 #include "miniros/transport/callback_queue_interface.h"
 #include "miniros/internal/thread_local_ptr.h"
 #include "miniros/rostime.h"
-#include "common.h"
+#include "miniros/common.h"
 
 #include <mutex>
 #include <shared_mutex>
@@ -186,6 +186,6 @@ protected:
 };
 typedef std::shared_ptr<CallbackQueue> CallbackQueuePtr;
 
-}
+} // namespace miniros
 
-#endif
+#endif // MINIROS_CALLBACK_QUEUE_H

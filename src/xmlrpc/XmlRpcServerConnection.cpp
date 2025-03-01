@@ -33,66 +33,6 @@ const char XmlRpcServerConnection::PARAMS[] = "params";
 const char XmlRpcServerConnection::FAULTCODE[] = "faultCode";
 const char XmlRpcServerConnection::FAULTSTRING[] = "faultString";
 
-NetAddress::~NetAddress()
-{
-  reset();
-}
-
-void NetAddress::reset()
-{
-  if (rawAddress) {
-    free(rawAddress);
-    rawAddress = nullptr;
-  }
-  address = "";
-  port = 0;
-  type = Type::AddressInvalid;
-}
-
-/// Fills in local address from socket.
-bool readLocalAddressv4(int sockfd, NetAddress& address)
-{
-  sockaddr_in my_addr;
-  // Get my ip address and port
-  memset(&my_addr, 0, sizeof(my_addr));
-  socklen_t len = sizeof(my_addr);
-  if (getsockname(sockfd, (sockaddr*) &my_addr, &len) != 0)
-    return false;
-
-  char ipBuffer[255];
-  if (!inet_ntop(AF_INET, &my_addr.sin_addr, ipBuffer, sizeof(ipBuffer)))
-    return false;
-  address.address = ipBuffer;
-  address.port = ntohs(my_addr.sin_port);
-  address.type = NetAddress::AddressIPv4;
-  sockaddr_in* outAddr = static_cast<sockaddr_in*>(malloc(sizeof(sockaddr_in)));
-  address.rawAddress = outAddr;
-  memcpy(outAddr, &my_addr, sizeof(sockaddr_in));
-  return true;
-}
-
-/// Fills in remote address from socket.
-bool readRemoteAddressv4(int sockfd, NetAddress& address)
-{
-  sockaddr_in my_addr;
-  // Get my ip address and port
-  memset(&my_addr, 0, sizeof(my_addr));
-  socklen_t len = sizeof(my_addr);
-  if (getpeername(sockfd, (sockaddr*) &my_addr, &len) != 0)
-    return false;
-
-  char ipBuffer[255];
-  if (!inet_ntop(AF_INET, &my_addr.sin_addr, ipBuffer, sizeof(ipBuffer)))
-    return false;
-  address.address = ipBuffer;
-  address.port = ntohs(my_addr.sin_port);
-  address.type = NetAddress::AddressIPv4;
-  sockaddr_in* outAddr = static_cast<sockaddr_in*>(malloc(sizeof(sockaddr_in)));
-  address.rawAddress = outAddr;
-  memcpy(outAddr, &my_addr, sizeof(sockaddr_in));
-  return true;
-}
-
 // The server delegates handling client requests to a serverConnection object.
 XmlRpcServerConnection::XmlRpcServerConnection(int fd, XmlRpcServer* server, bool deleteOnClose /*= false*/) :
   XmlRpcSource(fd, deleteOnClose)
@@ -102,7 +42,7 @@ XmlRpcServerConnection::XmlRpcServerConnection(int fd, XmlRpcServer* server, boo
   _bytesWritten = 0;
   _keepAlive = true;
   if (fd) {
-    readRemoteAddressv4(fd, _netAddress);
+    miniros::net::readRemoteAddressv4(fd, _netAddress);
   }
 
   if (_netAddress.valid())
@@ -136,16 +76,6 @@ unsigned XmlRpcServerConnection::handleEvent(unsigned /*eventType*/)
         ? XmlRpcDispatch::WritableEvent : XmlRpcDispatch::ReadableEvent;
 }
 
-void HttpFrame::reset()
-{
-  header = "";
-  request = "";
-  fields.clear();
-  requestType = {};
-  requestUrl = {};
-  requestHttpVersion = {};
-}
-
 bool XmlRpcServerConnection::readHeader()
 {
   // Read available data
@@ -163,6 +93,8 @@ bool XmlRpcServerConnection::readHeader()
   const char *bp = nullptr;                 // Start of body
   const char *lp = nullptr;                 // Start of content-length value
   const char *kp = nullptr;                 // Start of connection value
+
+  using HttpFrame = miniros::net::HttpFrame;
 
   HttpFrame::ParserState state = HttpFrame::ParseRequest;
   std::string_view fieldName;

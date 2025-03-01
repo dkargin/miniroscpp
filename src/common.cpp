@@ -32,7 +32,7 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "miniros/transport/common.h"
+#include "miniros/common.h"
 
 #include <random>
 #include <sstream>
@@ -40,6 +40,7 @@
 #include <cstdio>
 #include <cerrno>
 #include <cstring>
+#include <filesystem>
 #include <cassert>
 #include <sys/types.h>
 
@@ -66,6 +67,9 @@
 #include <systemd/sd-daemon.h>
 #endif
 #endif
+
+
+
 namespace miniros {
 
 void disableAllSignalsInThisThread()
@@ -134,8 +138,10 @@ static int portableSystemdNotify(const char *message) {
 
   /* If the variable is not set, the protocol is a noop */
   socket_path = getenv("NOTIFY_SOCKET");
-  if (!socket_path)
+  if (!socket_path) {
+    std::cerr << "No NOTIFY_SOCKET variable was set. No systemd notification will be done." << std::endl;
     return 0; /* Not set? Nothing to do */
+  }
 
   /* Only AF_UNIX is supported, with path or abstract sockets */
   if (socket_path[0] != '/' && socket_path[0] != '@')
@@ -153,15 +159,21 @@ static int portableSystemdNotify(const char *message) {
     socket_addr.sun.sun_path[0] = 0;
 
   fd.fd = socket(AF_UNIX, SOCK_DGRAM|SOCK_CLOEXEC, 0);
-  if (fd < 0)
+  if (fd < 0) {
+    std::cerr << "Failed to create sdnotify socket" << std::endl;
     return -errno;
+  }
 
-  if (connect(fd, &socket_addr.sa, offsetof(struct sockaddr_un, sun_path) + path_length) != 0)
+  if (connect(fd, &socket_addr.sa, offsetof(struct sockaddr_un, sun_path) + path_length) != 0) {
+    std::cerr << "Failed to connect sdnotify socket" << std::endl;
     return -errno;
+  }
 
   ssize_t written = write(fd, message, message_length);
-  if (written != (ssize_t) message_length)
+  if (written != (ssize_t) message_length) {
+    std::cerr << "Failed to write sdnotify message" << std::endl;
     return written < 0 ? -errno : -EPROTO;
+  }
 
   return 1; /* Notified! */
 }
@@ -169,7 +181,7 @@ static int portableSystemdNotify(const char *message) {
 #endif
 /// Sends signal to systemd.
 /// More info can be found at:
-/// https://www.freedesktop.org/software/systemd/man/latest/sd_notify.html#
+/// https://www.freedesktop.org/software/systemd/man/latest/sd_notify.html
 Error systemdNotify(const char* status)
 {
 #ifdef HAVE_LIBSYSTEMD
@@ -196,7 +208,7 @@ Error notifyNodeStarted()
 Error notifyNodeExiting()
 {
 #ifdef MINIROS_USE_LIBSYSTEMD
-  return systemdNotify("READY=1");
+  return systemdNotify("STOPPING=1");
 #endif
   return Error::NotSupported;
 }
@@ -206,6 +218,7 @@ static std::mt19937                    gen(rd());
 static std::uniform_int_distribution<> dis(0, 15);
 static std::uniform_int_distribution<> dis2(8, 11);
 
+/// code is taken from https://stackoverflow.com/questions/24365331/how-can-i-generate-uuid-in-c-without-using-boost-library
 std::string generatePseudoUuid() {
   std::stringstream ss;
   int i;
@@ -231,6 +244,28 @@ std::string generatePseudoUuid() {
     ss << dis(gen);
   };
   return ss.str();
+}
+
+Error makeDirectory(const std::string& path)
+{
+  std::error_code ec;
+  if (std::filesystem::exists(path, ec))
+    return Error::Ok;
+  if (!std::filesystem::create_directories(path, ec)) {
+    std::cerr << "Failed to create directory \"" << path << "\" : " << ec.message() <<  std::endl;
+    return Error::SystemError;
+  }
+  return Error::Ok;
+}
+
+Error changeCurrentDirectory(const std::string& path)
+{
+  if (!std::filesystem::exists(path)) {
+    std::cerr << "Failed to change current directory \"" << path << "\" - path do not exists" << std::endl;
+    return Error::SystemError;
+  }
+  std::filesystem::current_path(path);
+  return Error::Ok;
 }
 
 } // namespace miniros

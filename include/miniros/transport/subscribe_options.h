@@ -25,11 +25,11 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ROSCPP_SUBSCRIBE_OPTIONS_H
-#define ROSCPP_SUBSCRIBE_OPTIONS_H
+#ifndef MINIROS_SUBSCRIBE_OPTIONS_H
+#define MINIROS_SUBSCRIBE_OPTIONS_H
 
 #include "miniros/internal/forwards.h"
-#include "common.h"
+#include "miniros/common.h"
 #include "miniros/transport/transport_hints.h"
 #include "miniros/traits/message_traits.h"
 #include "subscription_callback_helper.h"
@@ -163,8 +163,6 @@ struct MINIROS_DECL SubscribeOptions
   }
 };
 
-}
+} // namespace miniros
 
-#endif
-
-
+#endif // MINIROS_SUBSCRIBE_OPTIONS_H

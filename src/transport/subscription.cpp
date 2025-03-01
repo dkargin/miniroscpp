@@ -56,7 +56,7 @@
 #include "miniros/transport/connection_manager.h"
 #include "miniros/transport/message_deserializer.h"
 #include "miniros/transport/subscription_queue.h"
-#include "miniros/transport/file_log.h"
+#include "miniros/file_log.h"
 #include "miniros/transport/transport_hints.h"
 #include "miniros/transport/subscription_callback_helper.h"
 

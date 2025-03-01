@@ -7,9 +7,8 @@
 
 #include <string>
 #include <vector>
-#include <atomic>
 
-#include "xmlrpcpp/XmlRpcValue.h"
+#include "miniros/xmlrpcpp/XmlRpcValue.h"
 #include "miniros/names.h"
 
 #include "registration_manager.h"

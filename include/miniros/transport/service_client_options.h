@@ -25,11 +25,10 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ROSCPP_SERVICE_CLIENT_OPTIONS_H
-#define ROSCPP_SERVICE_CLIENT_OPTIONS_H
+#ifndef MINIROS_SERVICE_CLIENT_OPTIONS_H
+#define MINIROS_SERVICE_CLIENT_OPTIONS_H
 
 #include "miniros/internal/forwards.h"
-#include "common.h"
 #include "miniros/traits/service_traits.h"
 
 namespace miniros
@@ -103,7 +102,6 @@ struct MINIROS_DECL ServiceClientOptions
   M_string header;                                                          ///< Extra key/value pairs to add to the connection header
 };
 
+} // namespace miniros
 
-}
-
-#endif
+#endif // MINIROS_SERVICE_CLIENT_OPTIONS_H

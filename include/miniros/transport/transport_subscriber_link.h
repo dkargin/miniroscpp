@@ -25,13 +25,15 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef MINIROSCPP_TRANSPORT_SUBSCRIBER_LINK_H
-#define MINIROSCPP_TRANSPORT_SUBSCRIBER_LINK_H
-
-#include "common.h"
-#include "subscriber_link.h"
+#ifndef MINIROS_TRANSPORT_SUBSCRIBER_LINK_H
+#define MINIROS_TRANSPORT_SUBSCRIBER_LINK_H
 
 #include <mutex>
+#include <queue>
+
+#include "miniros/common.h"
+#include "subscriber_link.h"
+
 
 namespace miniros
 {
@@ -79,4 +81,4 @@ typedef std::shared_ptr<TransportSubscriberLink> TransportSubscriberLinkPtr;
 
 } // namespace miniros
 
-#endif // MINIROSCPP_TRANSPORT_SUBSCRIBER_LINK_H
+#endif // MINIROS_TRANSPORT_SUBSCRIBER_LINK_H

@@ -25,11 +25,11 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ROSCPP_SERVICE_H
-#define ROSCPP_SERVICE_H
+#ifndef MINIROS_SERVICE_H
+#define MINIROS_SERVICE_H
 
 #include <string>
-#include "miniros/transport/common.h"
+#include "miniros/common.h"
 #include "miniros/internal/forwards.h"
 #include "miniros/node_handle.h"
 #include "miniros/traits/service_traits.h"
@@ -159,5 +159,5 @@ ServiceClient createClient(const std::string& service_name, bool persistent = fa
 
 }
 
-#endif // ROSCPP_SERVICE_H
+#endif // MINIROS_SERVICE_H
 

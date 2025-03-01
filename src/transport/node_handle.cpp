@@ -41,7 +41,7 @@
 #include "miniros/master_link.h"
 #include "miniros/names.h"
 #include "miniros/init.h"
-#include "xmlrpcpp/XmlRpc.h"
+#include "miniros/xmlrpcpp/XmlRpc.h"
 
 #include <thread>
 #include <sstream>

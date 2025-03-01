@@ -48,6 +48,10 @@ MINIROS_DECL Error notifyNodeExiting();
 
 MINIROS_DECL std::string generatePseudoUuid();
 
+MINIROS_DECL Error makeDirectory(const std::string& path);
+
+MINIROS_DECL Error changeCurrentDirectory(const std::string& path);
+
 }
 
 #endif

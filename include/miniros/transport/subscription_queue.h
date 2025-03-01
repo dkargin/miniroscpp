@@ -25,11 +25,11 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ROSCPP_SUBSCRIPTION_QUEUE_H
-#define ROSCPP_SUBSCRIPTION_QUEUE_H
+#ifndef MINIROS_SUBSCRIPTION_QUEUE_H
+#define MINIROS_SUBSCRIPTION_QUEUE_H
 
 #include "miniros/internal/forwards.h"
-#include "common.h"
+#include "miniros/common.h"
 #include "miniros/message_event.h"
 #include "callback_queue_interface.h"
 
@@ -91,4 +91,4 @@ private:
 
 }
 
-#endif // ROSCPP_SUBSCRIPTION_QUEUE_H
+#endif // MINIROS_SUBSCRIPTION_QUEUE_H

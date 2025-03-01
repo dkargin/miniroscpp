@@ -42,7 +42,9 @@ set(cpp_common_SRC
     debug.cpp
     header.cpp
     console.cpp
+    common.cpp
     console_print.cpp
+    file_log.cpp
     serialization.cpp)
 
 set(rosbag_SRC "")
@@ -146,7 +148,6 @@ set(transport_SRC
 
     transport/advertise_service_options.cpp
     transport/callback_queue.cpp
-    transport/common.cpp
     transport/connection.cpp
     transport/connection_manager.cpp
     transport/init.cpp
@@ -154,8 +155,8 @@ set(transport_SRC
     transport/intraprocess_publisher_link.cpp
     transport/internal_timer_manager.cpp
     transport/io.cpp
+    transport/http_tools.cpp
 
-    transport/file_log.cpp
     transport/master_link.cpp
     transport/message_deserializer.cpp
 
@@ -211,6 +212,7 @@ set(master_SRC
     roscore/registrations.cpp
     roscore/registration_manager.cpp
     roscore/parameter_storage.cpp
+    roscore/rosout.cpp
 )
 
 if (MINIROS_USE_SYSTEM_PROGRAM_OPTIONS)
@@ -231,11 +233,14 @@ target_link_libraries(roscxx
 
 target_compile_definitions(roscxx PRIVATE rostime_EXPORTS miniros_EXPORTS)
 
-target_include_directories(roscxx PRIVATE
+target_include_directories(roscxx
+PRIVATE
     ${MINIROS_INCLUDE_DIRS}
-    ${MINIROS_INCLUDE_TRANSPORT}
-    ${MINIROS_INCLUDE_ROOT}
-    ${MINIROS_INCLUDE_GENERATED_DIRS}
+    ${MINIROS_INCLUDE_ROOT}/miniros
+PUBLIC
+    $<BUILD_INTERFACE:${MINIROS_INCLUDE_ROOT}>
+    $<BUILD_INTERFACE:${MINIROS_INCLUDE_GENERATED_DIRS}>
+    $<INSTALL_INTERFACE:include/generated>  # <prefix>/include/mylib
 )
 
 find_package(PkgConfig QUIET)
@@ -243,7 +248,7 @@ find_package(PkgConfig QUIET)
 add_executable(miniroscore roscore/miniroscore.cpp)
 
 target_link_libraries(miniroscore roscxx impl::program_options)
-target_include_directories(miniroscore PRIVATE ${MINIROS_INCLUDE_ROOT})
+target_include_directories(miniroscore PRIVATE ${MINIROS_INCLUDE_ROOT} ${MINIROS_INCLUDE_GENERATED_DIRS})
 
 set(bag_storage_SRC
     rosbag_storage/bag_player.cpp
@@ -267,12 +272,11 @@ else ()
   add_library(bag_storage ${bag_storage_SRC})
 endif()
 
-target_include_directories(bag_storage PRIVATE ${MINIROS_INCLUDE_DIRS} ${rosbag_INCLUDE})
+target_include_directories(bag_storage PRIVATE ${MINIROS_INCLUDE_ROOT} ${rosbag_INCLUDE})
 target_compile_definitions(bag_storage PRIVATE rosbag_EXPORTS rosbag_storage_EXPORTS roslz4_EXPORTS)
 
 set_property(TARGET bag_storage PROPERTY CXX_STANDARD 17)
 target_link_libraries(bag_storage PRIVATE ${ENCRYPT_LIBRARIES} ${rosbag_INTERNAL_LIBS} ${rosbag_EXTERNAL_LIBS} roscxx)
-
 
 if (MINIROS_BUILD_ROSBAG_APPS)
     # Common library for rosbag applications.

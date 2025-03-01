@@ -28,7 +28,7 @@
 #ifndef ROSCPP_TRANSPORT_PUBLISHER_LINK_H
 #define ROSCPP_TRANSPORT_PUBLISHER_LINK_H
 
-#include "common.h"
+#include "miniros/common.h"
 #include "publisher_link.h"
 #include "connection.h"
 
