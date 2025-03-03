@@ -1,5 +1,5 @@
 [Unit]
-Description=Mini ROS master unit
+Description=MiniROS master unit
 After=network.target
 
 [Service]
@@ -8,7 +8,7 @@ WorkingDirectory=/var/run/miniroscore
 
 Environment=ROS_MASTER_URI=http://localhost:11311
 
-ExecStart=/usr/local/bin/miniroscore --dir=/var/run/miniroscore
+ExecStart=@CMAKE_INSTALL_PREFIX@/bin/miniroscore --dir=/var/run/miniroscore
 TimeoutSec=10
 
 [Install]
