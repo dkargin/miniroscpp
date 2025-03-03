@@ -4,12 +4,9 @@ After=network.target
 
 [Service]
 Type=notify
-WorkingDirectory=/var/run/miniroscore
-
 Environment=ROS_MASTER_URI=http://localhost:11311
-
 ExecStart=@CMAKE_INSTALL_PREFIX@/bin/miniroscore --dir=/var/run/miniroscore
-TimeoutSec=10
+TimeoutSec=5
 
 [Install]
 WantedBy=multi-user.target
