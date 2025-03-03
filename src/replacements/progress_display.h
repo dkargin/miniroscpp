@@ -21,6 +21,7 @@
 #define PROGRESS_DISPLAY_H
 
 #include <string>
+#include <iostream>
 #include <ostream>
 
 /// Helper class to display progress.
