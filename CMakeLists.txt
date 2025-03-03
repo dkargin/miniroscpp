@@ -78,6 +78,7 @@ endif()
 
 # Generate external config
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/include/miniros/config.h.in" "miniros/config.h")
+configure_file("${CMAKE_CURRENT_SOURCE_DIR}/scripts/miniroscore.service.in" miniroscore.service)
 
 # Processing external modules like bzip2 or lz4
 set(EXTERNAL_INCLUDE "")
@@ -161,6 +162,8 @@ else()
         RUNTIME DESTINATION bin
         INCLUDES DESTINATION include
   )
+
+  install(FILES "${CMAKE_CURRENT_BINARY_DIR}/miniroscore.service" DESTINATION share/${PROJECT_NAME})
 
   # This is local export file, which references files from local build tree.
   #export(EXPORT MiniROSTargets FILE "${CMAKE_CURRENT_BINARY_DIR}/cmake/${PROJECT_NAME}Targets.cmake")
