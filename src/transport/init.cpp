@@ -87,7 +87,7 @@ void init(const M_string& remappings);
 }
 
 CallbackQueuePtr g_global_queue;
-ROSOutAppender* g_rosout_appender = nullptr;
+std::atomic<ROSOutAppender*> g_rosout_appender = nullptr;
 static CallbackQueuePtr g_internal_callback_queue;
 
 static bool g_initialized = false;
@@ -96,11 +96,13 @@ static bool g_atexit_registered = false;
 static std::mutex g_start_mutex;
 static bool g_ok = false;
 static uint32_t g_init_options = 0;
-static bool g_shutdown_requested = false;
+static std::atomic_bool g_shutdown_requested = false;
 static std::atomic_bool g_shutting_down = false;
 static std::recursive_mutex g_shutting_down_mutex;
 static std::thread g_internal_queue_thread;
 static MasterLinkPtr g_master_link;
+
+void shutdownLocked(std::unique_lock<std::recursive_mutex>& lock);
 
 bool isInitialized()
 {
@@ -119,28 +121,24 @@ void checkForShutdown()
     // Since this gets run from within a mutex inside PollManager, we need to prevent ourselves from deadlocking with
     // another thread that's already in the middle of shutdown()
 
-    while (!g_shutting_down)
+    std::unique_lock<std::recursive_mutex> lock(g_shutting_down_mutex, std::defer_lock);
+
+    while (!lock.try_lock() && !g_shutting_down)
     {
       miniros::WallDuration(0.001).sleep();
     }
 
     if (!g_shutting_down)
     {
-      shutdown();
+      shutdownLocked(lock);
+      MINIROS_INFO("Shutdown procedure is complete");
+    } else {
+      MINIROS_WARN("Shutdown procedure was missed");
     }
 
     g_shutdown_requested = false;
   }
 }
-
-class ShutdownWatcher : public PollManager::PollWatcher {
-public:
-    virtual void onPollEvents() override {
-        checkForShutdown();
-    }
-};
-
-ShutdownWatcher g_shutdownWatcher;
 
 void requestShutdown()
 {
@@ -165,8 +163,7 @@ void shutdownCallback(const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& re
   if (num_params > 1)
   {
     std::string reason = params[1];
-    MINIROS_WARN("Shutdown request received.");
-    MINIROS_WARN("Reason given for shutdown: [%s]", reason.c_str());
+    MINIROS_WARN("XMLRPC shutdown request received, reason given: [%s]", reason.c_str());
     requestShutdown();
   }
 
@@ -274,6 +271,8 @@ CallbackQueuePtr getInternalCallbackQueue()
 void basicSigintHandler(int sig)
 {
   (void)sig;
+
+  MINIROS_INFO("Got SIGINT. Initiating shutdown");
   miniros::requestShutdown();
 }
 
@@ -323,7 +322,6 @@ Error start()
     g_master_link->param("/tcp_keepalive", TransportTCP::s_use_keepalive_, TransportTCP::s_use_keepalive_);
 
   PollManagerPtr pm = PollManager::instance();
-  pm->addPollThreadWatcher(&g_shutdownWatcher);
 
   XMLRPCManagerPtr rpcm = RPCManager::instance();
   rpcm->bind("shutdown", shutdownCallback);
@@ -361,7 +359,7 @@ Error start()
 
   if (!(g_init_options & init_options::NoRosout))
   {
-    g_rosout_appender = new ROSOutAppender(g_master_link);
+    g_rosout_appender = new ROSOutAppender(topicManager);
     miniros::console::register_appender(g_rosout_appender);
   }
 
@@ -599,12 +597,9 @@ bool ok()
   return g_ok;
 }
 
-void shutdown()
+void shutdownLocked(std::unique_lock<std::recursive_mutex>& lock)
 {
-  std::scoped_lock<std::recursive_mutex> lock(g_shutting_down_mutex);
-  if (g_shutting_down)
-    return;
-
+  MINIROS_INFO("Running shutdown procedure");
   g_shutting_down = true;
 
   miniros::console::shutdown();
@@ -616,12 +611,14 @@ void shutdown()
 
   if (g_internal_queue_thread.get_id() != std::this_thread::get_id())
   {
-      if (g_internal_queue_thread.joinable())
-          g_internal_queue_thread.join();
+    if (g_internal_queue_thread.joinable())
+      g_internal_queue_thread.join();
   }
+
   //miniros::console::deregister_appender(g_rosout_appender);
-  delete g_rosout_appender;
-  g_rosout_appender = nullptr;
+  if (auto rosout_appender = g_rosout_appender.exchange(nullptr)) {
+    delete rosout_appender;
+  }
 
   if (g_started)
   {
@@ -635,6 +632,15 @@ void shutdown()
   g_started = false;
   g_ok = false;
   Time::shutdown();
+}
+
+void shutdown()
+{
+  std::unique_lock<std::recursive_mutex> lock(g_shutting_down_mutex);
+  if (g_shutting_down) {
+    return;
+  }
+  shutdownLocked(lock);
 }
 
 MINIROS_DECL MasterLinkPtr getMasterLink()

@@ -92,17 +92,16 @@ void ServiceManager::shutdown()
   {
     std::scoped_lock<std::mutex> ss_lock(service_publications_mutex_);
 
-    for (L_ServicePublication::iterator i = service_publications_.begin();
-         i != service_publications_.end(); ++i)
+    for (auto i = service_publications_.begin(); i != service_publications_.end(); ++i)
     {
       unregisterService((*i)->getName());
-      //MINIROS_DEBUG( "shutting down service %s", (*i)->getName().c_str());
+      MINIROS_DEBUG( "shutting down service %s", (*i)->getName().c_str());
       (*i)->drop();
     }
     service_publications_.clear();
   }
 
-  L_ServiceServerLink local_service_clients;
+  std::list<ServiceServerLinkPtr> local_service_clients;
   {
     std::scoped_lock<std::mutex> lock(service_server_links_mutex_);
     local_service_clients.swap(service_server_links_);
@@ -162,8 +161,7 @@ bool ServiceManager::unadvertiseService(const string &serv_name)
   {
     std::scoped_lock<std::mutex> lock(service_publications_mutex_);
 
-    for (L_ServicePublication::iterator i = service_publications_.begin();
-         i != service_publications_.end(); ++i)
+    for (auto i = service_publications_.begin(); i != service_publications_.end(); ++i)
     {
       if((*i)->getName() == serv_name && !(*i)->isDropped())
       {
@@ -286,7 +284,7 @@ void ServiceManager::removeServiceServerLink(const ServiceServerLinkPtr& client)
 
   std::scoped_lock<std::mutex> lock(service_server_links_mutex_);
 
-  L_ServiceServerLink::iterator it = std::find(service_server_links_.begin(), service_server_links_.end(), client);
+  auto it = std::find(service_server_links_.begin(), service_server_links_.end(), client);
   if (it != service_server_links_.end())
   {
     service_server_links_.erase(it);

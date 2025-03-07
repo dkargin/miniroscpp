@@ -734,26 +734,22 @@ bool Subscription::addCallback(const SubscriptionCallbackHelperPtr& helper, cons
     {
       std::scoped_lock<std::mutex> lock(publisher_links_mutex_);
 
-      V_PublisherLink::iterator it = publisher_links_.begin();
-      V_PublisherLink::iterator end = publisher_links_.end();
-      for (; it != end;++it)
+      for (const PublisherLinkPtr& link: publisher_links_)
       {
-        const PublisherLinkPtr& link = *it;
-        if (link->isLatched())
-        {
-          M_PublisherLinkToLatchInfo::iterator des_it = latched_messages_.find(link);
-          if (des_it != latched_messages_.end())
-          {
-            const LatchInfo& latch_info = des_it->second;
+        if (!link->isLatched())
+          continue;
 
-            MessageDeserializerPtr des(std::make_shared<MessageDeserializer>(helper, latch_info.message, latch_info.connection_header));
-            bool was_full = false;
-            info->subscription_queue_->push(info->helper_, des, info->has_tracked_object_, info->tracked_object_, true, latch_info.receipt_time, &was_full);
-            if (!was_full)
-            {
-              info->callback_queue_->addCallback(info->subscription_queue_, (uint64_t)info.get());
-            }
-          }
+        auto des_it = latched_messages_.find(link);
+        if (des_it == latched_messages_.end())
+          continue;
+
+        const LatchInfo& latch_info = des_it->second;
+        auto des = std::make_shared<MessageDeserializer>(helper, latch_info.message, latch_info.connection_header);
+        bool was_full = false;
+        info->subscription_queue_->push(info->helper_, des, info->has_tracked_object_, info->tracked_object_, true, latch_info.receipt_time, &was_full);
+        if (!was_full)
+        {
+          info->callback_queue_->addCallback(info->subscription_queue_, (uint64_t)info.get());
         }
       }
     }

@@ -58,16 +58,24 @@ void PollManager::start()
 
 void PollManager::shutdown()
 {
+  // Logging system can dead here.
+  std::cout << "PollManager shutdown" << std::endl;
+
   if (shutting_down_) return;
 
-  shutting_down_ = true;
-  if (thread_.get_id() != std::this_thread::get_id())
+  if (thread_.joinable() && thread_.get_id() != std::this_thread::get_id())
   {
+    shutting_down_ = true;
     thread_.join();
+    poll_watchers_.disconnectAll();
+    std::cout << "PollManager shutdown complete" << std::endl;;
+  } else {
+    std::cout << "PollManager skipped from other thread" << std::endl;
   }
-
-  poll_watchers_.disconnectAll();
 }
+
+// Defined in init.cpp
+void checkForShutdown();
 
 void PollManager::threadFunc()
 {
@@ -78,20 +86,27 @@ void PollManager::threadFunc()
   {
     {
       std::scoped_lock<PollWatchers> lock(poll_watchers_);
-      for (PollWatcher& watcher: poll_watchers_)
+      auto it = poll_watchers_.begin();
+      for (; it != poll_watchers_.end(); it++)
       {
-          watcher.onPollEvents();;
+        if (it)
+          it->onPollEvents();
       }
     }
 
     if (shutting_down_)
     {
-      return;
+      break;
     }
 
+    // While it breaks abstraction, it reduces number of mutexes and threading challenges.
+    checkForShutdown();
+
     constexpr int updatePeriodMS = 100;
+
     poll_set_.update(updatePeriodMS);
   }
+  MINIROS_INFO("PollManager thread exit");
 }
 
 void PollManager::addPollThreadWatcher(PollWatcher* watcher) {

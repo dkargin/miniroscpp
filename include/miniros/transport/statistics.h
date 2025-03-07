@@ -28,6 +28,7 @@
 #ifndef ROSCPP_STATISTICS_H
 #define ROSCPP_STATISTICS_H
 
+#include <list>
 #include <map>
 
 #include "miniros/internal/forwards.h"

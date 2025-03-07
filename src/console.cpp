@@ -39,6 +39,7 @@
 #include "miniros/platform.h"
 #include "miniros/rostime.h"
 
+#include <atomic>
 #include <cstdio>
 #include <cstdarg>
 #include <cstring>
@@ -198,7 +199,7 @@ namespace console
 {
 
 bool g_initialized = false;
-bool g_shutting_down = false;
+std::atomic_bool g_shutting_down = false;
 std::mutex g_init_mutex;
 
 #ifdef ROSCONSOLE_BACKEND_LOG4CXX
@@ -710,7 +711,7 @@ std::string formatToString(const char* fmt, ...)
 static std::mutex g_print_mutex;
 static std::shared_ptr<char[]> g_print_buffer(new char[INITIAL_BUFFER_SIZE]);
 static size_t g_print_buffer_size = INITIAL_BUFFER_SIZE;
-static std::thread::id g_printing_thread_id;
+static std::atomic<std::thread::id> g_printing_thread_id;
 
 void print(FilterBase* filter, void* logger_handle, Level level,
     const char* file, int line, const char* function, const char* fmt, ...)

@@ -31,6 +31,7 @@
 #include "internal/forwards.h"
 
 #include "miniros/macros.h"
+#include "miniros/errors.h"
 
 namespace XmlRpc {
 class XmlRpcValue;
@@ -64,19 +65,19 @@ struct MINIROS_DECL TopicInfo {
  *  - registration of subscribers and publishers
  *  - interaction with rosparam part.
  */
-class MINIROS_DECL MasterLink {
+class MasterLink {
 public:
-  MasterLink(const std::shared_ptr<RPCManager>& rpcManager);
+  MINIROS_DECL MasterLink(const std::shared_ptr<RPCManager>& rpcManager);
 
-  ~MasterLink();
+  MINIROS_DECL ~MasterLink();
 
   using RpcValue = XmlRpc::XmlRpcValue;
 
   /// Init connection to rosmaster.
-  void initLink(const M_string& remappings);
+  MINIROS_DECL Error initLink(const M_string& remappings);
 
   /// Init rosparam part.
-  void initParam(const M_string& remappings);
+  MINIROS_DECL Error initParam(const M_string& remappings);
 
   /** @brief Execute an XMLRPC call on the master
    *
@@ -88,7 +89,7 @@ public:
    *
    * @return true if call succeeds, false otherwise.
    */
-  MINIROS_DECL bool execute(const std::string& method, const RpcValue& request,
+  MINIROS_DECL Error execute(const std::string& method, const RpcValue& request,
     RpcValue& response, RpcValue& payload, bool wait_for_master) const;
 
   /** @brief Get the hostname where the master runs.

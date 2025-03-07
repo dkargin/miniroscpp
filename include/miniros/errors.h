@@ -27,6 +27,13 @@ struct MINIROS_DECL Error {
     ParameterNotFound,
     /// URI is invalid.
     InvalidURI,
+    /// Some internal error.
+    /// This is some serious assert-level problem.
+    InternalError,
+    /// Operation was interrupted by a shutdown request.
+    ShutdownInterrupt,
+    /// Incorrect or unexpected response.
+    InvalidResponse,
   };
 
   Error(Error_t c) : code(c)
