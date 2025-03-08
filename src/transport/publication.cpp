@@ -25,6 +25,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <algorithm>
+
 #include "miniros/transport/publication.h"
 #include "miniros/transport/subscriber_link.h"
 #include "miniros/transport/connection.h"
@@ -32,6 +34,9 @@
 #include "miniros/single_subscriber_publisher.h"
 #include "miniros/serialization.h"
 
+#ifdef _MSC_VER
+#define _SILENCE_CXX17_OLD_ALLOCATOR_MEMBERS_DEPRECATION_WARNING
+#endif
 #include <generated/std_msgs/Header.hxx>
 
 namespace miniros

@@ -32,17 +32,19 @@
 *  POSSIBILITY OF SUCH DAMAGE.
 ********************************************************************/
 
+#include <algorithm>
+#include <set>
+
 #include "minibag/player.h"
 #include "minibag/message_instance.h"
 #include "minibag/view.h"
 
-#if !defined(_MSC_VER)
+#if !defined(_WIN32)
   #include <sys/select.h>
 #endif
 
 #include "rosgraph_msgs/Clock.hxx"
 
-#include <set>
 
 using std::map;
 using std::pair;
@@ -389,7 +391,7 @@ void Player::printTime()
         }
         else if (delayed_)
         {
-            miniros::Duration time_since_rate = std::max(miniros::Time::now() - last_rate_control_, miniros::Duration(0));
+            miniros::Duration time_since_rate = std::max<miniros::Duration>(miniros::Time::now() - last_rate_control_, miniros::Duration(0));
             printf("\r [DELAYED]  Bag Time: %13.6f   Duration: %.6f / %.6f   Delay: %.2f \r", time_publisher_.getTime().toSec(), d.toSec(), bag_length_.toSec(), time_since_rate.toSec());
         }
         else
@@ -678,7 +680,7 @@ void Player::setupTerminal() {
     if (terminal_modified_)
         return;
 
-#if defined(_MSC_VER)
+#if defined(_WIN32)
     input_handle = GetStdHandle(STD_INPUT_HANDLE);
     if (input_handle == INVALID_HANDLE_VALUE)
     {
@@ -719,7 +721,7 @@ void Player::restoreTerminal() {
 	if (!terminal_modified_)
 		return;
 
-#if defined(_MSC_VER)
+#if defined(_WIN32)
     SetConsoleMode(input_handle, stdin_set);
 #else
     const int fd = fileno(stdin);
@@ -732,11 +734,11 @@ int Player::readCharFromStdin() {
 #ifdef __APPLE__
     fd_set testfd;
     FD_COPY(&stdin_fdset_, &testfd);
-#elif !defined(_MSC_VER)
+#elif !defined(_WIN32)
     fd_set testfd = stdin_fdset_;
 #endif
 
-#if defined(_MSC_VER)
+#if defined(_WIN32)
     DWORD events = 0;
     INPUT_RECORD input_record[1];
     DWORD input_size = 1;

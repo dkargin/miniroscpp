@@ -32,12 +32,12 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <algorithm>
+
 #include "miniros/transport/service_publication.h"
 #include "miniros/transport/service_client_link.h"
 #include "miniros/transport/connection.h"
 #include "miniros/transport/callback_queue_interface.h"
-
-//
 
 #include <generated/std_msgs/String.hxx>
 
@@ -171,9 +171,9 @@ void ServicePublication::addServiceClientLink(const ServiceClientLinkPtr& link)
 
 void ServicePublication::removeServiceClientLink(const ServiceClientLinkPtr& link)
 {
-    std::scoped_lock<std::mutex> lock(client_links_mutex_);
+  std::scoped_lock<std::mutex> lock(client_links_mutex_);
 
-  V_ServiceClientLink::iterator it = std::find(client_links_.begin(), client_links_.end(), link);
+  auto it = std::find(client_links_.begin(), client_links_.end(), link);
   if (it != client_links_.end())
   {
     client_links_.erase(it);
@@ -184,19 +184,15 @@ void ServicePublication::dropAllConnections()
 {
   // Swap our client_links_ list with a local one so we can only lock for a short period of time, because a
   // side effect of our calling drop() on connections can be re-locking the client_links_ mutex
-  V_ServiceClientLink local_links;
+  std::vector<ServiceClientLinkPtr> local_links;
 
   {
     std::scoped_lock<std::mutex> lock(client_links_mutex_);
-
     local_links.swap(client_links_);
   }
 
-  for (V_ServiceClientLink::iterator i = local_links.begin();
-           i != local_links.end(); ++i)
-  {
-    (*i)->getConnection()->drop(Connection::Destructing);
-  }
+  for (ServiceClientLinkPtr link: local_links)
+    link->getConnection()->drop(Connection::Destructing);
 }
 
 } // namespace miniros

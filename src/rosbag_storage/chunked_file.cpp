@@ -37,16 +37,13 @@
 #include <iostream>
 #include <sstream>
 
-// Why do we need it here?
-//#include <ros/ros.h>
-
 #ifdef _WIN32
+#    include <io.h>
 #    ifdef __MINGW32__
 #      define fseeko fseeko64
 #      define ftello ftello64
-//     not sure if we need a ftruncate here yet or not
+#      define ftruncate _chsize
 #    else
-#        include <io.h>
 #        define fseeko _fseeki64
 #        define ftello _ftelli64
 #        define fileno _fileno

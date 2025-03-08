@@ -4,8 +4,12 @@
 
 #include <algorithm>
 
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#else
 #include <unistd.h>
-
+#endif
 #include "master_handler.h"
 
 #include "miniros/transport/rpc_manager.h"
@@ -60,7 +64,11 @@ std::string MasterHandler::getUri(const std::string& caller_id) const
 
 int MasterHandler::getPid(const std::string& caller_id) const
 {
+#ifdef _WIN32
+  return static_cast<int>(GetCurrentProcessId());
+#else
   return getpid();
+#endif
 }
 
 /*

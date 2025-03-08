@@ -115,9 +115,9 @@ public:
    */
   void removePublisherLink(const PublisherLinkPtr& pub_link);
 
-  const std::string& getName() const { return name_; }
-  uint32_t getNumCallbacks() const { return callbacks_.size(); }
-  uint32_t getNumPublishers();
+  const std::string& getName() const;
+  uint32_t getNumCallbacks() const;
+  uint32_t getNumPublishers() const;
 
   // We'll keep a list of these objects, representing in-progress XMLRPC 
   // connections to other nodes.
@@ -222,7 +222,7 @@ private:
 
   typedef std::vector<PublisherLinkPtr> V_PublisherLink;
   V_PublisherLink publisher_links_;
-  std::mutex publisher_links_mutex_;
+  mutable std::mutex publisher_links_mutex_;
 
   TransportHints transport_hints_;
 

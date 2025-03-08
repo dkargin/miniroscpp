@@ -35,15 +35,14 @@
 #pragma once
 
 #include <sys/stat.h>
-#if !defined(_MSC_VER)
+#if !defined(_WIN32)
   #include <termios.h>
   #include <unistd.h>
 #else
+  #define WIN32_LEAN_AND_MEAN
   #include <windows.h>
 #endif
-#include <time.h>
 
-#include <queue>
 #include <string>
 
 #include <miniros/ros.h>
@@ -68,7 +67,6 @@ namespace minibag {
 miniros::AdvertiseOptions createAdvertiseOptions(MessageInstance const& msg, uint32_t queue_size, const std::string& prefix = "");
 
 ROSBAG_DECL miniros::AdvertiseOptions createAdvertiseOptions(const ConnectionInfo* c, uint32_t queue_size, const std::string& prefix = "");
-
 
 struct ROSBAG_DECL PlayerOptions
 {
@@ -222,7 +220,7 @@ private:
 
     // Terminal
     bool    terminal_modified_;
-#if defined(_MSC_VER)
+#if defined(_WIN32)
     HANDLE input_handle;
     DWORD stdin_set;
 #else

@@ -11,7 +11,7 @@
 
 #include <errno.h>
 #include <string.h>
-#if !defined(_WINDOWS)
+#if !defined(_WIN32)
 # include <sys/resource.h>
 #else
 # include <winsock2.h>
@@ -30,7 +30,7 @@ XmlRpcServer::XmlRpcServer()
     _accept_error(false),
     _accept_retry_time_sec(0.0)
 {
-#if !defined(_WINDOWS)
+#if !defined(_WIN32)
   struct rlimit limit = { .rlim_cur = 0, .rlim_max = 0 };
   unsigned int max_files = 1024;
 
@@ -220,7 +220,7 @@ int XmlRpcServer::countFreeFDs() {
   // If the underlying system calls here fail, this will print an error and
   // return 0
 
-#if !defined(_WINDOWS)
+#if !defined(_WIN32)
   int free_fds = 0;
 
   struct rlimit limit = { .rlim_cur = 0, .rlim_max = 0 };

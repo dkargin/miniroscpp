@@ -12,9 +12,13 @@ else ()
   set(LIBSYSTEMD_FOUND FALSE)
 endif()
 
-if (LIBSYSTEMD_FOUND AND MINIROS_USE_LIBSYSTEMD)
-  message(STATUS "Will enable systemd support")
-  set(HAVE_LIBSYSTEMD TRUE)
+message(STATUS "Building miniros for platform ${CMAKE_SYSTEM_NAME}")
+
+if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  if (LIBSYSTEMD_FOUND AND MINIROS_USE_LIBSYSTEMD)
+    message(STATUS "Will enable systemd support")
+    set(HAVE_LIBSYSTEMD TRUE)
+  endif()
 endif()
 
 # execinfo.h is needed for backtrace on glibc systems
@@ -228,9 +232,15 @@ endif()
 
 set_property(TARGET roscxx PROPERTY CXX_STANDARD 17)
 
+if(WIN32)
+  set(PLATFORM_LIBS wsock32 ws2_32)
+else()
+  set(PLATFORM_LIBS stdc++fs)
+endif()
+
 target_link_libraries(roscxx
   PRIVATE
-    rt stdc++fs ${console_bridge_LIBRARIES} ${PKG_LIBS_LIBRARIES}
+    ${console_bridge_LIBRARIES} ${PKG_LIBS_LIBRARIES} ${PLATFORM_LIBS}
   PUBLIC
     ${CMAKE_THREAD_LIBS_INIT}
 )

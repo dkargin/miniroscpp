@@ -54,7 +54,7 @@
 #include <mach/mach.h>
 #endif  // defined(__APPLE__)
 
-#ifdef _WINDOWS
+#ifdef _WIN32
 #include <chrono>
 #include <thread>
 #include <windows.h>

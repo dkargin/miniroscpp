@@ -7,7 +7,7 @@
 
 #ifndef MAKEDEPEND
 
-#if defined(_WINDOWS)
+#if defined(_WIN32)
 # include <stdio.h>
 # include <winsock2.h>
 # include <ws2tcpip.h>
@@ -49,7 +49,7 @@ extern "C" {
 # include <stdlib.h>
 # include <arpa/inet.h>
 }
-#endif  // _WINDOWS
+#endif  // _WIN32
 
 #endif // MAKEDEPEND
 
@@ -66,7 +66,7 @@ using namespace XmlRpc;
 
 bool XmlRpcSocket::s_use_ipv6_ = false;
 
-#if defined(_WINDOWS)
+#if defined(_WIN32)
 
 static void initWinSock()
 {
@@ -84,7 +84,7 @@ static void initWinSock()
 
 #define initWinSock()
 
-#endif // _WINDOWS
+#endif // _WIN32
 
 
 // These errors are not considered fatal for an IO operation; the operation will be re-tried.
@@ -107,11 +107,11 @@ void
 XmlRpcSocket::close(int fd)
 {
   XmlRpcUtil::log(4, "XmlRpcSocket::close: fd %d.", fd);
-#if defined(_WINDOWS)
+#if defined(_WIN32)
   closesocket(fd);
 #else
   ::close(fd);
-#endif // _WINDOWS
+#endif // _WIN32
 }
 
 
@@ -120,12 +120,12 @@ XmlRpcSocket::close(int fd)
 bool
 XmlRpcSocket::setNonBlocking(int fd)
 {
-#if defined(_WINDOWS)
+#if defined(_WIN32)
   unsigned long flag = 1;
   return (ioctlsocket((SOCKET)fd, FIONBIO, &flag) == 0);
 #else
   return (fcntl(fd, F_SETFL, O_NONBLOCK) == 0);
-#endif // _WINDOWS
+#endif // _WIN32
 }
 
 
@@ -181,7 +181,7 @@ int
 XmlRpcSocket::accept(int fd)
 {
   struct sockaddr_in addr;
-#if defined(_WINDOWS)
+#if defined(_WIN32)
   int
 #else
   socklen_t
@@ -209,7 +209,7 @@ XmlRpcSocket::connect(int fd, const std::string& host, int port)
   hints.ai_family = AF_UNSPEC;
   int getaddr_err = getaddrinfo(host.c_str(), NULL, &hints, &addr);
   if (0 != getaddr_err) {
-#if !defined(_WINDOWS)
+#if !defined(_WIN32)
     if(getaddr_err == EAI_SYSTEM) {
       XmlRpcUtil::error("Couldn't find an %s address for [%s]: %s\n", s_use_ipv6_ ? "AF_INET6" : "AF_INET", host.c_str(), XmlRpcSocket::getErrorMsg().c_str());
     } else {
@@ -271,7 +271,7 @@ XmlRpcSocket::connect(int fd, const std::string& host, int port)
   if (result != 0 ) {
     int error = getError();
     // platform check here, EWOULDBLOCK on WIN32 and EINPROGRESS otherwise
-#if defined(_WINDOWS)
+#if defined(_WIN32)
     if (error != EWOULDBLOCK) {
 #else
     if (error != EINPROGRESS) {
@@ -298,7 +298,7 @@ bool XmlRpcSocket::nbRead(int fd, std::string& s, bool *eof)
   *eof = false;
 
   while ( ! wouldBlock && ! *eof) {
-#if defined(_WINDOWS)
+#if defined(_WIN32)
     int n = recv(fd, readBuf, READ_SIZE-1, 0);
 #else
     int n = read(fd, readBuf, READ_SIZE-1);
@@ -329,7 +329,7 @@ XmlRpcSocket::nbWrite(int fd, const std::string& s, int *bytesSoFar)
   bool wouldBlock = false;
 
   while ( nToWrite > 0 && ! wouldBlock ) {
-#if defined(_WINDOWS)
+#if defined(_WIN32)
     int n = send(fd, sp, nToWrite, 0);
 #else
     int n = write(fd, sp, nToWrite);
@@ -353,7 +353,7 @@ XmlRpcSocket::nbWrite(int fd, const std::string& s, int *bytesSoFar)
 // Returns last errno
 int XmlRpcSocket::getError()
 {
-#if defined(_WINDOWS)
+#if defined(_WIN32)
   return WSAGetLastError();
 #else
   return errno;

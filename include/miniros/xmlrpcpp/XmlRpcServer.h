@@ -15,7 +15,7 @@
 # include <map>
 # include <string>
 # include <vector>
-# ifndef _WINDOWS
+# ifndef _WIN32
 #  include <poll.h>
 # endif
 #endif
@@ -125,7 +125,7 @@ namespace XmlRpc {
 
     // Minimum number of free file descriptors before rejecting clients.
     static const int FREE_FD_BUFFER;
-#ifndef _WINDOWS
+#ifndef _WIN32
     // List of all file descriptors, used for counting open files.
     std::vector<struct pollfd> pollfds;
 #endif

@@ -27,6 +27,7 @@
 
 #define MINIROS_PACKAGE_NAME "service_manager"
 
+#include <algorithm>
 #include <cstdio>
 
 #include "miniros/transport/service_manager.h"

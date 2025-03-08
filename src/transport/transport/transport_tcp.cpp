@@ -719,7 +719,7 @@ void TransportTCP::socketUpdate(int events)
   #ifdef _MSC_VER
     char err[60];
     strerror_s(err,60,error);
-    ROSCPP_LOG_DEBUG("Socket %d closed with (ERR|HUP|NVAL) events %d: %s", sock_, events, err);
+    MINIROS_DEBUG("Socket %d closed with (ERR|HUP|NVAL) events %d: %s", sock_, events, err);
   #else
     MINIROS_DEBUG("Socket %d closed with (ERR|HUP|NVAL) events %d: %s", sock_, events, strerror(error));
   #endif

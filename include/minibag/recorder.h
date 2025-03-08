@@ -36,7 +36,7 @@
 #define ROSBAG_RECORDER_H
 
 #include <sys/stat.h>
-#if !defined(_MSC_VER)
+#if !defined(_WIN32)
   #include <termios.h>
   #include <unistd.h>
 #endif

@@ -32,13 +32,10 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  ********************************************************************/
 
-#include "minibag/recorder.h"
-
+#include <algorithm>
 #include <filesystem>
 #include <sys/stat.h>
-
 #include <time.h>
-
 #include <memory>
 #include <queue>
 #include <set>
@@ -46,6 +43,7 @@
 #include <string>
 
 #include <regex>
+#include "minibag/recorder.h"
 
 #include <miniros/topic_tools/shape_shifter.h>
 

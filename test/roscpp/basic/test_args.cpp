@@ -32,6 +32,7 @@
 /*
  * Test removing ROS args
  */
+#include <algorithm>
 
 #include <gtest/gtest.h>
 #include "miniros/init.h"

@@ -34,6 +34,7 @@
 
 #define MINIROS_PACKAGE_NAME "subscription"
 
+#include <algorithm>
 #include <sstream>
 #include <fcntl.h>
 #include <cerrno>
@@ -138,10 +139,21 @@ void Subscription::getInfo(XmlRpc::XmlRpcValue& info)
   }
 }
 
-uint32_t Subscription::getNumPublishers()
+const std::string& Subscription::getName() const
 {
-	std::scoped_lock<std::mutex> lock(publisher_links_mutex_);
-	return (uint32_t)publisher_links_.size();
+  return name_;
+}
+
+uint32_t Subscription::getNumCallbacks() const
+{
+  return static_cast<int32_t>(callbacks_.size());
+}
+
+
+uint32_t Subscription::getNumPublishers() const
+{
+    std::scoped_lock<std::mutex> lock(publisher_links_mutex_);
+    return (uint32_t)publisher_links_.size();
 }
 
 void Subscription::drop()

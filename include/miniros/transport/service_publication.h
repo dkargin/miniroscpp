@@ -40,7 +40,6 @@ namespace miniros
 
 class ServiceClientLink;
 typedef std::shared_ptr<ServiceClientLink> ServiceClientLinkPtr;
-typedef std::vector<ServiceClientLinkPtr> V_ServiceClientLink;
 class CallbackQueueInterface;
 
 class Message;
@@ -98,7 +97,7 @@ private:
   std::string response_data_type_;
   ServiceCallbackHelperPtr helper_;
 
-  V_ServiceClientLink client_links_;
+  std::vector<ServiceClientLinkPtr> client_links_;
   std::mutex client_links_mutex_;
 
   bool dropped_;
