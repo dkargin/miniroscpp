@@ -15,7 +15,6 @@
 
 namespace XmlRpc {
 
-
   static const char VALUE_TAG[]     = "<value>";
   static const char VALUE_ETAG[]    = "</value>";
 
@@ -43,12 +42,6 @@ namespace XmlRpc {
   static const char NAME_ETAG[]     = "</name>";
   static const char MEMBER_ETAG[]   = "</member>";
   static const char STRUCT_ETAG[]   = "</struct>";
-
-
-      
-  // Format strings
-  std::string XmlRpcValue::_doubleFormat("%.16g");
-
 
   XmlRpcValue XmlRpcValue::Array(int size)
   {
