@@ -329,7 +329,7 @@ struct VectorSerializer
 template<typename T, class ContainerAllocator>
 struct VectorSerializer<T, ContainerAllocator, typename std::enable_if_t<!mt::IsFixedSize<T>::value> >
 {
-  typedef std::vector<T, typename ContainerAllocator::template rebind<T>::other> VecType;
+  typedef std::vector<T, typename std::allocator_traits<ContainerAllocator>::template rebind_alloc<T>> VecType;
   typedef typename VecType::iterator IteratorType;
   typedef typename VecType::const_iterator ConstIteratorType;
 
@@ -379,7 +379,7 @@ struct VectorSerializer<T, ContainerAllocator, typename std::enable_if_t<!mt::Is
 template<typename T, class ContainerAllocator>
 struct VectorSerializer<T, ContainerAllocator, typename std::enable_if_t<mt::IsSimple<T>::value>>
 {
-  typedef std::vector<T, typename ContainerAllocator::template rebind<T>::other> VecType;
+  typedef std::vector<T, typename std::allocator_traits<ContainerAllocator>::template rebind_alloc<T>> VecType;
   typedef typename VecType::iterator IteratorType;
   typedef typename VecType::const_iterator ConstIteratorType;
 
@@ -421,7 +421,7 @@ struct VectorSerializer<T, ContainerAllocator, typename std::enable_if_t<mt::IsS
 template<typename T, class ContainerAllocator>
 struct VectorSerializer<T, ContainerAllocator, typename std::enable_if_t<mt::IsFixedSize<T>::value && !mt::IsSimple<T>::value> >
 {
-  typedef std::vector<T, typename ContainerAllocator::template rebind<T>::other> VecType;
+  typedef std::vector<T, typename std::allocator_traits<ContainerAllocator>::template rebind_alloc<T>> VecType;
   typedef typename VecType::iterator IteratorType;
   typedef typename VecType::const_iterator ConstIteratorType;
 
