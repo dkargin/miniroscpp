@@ -32,7 +32,6 @@
 #include <vector>
 #include <map>
 #include <set>
-#include <list>
 
 #include <memory>
 #include <functional>
@@ -70,18 +69,14 @@ typedef std::vector<SubscriberLinkPtr> V_SubscriberLink;
 class Subscription;
 typedef std::shared_ptr<Subscription> SubscriptionPtr;
 typedef std::weak_ptr<Subscription> SubscriptionWPtr;
-typedef std::list<SubscriptionPtr> L_Subscription;
-typedef std::set<SubscriptionPtr> S_Subscription;
 class PublisherLink;
 typedef std::shared_ptr<PublisherLink> PublisherLinkPtr;
 typedef std::vector<PublisherLinkPtr> V_PublisherLink;
 class ServicePublication;
 typedef std::shared_ptr<ServicePublication> ServicePublicationPtr;
-typedef std::list<ServicePublicationPtr> L_ServicePublication;
 typedef std::vector<ServicePublicationPtr> V_ServicePublication;
 class ServiceServerLink;
 typedef std::shared_ptr<ServiceServerLink> ServiceServerLinkPtr;
-typedef std::list<ServiceServerLinkPtr> L_ServiceServerLink;
 class Transport;
 typedef std::shared_ptr<Transport> TransportPtr;
 class NodeHandle;

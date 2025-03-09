@@ -50,17 +50,16 @@ MINIROS_DECLARE_MESSAGE(Log)
 namespace miniros
 {
 
-class Publication;
-typedef std::shared_ptr<Publication> PublicationPtr;
-typedef std::weak_ptr<Publication> PublicationWPtr;
-
 class MasterLink;
-typedef std::shared_ptr<MasterLink> MasterLinkPtr;
+using MasterLinkPtr = std::shared_ptr<MasterLink>;
+
+class TopicManager;
+using TopicManagerPtr = std::shared_ptr<TopicManager>;
 
 class MINIROS_DECL ROSOutAppender : public console::LogAppender
 {
 public:
-  explicit ROSOutAppender(const MasterLinkPtr& master);
+  explicit ROSOutAppender(const TopicManagerPtr& tm);
   ~ROSOutAppender() override;
 
   const std::string& getLastError() const;
@@ -80,7 +79,7 @@ protected:
   bool disable_topics_;
 
   std::thread publish_thread_;
-  MasterLinkPtr master_;
+  TopicManagerPtr topic_manager_;
 };
 
 } // namespace miniros

@@ -25,15 +25,17 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ROSCPP_SERVICE_MANAGER_H
-#define ROSCPP_SERVICE_MANAGER_H
+#ifndef MINIROS_SERVICE_MANAGER_H
+#define MINIROS_SERVICE_MANAGER_H
+
+#include <list>
+#include <mutex>
 
 #include "miniros/internal/forwards.h"
 #include "miniros/common.h"
 #include "advertise_service_options.h"
 #include "service_client_options.h"
 
-#include <mutex>
 
 namespace miniros
 {
@@ -130,10 +132,10 @@ private:
 
   bool isShuttingDown() { return shutting_down_; }
 
-  L_ServicePublication service_publications_;
+  std::list<ServicePublicationPtr> service_publications_;
   std::mutex service_publications_mutex_;
 
-  L_ServiceServerLink service_server_links_;
+  std::list<ServiceServerLinkPtr> service_server_links_;
   std::mutex service_server_links_mutex_;
 
   volatile bool shutting_down_;
@@ -147,4 +149,4 @@ private:
 
 } // namespace miniros
 
-#endif // ROSCPP_SERVICE_MANAGER_H
+#endif // MINIROS_SERVICE_MANAGER_H

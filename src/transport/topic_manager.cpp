@@ -129,8 +129,7 @@ void TopicManager::shutdown()
     advertised_topics_mutex_.unlock();
   }
 
-  // actually one should call poll_manager_->removePollThreadListener(), but the connection is not stored above
-  poll_manager_->shutdown();
+  poll_watcher_->disconnect();
 
   xmlrpc_manager_->unbind("publisherUpdate");
   xmlrpc_manager_->unbind("requestTopic");
@@ -165,6 +164,11 @@ void TopicManager::shutdown()
     }
     subscriptions_.clear();
   }
+
+  xmlrpc_manager_.reset();
+  connection_manager_.reset();
+  poll_manager_.reset();
+  master_link_.reset();
 }
 
 void TopicManager::processPublishQueues()
@@ -217,7 +221,7 @@ bool TopicManager::addSubCallback(const SubscribeOptions& ops)
       return false;
     }
 
-    for (L_Subscription::iterator s = subscriptions_.begin(); s != subscriptions_.end() && !found; ++s) {
+    for (auto s = subscriptions_.begin(); s != subscriptions_.end() && !found; ++s) {
       sub = *s;
       if (!sub->isDropped() && sub->getName() == ops.topic) {
         found_topic = true;
@@ -273,7 +277,7 @@ bool TopicManager::subscribe(const SubscribeOptions& ops)
   const std::string& md5sum = ops.md5sum;
   std::string datatype = ops.datatype;
 
-  SubscriptionPtr s(std::make_shared<Subscription>(ops.topic, md5sum, datatype, ops.transport_hints));
+  auto s = std::make_shared<Subscription>(ops.topic, md5sum, datatype, ops.transport_hints);
   s->initStatistics(ops.helper, master_link_);
   s->addCallback(
     ops.helper, ops.md5sum, ops.callback_queue, ops.queue_size, ops.tracked_object, ops.allow_concurrent_callbacks);
@@ -539,7 +543,7 @@ bool TopicManager::pubUpdate(const std::string& topic, const std::vector<std::st
 
     MINIROS_DEBUG("Received update for topic [%s] (%d publishers)", topic.c_str(), (int)pubs.size());
     // find the subscription
-    for (L_Subscription::const_iterator s = subscriptions_.begin(); s != subscriptions_.end(); ++s) {
+    for (auto s = subscriptions_.begin(); s != subscriptions_.end(); ++s) {
       if ((*s)->getName() != topic || (*s)->isDropped())
         continue;
 
@@ -751,8 +755,7 @@ bool TopicManager::unsubscribe(const std::string& topic, const SubscriptionCallb
       return false;
     }
 
-    L_Subscription::iterator it;
-    for (it = subscriptions_.begin(); it != subscriptions_.end(); ++it) {
+    for (auto it = subscriptions_.begin(); it != subscriptions_.end(); ++it) {
       if ((*it)->getName() == topic) {
         sub = *it;
         break;
@@ -771,8 +774,7 @@ bool TopicManager::unsubscribe(const std::string& topic, const SubscriptionCallb
     {
       std::scoped_lock<std::mutex> lock(subs_mutex_);
 
-      L_Subscription::iterator it;
-      for (it = subscriptions_.begin(); it != subscriptions_.end(); ++it) {
+      for (auto it = subscriptions_.begin(); it != subscriptions_.end(); ++it) {
         if ((*it)->getName() == topic) {
           subscriptions_.erase(it);
           break;

@@ -37,15 +37,16 @@
   #endif
 #endif
 
-#include "miniros/rostime.h"
-#include "miniros/impl/time.h"
+#include <atomic>
 #include <cmath>
 #include <ctime>
 #include <iomanip>
 #include <limits>
 #include <stdexcept>
 #include <mutex>
-#include <cmath>
+
+#include "miniros/rostime.h"
+#include "miniros/impl/time.h"
 
 // time related includes for macOS
 #if defined(__APPLE__)
@@ -86,7 +87,7 @@ namespace miniros
 
   // This is declared here because it's set from the Time class but read from
   // the Duration class, and need not be exported to users of either.
-  static bool g_stopped(false);
+  static std::atomic_bool g_stopped(false);
 
   // I assume that this is declared here, instead of time.h, to keep users
   // of time.h from including boost/thread/mutex.hpp

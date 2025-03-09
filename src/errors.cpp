@@ -24,6 +24,12 @@ const char* Error::toString() const {
       return "Parameter not found";
    case Error::InvalidURI:
      return "Invalid URI";
+   case Error::InternalError:
+     return "Internal error";
+   case Error::ShutdownInterrupt:
+     return "Interrupted by shutdown request";
+   case Error::InvalidResponse:
+     return "Invalid response";
   }
   return "Unknown error";
 }

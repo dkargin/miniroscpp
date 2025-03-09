@@ -45,11 +45,11 @@
 namespace miniros
 {
 
-ROSOutAppender::ROSOutAppender(const MasterLinkPtr& master)
+ROSOutAppender::ROSOutAppender(const TopicManagerPtr& tm)
 : shutting_down_(false)
 , disable_topics_(false)
 , publish_thread_(&ROSOutAppender::logThread, this)
-, master_(master)
+, topic_manager_(tm)
 {
   AdvertiseOptions ops;
   ops.init<rosgraph_msgs::Log>(names::resolve("/rosout"), 0);
@@ -106,10 +106,11 @@ void ROSOutAppender::log(::miniros::console::Level level, const char* str, const
   msg->function = function;
   msg->line = line;
 
+  MasterLinkPtr master = topic_manager_ ? topic_manager_->getMasterLink() : MasterLinkPtr();
   // check parameter server/cache for omit_topics flag
   // the same parameter is checked in rosout.py for the same purpose
-  if (master_)
-    master_->getCached("/rosout_disable_topics_generation", disable_topics_);
+  if (master)
+    master->getCached("/rosout_disable_topics_generation", disable_topics_);
 
   if (!disable_topics_) {
     this_node::getAdvertisedTopics(msg->topics);
@@ -137,22 +138,24 @@ void ROSOutAppender::logThread()
 
       if (shutting_down_)
       {
-        return;
+        break;
       }
 
       queue_condition_.wait(lock);
 
       if (shutting_down_)
       {
-        return;
+        break;
       }
 
       local_queue.swap(log_queue_);
     }
 
-    for (const auto& msg: local_queue)
-    {
-      TopicManager::instance()->publish(names::resolve("/rosout"), *msg);
+    if (topic_manager_) {
+      for (const auto& msg: local_queue)
+      {
+        topic_manager_->publish(names::resolve("/rosout"), *msg);
+      }
     }
   }
 }

@@ -25,8 +25,10 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ROSCPP_TOPIC_MANAGER_H
-#define ROSCPP_TOPIC_MANAGER_H
+#ifndef MINIROS_TOPIC_MANAGER_H
+#define MINIROS_TOPIC_MANAGER_H
+
+#include <list>
 
 #include "miniros/internal/forwards.h"
 #include "miniros/common.h"
@@ -217,7 +219,7 @@ private:
   bool isShuttingDown() { return shutting_down_; }
 
   std::mutex subs_mutex_;
-  L_Subscription subscriptions_;
+  std::list<SubscriptionPtr> subscriptions_;
 
   std::recursive_mutex advertised_topics_mutex_;
   V_Publication advertised_topics_;
@@ -239,4 +241,4 @@ private:
 
 } // namespace miniros
 
-#endif // ROSCPP_TOPIC_MANAGER_H
+#endif // MINIROS_TOPIC_MANAGER_H

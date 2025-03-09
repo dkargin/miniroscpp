@@ -73,10 +73,10 @@ MasterLink::~MasterLink()
   }
 }
 
-void MasterLink::initLink(const M_string& remappings)
+Error MasterLink::initLink(const M_string& remappings)
 {
   if (!internal_)
-    return;
+    return Error::InternalError;
 
   auto it = remappings.find("__master");
   if (it != remappings.end()) {
@@ -90,19 +90,12 @@ void MasterLink::initLink(const M_string& remappings)
 #else
     master_uri_env = getenv("ROS_MASTER_URI");
 #endif
-    if (!master_uri_env) {
-      MINIROS_FATAL("ROS_MASTER_URI is not defined in the environment. Either "
-                    "type the following or (preferrably) add this to your "
-                    "~/.bashrc file in order set up your "
-                    "local machine as a ROS master:\n\n"
-                    "export ROS_MASTER_URI=http://localhost:11311\n\n"
-                    "then, type 'roscore' in another shell to actually launch "
-                    "the master program.");
-      MINIROS_BREAK();
+    if (master_uri_env) {
+      internal_->uri = master_uri_env;
+    } else {
+      MINIROS_WARN("Defaulting ROS_MASTER_URI to localhost:11311");
+      internal_->uri = "http://localhost:11311";
     }
-
-    internal_->uri = master_uri_env;
-
 #ifdef _MSC_VER
     // http://msdn.microsoft.com/en-us/library/ms175774(v=vs.80).aspx
     free(master_uri_env);
@@ -112,8 +105,10 @@ void MasterLink::initLink(const M_string& remappings)
   // Split URI into
   if (!network::splitURI(internal_->uri, internal_->host, internal_->port)) {
     MINIROS_FATAL("Couldn't parse the master URI [%s] into a host:port pair.", internal_->uri.c_str());
-    MINIROS_BREAK();
+    return Error::InvalidURI;
   }
+
+  return Error::Ok;
 }
 
 std::string MasterLink::getHost() const
@@ -193,18 +188,18 @@ bool MasterLink::getNodes(std::vector<std::string>& nodes) const
   return true;
 }
 
-bool MasterLink::execute(const std::string& method, const RpcValue& request, RpcValue& response,
+Error MasterLink::execute(const std::string& method, const RpcValue& request, RpcValue& response,
   RpcValue& payload, bool wait_for_master) const
 {
   if (!internal_)
-    return false;
+    return Error::InternalError;
   miniros::SteadyTime start_time = miniros::SteadyTime::now();
 
   std::string master_host = getHost();
   uint32_t master_port = getPort();
   RPCManagerPtr manager = internal_->rpcManager;
   if (!manager)
-    return false;
+    return Error::InternalError;
   XmlRpc::XmlRpcClient* c = manager->getXMLRPCClient(master_host, master_port, "/");
   bool printed = false;
   bool slept = false;
@@ -230,14 +225,14 @@ bool MasterLink::execute(const std::string& method, const RpcValue& request, Rpc
 
       if (!wait_for_master) {
         manager->releaseXMLRPCClient(c);
-        return false;
+        return Error::NoMaster;
       }
 
       if (!internal_->retry_timeout.isZero() && (miniros::SteadyTime::now() - start_time) >= internal_->retry_timeout) {
         MINIROS_ERROR(
           "[%s] Timed out trying to connect to the master after [%f] seconds", method.c_str(), internal_->retry_timeout.toSec());
         manager->releaseXMLRPCClient(c);
-        return false;
+        return Error::NoMaster;
       }
 
       miniros::WallDuration(0.05).sleep();
@@ -245,10 +240,8 @@ bool MasterLink::execute(const std::string& method, const RpcValue& request, Rpc
     } else {
       if (!manager->validateXmlrpcResponse(method, response, payload)) {
         manager->releaseXMLRPCClient(c);
-
-        return false;
+        return Error::InvalidResponse;
       }
-
       break;
     }
 
@@ -261,7 +254,11 @@ bool MasterLink::execute(const std::string& method, const RpcValue& request, Rpc
 
   manager->releaseXMLRPCClient(c);
 
-  return b;
+  if (!ok) {
+    MINIROS_ERROR("[%s] Got shutdown request during RPC call", method.c_str());
+    return Error::ShutdownInterrupt;
+  }
+  return Error::Ok;;
 }
 
 void MasterLink::invalidateParentParams(const std::string& key)
@@ -984,7 +981,7 @@ void MasterLink::paramUpdateCallback(const RpcValue& params, RpcValue& result)
   this->update((std::string)params[1], params[2]);
 }
 
-void MasterLink::initParam(const M_string& remappings)
+Error MasterLink::initParam(const M_string& remappings)
 {
   auto it = remappings.begin();
   auto end = remappings.end();
@@ -1041,6 +1038,7 @@ void MasterLink::initParam(const M_string& remappings)
         return paramUpdateCallback(params, result);
       });
   }
+  return Error::Ok;
 }
 
 } // namespace miniros
