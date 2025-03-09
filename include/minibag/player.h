@@ -66,9 +66,9 @@ namespace minibag {
  */
 miniros::AdvertiseOptions createAdvertiseOptions(MessageInstance const& msg, uint32_t queue_size, const std::string& prefix = "");
 
-ROSBAG_DECL miniros::AdvertiseOptions createAdvertiseOptions(const ConnectionInfo* c, uint32_t queue_size, const std::string& prefix = "");
+miniros::AdvertiseOptions createAdvertiseOptions(const ConnectionInfo* c, uint32_t queue_size, const std::string& prefix = "");
 
-struct ROSBAG_DECL PlayerOptions
+struct PlayerOptions
 {
     PlayerOptions();
 
@@ -102,7 +102,7 @@ struct ROSBAG_DECL PlayerOptions
 
 
 //! PRIVATE. A helper class to track relevant state for publishing time
-class ROSBAG_DECL TimePublisher {
+class TimePublisher {
 public:
     /*! Create a time publisher
      *  A publish_frequency of < 0 indicates that time shouldn't actually be published
@@ -163,7 +163,7 @@ private:
  *  This API is currently considered private, but will be released in the 
  * future after view.
  */
-class ROSBAG_DECL Player
+class Player
 {
 public:
     Player(PlayerOptions const& options);
