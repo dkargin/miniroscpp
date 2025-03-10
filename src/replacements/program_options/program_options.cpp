@@ -5,8 +5,6 @@
 
 #include <cassert>
 #include <limits>
-#include <sstream>
-#include <cstring>
 
 #include "program_options.h"
 

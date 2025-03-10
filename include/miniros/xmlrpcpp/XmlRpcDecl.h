@@ -42,6 +42,9 @@
 
 #include <miniros/macros.h>
 
+#define XMLRPCPP_DECL MINIROS_HELPER_EXPORT
+
+/*
 #ifdef MINIROS_BUILD_SHARED_LIBS // ros is being built around shared libraries
   #ifdef xmlrpcpp_EXPORTS // we are building a shared lib/dll
     #define XMLRPCPP_DECL MINIROS_HELPER_EXPORT
@@ -51,5 +54,6 @@
 #else // ros is being built around static libraries
   #define XMLRPCPP_DECL
 #endif
+*/
 
 #endif /* XMLRPCPP_DECL_H_INCLUDED */

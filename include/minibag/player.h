@@ -35,15 +35,14 @@
 #pragma once
 
 #include <sys/stat.h>
-#if !defined(_MSC_VER)
+#if !defined(_WIN32)
   #include <termios.h>
   #include <unistd.h>
 #else
+  #define WIN32_LEAN_AND_MEAN
   #include <windows.h>
 #endif
-#include <time.h>
 
-#include <queue>
 #include <string>
 
 #include <miniros/ros.h>
@@ -67,10 +66,9 @@ namespace minibag {
  */
 miniros::AdvertiseOptions createAdvertiseOptions(MessageInstance const& msg, uint32_t queue_size, const std::string& prefix = "");
 
-ROSBAG_DECL miniros::AdvertiseOptions createAdvertiseOptions(const ConnectionInfo* c, uint32_t queue_size, const std::string& prefix = "");
+miniros::AdvertiseOptions createAdvertiseOptions(const ConnectionInfo* c, uint32_t queue_size, const std::string& prefix = "");
 
-
-struct ROSBAG_DECL PlayerOptions
+struct PlayerOptions
 {
     PlayerOptions();
 
@@ -104,7 +102,7 @@ struct ROSBAG_DECL PlayerOptions
 
 
 //! PRIVATE. A helper class to track relevant state for publishing time
-class ROSBAG_DECL TimePublisher {
+class TimePublisher {
 public:
     /*! Create a time publisher
      *  A publish_frequency of < 0 indicates that time shouldn't actually be published
@@ -165,7 +163,7 @@ private:
  *  This API is currently considered private, but will be released in the 
  * future after view.
  */
-class ROSBAG_DECL Player
+class Player
 {
 public:
     Player(PlayerOptions const& options);
@@ -222,7 +220,7 @@ private:
 
     // Terminal
     bool    terminal_modified_;
-#if defined(_MSC_VER)
+#if defined(_WIN32)
     HANDLE input_handle;
     DWORD stdin_set;
 #else

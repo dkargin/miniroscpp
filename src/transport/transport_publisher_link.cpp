@@ -253,7 +253,7 @@ void TransportPublisherLink::onRetryTimer(const miniros::SteadyTimerEvent&)
 
   if (needs_retry_ && SteadyTime::now() > next_retry_)
   {
-    retry_period_ = std::min(retry_period_ * 2, WallDuration(20));
+    retry_period_ = std::min<WallDuration>(retry_period_ * 2, WallDuration(20));
     needs_retry_ = false;
     SubscriptionPtr parent = parent_.lock();
     // TODO: support retry on more than just TCP

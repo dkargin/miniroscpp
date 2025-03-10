@@ -25,9 +25,10 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ROSCPP_TIMER_MANAGER_H
-#define ROSCPP_TIMER_MANAGER_H
+#ifndef MINIROS_TIMER_MANAGER_H
+#define MINIROS_TIMER_MANAGER_H
 
+#include <algorithm>
 #include <vector>
 #include <list>
 #include <thread>
@@ -81,8 +82,6 @@ private:
   typedef std::weak_ptr<TimerInfo> TimerInfoWPtr;
   typedef std::vector<TimerInfoPtr> V_TimerInfo;
 
-  typedef std::list<int32_t> L_int32;
-
 public:
   TimerManager();
   ~TimerManager();
@@ -114,7 +113,7 @@ private:
   volatile bool new_timer_;
 
   std::mutex waiting_mutex_;
-  L_int32 waiting_;
+  std::list<int32_t> waiting_;
 
   uint32_t id_counter_;
   std::mutex id_mutex_;
@@ -361,7 +360,7 @@ void TimerManager<T, D, E>::remove(int32_t handle)
     {
       std::scoped_lock<std::mutex> lock2(waiting_mutex_);
       // Remove from the waiting list if it's in it
-      L_int32::iterator it = std::find(waiting_.begin(), waiting_.end(), handle);
+      auto it = std::find(waiting_.begin(), waiting_.end(), static_cast<int32_t>(handle));
       if (it != waiting_.end())
       {
         waiting_.erase(it);

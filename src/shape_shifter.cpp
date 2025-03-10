@@ -75,7 +75,7 @@ Publisher ShapeShifter::advertise(NodeHandle& nh, const std::string& topic, uint
 
 uint32_t ShapeShifter::size() const
 {
-  return msgBuf.size();
+  return static_cast<uint32_t>(msgBuf.size());
 }
 
 } // namespace topic_tools

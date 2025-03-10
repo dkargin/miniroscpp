@@ -34,6 +34,9 @@
 
 #define MINIROS_PACKAGE_NAME "poll_set"
 
+#include <algorithm>
+#include <fcntl.h>
+
 #include "miniros/transport/poll_set.h"
 #include "miniros/file_log.h"
 
@@ -41,7 +44,6 @@
 
 #include <miniros/rosassert.h>
 
-#include <fcntl.h>
 
 namespace miniros
 {

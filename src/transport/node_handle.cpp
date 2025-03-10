@@ -228,7 +228,7 @@ std::string NodeHandle::remapName(const std::string& name) const
   M_string::const_iterator it = remappings_.find(resolved);
   if (it != remappings_.end())
   {
-    // ROSCPP_LOG_DEBUG("found 'local' remapping: %s", it->second.c_str());
+    // MINIROS_DEBUG("found 'local' remapping: %s", it->second.c_str());
     return it->second;
   }
 
@@ -238,7 +238,7 @@ std::string NodeHandle::remapName(const std::string& name) const
 
 std::string NodeHandle::resolveName(const std::string& name, bool remap) const
 {
-  // ROSCPP_LOG_DEBUG("resolveName(%s, %s)", name.c_str(), remap ? "true" : "false");
+  // MINIROS_DEBUG("resolveName(%s, %s)", name.c_str(), remap ? "true" : "false");
   std::string error;
   if (!names::validate(name, error))
   {
@@ -273,18 +273,18 @@ std::string NodeHandle::resolveName(const std::string& name, bool remap, no_vali
   }
   else if (!namespace_.empty())
   {
-    // ROSCPP_LOG_DEBUG("Appending namespace_ (%s)", namespace_.c_str());
+    // MINIROS_DEBUG("Appending namespace_ (%s)", namespace_.c_str());
     final = names::append(namespace_, final);
   }
 
-  // ROSCPP_LOG_DEBUG("resolveName, pre-clean: %s", final.c_str());
+  // MINIROS_DEBUG("resolveName, pre-clean: %s", final.c_str());
   final = names::clean(final);
-  // ROSCPP_LOG_DEBUG("resolveName, post-clean: %s", final.c_str());
+  // MINIROS_DEBUG("resolveName, post-clean: %s", final.c_str());
 
   if (remap)
   {
     final = remapName(final);
-    // ROSCPP_LOG_DEBUG("resolveName, remapped: %s", final.c_str());
+    // MINIROS_DEBUG("resolveName, remapped: %s", final.c_str());
   }
 
   return names::resolve(final, false);

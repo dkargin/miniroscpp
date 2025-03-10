@@ -2,9 +2,6 @@
 #include <cstring>
 #include <cstdlib>
 
-#include <netinet/in.h>
-#include <arpa/inet.h>
-
 #include "xmlrpcpp/XmlRpcServerConnection.h"
 
 #include "xmlrpcpp/XmlRpc.h"

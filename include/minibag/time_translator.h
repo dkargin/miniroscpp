@@ -51,7 +51,7 @@ namespace minibag {
  * That is, a time-sequence with time-scale 2 will finish twice as
  * quickly.
  */
-class ROSBAG_DECL TimeTranslator
+class TimeTranslator
 {
 public:
     TimeTranslator();

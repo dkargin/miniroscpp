@@ -25,12 +25,13 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
+#include <algorithm>
+#include <cassert>
+#include <set>
+
 #include "minibag/view.h"
 #include "minibag/bag.h"
 #include "minibag/message_instance.h"
-
-#include <set>
-#include <assert.h>
 
 using std::map;
 using std::string;

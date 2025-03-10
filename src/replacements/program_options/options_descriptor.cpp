@@ -3,6 +3,7 @@
 // (See accompanying file LICENSE_1_0.txt
 // or copy at http://www.boost.org/LICENSE_1_0.txt
 
+#include <algorithm>
 #include <cassert>
 #include <set>
 #include <iterator>
@@ -378,8 +379,13 @@ void format_paragraph(std::ostream& os,
     }
     else
     {
+        int tabCount = 0;
+        for (const auto& ch: par) {
+          if (ch == '\t')
+            tabCount++;
+        }
         // only one tab per paragraph allowed
-        if (count(par.begin(), par.end(), '\t') > 1)
+        if (tabCount > 1)
         {
             throw program_options::error("Only one tab per paragraph is allowed in the options description");
         }
@@ -440,7 +446,7 @@ void format_paragraph(std::ostream& os,
                 // find last ' ' in the second half of the current paragraph line
                 auto lbegin = std::reverse_iterator<std::string::const_iterator>(line_end);
                 auto lend = std::reverse_iterator<std::string::const_iterator>(line_begin);
-                std::string::const_iterator last_space = find(lbegin, lend, ' ').base();
+                std::string::const_iterator last_space = std::find(lbegin, lend, ' ').base();
 
                 if (last_space != line_begin)
                 {

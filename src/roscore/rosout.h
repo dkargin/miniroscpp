@@ -9,6 +9,9 @@
 
 #include "miniros/node_handle.h"
 
+#ifdef _MSC_VER
+#define _SILENCE_CXX17_OLD_ALLOCATOR_MEMBERS_DEPRECATION_WARNING
+#endif
 #include "rosgraph_msgs/Log.hxx"
 
 namespace miniros {
@@ -26,7 +29,7 @@ namespace master {
 /**
  * the rosout node subscribes to /rosout, logs the messages to file, and re-broadcasts the messages to /rosout_agg
  */
-class Rosout
+class MINIROS_DECL Rosout
 {
 public:
   std::string log_file_name_;

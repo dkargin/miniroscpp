@@ -6,7 +6,7 @@ cmake_minimum_required(VERSION 3.13)
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 cmake_policy(SET CMP0077 NEW)
 
-project(miniros VERSION 0.5.0)
+project(miniros VERSION 0.5.1)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -29,8 +29,12 @@ option(MINIROS_BUILD_TESTS "Build tests" ${MINIROS_ADDITIONAL_COMPONENTS})
 option(MINIROS_BUILD_SHARED_LIBS "Build shared version of miniros" ON)
 option(MINIROS_ROSBAG_USE_GPGME_ENCRYPTION "Use GPGME encryption support" OFF)
 option(MINIROS_ROSBAG_USE_OPENSSL_ENCRYPTION "Use openssl encryption for rosbag" OFF)
-option(MINIROS_USE_LIBSYSTEMD "Signal systemd when node has actually started" ON)
 option(MINIROS_PATCH_RPATH "Patch RPATH" OFF)
+
+if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  option(MINIROS_USE_LIBSYSTEMD "Signal systemd when node has actually started" ON)
+endif()
+
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")

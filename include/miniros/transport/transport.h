@@ -32,14 +32,16 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ROSCPP_TRANSPORT_H
-#define ROSCPP_TRANSPORT_H
+#ifndef MINIROS_TRANSPORT_H
+#define MINIROS_TRANSPORT_H
 
 #include <functional>
 #include <memory>
+#include <string>
+#include <vector>
 
 #include <miniros/types.h>
-#include <vector>
+
 
 namespace miniros
 {
@@ -153,4 +155,4 @@ private:
 
 }
 
-#endif // ROSCPP_TRANSPORT_H
+#endif // MINIROS_TRANSPORT_H

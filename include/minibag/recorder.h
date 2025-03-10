@@ -36,7 +36,7 @@
 #define ROSBAG_RECORDER_H
 
 #include <sys/stat.h>
-#if !defined(_MSC_VER)
+#if !defined(_WIN32)
   #include <termios.h>
   #include <unistd.h>
 #endif
@@ -66,7 +66,7 @@
 
 namespace minibag {
 
-class ROSBAG_DECL OutgoingMessage
+class OutgoingMessage
 {
 public:
     OutgoingMessage(std::string const& _topic, miniros::topic_tools::ShapeShifter::ConstPtr _msg, std::shared_ptr<miniros::M_string> _connection_header, miniros::Time _time);
@@ -77,7 +77,7 @@ public:
     miniros::Time                           time;
 };
 
-class ROSBAG_DECL OutgoingQueue
+class OutgoingQueue
 {
 public:
     OutgoingQueue(std::string const& _filename, std::queue<OutgoingMessage>* _queue, miniros::Time _time);
@@ -87,7 +87,7 @@ public:
     miniros::Time                    time;
 };
 
-struct ROSBAG_DECL RecorderOptions
+struct RecorderOptions
 {
     RecorderOptions();
 
@@ -119,7 +119,7 @@ struct ROSBAG_DECL RecorderOptions
     std::vector<std::string> topics;
 };
 
-class ROSBAG_DECL Recorder
+class Recorder
 {
 public:
     Recorder(RecorderOptions const& options);

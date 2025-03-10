@@ -60,8 +60,10 @@
 
 #ifdef MINIROS_USE_LIBSYSTEMD
 
+#ifndef WIN32
 #include <sys/socket.h>
 #include <sys/un.h>
+#endif
 
 #ifdef HAVE_LIBSYSTEMD
 #include <systemd/sd-daemon.h>
@@ -88,7 +90,7 @@ void disableAllSignalsInThisThread()
 
 // Following advice at https://stackoverflow.com/questions/10121560/stdthread-naming-your-thread
 void setThreadName(const char* threadName) {
-#if defined(WIN32)
+#if defined(_WIN32)
   // TODO: Implement.
 #elif defined(__linux__)
   prctl(PR_SET_NAME, threadName,0,0,0);
@@ -189,7 +191,7 @@ Error systemdNotify(const char* status)
     return Error::SystemError;
   }
   return Error::Ok;
-#else
+#elif defined(MINIROS_USE_LIBSYSTEMD)
   if (portableSystemdNotify(status))
     return Error::Ok;
   return Error::SystemError;

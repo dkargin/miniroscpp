@@ -134,12 +134,10 @@ void Header::write(const M_string& key_vals, shared_array_uint8_t& buffer, uint3
   // Calculate the necessary size
   size = 0;
   {
-    M_string::const_iterator it = key_vals.begin();
-    M_string::const_iterator end = key_vals.end();
-    for (; it != end; ++it)
+    for (const auto& r: key_vals)
     {
-      const std::string& key = it->first;
-      const std::string& value = it->second;
+      const std::string& key = r.first;
+      const std::string& value = r.second;
 
       size += (uint32_t)key.length();
       size += (uint32_t)value.length();
@@ -158,17 +156,15 @@ void Header::write(const M_string& key_vals, shared_array_uint8_t& buffer, uint3
 
   // Write the data
   {
-    M_string::const_iterator it = key_vals.begin();
-    M_string::const_iterator end = key_vals.end();
-    for (; it != end; ++it)
+    for (const auto& r: key_vals)
     {
-      const std::string& key = it->first;
-      const std::string& value = it->second;
+      const std::string& key = r.first;
+      const std::string& value = r.second;
 
-      uint32_t len = key.length() + value.length() + 1;
+      uint32_t len = static_cast<uint32_t>(key.length() + value.length() + 1);
       SMINIROS_SERIALIZE_PRIMITIVE(ptr, len);
       SMINIROS_SERIALIZE_BUFFER(ptr, key.data(), key.length());
-      static const char equals = '=';
+      constexpr char equals = '=';
       SMINIROS_SERIALIZE_PRIMITIVE(ptr, equals);
       SMINIROS_SERIALIZE_BUFFER(ptr, value.data(), value.length());
     }

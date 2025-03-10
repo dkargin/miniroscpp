@@ -10,7 +10,7 @@
 #include "miniros/rostime.h"
 
 
-#if defined(_WINDOWS)
+#if defined(_WIN32)
 # include <winsock2.h>
 static inline int poll( struct pollfd *pfd, int nfds, int timeout)
 {
@@ -25,7 +25,7 @@ static inline int poll( struct pollfd *pfd, int nfds, int timeout)
 #else
 # include <sys/poll.h>
 # include <sys/time.h>
-#endif  // _WINDOWS
+#endif  // _WIN32
 
 
 using namespace XmlRpc;
@@ -84,7 +84,7 @@ void XmlRpcDispatch::work(double timeout)
   const unsigned POLLIN_CHK = (POLLIN | POLLHUP | POLLERR); // Readable or connection lost
   const unsigned POLLOUT_REQ = POLLOUT; // Request write
   const unsigned POLLOUT_CHK = (POLLOUT | POLLERR); // Writable or connection lost
-#if !defined(_WINDOWS)
+#if !defined(_WIN32)
   const unsigned POLLEX_REQ = POLLPRI; // Out-of-band data received
   const unsigned POLLEX_CHK = (POLLPRI | POLLNVAL); // Out-of-band data or invalid fd
 #else
@@ -123,7 +123,7 @@ void XmlRpcDispatch::work(double timeout)
 
     if (nEvents < 0)
     {
-#if defined(_WINDOWS)
+#if defined(_WIN32)
       XmlRpcUtil::error("Error in XmlRpcDispatch::work: error in poll (%d).", WSAGetLastError());
 #else
       if(errno != EINTR)
