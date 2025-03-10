@@ -2,13 +2,17 @@
 
 MiniROS is a standalone ROS distribution with minimum external requirements.
 
+Supported platforms:
+
+ - [![Linux](https://github.com/dkargin/miniroscpp/actions/workflows/cmake-multiplatform.yml/badge.svg)](https://github.com/dkargin/miniroscpp/actions/workflows/cmake-multiplatform.yml)
+ - [![Windows](https://github.com/dkargin/miniroscpp/actions/workflows/cmake-win32.yml/badge.svg)](https://github.com/dkargin/miniroscpp/actions/workflows/cmake-win32.yml)
+
 Contents:
 
-1. All serialization code from roscpp.
-1. All client code from roscpp.
-1. rosbag_storage library for interaction with rosbag files from C++.
-1. rostime. It is still not tested.
-1. include/generated contains generated code for std_msgs and common_msg
+1. All serialization and transport code from roscpp.
+2. rosbag_storage library for interaction with rosbag files from C++.
+3. rostime. It is still not tested.
+4. include/generated contains generated code for std_msgs and common_msg
 
 # Building standalone library #
 
