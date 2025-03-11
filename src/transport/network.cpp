@@ -229,6 +229,97 @@ void init(const M_string& remappings)
   }
 }
 
+NetAddress::NetAddress()
+{
+  rawAddress = nullptr;
+  port = 0;
+  type = Type::AddressInvalid;
+}
+
+NetAddress::NetAddress(NetAddress&& other)
+{
+  std::swap(rawAddress, other.rawAddress);
+  std::swap(address, other.address);
+  port = other.port;
+  type = other.type;
+}
+
+NetAddress::NetAddress(const NetAddress& other)
+{
+  if (other.type == Type::AddressIPv4 && other.rawAddress) {
+    sockaddr_in* addr = static_cast<sockaddr_in*>(malloc(sizeof(sockaddr_in)));
+    rawAddress = addr;
+    memcpy(rawAddress, other.rawAddress, sizeof(sockaddr_in));
+    type = Type::AddressIPv4;
+  } else {
+    type = Type::AddressInvalid;
+  }
+  port = other.port;
+  address = other.address;
+}
+
+NetAddress::~NetAddress()
+{
+  reset();
+}
+
+void NetAddress::reset()
+{
+  if (rawAddress) {
+    free(rawAddress);
+    rawAddress = nullptr;
+  }
+  address = "";
+  port = 0;
+  type = Type::AddressInvalid;
+}
+
+/// Fills in local address from socket.
+bool readLocalAddress_v4(int sockfd, NetAddress& address)
+{
+  address.reset();
+  sockaddr_in my_addr {};
+
+  socklen_t len = sizeof(my_addr);
+  if (getsockname(sockfd, (sockaddr*) &my_addr, &len) != 0)
+    return false;
+
+  char ipBuffer[255];
+  if (!inet_ntop(AF_INET, &my_addr.sin_addr, ipBuffer, sizeof(ipBuffer)))
+    return false;
+  address.address = ipBuffer;
+  address.port = ntohs(my_addr.sin_port);
+  address.type = NetAddress::AddressIPv4;
+  sockaddr_in* outAddr = static_cast<sockaddr_in*>(malloc(sizeof(sockaddr_in)));
+  address.rawAddress = outAddr;
+  memcpy(outAddr, &my_addr, sizeof(sockaddr_in));
+  return true;
+}
+
+/// Fills in remote address from socket.
+bool readRemoteAddress_v4(int sockfd, NetAddress& address)
+{
+  address.reset();
+
+  sockaddr_in my_addr{};
+
+  socklen_t len = sizeof(my_addr);
+  if (getpeername(sockfd, (sockaddr*) &my_addr, &len) != 0)
+    return false;
+
+  char ipBuffer[255];
+  if (!inet_ntop(AF_INET, &my_addr.sin_addr, ipBuffer, sizeof(ipBuffer)))
+    return false;
+  address.address = ipBuffer;
+  address.port = ntohs(my_addr.sin_port);
+  address.type = NetAddress::AddressIPv4;
+  sockaddr_in* outAddr = static_cast<sockaddr_in*>(malloc(sizeof(sockaddr_in)));
+  address.rawAddress = outAddr;
+  memcpy(outAddr, &my_addr, sizeof(sockaddr_in));
+  return true;
+}
+
+
 } // namespace network
 
 } // namespace miniros

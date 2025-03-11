@@ -12,7 +12,7 @@
 #include "miniros/common.h"
 
 namespace miniros {
-namespace net {
+namespace network {
 
 /// Intermediate storage for HTTP data.
 struct MINIROS_DECL HttpFrame {
@@ -54,39 +54,7 @@ struct MINIROS_DECL HttpFrame {
   void reset();
 };
 
-/// Network address.
-struct MINIROS_DECL NetAddress {
-  enum Type {
-    AddressInvalid, AddressIPv4, AddressIPv6
-  };
-
-  Type type = AddressInvalid;
-
-  /// String representation of network address.
-  std::string address;
-
-  /// Network port.
-  int port = 0;
-
-  /// Pointer to actual address implementation.
-  void* rawAddress = nullptr;
-
-  ~NetAddress();
-
-  /// Reset internal address.
-  void reset();
-
-  /// Check if address is valid.
-  bool valid() const { return type != AddressInvalid; }
-};
-
-/// Fills in local address from socket.
-MINIROS_DECL bool readLocalAddressv4(int sockfd, NetAddress& address);
-
-/// Fills in remote address from socket.
-MINIROS_DECL bool readRemoteAddressv4(int sockfd, NetAddress& address);
-
-} // namespace net
+} // namespace network
 
 } // namespace miniros
 #endif // MINIROS_HTTP_H

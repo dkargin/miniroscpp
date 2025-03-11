@@ -25,8 +25,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ROSCPP_NETWORK_H
-#define ROSCPP_NETWORK_H
+#ifndef MINIROS_NETWORK_H
+#define MINIROS_NETWORK_H
 
 #include "miniros/internal/forwards.h"
 
@@ -42,6 +42,45 @@ namespace network
 MINIROS_DECL bool splitURI(const std::string& uri, std::string& host, uint32_t& port);
 MINIROS_DECL const std::string& getHost();
 MINIROS_DECL uint16_t getTCPROSPort();
+
+
+/// Network address.
+struct MINIROS_DECL NetAddress {
+  enum Type {
+    AddressInvalid,
+    AddressIPv4,
+    //AddressIPv6,
+  };
+
+  Type type;
+
+  /// String representation of network address.
+  std::string address;
+
+  /// Network port.
+  int port;
+
+  /// Pointer to actual address implementation.
+  void* rawAddress;
+
+  NetAddress();
+  NetAddress(const NetAddress& other);
+  NetAddress(NetAddress&& other);
+
+  ~NetAddress();
+
+  /// Reset internal address.
+  void reset();
+
+  /// Check if address is valid.
+  bool valid() const { return type != AddressInvalid; }
+};
+
+/// Fills in local address from socket.
+MINIROS_DECL bool readLocalAddress_v4(int sockfd, NetAddress& address);
+
+/// Fills in remote address from socket.
+MINIROS_DECL bool readRemoteAddress_v4(int sockfd, NetAddress& address);
 
 } // namespace network
 

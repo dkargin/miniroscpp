@@ -8,7 +8,7 @@
 #include <memory>
 #include <mutex>
 
-#include "registrations.h"
+#include "node_ref.h"
 
 namespace miniros {
 
@@ -38,20 +38,20 @@ public:
   /// Register or update node API.
   std::shared_ptr<NodeRef> registerNodeApi(const std::string& caller_id, const std::string& caller_api, bool& rtn);
 
-  void _register(Registrations& r, const std::string& key, const std::string& caller_id, const std::string& caller_api,
+  std::shared_ptr<NodeRef> _register(Registrations& r, const std::string& key, const std::string& caller_id, const std::string& caller_api,
     const std::string& service_api = "");
 
   ReturnStruct unregisterObject(Registrations& r, const std::string& key, const std::string& caller_id,
     const std::string& caller_api, const std::string& service_api = "");
 
-  void register_service(const std::string& service, const std::string& caller_id, const std::string& caller_api,
+  std::shared_ptr<NodeRef> register_service(const std::string& service, const std::string& caller_id, const std::string& caller_api,
     const std::string& service_api);
 
-  void register_publisher(const std::string& topic, const std::string& caller_id, const std::string& caller_api);
+  std::shared_ptr<NodeRef> register_publisher(const std::string& topic, const std::string& caller_id, const std::string& caller_api);
 
-  void register_subscriber(const std::string& topic, const std::string& caller_id, const std::string& caller_api);
+  std::shared_ptr<NodeRef> register_subscriber(const std::string& topic, const std::string& caller_id, const std::string& caller_api);
 
-  void register_param_subscriber(const std::string& param, const std::string& caller_id, const std::string& caller_api);
+  std::shared_ptr<NodeRef> register_param_subscriber(const std::string& param, const std::string& caller_id, const std::string& caller_api);
 
   ReturnStruct unregister_service(const std::string& service, const std::string& caller_id, const std::string& service_api);
 

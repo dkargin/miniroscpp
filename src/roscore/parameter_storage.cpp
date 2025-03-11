@@ -2,6 +2,7 @@
 // Created by dkargin on 2/25/25.
 //
 
+#include <cassert>
 #include <fstream>
 
 #include "registration_manager.h"
@@ -91,7 +92,7 @@ std::string ParameterStorage::searchParam(const std::string& ns, const std::stri
             return None
    */
 
-  // there are more efficient implementations, but our hiearchy
+  // there are more efficient implementations, but our hierarchy
   // is not very deep and this is fairly clean code to read.
   // - we only search for the first namespace in the key to check for a match
 

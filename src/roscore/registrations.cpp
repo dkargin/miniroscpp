@@ -2,6 +2,10 @@
 // Created by dkargin on 2/9/25.
 //
 
+#include <algorithm>
+#include <cassert>
+#include <sstream>
+
 #include "registrations.h"
 
 namespace miniros {

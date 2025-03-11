@@ -74,15 +74,17 @@ More detailed migration guide can be found at [Migration guide](docs/migration.m
 
 1. ROSBag C++ client is complete. It is an independent library. No boost or big external libraries are required.
 2. Ported ROS C++ client code to use only c++17.
-3. Ported rosbag play and record utilities.
+3. Ported rosbag play and record utilities. Now they invoked through `minibag record` and `minibag play` commands.
 4. Added some tests from original ros_comm package. Though they do not work without some external rosmaster.
 5. **miniroscore** is pure C++ rewrite of **roscore**. **miniros::Master** can be embedded into user application.
 
 Missing things:
 
-1. This is not a complete ROS distribution. You still need regular ROS tools, like roslaunch, rostopic or rosmaster somewhere else. This is just a portable C++ client, which helps connecting ROS system from the projects, where using regular ROS is not the best idea.
-2. ROS logging is probably broken right now.
-3. Full testing from ros_comm is also missing.
+1. ROS logging is probably broken right now. MINIROS_INFO works somehow, but other log levels are probably broken. 
+2. Testing suite from ros_comm not completely backported. I need to replace rostest invocations with CMake/CTest scripts.
+3. No additional utilities like roslaunch, rostopic, rosnode, ... .
+4. No complicated things like actionlib, bond, nodelet, ... . 
+5. `minibag info` is not implemented.
 
 # Future plans #
 
@@ -101,21 +103,21 @@ Since **miniros** is experimental distribution, I am free to improve core API. T
 
 Current codebase is an adaptation of the following ROS packages:
 
-** roscpp_core ** (http://wiki.ros.org/roscpp_core)
+**roscpp_core** (http://wiki.ros.org/roscpp_core)
 
  - cpp_common
  - roscpp_traits - all headers have gone to include/miniros/...
  - roscpp_serialization - all code moved to include/miniros and src accordingly.
  - rostime - all code moved to include/miniros and src accordingly.
 
-** ros_comm** (http://wiki.ros.org/ros_comm)
+**ros_comm** (http://wiki.ros.org/ros_comm)
 
  - roslz4 - used by rosbag. Moved to src/roslz4.
  - tools/rosbag_storage - core rosbag library. It was renamed to minibag and merged.
  
-** console_bridge** (http://wiki.ros.org/console_bridge)
+**console_bridge** (http://wiki.ros.org/console_bridge)
 
-** topic_tools**
+**topic_tools**
   - ShapeShifter - it was ported here for rosbag app.
 
 # Additional packages used #

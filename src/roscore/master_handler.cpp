@@ -12,8 +12,10 @@
 #endif
 #include "master_handler.h"
 
-#include "miniros/transport/rpc_manager.h"
 #include "miniros/transport/network.h"
+#include "miniros/transport/rpc_manager.h"
+
+#include <xmlrpcpp/XmlRpcServerConnection.h>
 
 namespace miniros {
 namespace master {
@@ -40,14 +42,15 @@ Error MasterHandler::sendToNode(const std::shared_ptr<NodeRef>& nr, const char* 
 
   uint32_t peer_port = 0;
   std::string peer_host;
-  if (!miniros::network::splitURI(nr->api, peer_host, peer_port)) {
-    MINIROS_ERROR_NAMED("handler", "Failed to splitURI of node \"%s\"", nr->api.c_str());
+  std::string nodeApi = nr->getApi();
+  if (!miniros::network::splitURI(nodeApi, peer_host, peer_port)) {
+    MINIROS_ERROR_NAMED("handler", "Failed to splitURI of node \"%s\"", nodeApi.c_str());
     return Error::InvalidURI;
   }
 
-  XmlRpc::XmlRpcClient* client = m_rpcManager->getXMLRPCClient(peer_host, peer_port, nr->api);
+  XmlRpc::XmlRpcClient* client = m_rpcManager->getXMLRPCClient(peer_host, peer_port, nodeApi);
   if (!client) {
-    MINIROS_ERROR_NAMED("handler", "Failed to create client to notify node \"%s\"", nr->api.c_str());
+    MINIROS_ERROR_NAMED("handler", "Failed to create client to notify node \"%s\"", nodeApi.c_str());
     return Error::SystemError;
   }
 
@@ -71,38 +74,6 @@ int MasterHandler::getPid(const std::string& caller_id) const
 #endif
 }
 
-/*
-*MINIROS_DEBUG_NAMED("rosmaster", "publisher_update_task");
-  RpcValue l;
-  l[0] = api;
-  l[1] = "";
-  for (int i = 0; i < pub_uris.size(); i++) {
-    RpcValue ll(pub_uris[i]);
-    l[i + 1] = ll;
-  }
-
-  RpcValue args;
-  args[0] = "master";
-  args[1] = topic;
-  args[2] = l;
-
-  uint32_t peer_port = 0;
-  std::string peer_host;
-  if (!miniros::network::splitURI(api, peer_host, peer_port)) {
-    MINIROS_ERROR_NAMED("handler", "Failed to splitURI of node \"%s\"", api.c_str());
-    return {};
-  }
-
-  XmlRpc::XmlRpcClient* client = m_rpcManager->getXMLRPCClient(peer_host, peer_port, api);
-  if (!client) {
-    MINIROS_ERROR_NAMED("handler", "Failed to create client to notify node \"%s\"", api.c_str());
-    return {};
-  }
-
-  RpcValue result;
-  client->execute("publisherUpdate", args, result);
-  return {};
- */
 void MasterHandler::_notify_topic_subscribers(const std::string& topic,
   const std::vector<std::string>& pub_uris,
   const std::vector<std::string>& sub_uris)
@@ -114,7 +85,7 @@ void MasterHandler::_notify_topic_subscribers(const std::string& topic,
     std::shared_ptr<NodeRef> nr = m_regManager->getNodeByAPI(node_api);
 
     RpcValue l;
-    l[0] = nr->api;
+    l[0] = nr->getApi();
     l[1] = "";
     for (int i = 0; i < pub_uris.size(); i++) {
       RpcValue ll(pub_uris[i]);
@@ -144,9 +115,13 @@ ReturnStruct MasterHandler::unregisterService(
 }
 
 ReturnStruct MasterHandler::registerSubscriber(const std::string& caller_id, const std::string& topic,
-  const std::string& topic_type, const std::string& caller_api, RpcConnection*)
+  const std::string& topic_type, const std::string& caller_api, RpcConnection* conn)
 {
-  m_regManager->register_subscriber(topic, caller_id, caller_api);
+  std::shared_ptr<NodeRef> ref = m_regManager->register_subscriber(topic, caller_id, caller_api);
+  if (ref) {
+    network::NetAddress address = conn->getClientAddress();
+    ref->updateDirectAddress(address);
+  }
 
   if (!m_topicTypes.count(topic_type))
     m_topicTypes[topic] = topic_type;
@@ -174,14 +149,18 @@ int MasterHandler::unregisterSubscriber(
 }
 
 ReturnStruct MasterHandler::registerPublisher(const std::string& caller_id, const std::string& topic,
-  const std::string& topic_type, const std::string& caller_api, RpcConnection*)
+  const std::string& topic_type, const std::string& caller_api, RpcConnection* conn)
 {
   MINIROS_INFO_NAMED("handler", "registerPublisher topic=%s caller_id=%s caller_api=%s",
     topic.c_str(), caller_id.c_str(), caller_api.c_str());
   if (!m_topicTypes.count(topic_type))
     m_topicTypes[topic] = topic_type;
 
-  m_regManager->register_publisher(topic, caller_id, caller_api);
+  std::shared_ptr<NodeRef> ref = m_regManager->register_publisher(topic, caller_id, caller_api);
+  if (ref) {
+    network::NetAddress address = conn->getClientAddress();
+    ref->updateDirectAddress(address);
+  }
 
   std::vector<std::string> pub_uris = m_regManager->publishers.get_apis(topic);
   std::vector<std::string> sub_uris = m_regManager->subscribers.get_apis(topic);
@@ -218,10 +197,10 @@ int MasterHandler::unregisterPublisher(
 std::string MasterHandler::lookupNode(const std::string& caller_id, const std::string& node_name) const
 {
   MINIROS_INFO_NAMED("handler", "lookupNode node=%s caller_id=%s", node_name.c_str(), caller_id.c_str());
-  auto node = m_regManager->getNodeByName(node_name);
+  std::shared_ptr<NodeRef> node = m_regManager->getNodeByName(node_name);
   if (!node)
     return "";
-  return node->api;
+  return node->getApi();
 }
 
 /// <param name="subgraph">Optional std::string, only returns topics that start with that name</param>
