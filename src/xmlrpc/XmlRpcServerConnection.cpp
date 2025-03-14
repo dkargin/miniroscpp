@@ -38,8 +38,9 @@ XmlRpcServerConnection::XmlRpcServerConnection(int fd, XmlRpcServer* server, boo
   _connectionState = READ_HEADER;
   _bytesWritten = 0;
   _keepAlive = true;
+
   if (fd) {
-    miniros::net::readRemoteAddressv4(fd, _netAddress);
+    miniros::network::readRemoteAddress(fd, _netAddress);
   }
 
   if (_netAddress.valid())
@@ -47,7 +48,6 @@ XmlRpcServerConnection::XmlRpcServerConnection(int fd, XmlRpcServer* server, boo
   else
     XmlRpcUtil::log(2,"XmlRpcServerConnection: new socket %d from unknown endpoint", fd);
 }
-
 
 XmlRpcServerConnection::~XmlRpcServerConnection()
 {
@@ -91,7 +91,7 @@ bool XmlRpcServerConnection::readHeader()
   const char *lp = nullptr;                 // Start of content-length value
   const char *kp = nullptr;                 // Start of connection value
 
-  using HttpFrame = miniros::net::HttpFrame;
+  using HttpFrame = miniros::network::HttpFrame;
 
   HttpFrame::ParserState state = HttpFrame::ParseRequest;
   std::string_view fieldName;
@@ -440,3 +440,7 @@ XmlRpcServerConnection::generateFaultResponse(std::string const& errorMsg, int e
   _response = header + body;
 }
 
+const miniros::network::NetAddress& XmlRpcServerConnection::getClientAddress() const
+{
+  return _netAddress;
+}

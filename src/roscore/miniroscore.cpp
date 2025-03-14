@@ -43,6 +43,7 @@ int main(int argc, const char ** argv) {
     ("xmlrpc_log", po::value<int>()->default_value(1), "Verbosity level of XmlRpc logging")
     ("rosout", po::value<bool>()->default_value(true), "Enable rosout log aggregator")
     ("dir", po::value<std::string>(), "Path to working directory")
+    ("resolve", po::value<bool>()->default_value(false), "Resolve node IP address")
     ;
 
   po::variables_map vm;
@@ -69,6 +70,11 @@ int main(int argc, const char ** argv) {
     return EXIT_SUCCESS;
   }
 
+  bool resolve = false;
+  if (vm.count("resolve")) {
+    resolve = vm["resolve"].as<bool>();
+  }
+
   if (vm.count("dir")) {
     std::string wd = vm["dir"].as<std::string>();
 
@@ -92,6 +98,8 @@ int main(int argc, const char ** argv) {
 
   MINIROS_INFO("Creating Master object");
   miniros::master::Master master(masterRpcManager);
+
+  master.setResolveNodeIP(resolve);
 
   MINIROS_INFO("Starting Master thread");
   master.start();
@@ -118,6 +126,7 @@ int main(int argc, const char ** argv) {
   miniros::WallDuration period(0.02);
   while (!g_sigintReceived && master.ok()) {
     callbackQueue->callAvailable(period);
+    master.update();
   }
 
   MINIROS_INFO("Exiting main loop");

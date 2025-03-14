@@ -25,8 +25,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ROSCPP_NETWORK_H
-#define ROSCPP_NETWORK_H
+#ifndef MINIROS_NETWORK_H
+#define MINIROS_NETWORK_H
 
 #include "miniros/internal/forwards.h"
 
@@ -42,6 +42,77 @@ namespace network
 MINIROS_DECL bool splitURI(const std::string& uri, std::string& host, uint32_t& port);
 MINIROS_DECL const std::string& getHost();
 MINIROS_DECL uint16_t getTCPROSPort();
+
+
+/// Network address.
+struct MINIROS_DECL NetAddress {
+  enum Type {
+    AddressInvalid,
+    AddressIPv4,
+    AddressIPv6,
+  };
+
+  Type type = AddressInvalid;
+
+  /// String representation of network address.
+  std::string address;
+
+  /// Network port.
+  int port = 0;
+
+  /// Pointer to actual address implementation.
+  /// It points to sockaddr_t or one of its variants.
+  void* rawAddress = nullptr;
+  /// Size of raw address.
+  size_t rawAddressSize = 0;
+
+  NetAddress();
+  NetAddress(const NetAddress& other);
+  NetAddress(NetAddress&& other) noexcept;
+
+  ~NetAddress();
+
+  /// Reset internal address.
+  void reset();
+
+  /// Check if an address is local one.
+  bool isLocal() const;
+
+  /// Check if address is valid.
+  bool valid() const { return type != AddressInvalid; }
+};
+
+/// Annotated URL.
+struct URL {
+  /// Network address.
+  std::string host;
+
+  uint32_t port = 0;
+  /// Address scheme, "http://", "ws://", ...
+  std::string scheme;
+  /// Path part of URL.
+  std::string path;
+
+  URL();
+
+  bool fromString(const std::string& urlStr, bool defaultPort);
+
+  void reset();
+
+  /// Check if URL s empty.
+  bool empty() const;
+
+  /// Convert URL back to string.
+  std::string toString() const;
+};
+
+/// Fills in local address from socket.
+MINIROS_DECL bool readLocalAddress(int sockfd, NetAddress& address);
+
+/// Fills in remote address from socket.
+MINIROS_DECL bool readRemoteAddress(int sockfd, NetAddress& address);
+
+MINIROS_DECL int listNetworkInterfaces();
 
 } // namespace network
 

@@ -52,6 +52,12 @@ public:
 
   std::string getUri() const;
 
+  void setResolveNodeIP(bool resolv);
+
+  /// Update queued tasks.
+  void update();
+
+public: /// Request handlers
   RpcValue lookupService(const std::string& caller_id, const std::string& service, Connection*);
 
   /// Register the caller as a provider of the specified service.

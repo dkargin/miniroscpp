@@ -213,6 +213,7 @@ set(transport_SRC
 set(master_SRC
     roscore/master.cpp
     roscore/master_handler.cpp
+    roscore/node_ref.cpp
     roscore/registrations.cpp
     roscore/registration_manager.cpp
     roscore/parameter_storage.cpp
