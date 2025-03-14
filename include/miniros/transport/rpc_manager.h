@@ -259,8 +259,7 @@ private:
   std::mutex xmlrpc_call_mutex_;
 #endif
   XmlRpc::XmlRpcServer server_;
-  typedef std::vector<CachedXmlRpcClient> V_CachedXmlRpcClient;
-  V_CachedXmlRpcClient clients_;
+  std::vector<CachedXmlRpcClient> clients_;
   std::mutex clients_mutex_;
 
   std::atomic_bool shutting_down_;

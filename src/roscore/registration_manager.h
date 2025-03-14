@@ -20,24 +20,43 @@ class MINIROS_DECL RegistrationManager {
 public:
   using RpcValue = XmlRpc::XmlRpcValue;
 
+  RegistrationManager();
+
   Registrations publishers;
   Registrations subscribers;
   Registrations services;
-  Registrations param_subscribers;
 
-  RegistrationManager();
+  /// Get a list of URIs for specified topic and caller.
+  std::vector<std::string> getTopicSubscribersUri(const std::string& topic, const std::string& caller_api);
 
-  bool reverse_lookup(const std::string& caller_api) const;
+  /// Get nodes which publish specified topic.
+  std::vector<std::shared_ptr<NodeRef>> getTopicPublishers(const std::string& topic) const;
+
+  /// Get nodes which subscribe to specified topic.
+  std::vector<std::shared_ptr<NodeRef>> getTopicSubscribers(const std::string& topic) const;
+
+  /// Returns URI of a service provider.
+  std::string getServiceUri(const std::string& service, const std::string& caller_api, bool resolveIp) const;
 
   /// Find node by its name.
+  /// @returns reference to a node or nullptr if no node is found.
   std::shared_ptr<NodeRef> getNodeByName(const std::string& nodeName) const;
 
   /// Find node by an API URI.
-  std::shared_ptr<NodeRef> getNodeByAPI(const std::string& nodeName) const;
+  /// @returns reference to a node or nullptr if no node is found.
+  std::shared_ptr<NodeRef> getNodeByAPI(const std::string& nodeApi) const;
 
   /// Register or update node API.
   std::shared_ptr<NodeRef> registerNodeApi(const std::string& caller_id, const std::string& caller_api, bool& rtn);
 
+  /// Internal method for registering an object.
+  /// It can allocate new NodeRef for an object, or update an existing one.
+  /// @param r - a container for registrations
+  /// @param key - name of an object being registered
+  /// @param caller_id - name of a node
+  /// @param caller_api - API of a node
+  /// @param service_api - ?
+  /// @returns reference to a node.
   std::shared_ptr<NodeRef> _register(Registrations& r, const std::string& key, const std::string& caller_id, const std::string& caller_api,
     const std::string& service_api = "");
 
@@ -61,11 +80,33 @@ public:
 
   ReturnStruct unregister_param_subscriber(const std::string& param, const std::string& caller_id, const std::string& caller_api);
 
+  /// Take collection of nodes for shutdown.
+  std::set<std::shared_ptr<NodeRef>> pullShutdownNodes();
+
+  std::ostream& writeJson(std::ostream& os, miniros::JsonState& state, const miniros::JsonSettings& settings) const;
+
+protected:
+
+  /// Find node by its name.
+  /// This version does not lock any mutex.
+  /// @returns reference to a node or nullptr if no node is found.
+  std::shared_ptr<NodeRef> getNodeByNameUnsafe(const std::string& nodeName) const;
+
+  /// Find node by an API URI.
+  /// This version does not lock any mutex.
+  /// @returns reference to a node or nullptr if no node is found.
+  std::shared_ptr<NodeRef> getNodeByAPIUnsafe(const std::string& nodeApi) const;
+
 protected:
   mutable std::mutex m_guard;
 
   /// Maps node name/id to a ref.
   std::map<std::string, std::shared_ptr<NodeRef>> m_nodes;
+
+  /// A collection of nodes queued for shutdown.
+  std::set<std::shared_ptr<NodeRef>> m_nodesToShutdown;
+
+  Registrations param_subscribers;
 };
 
 } // namespace master

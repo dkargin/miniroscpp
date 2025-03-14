@@ -18,10 +18,15 @@ namespace miniros {
 
 namespace master {
 
-/// Container for node registration information. Used in master's
-/// self.nodes data structure.  This is effectively a reference
-/// counter for the node registration information: when the
-/// subscriptions and publications are empty the node registration can be deleted.
+/// NodeRef contains specific data about a node: publishers, subscribers, services, etc.
+/// It also stores information about ip addresses of the node.
+///
+/// IP resolution:
+/// Each node reports its own api key an id in most requests to master. Master tries to ensure that _id is unique.
+/// It will send a shutdown request to other node if new node with the same `id` appears. In this particular situation `id`
+/// will not be unique if we consider not only master's database, but all the network. For this reason API address
+/// should be used as part of the identification as well.
+///
 class MINIROS_DECL NodeRef
 {
 public:
@@ -31,6 +36,7 @@ public:
 
     void clear();
 
+    /// Check if there are any registrations.
     bool is_empty() const;
 
     /// Add registration.
@@ -39,13 +45,22 @@ public:
     /// Remove registration.
     bool remove(Registrations::Type type_, const std::string& key);
 
-    void shutdown_node_task(const std::string& api, int caller_id, const std::string& reason);
+    const std::string& id() const
+    {
+        return m_id;
+    }
 
     /// Get default API address.
     std::string getApi() const;
 
+    /// Get resolved IP url, which is accessible by specified Node.
+    std::string getResolvedApiFor(bool useIP, const std::shared_ptr<NodeRef>& other) const;
+
     /// Update direct IP address of a node.
     void updateDirectAddress(const network::NetAddress& address);
+
+    /// Save state in a json form.
+    void writeJson(std::ostream& os, miniros::JsonState& state, const miniros::JsonSettings& settings);
 
 protected:
     std::set<std::string> m_paramSubscriptions;
@@ -53,10 +68,10 @@ protected:
     std::set<std::string> m_topicPublications;
     std::set<std::string> m_services;
 
-    std::string id;
-
-    /// Default URL of a node, as reported by node itself.
+    std::string m_id;
     std::string m_api;
+
+    network::URL m_apiUrl;
 
     /// Resolved IP of a node.
     std::string m_resolvedIp;

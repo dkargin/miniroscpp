@@ -10,6 +10,8 @@
 
 #include "XmlRpcDecl.h"
 
+#include "miniros/internal/json_tools.h"
+
 #include <cstring>
 
 #ifndef MAKEDEPEND
@@ -168,17 +170,7 @@ namespace XmlRpc {
     //! Write the value (no xml encoding)
     std::ostream& write(std::ostream& os) const;
 
-    struct JsonState {
-      // Current offset.
-      int offset = 0;
-      bool sameline = false;
-    };
-
-    struct JsonSettings {
-      int tabs = 2;
-    };
-
-    std::ostream& writeJson(std::ostream& os, JsonState& state, const JsonSettings& settings) const;
+    std::ostream& writeJson(std::ostream& os, miniros::JsonState& state, const miniros::JsonSettings& settings) const;
 
   protected:
     // Clean up

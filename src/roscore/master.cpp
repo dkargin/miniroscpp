@@ -21,6 +21,8 @@ Master::Master(std::shared_ptr<RPCManager> manager)
     MINIROS_WARN("Invalid XMLRPC uri. Using ROS_MASTER_URI=http://%s:%d", m_host.c_str(), m_port);
   }
 
+  network::listNetworkInterfaces();
+
   m_parameterStorage.paramUpdateFn =
     [this] (const std::shared_ptr<NodeRef>& nr, const std::string& fullPath, const RpcValue* value) {
       this->m_handler.sendToNode(nr, "paramUpdate", fullPath, value ? *value : RpcValue::Dict());
@@ -98,6 +100,16 @@ void Master::setupBindings()
   m_rpcManager->bindEx3("subscribeParam", this, &Master::subscribeParam);
   m_rpcManager->bindEx3("unsubscribeParam", this, &Master::unsubscribeParam);
   m_rpcManager->bindEx1("getParamNames", this, &Master::getParamNames);
+}
+
+void Master::setResolveNodeIP(bool resolv)
+{
+  m_handler.setResolveNodeIP(resolv);
+}
+
+void Master::update()
+{
+  m_handler.update();
 }
 
 Master::RpcValue Master::lookupService(const std::string& caller_id, const std::string& service, Connection*)

@@ -27,11 +27,12 @@ std::string Registrations::get_service_api(const std::string& service) const
   return {};
 }
 
-std::vector<std::string> Registrations::get_apis(const std::string& key)
+std::vector<std::string> Registrations::getApis(const std::string& key) const
 {
   std::vector<std::string> rtn;
-  if (map.count(key)) {
-    for (const Record& obj : map[key])
+  auto it = map.find(key);
+  if (it != map.end()) {
+    for (const Record& obj : it->second)
       rtn.push_back(obj.api);
   }
   return rtn;

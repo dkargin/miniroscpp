@@ -38,8 +38,9 @@ XmlRpcServerConnection::XmlRpcServerConnection(int fd, XmlRpcServer* server, boo
   _connectionState = READ_HEADER;
   _bytesWritten = 0;
   _keepAlive = true;
+
   if (fd) {
-    miniros::network::readRemoteAddress_v4(fd, _netAddress);
+    miniros::network::readRemoteAddress(fd, _netAddress);
   }
 
   if (_netAddress.valid())
@@ -47,7 +48,6 @@ XmlRpcServerConnection::XmlRpcServerConnection(int fd, XmlRpcServer* server, boo
   else
     XmlRpcUtil::log(2,"XmlRpcServerConnection: new socket %d from unknown endpoint", fd);
 }
-
 
 XmlRpcServerConnection::~XmlRpcServerConnection()
 {

@@ -65,10 +65,11 @@ public:
     /// Get URL to service.
     std::string get_service_api(const std::string& service) const;
 
-    std::vector<std::string> get_apis(const std::string& key);
+    std::vector<std::string> getApis(const std::string& key) const;
 
     bool has_key(const std::string& key) const;
 
+    /// Returns a map: resourceName -> array of URIs who provide/need this resource (subscription, publication, service, ...)
     std::map<std::string, std::vector<std::string>> getState() const;
 
     void registerObj(const std::string& key, const std::string& caller_id,

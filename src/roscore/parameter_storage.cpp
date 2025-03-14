@@ -367,8 +367,8 @@ void ParameterStorage::dumpParamStateUnsafe(const char* file) const
 {
   std::ofstream out(file);
 
-  RpcValue::JsonState jstate;
-  RpcValue::JsonSettings jsettings;
+  miniros::JsonState jstate;
+  miniros::JsonSettings jsettings;
   m_parameterRoot.writeJson(out, jstate, jsettings);
 }
 

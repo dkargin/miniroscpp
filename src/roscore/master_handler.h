@@ -42,9 +42,8 @@ public:
 
   int getPid(const std::string& caller_id) const;
 
-  void _notify_topic_subscribers(const std::string& topic,
-    const std::vector<std::string>& pub_uris,
-    const std::vector<std::string>& sub_uris);
+  void notifyTopicSubscribers(const std::string& topic,
+    const std::vector<std::shared_ptr<NodeRef>>& subscribers);
 
   ReturnStruct registerService(const std::string& caller_id, const std::string& service,
     const std::string& service_api, const std::string& caller_api, RpcConnection* conn);
@@ -80,6 +79,13 @@ public:
 
   SystemState getSystemState(const std::string& caller_id) const;
 
+  /// Enable IP resolving mode.
+  void setResolveNodeIP(bool resolve);
+
+  /// Updates internal tasks.
+  /// It is called from the main thread, out of any RPC handlers.
+  void update();
+
 protected:
   RegistrationManager* m_regManager;
 
@@ -87,6 +93,8 @@ protected:
 
   /// Maps topicName to type md5.
   std::map<std::string, std::string> m_topicTypes;
+
+  bool m_resolveIp = false;
 };
 
 } // namespace master

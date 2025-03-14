@@ -48,14 +48,20 @@ Error MasterHandler::sendToNode(const std::shared_ptr<NodeRef>& nr, const char* 
     return Error::InvalidURI;
   }
 
+  // It is expected that client is in idle state, so we can send request immediately without waiting for a response for
+  // some previous request.
   XmlRpc::XmlRpcClient* client = m_rpcManager->getXMLRPCClient(peer_host, peer_port, nodeApi);
   if (!client) {
     MINIROS_ERROR_NAMED("handler", "Failed to create client to notify node \"%s\"", nodeApi.c_str());
     return Error::SystemError;
   }
+  if (!client->isReady()) {
+    MINIROS_FATAL_NAMED("handler", "RPC client is not in idle state");
+    return Error::SystemError;
+  }
 
   RpcValue result;
-  if (!client->execute(method, args, result))
+  if (!client->executeNonBlock(method, args))
     return Error::SystemError;
   return Error::Ok;
 }
@@ -74,25 +80,25 @@ int MasterHandler::getPid(const std::string& caller_id) const
 #endif
 }
 
-void MasterHandler::_notify_topic_subscribers(const std::string& topic,
-  const std::vector<std::string>& pub_uris,
-  const std::vector<std::string>& sub_uris)
+void MasterHandler::notifyTopicSubscribers(const std::string& topic, const std::vector<std::shared_ptr<NodeRef>>& subscribers)
 {
-  if (sub_uris.empty())
+  if (subscribers.empty())
     return;
 
-  for (const std::string& node_api: sub_uris) {
-    std::shared_ptr<NodeRef> nr = m_regManager->getNodeByAPI(node_api);
+  // Note that list of URI can be different for different clients because of IP resolution and configuration of the network.
+  std::vector<std::shared_ptr<NodeRef>> publishers = m_regManager->getTopicPublishers(topic);
+  RpcValue l = RpcValue::Array(publishers.size() + 1);
 
-    RpcValue l;
-    l[0] = nr->getApi();
+  for (std::shared_ptr<NodeRef> sub: subscribers) {
+
+    l[0] = sub->getApi();
     l[1] = "";
-    for (int i = 0; i < pub_uris.size(); i++) {
-      RpcValue ll(pub_uris[i]);
-      l[i + 1] = ll;
+    for (int i = 0; i < publishers.size(); i++) {
+      if (publishers[i]) {
+        l[i + 1] = publishers[i]->getResolvedApiFor(m_resolveIp, sub);
+      }
     }
-
-    sendToNode(nr, "publisherUpdate", topic, l);
+    sendToNode(sub, "publisherUpdate", topic, l);
   }
 }
 
@@ -105,7 +111,7 @@ ReturnStruct MasterHandler::registerService(const std::string& caller_id, const 
 
 std::string MasterHandler::lookupService(const std::string& caller_id, const std::string& service) const
 {
-  return m_regManager->services.get_service_api(service);
+  return m_regManager->getServiceUri(service, caller_id, m_resolveIp);
 }
 
 ReturnStruct MasterHandler::unregisterService(
@@ -118,15 +124,15 @@ ReturnStruct MasterHandler::registerSubscriber(const std::string& caller_id, con
   const std::string& topic_type, const std::string& caller_api, RpcConnection* conn)
 {
   std::shared_ptr<NodeRef> ref = m_regManager->register_subscriber(topic, caller_id, caller_api);
-  if (ref) {
-    network::NetAddress address = conn->getClientAddress();
-    ref->updateDirectAddress(address);
-  }
+  if (!ref)
+    return ReturnStruct(0, "Internal error");
+  network::NetAddress address = conn->getClientAddress();
+  ref->updateDirectAddress(address);
 
   if (!m_topicTypes.count(topic_type))
     m_topicTypes[topic] = topic_type;
 
-  std::vector<std::string> pubUris = m_regManager->publishers.get_apis(topic);
+  std::vector<std::shared_ptr<NodeRef>> publishers = m_regManager->getTopicPublishers(topic);
 
   ReturnStruct rtn;
   std::stringstream ss;
@@ -134,9 +140,10 @@ ReturnStruct MasterHandler::registerSubscriber(const std::string& caller_id, con
   rtn.statusMessage = ss.str();
   rtn.statusCode = 1;
 
-  rtn.value = RpcValue::Array(pubUris.size());
-  for (int i = 0; i < pubUris.size(); i++) {
-    rtn.value[i] = pubUris[i];
+  rtn.value = RpcValue::Array(publishers.size());
+  for (int i = 0; i < publishers.size(); i++) {
+    if (publishers[i])
+      rtn.value[i] = publishers[i]->getResolvedApiFor(m_resolveIp, ref);
   }
   return rtn;
 }
@@ -157,24 +164,24 @@ ReturnStruct MasterHandler::registerPublisher(const std::string& caller_id, cons
     m_topicTypes[topic] = topic_type;
 
   std::shared_ptr<NodeRef> ref = m_regManager->register_publisher(topic, caller_id, caller_api);
-  if (ref) {
-    network::NetAddress address = conn->getClientAddress();
-    ref->updateDirectAddress(address);
-  }
+  if (!ref)
+      return ReturnStruct(0, "Internal error");
 
-  std::vector<std::string> pub_uris = m_regManager->publishers.get_apis(topic);
-  std::vector<std::string> sub_uris = m_regManager->subscribers.get_apis(topic);
-  _notify_topic_subscribers(topic, pub_uris, sub_uris);
+  network::NetAddress address = conn->getClientAddress();
+  ref->updateDirectAddress(address);
 
+  std::vector<std::shared_ptr<NodeRef>> subscribers = m_regManager->getTopicSubscribers(topic);
+  notifyTopicSubscribers(topic, subscribers);
   ReturnStruct rtn;
   std::stringstream ss;
   ss << "Registered [" << caller_id << "] as publisher of [" << topic << "]";
   rtn.statusMessage = ss.str();
   rtn.statusCode = 1;
-  rtn.value = RpcValue::Array(sub_uris.size());
-  for (int i = 0; i < sub_uris.size(); i++) {
-    // This looks very strange.
-    rtn.value[i] = sub_uris[i];
+  rtn.value = RpcValue::Array(subscribers.size());
+  for (int i = 0; i < subscribers.size(); i++) {
+    if (!subscribers[i])
+      continue;
+    rtn.value[i] = subscribers[i]->getResolvedApiFor(m_resolveIp, ref);
   }
   return rtn;
 }
@@ -186,11 +193,11 @@ int MasterHandler::unregisterPublisher(
     topic.c_str(), caller_id.c_str(), caller_api.c_str());
   auto ret = m_regManager->unregister_publisher(topic, caller_id, caller_api);
 
-  if (true) {
-    std::vector<std::string> pub_uris = m_regManager->publishers.get_apis(topic);
-    std::vector<std::string> sub_uris = m_regManager->subscribers.get_apis(topic);
-    _notify_topic_subscribers(topic, pub_uris, sub_uris);
+  if (ret.statusCode) {
+    std::vector<std::shared_ptr<NodeRef>> subscribers = m_regManager->getTopicSubscribers(topic);
+    notifyTopicSubscribers(topic, subscribers);
   }
+
   return 1;
 }
 
@@ -200,10 +207,9 @@ std::string MasterHandler::lookupNode(const std::string& caller_id, const std::s
   std::shared_ptr<NodeRef> node = m_regManager->getNodeByName(node_name);
   if (!node)
     return "";
-  return node->getApi();
+  return node->getResolvedApiFor(m_resolveIp, {});
 }
 
-/// <param name="subgraph">Optional std::string, only returns topics that start with that name</param>
 std::vector<std::vector<std::string>> MasterHandler::getPublishedTopics(
   const std::string& caller_id, const std::string& subgraph) const
 {
@@ -246,10 +252,28 @@ MasterHandler::SystemState MasterHandler::getSystemState(const std::string& call
   MINIROS_DEBUG_NAMED("handler", "getSystemState from %s", caller_id.c_str());
   SystemState result;
 
+  // TODO: Resolve IP here.
   result.publishers = m_regManager->publishers.getState();
   result.subscribers = m_regManager->subscribers.getState();
   result.services = m_regManager->services.getState();
   return result;
+}
+
+void MasterHandler::setResolveNodeIP(bool resolve)
+{
+  m_resolveIp = resolve;
+}
+
+void MasterHandler::update()
+{
+  auto shutdownNodes = m_regManager->pullShutdownNodes();
+  for (std::shared_ptr<NodeRef> nr: shutdownNodes) {
+    RpcValue msg;
+    std::stringstream ss;
+    ss << "[" << nr->id() << "] Reason: new node registered with same name";
+    msg = ss.str();
+    sendToNode(nr, "shutdown", msg);
+  }
 }
 
 } // namespace master

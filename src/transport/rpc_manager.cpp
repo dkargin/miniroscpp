@@ -334,12 +334,14 @@ XmlRpcClient* RPCManager::getXMLRPCClient(const std::string &host, const int por
           i->client_->getUri()  == uri)
       {
         // hooray, it's pointing at our destination. re-use it.
-        c = i->client_;
-        i->in_use_ = true;
-        i->last_use_time_ = SteadyTime::now();
-        break;
+        if (i->client_->isReady()) {
+          c = i->client_;
+          i->in_use_ = true;
+          i->last_use_time_ = SteadyTime::now();
+          break;
+        }
       }
-      else if (i->last_use_time_ + CachedXmlRpcClient::s_zombie_time_ < SteadyTime::now())
+      if (i->last_use_time_ + CachedXmlRpcClient::s_zombie_time_ < SteadyTime::now())
       {
         // toast this guy. he's dead and nobody is reusing him.
         delete i->client_;
