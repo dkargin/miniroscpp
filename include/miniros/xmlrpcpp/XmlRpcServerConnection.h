@@ -10,7 +10,7 @@
 #include <string>
 
 #include "miniros/transport/http_tools.h"
-#include "miniros/transport/network.h"
+#include "miniros/transport/net_address.h"
 
 #include "xmlrpcpp/XmlRpcValue.h"
 #include "xmlrpcpp/XmlRpcSource.h"

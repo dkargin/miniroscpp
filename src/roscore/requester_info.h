@@ -8,7 +8,7 @@
 #include <string>
 
 #include "miniros/errors.h"
-#include "miniros/transport/network.h"
+#include "miniros/transport/net_address.h"
 
 namespace miniros {
 namespace master {

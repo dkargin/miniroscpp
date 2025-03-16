@@ -23,8 +23,6 @@ Master::Master(std::shared_ptr<RPCManager> manager)
     MINIROS_WARN("Invalid XMLRPC uri. Using ROS_MASTER_URI=http://%s:%d", m_host.c_str(), m_port);
   }
 
-  network::listNetworkInterfaces();
-
   m_parameterStorage.paramUpdateFn =
     [this] (const std::shared_ptr<NodeRef>& nr, const std::string& fullPath, const RpcValue* value) {
       this->m_handler.sendToNode(nr, "paramUpdate", fullPath, value ? *value : RpcValue::Dict());

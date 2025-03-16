@@ -5,11 +5,13 @@
 #ifndef MINIROS_NODE_REF_H
 #define MINIROS_NODE_REF_H
 
+#include <memory>
 #include <set>
 #include <string>
 
 #include <miniros/macros.h>
-#include <miniros/transport/network.h>
+#include <miniros/transport/net_address.h>
+#include <miniros/transport/url.h>
 
 #include "registrations.h"
 
