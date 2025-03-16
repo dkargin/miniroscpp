@@ -9,6 +9,7 @@
 #include <mutex>
 
 #include "node_ref.h"
+#include "requester_info.h"
 
 namespace miniros {
 
@@ -36,7 +37,7 @@ public:
   std::vector<std::shared_ptr<NodeRef>> getTopicSubscribers(const std::string& topic) const;
 
   /// Returns URI of a service provider.
-  std::string getServiceUri(const std::string& service, const std::string& caller_api, bool resolveIp) const;
+  std::string getServiceUri(const RequesterInfo& requesterInfo, const std::string& service, bool resolveIp) const;
 
   /// Find node by its name.
   /// @returns reference to a node or nullptr if no node is found.

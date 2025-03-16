@@ -56,6 +56,9 @@ public:
     /// Get resolved IP url, which is accessible by specified Node.
     std::string getResolvedApiFor(bool useIP, const std::shared_ptr<NodeRef>& other) const;
 
+    std::string getResolvedApiFor(bool useIP, const network::NetAddress& requesterIp) const;
+
+
     /// Update direct IP address of a node.
     void updateDirectAddress(const network::NetAddress& address);
 

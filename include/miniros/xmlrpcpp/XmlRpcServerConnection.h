@@ -50,7 +50,11 @@ public:
   //!   @param eventType Type of IO event that occurred. @see XmlRpcDispatch::EventType.
   unsigned handleEvent(unsigned eventType) override;
 
+  /// Get address of client's endpoint.
   const miniros::network::NetAddress& getClientAddress() const;
+
+  /// Get address of this server.
+  const miniros::network::NetAddress& getHostAddress() const;
 
 protected:
 
@@ -84,7 +88,9 @@ protected:
   ServerConnectionState _connectionState;
 
   /// Address of endpoint.
-  miniros::network::NetAddress _netAddress;
+  miniros::network::NetAddress _clientAddress;
+  /// Address of a server.
+  miniros::network::NetAddress _hostAddress;
 
   miniros::network::HttpFrame _httpFrame;
 

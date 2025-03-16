@@ -69,8 +69,9 @@ struct MINIROS_DECL NetAddress {
   NetAddress();
   NetAddress(const NetAddress& other);
   NetAddress(NetAddress&& other) noexcept;
-
   ~NetAddress();
+
+  NetAddress& operator=(const NetAddress& other);
 
   /// Reset internal address.
   void reset();

@@ -94,6 +94,15 @@ std::string NodeRef::getResolvedApiFor(bool useIP, const std::shared_ptr<NodeRef
   return m_api;
 }
 
+std::string NodeRef::getResolvedApiFor(bool useIP, const network::NetAddress& requesterIp) const
+{
+  // TODO: Check if both nodes are related to the same machine.
+  if (useIP && !m_resolvedIp.empty() && !m_apiUrl.empty()) {
+    return m_apiUrl.toString();
+  }
+  return m_api;
+}
+
 void NodeRef::writeJson(std::ostream& os, miniros::JsonState& state, const miniros::JsonSettings& settings)
 {
   // TODO: Implement

@@ -242,6 +242,26 @@ NetAddress::~NetAddress()
   reset();
 }
 
+NetAddress& NetAddress::operator=(const NetAddress& other)
+{
+  if (this == &other)
+    return *this;
+  reset();
+
+  if (other.rawAddress && (other.type == Type::AddressIPv4 || other.type == Type::AddressIPv6)) {
+    sockaddr_in* addr = static_cast<sockaddr_in*>(malloc(sizeof(sockaddr_in)));
+    rawAddress = addr;
+    rawAddressSize = other.rawAddressSize;
+    memcpy(rawAddress, other.rawAddress, other.rawAddressSize);
+    type = other.type;
+  } else {
+    type = Type::AddressInvalid;
+  }
+  port = other.port;
+  address = other.address;
+  return *this;
+}
+
 void NetAddress::reset()
 {
   if (rawAddress) {

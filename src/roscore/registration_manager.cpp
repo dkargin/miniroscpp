@@ -52,8 +52,10 @@ std::shared_ptr<NodeRef> RegistrationManager::_register(Registrations& r, const 
 {
   bool changed = false;
   std::shared_ptr<NodeRef> node_ref = registerNodeApi(caller_id, caller_api, changed);
-  if (!node_ref)
+  if (!node_ref) {
+    MINIROS_ERROR("Failed to register NodeRef(node=%s api=%s)", caller_id.c_str(), caller_api.c_str());
     return {};
+  }
 
   node_ref->add(r.type(), key);
 
@@ -198,13 +200,13 @@ std::vector<std::shared_ptr<NodeRef>> RegistrationManager::getTopicSubscribers(c
   return result;
 }
 
-std::string RegistrationManager::getServiceUri(const std::string& service, const std::string& caller_api, bool resolveIp) const
+std::string RegistrationManager::getServiceUri(const RequesterInfo& requesterInfo, const std::string& service, bool resolveIp) const
 {
   std::string service_api = services.get_service_api(service);
-  std::shared_ptr<NodeRef> caller = getNodeByAPI(caller_api);
+
   std::shared_ptr<NodeRef> node = getNodeByAPI(service_api);
-  if (node && caller)
-    return node->getResolvedApiFor(resolveIp, caller);
+  if (node && requesterInfo.clientAddress.valid())
+    return node->getResolvedApiFor(resolveIp, requesterInfo.clientAddress);
   return service_api;
 }
 

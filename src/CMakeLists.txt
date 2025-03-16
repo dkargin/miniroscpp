@@ -216,6 +216,7 @@ set(master_SRC
     roscore/node_ref.cpp
     roscore/registrations.cpp
     roscore/registration_manager.cpp
+    roscore/requester_info.cpp
     roscore/parameter_storage.cpp
     roscore/rosout.cpp
 )
