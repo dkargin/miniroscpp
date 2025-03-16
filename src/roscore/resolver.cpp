@@ -7,6 +7,7 @@
 #ifdef HAVE_IFADDRS_H
 #include <ifaddrs.h>
 #endif
+#include <cstring>
 
 #include "miniros/transport/io.h"
 
@@ -14,23 +15,28 @@
 
 namespace miniros {
 namespace network {
-
-const char* addressFamilyName(int family)
-{
-  switch (family) {
-    case AF_INET: return "AF_INET";
-    case AF_INET6: return "AF_INET6";
-    case AF_PACKET: return "AF_PACKET";
-    default:
-      return "????";
-  }
+// Defined in net_address.cpp
+bool fillAddress(const sockaddr_in& my_addr, NetAddress& address);
 }
 
-// Defined in net_address.cpp
-bool fillAddress(const sockaddr_in& my_addr, int len, NetAddress& address);
+namespace master {
+
+const std::string& AddressResolver::getHost() const
+{
+  std::scoped_lock lock(m_mutex);
+  return m_hostname;
+}
 
 Error AddressResolver::scanAdapters()
 {
+  std::scoped_lock lock(m_mutex);
+  char host[1024] = {};
+  if (gethostname(host, sizeof(host) - 1) != 0) {
+    MINIROS_ERROR("determineIP: gethostname failed");
+  } else {
+    m_hostname = host;
+  }
+
 #ifdef HAVE_IFADDRS_H
   ifaddrs* addressList = nullptr;
 
@@ -49,32 +55,14 @@ Error AddressResolver::scanAdapters()
     if (family == AF_INET || family == AF_INET6) {
       NetAdapter adapter;
       adapter.name = ifa->ifa_name;
-
-      /* Display interface name and family (including symbolic form of the latter for the common families). */
-      printf("%-8s %s (%d)\n", ifa->ifa_name, addressFamilyName(family), family);
-
-      char tmpHost[NI_MAXHOST];
       const size_t addrLen = (family == AF_INET) ? sizeof(struct sockaddr_in) : sizeof(struct sockaddr_in6);
-      /* For an AF_INET* interface address, display the address. */
-      int s = getnameinfo(ifa->ifa_addr, addrLen,
-              tmpHost, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
-      if (s != 0) {
-        printf("getnameinfo() failed: %s\n", gai_strerror(s));
+      if (!fillAddress(*reinterpret_cast<sockaddr_in*>(ifa->ifa_addr), adapter.address)) {
+        continue;
       }
-
-      fillAddress(*reinterpret_cast<sockaddr_in*>(ifa->ifa_addr), addrLen, adapter.address);
-      std::string host = tmpHost;
-
-      /* For an AF_INET* interface address, display the address. */
-      s = getnameinfo(ifa->ifa_netmask, (family == AF_INET) ? sizeof(struct sockaddr_in) :
-                                    sizeof(struct sockaddr_in6),
-              tmpHost, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
-      if (s != 0) {
-        printf("getnameinfo() failed: %s\n", gai_strerror(s));
+      if (!fillAddress(*reinterpret_cast<sockaddr_in*>(ifa->ifa_netmask), adapter.mask)) {
+        continue;
       }
-      std::string mask = tmpHost;
-      printf("\t\taddress: <%s> mask: <%s>\n", host.c_str(), mask.c_str());
-
+      // TODO: Probably read additional flags, like DHCP or whatever.
       m_adapters.push_back(adapter);
     }
   } // end for
@@ -84,5 +72,53 @@ Error AddressResolver::scanAdapters()
 #endif
   return Error::Ok ;
 }
-} // namespace network
+
+std::string AddressResolver::resolveAddressFor(const std::shared_ptr<NodeRef>& node,
+  const network::NetAddress& remoteAddress,
+  const network::NetAddress& localAddress) const
+{
+  if (!m_resolveIp)
+    return node->getApi();
+
+  std::string host = node->getHost();
+  if (isLocalhost(host)) {
+    // If remote is also belongs to this host, then maybe it is ok to return default API.
+  }
+  // TODO: Check if node is located on a localhost:
+  // 1. Its hostname is equal to current address and we had a connection to this node, which used localhost adapter.
+
+  return node->getApi();
+}
+
+std::string AddressResolver::resolveAddressFor(const std::shared_ptr<NodeRef>& node, const std::shared_ptr<NodeRef>& requester) const
+{
+  if (!m_resolveIp)
+    return node->getApi();
+
+  std::string host = node->getHost();
+  if (isLocalhost(host)) {
+    // If remote is also belongs to this host, then maybe it is ok to return default API.
+  }
+
+  return node->getApi();
+}
+
+bool AddressResolver::isLocalhost(const std::string& host) const
+{
+  if (host == m_hostname)
+    return true;
+  if (host == "localhost")
+    return true;
+  if (host == "127.0.0.1")
+    return true;
+  return false;
+}
+
+void AddressResolver::setResolveIp(bool resolve)
+{
+  std::scoped_lock<std::mutex> lock(m_mutex);
+  m_resolveIp = resolve;
+}
+
+} // namespace master
 } // namespace miniros

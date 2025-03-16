@@ -55,11 +55,9 @@ public:
     /// Get default API address.
     std::string getApi() const;
 
-    /// Get resolved IP url, which is accessible by specified Node.
-    std::string getResolvedApiFor(bool useIP, const std::shared_ptr<NodeRef>& other) const;
-
-    std::string getResolvedApiFor(bool useIP, const network::NetAddress& requesterIp) const;
-
+    /// Get hostname.
+    /// Hostname is often determined by API URL. In some cases hostname is a direct IP address.
+    std::string getHost() const;
 
     /// Update direct IP address of a node.
     void updateDirectAddress(const network::NetAddress& address);

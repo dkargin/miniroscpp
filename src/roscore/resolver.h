@@ -14,9 +14,10 @@
 
 #include "miniros/transport/net_address.h"
 #include "miniros/errors.h"
+#include "node_ref.h"
 
 namespace miniros {
-namespace network {
+namespace master {
 
 class MINIROS_DECL AddressResolver {
 public:
@@ -24,26 +25,47 @@ public:
     /// Name of the adapter.
     std::string name;
     /// Address on the adapter.
-    NetAddress address;
-    uint8_t ip4mask[4];
+    network::NetAddress address;
+    /// IPv4 netmask.
+    network::NetAddress mask;
 
-    NetAddress mask;
+    /// Check it is localhost/loopback interface.
+    bool isLoopback() const;
+
+    /// Check if specified address belongs to this address range and mask.
+    bool matchNetAddress(const network::NetAddress& address) const;
   };
 
   /// Scan or update existing network adapters.
   Error scanAdapters();
 
   /// Find adapter for specific address.
-  const NetAdapter* findAdapterForRemoteAddress(const NetAddress& address) const;
+  const NetAdapter* findAdapterForRemoteAddress(const network::NetAddress& address) const;
 
   /// Find adapter for specific local address.
-  const NetAdapter* findAdapterForLocalAddress(const NetAddress& address) const;
+  const NetAdapter* findAdapterForLocalAddress(const network::NetAddress& address) const;
 
   struct HostInfo {
   };
 
-  /// A collection of hosts.
-  std::map<std::string, std::shared_ptr<HostInfo>> m_hosts;
+  /// Determine good URI for a node.
+  /// @returns resolved URI of a node.
+  std::string resolveAddressFor(const std::shared_ptr<NodeRef>& node,
+    const network::NetAddress& remoteAddress,
+    const network::NetAddress& localAddress) const;
+
+  /// Determine good URI for a node.
+  /// @returns resolved URI of a node.
+  std::string resolveAddressFor(const std::shared_ptr<NodeRef>& node, const std::shared_ptr<NodeRef>& requester) const;
+
+  /// Get local hostname.
+  const std::string& getHost() const;
+
+  /// Enable/disable IP resolution.
+  void setResolveIp(bool resolve);
+
+  /// Check if specified address is a localhost.
+  bool isLocalhost(const std::string& hostname) const;
 
 protected:
   /// Name of the host, as reported by a system.
@@ -52,10 +74,14 @@ protected:
   /// Collection of network adapters.
   std::vector<NetAdapter> m_adapters;
 
+  /// A collection of hosts.
+  std::map<std::string, std::shared_ptr<HostInfo>> m_hosts;
+
+  bool m_resolveIp = false;
   mutable std::mutex m_mutex;
 };
 
-} // namespace network
+} // namespace master
 } // namespace miniros
 
 #endif //MINIROS_RESOLVER_H

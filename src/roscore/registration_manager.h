@@ -36,9 +36,6 @@ public:
   /// Get nodes which subscribe to specified topic.
   std::vector<std::shared_ptr<NodeRef>> getTopicSubscribers(const std::string& topic) const;
 
-  /// Returns URI of a service provider.
-  std::string getServiceUri(const RequesterInfo& requesterInfo, const std::string& service, bool resolveIp) const;
-
   /// Find node by its name.
   /// @returns reference to a node or nullptr if no node is found.
   std::shared_ptr<NodeRef> getNodeByName(const std::string& nodeName) const;

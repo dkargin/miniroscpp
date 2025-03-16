@@ -74,6 +74,11 @@ std::string NodeRef::getApi() const
   return m_api;
 }
 
+std::string NodeRef::getHost() const
+{
+  return m_apiUrl.host;
+}
+
 void NodeRef::updateDirectAddress(const network::NetAddress& address)
 {
   if (address.type == network::NetAddress::AddressIPv4 && !address.isLocal()) {
@@ -85,23 +90,6 @@ void NodeRef::updateDirectAddress(const network::NetAddress& address)
   }
 }
 
-std::string NodeRef::getResolvedApiFor(bool useIP, const std::shared_ptr<NodeRef>& other) const
-{
-  // TODO: Check if both nodes are related to the same machine.
-  if (useIP && !m_resolvedIp.empty() && !m_apiUrl.empty()) {
-    return m_apiUrl.toString();
-  }
-  return m_api;
-}
-
-std::string NodeRef::getResolvedApiFor(bool useIP, const network::NetAddress& requesterIp) const
-{
-  // TODO: Check if both nodes are related to the same machine.
-  if (useIP && !m_resolvedIp.empty() && !m_apiUrl.empty()) {
-    return m_apiUrl.toString();
-  }
-  return m_api;
-}
 
 void NodeRef::writeJson(std::ostream& os, miniros::JsonState& state, const miniros::JsonSettings& settings)
 {

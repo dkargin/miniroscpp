@@ -200,16 +200,5 @@ std::vector<std::shared_ptr<NodeRef>> RegistrationManager::getTopicSubscribers(c
   return result;
 }
 
-std::string RegistrationManager::getServiceUri(const RequesterInfo& requesterInfo, const std::string& service, bool resolveIp) const
-{
-  std::string service_api = services.get_service_api(service);
-
-  std::shared_ptr<NodeRef> node = getNodeByAPI(service_api);
-  if (node && requesterInfo.clientAddress.valid())
-    return node->getResolvedApiFor(resolveIp, requesterInfo.clientAddress);
-  return service_api;
-}
-
-
 } // namespace master
 } // namespace miniros

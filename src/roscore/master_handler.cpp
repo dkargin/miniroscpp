@@ -28,6 +28,7 @@ bool startsWith(const std::string& str, const std::string& prefix)
 MasterHandler::MasterHandler(RPCManagerPtr rpcManager, RegistrationManager* regManager)
   :m_rpcManager(rpcManager), m_regManager(regManager)
 {
+  m_resolver.scanAdapters();
 }
 
 Error MasterHandler::sendToNode(const std::shared_ptr<NodeRef>& nr, const char* method, const RpcValue& arg1, const RpcValue& arg2)
@@ -95,7 +96,7 @@ void MasterHandler::notifyTopicSubscribers(const std::string& topic, const std::
     l[1] = "";
     for (int i = 0; i < publishers.size(); i++) {
       if (publishers[i]) {
-        l[i + 1] = publishers[i]->getResolvedApiFor(m_resolveIp, sub);
+        l[i + 1] = m_resolver.resolveAddressFor(publishers[i], sub);
       }
     }
     sendToNode(sub, "publisherUpdate", topic, l);
@@ -111,7 +112,13 @@ ReturnStruct MasterHandler::registerService(const std::string& caller_id, const 
 
 std::string MasterHandler::lookupService(const RequesterInfo& requesterInfo, const std::string& service) const
 {
-  return m_regManager->getServiceUri(requesterInfo, service, m_resolveIp);
+  std::string service_api = m_regManager->services.get_service_api(service);
+  std::shared_ptr<NodeRef> node = m_regManager->getNodeByAPI(service_api);
+  if (node && requesterInfo.clientAddress.valid()) {
+    // TODO: Is service_api URL is the same as node API?
+    return m_resolver.resolveAddressFor(node, requesterInfo.clientAddress, requesterInfo.localAddress);
+  }
+  return service_api;
 }
 
 ReturnStruct MasterHandler::unregisterService(const RequesterInfo& requesterInfo, const std::string& service,
@@ -142,8 +149,9 @@ ReturnStruct MasterHandler::registerSubscriber(const std::string& caller_id, con
 
   rtn.value = RpcValue::Array(publishers.size());
   for (int i = 0; i < publishers.size(); i++) {
-    if (publishers[i])
-      rtn.value[i] = publishers[i]->getResolvedApiFor(m_resolveIp, ref);
+    if (publishers[i]) {
+      rtn.value[i] = m_resolver.resolveAddressFor(publishers[i], ref);
+    }
   }
   return rtn;
 }
@@ -184,7 +192,7 @@ ReturnStruct MasterHandler::registerPublisher(const std::string& caller_id, cons
   for (int i = 0; i < subscribers.size(); i++) {
     if (!subscribers[i])
       continue;
-    rtn.value[i] = subscribers[i]->getResolvedApiFor(m_resolveIp, ref);
+    rtn.value[i] = m_resolver.resolveAddressFor(subscribers[i], ref);
   }
   return rtn;
 }
@@ -213,7 +221,7 @@ std::string MasterHandler::lookupNode(const RequesterInfo& requesterInfo, const 
   std::shared_ptr<NodeRef> node = m_regManager->getNodeByName(node_name);
   if (!node)
     return "";
-  return node->getResolvedApiFor(m_resolveIp, requesterInfo.clientAddress);
+  return m_resolver.resolveAddressFor(node, requesterInfo.clientAddress, requesterInfo.localAddress);
 }
 
 std::vector<std::vector<std::string>> MasterHandler::getPublishedTopics(
@@ -267,7 +275,7 @@ MasterHandler::SystemState MasterHandler::getSystemState(const RequesterInfo& re
 
 void MasterHandler::setResolveNodeIP(bool resolve)
 {
-  m_resolveIp = resolve;
+  m_resolver.setResolveIp(resolve);
 }
 
 void MasterHandler::update()

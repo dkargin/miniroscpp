@@ -14,6 +14,7 @@
 #include "registration_manager.h"
 #include "parameter_storage.h"
 #include "requester_info.h"
+#include "resolver.h"
 
 namespace XmlRpc {
 class XmlRpcServerConnection;
@@ -87,14 +88,13 @@ public:
   void update();
 
 protected:
+  AddressResolver m_resolver;
   RegistrationManager* m_regManager;
 
   RPCManagerPtr m_rpcManager;
 
   /// Maps topicName to type md5.
   std::map<std::string, std::string> m_topicTypes;
-
-  bool m_resolveIp = false;
 };
 
 } // namespace master

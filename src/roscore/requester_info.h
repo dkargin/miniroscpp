@@ -22,7 +22,7 @@ struct MINIROS_DECL RequesterInfo {
   /// Address is used to provide accessible URI in the response.
   network::NetAddress clientAddress;
   /// Address of a local endpoint.
-  network::NetAddress hostAddress;
+  network::NetAddress localAddress;
 
   RequesterInfo() = default;
 
