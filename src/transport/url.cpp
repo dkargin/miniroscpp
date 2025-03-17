@@ -67,7 +67,7 @@ bool URL::empty() const
   return host.empty();
 }
 
-std::string URL::toString() const
+std::string URL::str() const
 {
   std::stringstream ss;
   ss << scheme << host;

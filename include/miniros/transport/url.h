@@ -34,7 +34,7 @@ struct MINIROS_DECL URL {
   bool empty() const;
 
   /// Convert URL back to string.
-  std::string toString() const;
+  std::string str() const;
 };
 
 } // namespace network

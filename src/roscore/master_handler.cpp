@@ -96,27 +96,36 @@ void MasterHandler::notifyTopicSubscribers(const std::string& topic, const std::
     l[1] = "";
     for (int i = 0; i < publishers.size(); i++) {
       if (publishers[i]) {
-        l[i + 1] = m_resolver.resolveAddressFor(publishers[i], sub);
+        network::URL url = m_resolver.resolveAddressFor(publishers[i], sub);
+        l[i + 1] = url.str();
       }
     }
     sendToNode(sub, "publisherUpdate", topic, l);
   }
 }
 
-ReturnStruct MasterHandler::registerService(const std::string& caller_id, const std::string& service,
-    const std::string& service_api, const std::string& caller_api, RpcConnection*)
+ReturnStruct MasterHandler::registerService(const RequesterInfo& requesterInfo, const std::string& service,
+    const std::string& service_api)
 {
-  m_regManager->register_service(service, caller_id, caller_api, service_api);
-  return ReturnStruct(1, "Registered [" + caller_id + "] as provider of [" + service + "]", RpcValue(1));
+  std::shared_ptr<NodeRef> ref = m_regManager->register_service(service, requesterInfo.callerId, requesterInfo.callerApi, service_api);
+  if (!ref)
+    return ReturnStruct(0, "Internal error");
+
+  if (auto hostInfo = m_resolver.updateHost(requesterInfo))
+    ref->updateHost(hostInfo);
+
+  return ReturnStruct(1, "Registered [" + requesterInfo.callerId + "] as provider of [" + service + "]", RpcValue(1));
 }
 
 std::string MasterHandler::lookupService(const RequesterInfo& requesterInfo, const std::string& service) const
 {
+  // service_api looks like "rosrpc://hostname:port". It differs from ClientAPI URL.
   std::string service_api = m_regManager->services.get_service_api(service);
   std::shared_ptr<NodeRef> node = m_regManager->getNodeByAPI(service_api);
   if (node && requesterInfo.clientAddress.valid()) {
-    // TODO: Is service_api URL is the same as node API?
-    return m_resolver.resolveAddressFor(node, requesterInfo.clientAddress, requesterInfo.localAddress);
+    // TODO: resolve service_api
+    network::URL url = m_resolver.resolveAddressFor(node, requesterInfo.clientAddress, requesterInfo.localAddress);
+    return url.str();
   }
   return service_api;
 }
@@ -127,14 +136,15 @@ ReturnStruct MasterHandler::unregisterService(const RequesterInfo& requesterInfo
   return m_regManager->unregister_service(service, requesterInfo.callerId, service_api);
 }
 
-ReturnStruct MasterHandler::registerSubscriber(const std::string& caller_id, const std::string& topic,
-  const std::string& topic_type, const std::string& caller_api, RpcConnection* conn)
+ReturnStruct MasterHandler::registerSubscriber(const RequesterInfo& requesterInfo, const std::string& topic,
+  const std::string& topic_type)
 {
-  std::shared_ptr<NodeRef> ref = m_regManager->register_subscriber(topic, caller_id, caller_api);
+  std::shared_ptr<NodeRef> ref = m_regManager->register_subscriber(topic, requesterInfo.callerId, requesterInfo.callerApi);
   if (!ref)
     return ReturnStruct(0, "Internal error");
-  network::NetAddress address = conn->getClientAddress();
-  ref->updateDirectAddress(address);
+
+  if (auto hostInfo = m_resolver.updateHost(requesterInfo))
+    ref->updateHost(hostInfo);
 
   if (!m_topicTypes.count(topic_type))
     m_topicTypes[topic] = topic_type;
@@ -150,7 +160,8 @@ ReturnStruct MasterHandler::registerSubscriber(const std::string& caller_id, con
   rtn.value = RpcValue::Array(publishers.size());
   for (int i = 0; i < publishers.size(); i++) {
     if (publishers[i]) {
-      rtn.value[i] = m_resolver.resolveAddressFor(publishers[i], ref);
+      network::URL url = m_resolver.resolveAddressFor(publishers[i], ref);
+      rtn.value[i] = url.str();
     }
   }
   return rtn;
@@ -165,34 +176,36 @@ int MasterHandler::unregisterSubscriber(const RequesterInfo& requesterInfo, cons
   return 1;
 }
 
-ReturnStruct MasterHandler::registerPublisher(const std::string& caller_id, const std::string& topic,
-  const std::string& topic_type, const std::string& caller_api, RpcConnection* conn)
+ReturnStruct MasterHandler::registerPublisher(const RequesterInfo& requesterInfo, const std::string& topic,
+  const std::string& topic_type)
 {
   MINIROS_INFO_NAMED("handler", "registerPublisher topic=%s caller_id=%s caller_api=%s",
-    topic.c_str(), caller_id.c_str(), caller_api.c_str());
+    topic.c_str(), requesterInfo.callerId.c_str(), requesterInfo.callerApi.c_str());
+
   if (!m_topicTypes.count(topic_type))
     m_topicTypes[topic] = topic_type;
 
-  std::shared_ptr<NodeRef> ref = m_regManager->register_publisher(topic, caller_id, caller_api);
+  std::shared_ptr<NodeRef> ref = m_regManager->register_publisher(topic, requesterInfo.callerId, requesterInfo.callerApi);
   if (!ref) {
     return ReturnStruct(0, "Internal error");
   }
 
-  network::NetAddress address = conn->getClientAddress();
-  ref->updateDirectAddress(address);
+  if (auto hostInfo = m_resolver.updateHost(requesterInfo))
+    ref->updateHost(hostInfo);
 
   std::vector<std::shared_ptr<NodeRef>> subscribers = m_regManager->getTopicSubscribers(topic);
   notifyTopicSubscribers(topic, subscribers);
   ReturnStruct rtn;
   std::stringstream ss;
-  ss << "Registered [" << caller_id << "] as publisher of [" << topic << "]";
+  ss << "Registered [" << requesterInfo.callerId << "] as publisher of [" << topic << "]";
   rtn.statusMessage = ss.str();
   rtn.statusCode = 1;
   rtn.value = RpcValue::Array(subscribers.size());
   for (int i = 0; i < subscribers.size(); i++) {
     if (!subscribers[i])
       continue;
-    rtn.value[i] = m_resolver.resolveAddressFor(subscribers[i], ref);
+    network::URL url = m_resolver.resolveAddressFor(subscribers[i], ref);
+    rtn.value[i] = url.str();
   }
   return rtn;
 }
@@ -221,7 +234,8 @@ std::string MasterHandler::lookupNode(const RequesterInfo& requesterInfo, const 
   std::shared_ptr<NodeRef> node = m_regManager->getNodeByName(node_name);
   if (!node)
     return "";
-  return m_resolver.resolveAddressFor(node, requesterInfo.clientAddress, requesterInfo.localAddress);
+  network::URL url = m_resolver.resolveAddressFor(node, requesterInfo.clientAddress, requesterInfo.localAddress);
+  return url.str();
 }
 
 std::vector<std::vector<std::string>> MasterHandler::getPublishedTopics(

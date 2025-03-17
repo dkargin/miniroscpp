@@ -133,9 +133,15 @@ Master::RpcValue Master::lookupService(const std::string& caller_id, const std::
 }
 
 Master::RpcValue Master::registerService(const std::string& caller_id, const std::string& service,
-  const std::string& service_api, const std::string& caller_api, Connection* conn)
+  const std::string& service_api, const std::string& caller_api, Connection* connection)
 {
-  ReturnStruct r = m_handler.registerService(caller_id, service, service_api, caller_api, conn);
+  RequesterInfo requesterInfo;
+  if (!requesterInfo.assign(caller_id, connection->getfd())) {
+    MINIROS_WARN("Failed to read network address of caller %s", caller_id.c_str());
+  }
+  requesterInfo.callerApi = caller_api;
+
+  ReturnStruct r = m_handler.registerService(requesterInfo, service, service_api);
 
   RpcValue res = RpcValue::Array(3);;
   res[0] = r.statusCode;
@@ -247,11 +253,17 @@ Master::RpcValue Master::getPublishedTopics(const std::string& caller_id, const 
 }
 
 Master::RpcValue Master::registerPublisher(const std::string& caller_id, const std::string& topic,
-  const std::string& type, const std::string& caller_api, Connection* conn)
+  const std::string& type, const std::string& caller_api, Connection* connection)
 {
   MINIROS_INFO("PUBLISHING: caller_id=\"%s\" caller_api=%s topic=\"%s\"", caller_id.c_str(), caller_api.c_str(), topic.c_str());
 
-  ReturnStruct st = m_handler.registerPublisher(caller_id, topic, type, caller_api, conn);
+  RequesterInfo requesterInfo;
+  if (!requesterInfo.assign(caller_id, connection->getfd())) {
+    MINIROS_WARN("Failed to read network address of caller %s", caller_id.c_str());
+  }
+  requesterInfo.callerApi = caller_api;
+
+  ReturnStruct st = m_handler.registerPublisher(requesterInfo, topic, type);
   RpcValue res = RpcValue::Array(3);
   res[0] = st.statusCode;
   res[1] = st.statusMessage;
@@ -280,9 +292,15 @@ Master::RpcValue Master::unregisterPublisher(
 }
 
 Master::RpcValue Master::registerSubscriber(const std::string& caller_id, const std::string& topic,
-  const std::string& type, const std::string& caller_api, Connection* conn)
+  const std::string& type, const std::string& caller_api, Connection* connection)
 {
-  ReturnStruct st = m_handler.registerSubscriber(caller_id, topic, type, caller_api, conn);
+  RequesterInfo requesterInfo;
+  if (!requesterInfo.assign(caller_id, connection->getfd())) {
+    MINIROS_WARN("Failed to read network address of caller %s", caller_id.c_str());
+  }
+  requesterInfo.callerApi = caller_api;
+
+  ReturnStruct st = m_handler.registerSubscriber(requesterInfo, topic, type);
   RpcValue res = RpcValue::Array(3);
   res[0] = st.statusCode;
   res[1] = st.statusMessage;

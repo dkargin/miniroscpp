@@ -20,6 +20,8 @@ namespace miniros {
 
 namespace master {
 
+struct HostInfo;
+
 /// NodeRef contains specific data about a node: publishers, subscribers, services, etc.
 /// It also stores information about ip addresses of the node.
 ///
@@ -52,6 +54,9 @@ public:
         return m_id;
     }
 
+    /// Get annotated URL to ClientAPI interface.
+    network::URL getUrl() const;
+
     /// Get default API address.
     std::string getApi() const;
 
@@ -59,8 +64,9 @@ public:
     /// Hostname is often determined by API URL. In some cases hostname is a direct IP address.
     std::string getHost() const;
 
-    /// Update direct IP address of a node.
-    void updateDirectAddress(const network::NetAddress& address);
+    void updateHost(const std::shared_ptr<HostInfo>& hostInfo);
+
+    std::weak_ptr<const HostInfo> hostInfo() const;
 
     /// Save state in a json form.
     void writeJson(std::ostream& os, miniros::JsonState& state, const miniros::JsonSettings& settings);
@@ -78,6 +84,8 @@ protected:
 
     /// Resolved IP of a node.
     std::string m_resolvedIp;
+
+    std::weak_ptr<HostInfo> m_hostInfo;
 };
 
 } // namespace master

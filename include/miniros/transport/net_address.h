@@ -32,8 +32,6 @@ struct MINIROS_DECL NetAddress {
   /// Pointer to actual address implementation.
   /// It points to sockaddr_t or one of its variants.
   void* rawAddress = nullptr;
-  /// Size of raw address.
-  size_t rawAddressSize = 0;
 
   NetAddress();
   NetAddress(const NetAddress& other);
@@ -53,6 +51,13 @@ struct MINIROS_DECL NetAddress {
 
   /// Generate string representation of an address.
   std::string str() const;
+
+  /// Check type of provided address in a string form.
+  static Type checkAddressType(const std::string& address);
+
+  friend bool operator < (const NetAddress& a, const NetAddress& b);
+  friend bool operator == (const NetAddress& a, const NetAddress& b);
+  friend bool operator != (const NetAddress& a, const NetAddress& b);
 };
 
 /// Fills in local address from socket.

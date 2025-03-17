@@ -46,20 +46,17 @@ public:
 
   void notifyTopicSubscribers(const std::string& topic, const std::vector<std::shared_ptr<NodeRef>>& subscribers);
 
-  ReturnStruct registerService(const std::string& caller_id, const std::string& service,
-    const std::string& service_api, const std::string& caller_api, RpcConnection* conn);
+  ReturnStruct registerService(const RequesterInfo& requesterInfo, const std::string& service, const std::string& service_api);
 
   std::string lookupService(const RequesterInfo& requesterInfo, const std::string& service) const;
 
   ReturnStruct unregisterService(const RequesterInfo& requesterInfo, const std::string& service, const std::string& service_api);
 
-  ReturnStruct registerSubscriber(const std::string& caller_id, const std::string& topic, const std::string& topic_type,
-    const std::string& caller_api, RpcConnection* conn);
+  ReturnStruct registerSubscriber(const RequesterInfo& requesterInfo, const std::string& topic, const std::string& topic_type);
 
   int unregisterSubscriber(const RequesterInfo& requesterInfo, const std::string& topic);
 
-  ReturnStruct registerPublisher(const std::string& caller_id, const std::string& topic, const std::string& topic_type,
-    const std::string& caller_api, RpcConnection* conn);
+  ReturnStruct registerPublisher(const RequesterInfo& requesterInfo, const std::string& topic, const std::string& topic_type);
 
   int unregisterPublisher(const RequesterInfo& requesterInfo, const std::string& topic);
 

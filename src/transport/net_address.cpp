@@ -18,7 +18,6 @@ NetAddress::NetAddress()
 NetAddress::NetAddress(NetAddress&& other) noexcept
 {
   std::swap(rawAddress, other.rawAddress);
-  std::swap(rawAddressSize, other.rawAddressSize);
   std::swap(address, other.address);
 
   port = other.port;
@@ -43,8 +42,7 @@ NetAddress::NetAddress(const NetAddress& other)
     size_t size = getAddressSize(other.type);
     sockaddr_in* addr = static_cast<sockaddr_in*>(malloc(size));
     rawAddress = addr;
-    rawAddressSize = other.rawAddressSize;
-    memcpy(rawAddress, other.rawAddress, other.rawAddressSize);
+    memcpy(rawAddress, other.rawAddress, getAddressSize(other.type));
     type = other.type;
   } else {
     type = Type::AddressInvalid;
@@ -67,8 +65,7 @@ NetAddress& NetAddress::operator=(const NetAddress& other)
   if (other.rawAddress && (other.type == Type::AddressIPv4 || other.type == Type::AddressIPv6)) {
     sockaddr_in* addr = static_cast<sockaddr_in*>(malloc(sizeof(sockaddr_in)));
     rawAddress = addr;
-    rawAddressSize = other.rawAddressSize;
-    memcpy(rawAddress, other.rawAddress, other.rawAddressSize);
+    memcpy(rawAddress, other.rawAddress, getAddressSize(other.type));
     type = other.type;
   } else {
     type = Type::AddressInvalid;
@@ -119,7 +116,6 @@ bool fillAddress(const sockaddr_in& my_addr, NetAddress& address)
   size_t size = getAddressSize(address.type);
   sockaddr_in* outAddr = static_cast<sockaddr_in*>(malloc(size));
   address.rawAddress = outAddr;
-  address.rawAddressSize = size;
   memcpy(outAddr, &my_addr, size);
   return true;
 }
@@ -144,6 +140,46 @@ bool readRemoteAddress(int sockfd, NetAddress& address)
     return false;
 
   return fillAddress(my_addr, address);
+}
+
+std::string NetAddress::str() const
+{
+  std::stringstream ss;
+  ss << address;
+  if (port) {
+    ss << ":" << port;
+  }
+  return ss.str();
+}
+
+NetAddress::Type NetAddress::checkAddressType(const std::string& address)
+{
+  sockaddr_in sa = {};
+  if (inet_pton(AF_INET, address.c_str(), &sa.sin_addr) == 1) {
+    return Type::AddressIPv4;
+  }
+  if (inet_pton(AF_INET6, address.c_str(), &sa.sin_addr) == 1) {
+    return Type::AddressIPv6;
+  }
+  return Type::AddressInvalid;
+}
+
+bool operator < (const NetAddress& a, const NetAddress& b)
+{
+  return a.str() < b.str();
+}
+
+bool operator == (const NetAddress& a, const NetAddress& b)
+{
+  if (a.type  == b.type && a.port == b.port) {
+    return a.rawAddress && b.rawAddress && memcmp(a.rawAddress, b.rawAddress, getAddressSize(a.type)) == 0;
+  }
+  return false;
+}
+
+bool operator != (const NetAddress& a, const NetAddress& b)
+{
+  return !(a == b);
 }
 
 } // namespace network

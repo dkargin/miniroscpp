@@ -69,6 +69,11 @@ bool NodeRef::remove(Registrations::Type type_, const std::string& key)
   return true;
 }
 
+network::URL NodeRef::getUrl() const
+{
+  return m_apiUrl;
+}
+
 std::string NodeRef::getApi() const
 {
   return m_api;
@@ -79,21 +84,19 @@ std::string NodeRef::getHost() const
   return m_apiUrl.host;
 }
 
-void NodeRef::updateDirectAddress(const network::NetAddress& address)
-{
-  if (address.type == network::NetAddress::AddressIPv4 && !address.isLocal()) {
-    // TODO: we can get local address, like 127.0.0.1.
-    // This address is not very practical for other subscribers.
-    m_resolvedIp = address.address;
-    m_apiUrl.host = address.address;
-    MINIROS_INFO("NodeRef(%s) updated address to %s", m_id.c_str(), address.address.c_str());
-  }
-}
-
-
 void NodeRef::writeJson(std::ostream& os, miniros::JsonState& state, const miniros::JsonSettings& settings)
 {
   // TODO: Implement
+}
+
+void NodeRef::updateHost(const std::shared_ptr<HostInfo>& hostInfo)
+{
+  m_hostInfo = hostInfo;
+}
+
+std::weak_ptr<const HostInfo> NodeRef::hostInfo() const
+{
+  return m_hostInfo;
 }
 
 } // namespace master

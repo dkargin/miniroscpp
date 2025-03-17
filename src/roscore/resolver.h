@@ -12,12 +12,27 @@
 #include <string>
 #include <vector>
 
-#include "miniros/transport/net_address.h"
 #include "miniros/errors.h"
+#include "miniros/transport/net_address.h"
 #include "node_ref.h"
+#include "requester_info.h"
 
 namespace miniros {
 namespace master {
+
+/// Information about network host.
+struct HostInfo {
+  std::string hostname;
+
+  /// A list IP addresses, usable for external clients.
+  std::set<network::NetAddress> addresses;
+
+  /// This host is local to master.
+  /// It uses loopback or some other kind of local connection for communication.
+  bool local = false;
+
+  HostInfo(const std::string& name);
+};
 
 class MINIROS_DECL AddressResolver {
 public:
@@ -45,18 +60,20 @@ public:
   /// Find adapter for specific local address.
   const NetAdapter* findAdapterForLocalAddress(const network::NetAddress& address) const;
 
-  struct HostInfo {
-  };
+  std::shared_ptr<HostInfo> updateHost(const  RequesterInfo& requesterInfo);
+
+  /// Finds host by its ip address.
+  std::shared_ptr<HostInfo> findHost(const network::NetAddress& address) const;
 
   /// Determine good URI for a node.
   /// @returns resolved URI of a node.
-  std::string resolveAddressFor(const std::shared_ptr<NodeRef>& node,
+  network::URL resolveAddressFor(const std::shared_ptr<NodeRef>& node,
     const network::NetAddress& remoteAddress,
     const network::NetAddress& localAddress) const;
 
   /// Determine good URI for a node.
   /// @returns resolved URI of a node.
-  std::string resolveAddressFor(const std::shared_ptr<NodeRef>& node, const std::shared_ptr<NodeRef>& requester) const;
+  network::URL resolveAddressFor(const std::shared_ptr<NodeRef>& node, const std::shared_ptr<NodeRef>& requester) const;
 
   /// Get local hostname.
   const std::string& getHost() const;
