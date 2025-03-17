@@ -52,7 +52,7 @@ TEST(NoSimTime, isTimeValid)
   auto ml = miniros::getMasterLink();
   // Check that the use_sim_time parameter is set to true
   bool use_sim_time = false;
-  ml->param("/use_sim_time", use_sim_time, use_sim_time)
+  ml->param("/use_sim_time", use_sim_time, use_sim_time);
   //miniros::param::param("/use_sim_time", use_sim_time, use_sim_time);
   EXPECT_TRUE(use_sim_time);
   EXPECT_TRUE(miniros::Time::isSystemTime());
