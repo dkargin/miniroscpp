@@ -340,17 +340,13 @@ Master::RpcValue Master::lookupNode(const std::string& caller_id, const std::str
   return res;
 }
 
-Master::RpcValue Master::getTime(Connection*)
-{
-  throw std::runtime_error("NOT IMPLEMENTED YET!");
-}
-
-Master::RpcValue Master::hasParam(const std::string& caller_id, const std::string& topic, Connection* /*conn*/)
+Master::RpcValue Master::hasParam(const std::string& caller_id, const std::string& key, Connection* /*conn*/)
 {
   RpcValue res = RpcValue::Array(3);
+  bool found = m_parameterStorage.hasParam(caller_id, key);
   res[0] = 1;
-  res[1] = "hasParam";
-  res[2] = m_parameterStorage.hasParam(caller_id, topic);
+  res[1] = key;
+  res[2] = found;
   return res;
 }
 
@@ -365,16 +361,17 @@ Master::RpcValue Master::setParam(
   return res;
 }
 
-Master::RpcValue Master::getParam(const std::string& caller_id, const std::string& topic, Connection*)
+Master::RpcValue Master::getParam(const std::string& caller_id, const std::string& key, Connection*)
 {
   RpcValue res = RpcValue::Array(3);
-  RpcValue value = m_parameterStorage.getParam(caller_id, topic);
+  RpcValue value = m_parameterStorage.getParam(caller_id, key);
   if (!value.valid()) {
-    res[0] = 0;
-    res[1] = std::string("Parameter ") + topic + std::string(" is not set");
+    res[0] = -1;
+    res[1] = std::string("Parameter [") + key + std::string("] is not set");
+    res[2] = 0;
   } else {
     res[0] = 1;
-    res[1] = "getParam";
+    res[1] = std::string("Parameter [") + key + std::string("]");
     res[2] = value;
   }
   return res;

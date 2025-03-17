@@ -128,8 +128,6 @@ public: /// Request handlers
   /// Returns (int, str, str) (code, statusMessage, URI)
   RpcValue lookupNode(const std::string& caller_id, const std::string& node, Connection* conn);
 
-  RpcValue getTime(Connection*);
-
   /// Parameter API
 
   /// Check whether a parameter exists
