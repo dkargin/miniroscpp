@@ -39,17 +39,21 @@
  */
 
 #include <gtest/gtest.h>
+
 #include "miniros/ros.h"
-#include "miniros/topic_manager.h"
+#include "miniros/transport/topic_manager.h"
+#include "miniros/master_link.h"
 
 TEST(NoSimTime, isTimeValid)
 {
   // We should be using the system time, so time should be valid right away
   ASSERT_TRUE(miniros::Time::isValid());
 
+  auto ml = miniros::getMasterLink();
   // Check that the use_sim_time parameter is set to true
   bool use_sim_time = false;
-  miniros::param::param("/use_sim_time", use_sim_time, use_sim_time);
+  ml->param("/use_sim_time", use_sim_time, use_sim_time)
+  //miniros::param::param("/use_sim_time", use_sim_time, use_sim_time);
   EXPECT_TRUE(use_sim_time);
   EXPECT_TRUE(miniros::Time::isSystemTime());
 
