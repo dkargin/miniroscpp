@@ -143,6 +143,9 @@ ReturnStruct MasterHandler::registerSubscriber(const RequesterInfo& requesterInf
   if (!ref)
     return ReturnStruct(0, "Internal error");
 
+  MINIROS_INFO_NAMED("handler", "registerSubscriber(\"%s\") caller_id=%s caller_api=%s",
+    topic.c_str(), requesterInfo.callerId.c_str(), requesterInfo.callerApi.c_str());
+
   if (auto hostInfo = m_resolver.updateHost(requesterInfo))
     ref->updateHost(hostInfo);
 
@@ -161,7 +164,9 @@ ReturnStruct MasterHandler::registerSubscriber(const RequesterInfo& requesterInf
   for (int i = 0; i < publishers.size(); i++) {
     if (publishers[i]) {
       network::URL url = m_resolver.resolveAddressFor(publishers[i], requesterInfo.clientAddress, requesterInfo.localAddress);
-      rtn.value[i] = url.str();
+      std::string strUrl = url.str();
+      MINIROS_INFO_NAMED("handler", "registerSubscriber(\"%s\") - pub=%s", topic.c_str(), strUrl.c_str());
+      rtn.value[i] = strUrl;
     }
   }
   return rtn;
@@ -179,7 +184,7 @@ int MasterHandler::unregisterSubscriber(const RequesterInfo& requesterInfo, cons
 ReturnStruct MasterHandler::registerPublisher(const RequesterInfo& requesterInfo, const std::string& topic,
   const std::string& topic_type)
 {
-  MINIROS_INFO_NAMED("handler", "registerPublisher topic=%s caller_id=%s caller_api=%s",
+  MINIROS_INFO_NAMED("handler", "registerPublisher(\"%s\") caller_id=%s caller_api=%s",
     topic.c_str(), requesterInfo.callerId.c_str(), requesterInfo.callerApi.c_str());
 
   if (!m_topicTypes.count(topic_type))
@@ -205,14 +210,16 @@ ReturnStruct MasterHandler::registerPublisher(const RequesterInfo& requesterInfo
     if (!subscribers[i])
       continue;
     network::URL url = m_resolver.resolveAddressFor(subscribers[i], requesterInfo.clientAddress, requesterInfo.localAddress);
-    rtn.value[i] = url.str();
+    std::string strUrl = url.str();
+    MINIROS_INFO_NAMED("handler", "registerPublisher(\"%s\") - sub=%s", topic.c_str(), strUrl.c_str());
+    rtn.value[i] = strUrl;
   }
   return rtn;
 }
 
 int MasterHandler::unregisterPublisher(const RequesterInfo& requesterInfo, const std::string& topic)
 {
-  MINIROS_INFO_NAMED("handler", "unregisterPublisher topic=%s caller_id=%s caller_api=%s",
+  MINIROS_INFO_NAMED("handler", "unregisterPublisher(\"%s\") caller_id=%s caller_api=%s",
     topic.c_str(), requesterInfo.callerId.c_str(), requesterInfo.callerApi.c_str());
   // Publisher can be unregistered either by a direct call of actual subscriber,
   // or as a part of cleanup procedure from rosnode/rostopic utility. So we do not need to check whether

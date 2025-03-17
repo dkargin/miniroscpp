@@ -25,7 +25,7 @@ struct HostInfo {
   std::string hostname;
 
   /// A list IP addresses, usable for external clients.
-  std::set<network::NetAddress> addresses;
+  std::set<network::NetAddress, network::AddressCompare> addresses;
 
   /// This host is local to master.
   /// It uses loopback or some other kind of local connection for communication.

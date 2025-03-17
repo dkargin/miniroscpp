@@ -182,5 +182,13 @@ bool operator != (const NetAddress& a, const NetAddress& b)
   return !(a == b);
 }
 
+bool AddressCompare::operator()(const NetAddress& a, const NetAddress& b) const
+{
+  if (a.type == b.type) {
+    return a.address < b.address;
+  }
+  return a.type < b.type;
+}
+
 } // namespace network
 } // namespace miniros

@@ -60,6 +60,11 @@ struct MINIROS_DECL NetAddress {
   friend bool operator != (const NetAddress& a, const NetAddress& b);
 };
 
+/// Address comparator which checks for IP address only, without comparing the port.
+struct AddressCompare {
+  bool operator()(const NetAddress& a, const NetAddress& b) const;
+};
+
 /// Fills in local address from socket.
 MINIROS_DECL bool readLocalAddress(int sockfd, NetAddress& address);
 
