@@ -34,23 +34,27 @@ struct HostInfo {
   HostInfo(const std::string& name);
 };
 
+/// NetAdapter encapsulates all the information about specific network adapter.
+struct NetAdapter {
+  /// Name of the adapter.
+  std::string name;
+  /// Address on the adapter.
+  network::NetAddress address;
+  /// IPv4 netmask.
+  network::NetAddress mask;
+
+  /// Check it is localhost/loopback interface.
+  bool isLoopback() const;
+
+  /// Check if specified address belongs to this address range and mask.
+  bool matchNetAddress(const network::NetAddress& address) const;
+
+  /// Check if this adapter can be used to access specified host.
+  bool hasAccessTo(const HostInfo& host) const;
+};
+
 class MINIROS_DECL AddressResolver {
 public:
-  struct NetAdapter {
-    /// Name of the adapter.
-    std::string name;
-    /// Address on the adapter.
-    network::NetAddress address;
-    /// IPv4 netmask.
-    network::NetAddress mask;
-
-    /// Check it is localhost/loopback interface.
-    bool isLoopback() const;
-
-    /// Check if specified address belongs to this address range and mask.
-    bool matchNetAddress(const network::NetAddress& address) const;
-  };
-
   /// Scan or update existing network adapters.
   Error scanAdapters();
 

@@ -160,7 +160,7 @@ ReturnStruct MasterHandler::registerSubscriber(const RequesterInfo& requesterInf
   rtn.value = RpcValue::Array(publishers.size());
   for (int i = 0; i < publishers.size(); i++) {
     if (publishers[i]) {
-      network::URL url = m_resolver.resolveAddressFor(publishers[i], ref);
+      network::URL url = m_resolver.resolveAddressFor(publishers[i], requesterInfo.clientAddress, requesterInfo.localAddress);
       rtn.value[i] = url.str();
     }
   }
@@ -204,7 +204,7 @@ ReturnStruct MasterHandler::registerPublisher(const RequesterInfo& requesterInfo
   for (int i = 0; i < subscribers.size(); i++) {
     if (!subscribers[i])
       continue;
-    network::URL url = m_resolver.resolveAddressFor(subscribers[i], ref);
+    network::URL url = m_resolver.resolveAddressFor(subscribers[i], requesterInfo.clientAddress, requesterInfo.localAddress);
     rtn.value[i] = url.str();
   }
   return rtn;

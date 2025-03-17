@@ -22,6 +22,41 @@ bool fillAddress(const sockaddr_in& my_addr, NetAddress& address);
 
 namespace master {
 
+bool NetAdapter::matchNetAddress(const network::NetAddress& other) const
+{
+  if (address.type != other.type) {
+    return false;
+  }
+
+  if (!mask.valid() || !address.valid() || !other.valid())
+    return false;
+
+  if (other.type == network::NetAddress::AddressIPv4) {
+    const sockaddr_in* rawAddr = static_cast<const sockaddr_in*>(address.rawAddress);
+    const sockaddr_in* rawMask = static_cast<const sockaddr_in*>(mask.rawAddress);
+    const sockaddr_in* rawOtherAddr = static_cast<const sockaddr_in*>(other.rawAddress);
+
+    uint32_t ip = rawAddr->sin_addr.s_addr;
+    uint32_t netip = rawOtherAddr->sin_addr.s_addr;
+    uint32_t netmask = rawOtherAddr->sin_addr.s_addr;
+    // is on same subnet...
+    if ((netip & netmask) == (ip & netmask))
+      return true;
+  }
+  return false;
+}
+
+bool NetAdapter::hasAccessTo(const HostInfo& host) const
+{
+  for (const auto& address: host.addresses) {
+    if (address.isLocal())
+      continue;
+    if (matchNetAddress(address))
+      return true;
+  }
+  return false;
+}
+
 const std::string& AddressResolver::getHost() const
 {
   std::scoped_lock lock(m_mutex);
@@ -71,7 +106,6 @@ Error AddressResolver::scanAdapters()
     if (family == AF_INET || family == AF_INET6) {
       NetAdapter adapter;
       adapter.name = ifa->ifa_name;
-      const size_t addrLen = (family == AF_INET) ? sizeof(struct sockaddr_in) : sizeof(struct sockaddr_in6);
       if (!fillAddress(*reinterpret_cast<sockaddr_in*>(ifa->ifa_addr), adapter.address)) {
         continue;
       }
@@ -108,6 +142,8 @@ network::URL AddressResolver::resolveAddressFor(const std::shared_ptr<NodeRef>& 
     return {};
 
   network::URL url = node->getUrl();
+
+  std::scoped_lock lock(m_mutex);
   if (!m_resolveIp)
     return url;
 
@@ -147,23 +183,55 @@ network::URL AddressResolver::resolveAddressFor(const std::shared_ptr<NodeRef>& 
   assert(node);
   if (!node)
     return {};
-
   network::URL url = node->getUrl();
+
+  assert(requester);
+  if (!requester) {
+    MINIROS_WARN_NAMED("resolver", "resolveAddressFor(%s) - requester is null", node->id().c_str());
+    return url;
+  }
+
+  std::scoped_lock lock(m_mutex);
   if (!m_resolveIp)
     return url;
 
   auto nodeHost = node->hostInfo().lock();
   if (!nodeHost) {
-    MINIROS_WARN_NAMED("resolver", "No HostInfo for node %s", node->id().c_str());
+    MINIROS_WARN_NAMED("resolver", "resolveAddressFor(%s) - no HostInfo", node->id().c_str());
     return url;
   }
 
   auto requesterHost = requester->hostInfo().lock();
+  if (!requesterHost) {
+    MINIROS_WARN_NAMED("resolver", "resolveAddressFor(%s) - no HostInfo for requester %s", node->id().c_str(), requester->id().c_str());
+    return url;
+  }
+
   if (requesterHost && nodeHost == requesterHost) {
     // Both requester and node are on the same host. No additional resolution is needed.
     return url;
   }
 
+  if (nodeHost->local) {
+    for (const auto& adapter: m_adapters) {
+      if (adapter.hasAccessTo(*requesterHost)) {
+        url.host = adapter.address.str();
+        return url;
+      }
+    }
+    MINIROS_WARN_NAMED("resolver", "resolveAddressFor(%s) - no adapter matched for %s", node->id().c_str(), requester->id().c_str());
+  } else {
+    // Just return any address. That will fork for simple networks.
+    for (const auto& addr: nodeHost->addresses) {
+      if (!addr.isLocal()) {
+        url.host = addr.str();
+        return url;
+      }
+    }
+    MINIROS_WARN_NAMED("resolver", "resolveAddressFor(%s) - no suitable host address found for node %s", node->id().c_str(), requester->id().c_str());
+  }
+
+  MINIROS_WARN_NAMED("resolver", "resolveAddressFor(%s) - failed to resolve address for %s", node->id().c_str(), requester->id().c_str());
   return url;
 }
 
@@ -190,6 +258,10 @@ bool AddressResolver::isLocalhost(const std::string& host) const
     return true;
   if (host == "0:0:0:0:0:0:0:1"  || host == "::1") // IP v6 address
     return true;
+  auto it = m_hosts.find(host);
+  if (it != m_hosts.end() && it->second->local) {
+    return true;
+  }
   return false;
 }
 
@@ -203,6 +275,7 @@ std::shared_ptr<HostInfo> AddressResolver::updateHost(const  RequesterInfo& requ
 {
   if (requesterInfo.callerApi.empty())
     return {};
+
   network::URL url;
   url.fromString(requesterInfo.callerApi, /*defaultPort*/false);
 
@@ -212,6 +285,8 @@ std::shared_ptr<HostInfo> AddressResolver::updateHost(const  RequesterInfo& requ
   // check if we got a direct IP address instead of a string hostname.
   bool isIP = network::NetAddress::checkAddressType(url.host) != network::NetAddress::AddressInvalid;
   bool isSameMachine = requesterInfo.clientAddress.isLocal();
+
+  std::scoped_lock lock(m_mutex);
 
   if (isIP) {
     if (isSameMachine) {
