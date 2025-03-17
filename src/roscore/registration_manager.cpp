@@ -195,7 +195,10 @@ std::vector<std::shared_ptr<NodeRef>> RegistrationManager::getTopicSubscribers(c
   std::vector<std::shared_ptr<NodeRef>> result;
   std::vector<std::string> sub_api = subscribers.getApis(topic);
   for (const auto& api: sub_api) {
-    result.push_back(getNodeByAPIUnsafe(api));
+    auto node = getNodeByNameUnsafe(api);
+    if (node) {
+      result.push_back(node);
+    }
   }
   return result;
 }

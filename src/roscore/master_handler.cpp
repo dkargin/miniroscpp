@@ -91,16 +91,17 @@ void MasterHandler::notifyTopicSubscribers(const std::string& topic, const std::
   RpcValue l = RpcValue::Array(publishers.size() + 1);
 
   for (std::shared_ptr<NodeRef> sub: subscribers) {
-
-    l[0] = sub->getApi();
-    l[1] = "";
-    for (int i = 0; i < publishers.size(); i++) {
-      if (publishers[i]) {
-        network::URL url = m_resolver.resolveAddressFor(publishers[i], sub);
-        l[i + 1] = url.str();
+    if (sub) {
+      l[0] = sub->getApi();
+      l[1] = "";
+      for (int i = 0; i < publishers.size(); i++) {
+        if (publishers[i]) {
+          network::URL url = m_resolver.resolveAddressFor(publishers[i], sub);
+          l[i + 1] = url.str();
+        }
       }
+      sendToNode(sub, "publisherUpdate", topic, l);
     }
-    sendToNode(sub, "publisherUpdate", topic, l);
   }
 }
 
@@ -163,8 +164,14 @@ ReturnStruct MasterHandler::registerSubscriber(const RequesterInfo& requesterInf
   rtn.value = RpcValue::Array(publishers.size());
   for (int i = 0; i < publishers.size(); i++) {
     if (publishers[i]) {
-      network::URL url = m_resolver.resolveAddressFor(publishers[i], requesterInfo.clientAddress, requesterInfo.localAddress);
-      std::string strUrl = url.str();
+      std::string strUrl;
+      if (publishers[i] != ref) {
+        network::URL url = m_resolver.resolveAddressFor(publishers[i], requesterInfo.clientAddress, requesterInfo.localAddress);
+        strUrl = url.str();
+      } else {
+        // The publisher is the same as the subscriber. Do not resolve IP address in this case.
+        strUrl = publishers[i]->getApi();
+      }
       MINIROS_INFO_NAMED("handler", "registerSubscriber(\"%s\") - pub=%s", topic.c_str(), strUrl.c_str());
       rtn.value[i] = strUrl;
     }

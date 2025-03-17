@@ -37,6 +37,7 @@ public:
     NodeRef() = default;
 
     NodeRef(const std::string& _id, const std::string& _api);
+    ~NodeRef();
 
     void clear();
 

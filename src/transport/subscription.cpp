@@ -216,7 +216,7 @@ bool urisEqual(const std::string& uri1, const std::string& uri2)
 
 bool Subscription::pubUpdate(const V_string& new_pubs)
 {
-  std::scoped_lock<std::mutex> lock(shutdown_mutex_);
+  std::scoped_lock<std::mutex> slock(shutdown_mutex_);
 
   if (shutting_down_ || dropped_)
   {
@@ -225,31 +225,24 @@ bool Subscription::pubUpdate(const V_string& new_pubs)
 
   bool retval = true;
 
+  const std::string ownURI = RPCManager::instance()->getServerURI();
   {
     std::stringstream ss;
 
-    for (V_string::const_iterator up_i = new_pubs.begin();
-         up_i != new_pubs.end(); ++up_i)
-    {
-      ss << *up_i << ", ";
-    }
+    for (const std::string& up_i: new_pubs)
+      ss << up_i << ", ";
 
     ss << " already have these connections: ";
     {
       std::scoped_lock<std::mutex> lock(publisher_links_mutex_);
-      for (V_PublisherLink::iterator spc = publisher_links_.begin();
-           spc!= publisher_links_.end(); ++spc)
-      {
-        ss << (*spc)->getPublisherXMLRPCURI() << ", ";
-      }
+      for (PublisherLinkPtr& plink: publisher_links_)
+        ss << plink->getPublisherXMLRPCURI() << ", ";
     }
 
-    std::scoped_lock<std::mutex> lock(pending_connections_mutex_);
-    S_PendingConnection::iterator it = pending_connections_.begin();
-    S_PendingConnection::iterator end = pending_connections_.end();
-    for (; it != end; ++it)
     {
-      ss << (*it)->getRemoteURI() << ", ";
+      std::scoped_lock<std::mutex> lock(pending_connections_mutex_);
+      for (const PendingConnectionPtr& conn: pending_connections_)
+        ss << conn->getRemoteURI() << ", ";
     }
 
     MINIROS_DEBUG("Publisher update for [%s]: %s", name_.c_str(), ss.str().c_str());
@@ -299,11 +292,9 @@ bool Subscription::pubUpdate(const V_string& new_pubs)
       if (!found)
       {
         std::scoped_lock<std::mutex> lock(pending_connections_mutex_);
-        S_PendingConnection::iterator it = pending_connections_.begin();
-        S_PendingConnection::iterator end = pending_connections_.end();
-        for (; it != end; ++it)
+        for (const PendingConnectionPtr& conn: pending_connections_)
         {
-          if (urisEqual(*up_i, (*it)->getRemoteURI()))
+          if (urisEqual(*up_i, conn->getRemoteURI()))
           {
             found = true;
             break;
@@ -318,32 +309,30 @@ bool Subscription::pubUpdate(const V_string& new_pubs)
     }
   }
 
-  for (V_PublisherLink::iterator i = subtractions.begin(); i != subtractions.end(); ++i)
+  for (const PublisherLinkPtr& link: subtractions)
   {
-	const PublisherLinkPtr& link = *i;
-    if (link->getPublisherXMLRPCURI() != RPCManager::instance()->getServerURI())
+    if (link->getPublisherXMLRPCURI() != ownURI)
     {
       MINIROS_DEBUG("Disconnecting from publisher [%s] of topic [%s] at [%s]",
-                        link->getCallerID().c_str(), name_.c_str(), link->getPublisherXMLRPCURI().c_str());
-		  link->drop();
-	  }
-	  else
-	  {
-		  MINIROS_DEBUG("Disconnect: skipping myself for topic [%s]", name_.c_str());
-	  }
-	}
-
-  for (V_string::iterator i = additions.begin();
-            i != additions.end(); ++i)
-  {
-    // this function should never negotiate a self-subscription
-    if (RPCManager::instance()->getServerURI() != *i)
-    {
-      retval &= negotiateConnection(*i);
+                  link->getCallerID().c_str(), name_.c_str(), link->getPublisherXMLRPCURI().c_str());
+      link->drop();
     }
     else
     {
-      MINIROS_DEBUG("Skipping myself (%s, %s)", name_.c_str(), RPCManager::instance()->getServerURI().c_str());
+      MINIROS_DEBUG("Disconnect: skipping myself for topic [%s]", name_.c_str());
+    }
+  }
+
+  for (const std::string& uri: additions)
+  {
+    // this function should never negotiate a self-subscription
+    if (ownURI != uri)
+    {
+      retval &= negotiateConnection(uri);
+    }
+    else
+    {
+      MINIROS_DEBUG("Skipping myself (%s, %s)", name_.c_str(), ownURI.c_str());
     }
   }
 
@@ -362,11 +351,9 @@ bool Subscription::negotiateConnection(const std::string& xmlrpc_uri)
     transport_hints_.reliable();
     transports = transport_hints_.getTransports();
   }
-  for (V_string::const_iterator it = transports.begin();
-       it != transports.end();
-       ++it)
+  for (const std::string& transport: transports)
   {
-    if (*it == "UDP")
+    if (transport == "UDP")
     {
       int max_datagram_size = transport_hints_.getMaxDatagramSize();
       udp_transport = std::make_shared<TransportUDP>(&PollManager::instance()->getPollSet());
@@ -390,14 +377,14 @@ bool Subscription::negotiateConnection(const std::string& xmlrpc_uri)
 
       protos_array[protos++] = udpros_array;
     }
-    else if (*it == "TCP")
+    else if (transport == "TCP")
     {
       tcpros_array[0] = std::string("TCPROS");
       protos_array[protos++] = tcpros_array;
     }
     else
     {
-      MINIROS_WARN("Unsupported transport type hinted: %s, skipping", it->c_str());
+      MINIROS_WARN("Unsupported transport type hinted: %s, skipping", transport.c_str());
     }
   }
   params[0] = this_node::getName();

@@ -292,6 +292,7 @@ bool isStarted()
   return g_started;
 }
 
+/// Start is issued by a first NodeHandle::construct.
 Error start()
 {
   std::scoped_lock<std::mutex> lock(g_start_mutex);

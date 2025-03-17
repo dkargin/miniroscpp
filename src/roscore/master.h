@@ -30,6 +30,10 @@ Current status codes:
     1: SUCCESS: Method completed successfully.
 */
 
+namespace XmlRpc {
+class XmlRpcServerConnection;
+}
+
 namespace miniros {
 namespace master {
 

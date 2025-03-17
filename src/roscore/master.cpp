@@ -105,6 +105,7 @@ void Master::setupBindings()
 void Master::setResolveNodeIP(bool resolv)
 {
   m_handler.setResolveNodeIP(resolv);
+  m_parameterStorage.setParam("master", "/resolve_ip", resolv);
 }
 
 void Master::update()
@@ -181,7 +182,7 @@ Master::RpcValue Master::getTopicTypes(const std::string& topic, Connection*)
 
   RpcValue res = RpcValue::Array(3);;
   res[0] = 1;
-  res[1] = "getTopicTypes";
+  res[1] = "current system state";
   res[2] = xmlTopics;
   return res;
 }
@@ -190,7 +191,7 @@ Master::RpcValue Master::getSystemState(const std::string& caller_id, Connection
 {
   RpcValue res = RpcValue::Array(3);
   res[0] = 1;
-  res[1] = "getSystemState";
+  res[1] = "current system state";
 
   auto writeXml = [&](const std::map<std::string, std::vector<std::string>>& providers, RpcValue& result) {
     int index = 0;

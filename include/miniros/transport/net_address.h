@@ -24,6 +24,7 @@ struct MINIROS_DECL NetAddress {
   Type type = AddressInvalid;
 
   /// String representation of network address.
+  /// It does not contain port. It can contain some DNS name.
   std::string address;
 
   /// Network port.

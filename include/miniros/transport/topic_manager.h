@@ -37,6 +37,10 @@
 
 #include "miniros/xmlrpcpp/XmlRpcValue.h"
 
+namespace XmlRpc {
+class XmlRpcServerConnection;
+}
+
 namespace miniros
 {
 
@@ -51,7 +55,7 @@ class PollManager;
 typedef std::shared_ptr<PollManager> PollManagerPtr;
 
 class RPCManager;
-typedef std::shared_ptr<RPCManager> XMLRPCManagerPtr;
+typedef std::shared_ptr<RPCManager> RPCManagerPtr;
 
 class ConnectionManager;
 typedef std::shared_ptr<ConnectionManager> ConnectionManagerPtr;
@@ -64,10 +68,12 @@ class MINIROS_DECL TopicManager
 public:
   static const TopicManagerPtr& instance();
 
+  using RpcValue = XmlRpc::XmlRpcValue;
+
   TopicManager();
   ~TopicManager();
 
-  void start(PollManagerPtr pm, MasterLinkPtr master_link, ConnectionManagerPtr cm, XMLRPCManagerPtr rpcm);
+  void start(PollManagerPtr pm, MasterLinkPtr master_link, ConnectionManagerPtr cm, RPCManagerPtr rpcm);
   void shutdown();
 
   bool subscribe(const SubscribeOptions& ops);
@@ -145,6 +151,7 @@ private:
    *
    * Negotiate a subscriber connection on a topic.
    *
+   * @param caller
    * @param topic The topic of interest.
    * @param protos List of transport protocols, in preference order
    * @param ret Return value
@@ -152,7 +159,7 @@ private:
    * @return true on success, false otherwise
    *
    */
-  bool requestTopic(const std::string &topic, const XmlRpc::XmlRpcValue &protos, XmlRpc::XmlRpcValue &ret);
+  RpcValue requestTopic(const std::string& caller, const std::string &topic, const RpcValue &protos, XmlRpc::XmlRpcServerConnection* conn);
 
   // Must lock the advertised topics mutex before calling this function
   bool isTopicAdvertised(const std::string& topic);
@@ -234,9 +241,12 @@ private:
   std::unique_ptr<PollWatcher> poll_watcher_;
 
   ConnectionManagerPtr connection_manager_;
-  XMLRPCManagerPtr xmlrpc_manager_;
+  RPCManagerPtr rpc_manager_;
 
   MasterLinkPtr master_link_;
+
+  /// Provide direct IP for clients.
+  bool resolve_ip_;
 };
 
 } // namespace miniros
