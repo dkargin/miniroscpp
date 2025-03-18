@@ -13,6 +13,8 @@
 
 #include "registration_manager.h"
 #include "parameter_storage.h"
+#include "requester_info.h"
+#include "resolver.h"
 
 namespace XmlRpc {
 class XmlRpcServerConnection;
@@ -42,33 +44,28 @@ public:
 
   int getPid(const std::string& caller_id) const;
 
-  void _notify_topic_subscribers(const std::string& topic,
-    const std::vector<std::string>& pub_uris,
-    const std::vector<std::string>& sub_uris);
+  void notifyTopicSubscribers(const std::string& topic, const std::vector<std::shared_ptr<NodeRef>>& subscribers);
 
-  ReturnStruct registerService(const std::string& caller_id, const std::string& service,
-    const std::string& service_api, const std::string& caller_api, RpcConnection* conn);
+  ReturnStruct registerService(const RequesterInfo& requesterInfo, const std::string& service, const std::string& service_api);
 
-  std::string lookupService(const std::string& caller_id, const std::string& service) const;
+  std::string lookupService(const RequesterInfo& requesterInfo, const std::string& service) const;
 
-  ReturnStruct unregisterService(const std::string& caller_id, const std::string& service, const std::string& service_api);
+  ReturnStruct unregisterService(const RequesterInfo& requesterInfo, const std::string& service, const std::string& service_api);
 
-  ReturnStruct registerSubscriber(const std::string& caller_id, const std::string& topic, const std::string& topic_type,
-    const std::string& caller_api, RpcConnection* conn);
+  ReturnStruct registerSubscriber(const RequesterInfo& requesterInfo, const std::string& topic, const std::string& topic_type);
 
-  int unregisterSubscriber(const std::string& caller_id, const std::string& topic, const std::string& caller_api);
+  int unregisterSubscriber(const RequesterInfo& requesterInfo, const std::string& topic);
 
-  ReturnStruct registerPublisher(const std::string& caller_id, const std::string& topic, const std::string& topic_type,
-    const std::string& caller_api, RpcConnection* conn);
+  ReturnStruct registerPublisher(const RequesterInfo& requesterInfo, const std::string& topic, const std::string& topic_type);
 
-  int unregisterPublisher(const std::string& caller_id, const std::string& topic, const std::string& caller_api);
+  int unregisterPublisher(const RequesterInfo& requesterInfo, const std::string& topic);
 
-  std::string lookupNode(const std::string& caller_id, const std::string& node_name) const;
+  std::string lookupNode(const RequesterInfo& requesterInfo, const std::string& node_name) const;
 
-  /// Get list of piblished topics.
-  /// @param caller_id - name of requesting node.
+  /// Get list of published topics.
+  /// @param requesterInfo - information about requester.
   /// @param subgraph - Optional std::string, only returns topics that start with that name
-  std::vector<std::vector<std::string>> getPublishedTopics(const std::string& caller_id, const std::string& subgraph) const;
+  std::vector<std::vector<std::string>> getPublishedTopics(const RequesterInfo& requesterInfo, const std::string& subgraph) const;
 
   std::map<std::string,std::string> getTopicTypes(const std::string& caller_id) const;
 
@@ -78,9 +75,17 @@ public:
     std::map<std::string, std::vector<std::string>> services;
   };
 
-  SystemState getSystemState(const std::string& caller_id) const;
+  SystemState getSystemState(const RequesterInfo& requesterInfo) const;
+
+  /// Enable IP resolving mode.
+  void setResolveNodeIP(bool resolve);
+
+  /// Updates internal tasks.
+  /// It is called from the main thread, out of any RPC handlers.
+  void update();
 
 protected:
+  AddressResolver m_resolver;
   RegistrationManager* m_regManager;
 
   RPCManagerPtr m_rpcManager;

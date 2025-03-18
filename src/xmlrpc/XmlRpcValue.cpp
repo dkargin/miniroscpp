@@ -687,7 +687,7 @@ namespace XmlRpc {
     return os;
   }
 
-  std::ostream& XmlRpcValue::writeJson(std::ostream& os, JsonState& state, const JsonSettings& settings) const
+  std::ostream& XmlRpcValue::writeJson(std::ostream& os, miniros::JsonState& state, const miniros::JsonSettings& settings) const
   {
     /*
     *{

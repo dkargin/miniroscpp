@@ -3,20 +3,20 @@ include_directories(${MINIROS_INCLUDE_TRANSPORT})
 
 set(TEST_GROUP basic)
 
-miniros_add_test(${TEST_GROUP}-test_version test_version.cpp)
-miniros_add_test(${TEST_GROUP}-test_header test_header.cpp)
-miniros_add_test(${TEST_GROUP}-test_poll_set test_poll_set.cpp)
+miniros_add_test(${TEST_GROUP}-test_version SOURCES test_version.cpp)
+miniros_add_test(${TEST_GROUP}-test_header SOURCES test_header.cpp)
+miniros_add_test(${TEST_GROUP}-test_poll_set SOURCES test_poll_set.cpp)
 
 if(WIN32)
   target_link_libraries(${TEST_GROUP}-test_poll_set ws2_32)
 endif()
 
-miniros_add_test(${TEST_GROUP}-test_transport_tcp test_transport_tcp.cpp)
-miniros_add_test(${TEST_GROUP}-test_subscription_queue test_subscription_queue.cpp)
-miniros_add_test(${TEST_GROUP}-test_callback_queue test_callback_queue.cpp)
-miniros_add_test(${TEST_GROUP}-test_names test_names.cpp)
-miniros_add_test(${TEST_GROUP}-test_args test_args.cpp)
-miniros_add_test(${TEST_GROUP}-test_observer test_observer.cpp)
+miniros_add_test(${TEST_GROUP}-test_transport_tcp SOURCES test_transport_tcp.cpp)
+miniros_add_test(${TEST_GROUP}-test_subscription_queue SOURCES test_subscription_queue.cpp)
+miniros_add_test(${TEST_GROUP}-test_callback_queue SOURCES test_callback_queue.cpp)
+miniros_add_test(${TEST_GROUP}-test_names SOURCES  test_names.cpp)
+miniros_add_test(${TEST_GROUP}-test_args SOURCES test_args.cpp)
+miniros_add_test(${TEST_GROUP}-test_observer SOURCES test_observer.cpp)
 
 if(catkin_FOUND AND CATKIN_ENABLE_TESTING)
   message(STATUS "Trying to find rostest for more complex testing")
@@ -24,7 +24,7 @@ if(catkin_FOUND AND CATKIN_ENABLE_TESTING)
 endif()
 
 if (CATKIN_FOUND AND ROSTEST_FOUND)
-  # TODO: Revisit these tests and port them to miniros
+  # TODO: keeping this list for reference.
   add_rostest(launch/real_time_test.xml)
   add_rostest(launch/sim_time_test.xml)
 

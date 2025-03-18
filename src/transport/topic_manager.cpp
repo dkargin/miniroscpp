@@ -40,11 +40,13 @@
 #include "miniros/transport/subscription.h"
 #include "miniros/transport/transport_tcp.h"
 #include "miniros/transport/transport_udp.h"
+#include "miniros/transport/net_address.h"
 
 #include "miniros/xmlrpcpp/XmlRpc.h"
 
 #include <miniros/console.h>
 #include <sstream>
+#include <xmlrpcpp/XmlRpcServerConnection.h>
 
 using namespace XmlRpc; // A battle to be fought later
 
@@ -83,36 +85,41 @@ TopicManager::~TopicManager()
   shutdown();
 }
 
-void TopicManager::start(PollManagerPtr pm, MasterLinkPtr master_link, ConnectionManagerPtr cm, XMLRPCManagerPtr rpcm)
+void TopicManager::start(PollManagerPtr pm, MasterLinkPtr master_link, ConnectionManagerPtr cm, RPCManagerPtr rpcm)
 {
   std::scoped_lock<std::mutex> shutdown_lock(shutting_down_mutex_);
   shutting_down_ = false;
+  resolve_ip_ = false;
 
   master_link_ = master_link;
   poll_manager_ = pm;
   connection_manager_ = cm;
-  xmlrpc_manager_ = rpcm;
+  rpc_manager_ = rpcm;
 
-  xmlrpc_manager_->bind("publisherUpdate", [this](const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result) {
+  rpc_manager_->bind("publisherUpdate", [this](const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result) {
     this->pubUpdateCallback(params, result);
   });
-  xmlrpc_manager_->bind("requestTopic", [this](const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result) {
-    this->requestTopicCallback(params, result);
-  });
-  xmlrpc_manager_->bind("getBusStats", [this](const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result) {
+
+  rpc_manager_->bindEx3("requestTopic", this, &TopicManager::requestTopic);
+
+  rpc_manager_->bind("getBusStats", [this](const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result) {
     this->getBusStatsCallback(params, result);
   });
-  xmlrpc_manager_->bind("getBusInfo", [this](const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result) {
+  rpc_manager_->bind("getBusInfo", [this](const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result) {
     this->getBusInfoCallback(params, result);
   });
-  xmlrpc_manager_->bind("getSubscriptions", [this](const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result) {
+  rpc_manager_->bind("getSubscriptions", [this](const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result) {
     this->getSubscriptionsCallback(params, result);
   });
-  xmlrpc_manager_->bind("getPublications", [this](const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result) {
+  rpc_manager_->bind("getPublications", [this](const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result) {
     this->getPublicationsCallback(params, result);
   });
 
   poll_manager_->addPollThreadWatcher(poll_watcher_.get());
+
+  if (master_link_) {
+    resolve_ip_ = master_link->param<bool>("/resolve_ip", false);
+  }
 }
 
 void TopicManager::shutdown()
@@ -131,12 +138,12 @@ void TopicManager::shutdown()
 
   poll_watcher_->disconnect();
 
-  xmlrpc_manager_->unbind("publisherUpdate");
-  xmlrpc_manager_->unbind("requestTopic");
-  xmlrpc_manager_->unbind("getBusStats");
-  xmlrpc_manager_->unbind("getBusInfo");
-  xmlrpc_manager_->unbind("getSubscriptions");
-  xmlrpc_manager_->unbind("getPublications");
+  rpc_manager_->unbind("publisherUpdate");
+  rpc_manager_->unbind("requestTopic");
+  rpc_manager_->unbind("getBusStats");
+  rpc_manager_->unbind("getBusInfo");
+  rpc_manager_->unbind("getSubscriptions");
+  rpc_manager_->unbind("getPublications");
 
   MINIROS_DEBUG("Shutting down topics...");
   MINIROS_DEBUG("  shutting down publishers");
@@ -165,7 +172,7 @@ void TopicManager::shutdown()
     subscriptions_.clear();
   }
 
-  xmlrpc_manager_.reset();
+  rpc_manager_.reset();
   connection_manager_.reset();
   poll_manager_.reset();
   master_link_.reset();
@@ -392,7 +399,7 @@ bool TopicManager::advertise(const AdvertiseOptions& ops, const SubscriberCallba
   args[0] = this_node::getName();
   args[1] = ops.topic;
   args[2] = ops.datatype;
-  args[3] = xmlrpc_manager_->getServerURI();
+  args[3] = rpc_manager_->getServerURI();
   return master_link_->execute("registerPublisher", args, result, payload, true);
 }
 
@@ -446,7 +453,7 @@ bool TopicManager::unregisterPublisher(const std::string& topic)
   XmlRpcValue args, result, payload;
   args[0] = this_node::getName();
   args[1] = topic;
-  args[2] = xmlrpc_manager_->getServerURI();
+  args[2] = rpc_manager_->getServerURI();
   return master_link_->execute("unregisterPublisher", args, result, payload, false);
 }
 
@@ -472,7 +479,7 @@ bool TopicManager::registerSubscriber(const SubscriptionPtr& s, const std::strin
   args[0] = this_node::getName();
   args[1] = s->getName();
   args[2] = datatype;
-  args[3] = xmlrpc_manager_->getServerURI();
+  args[3] = rpc_manager_->getServerURI();
 
   if (!master_link_->execute("registerSubscriber", args, result, payload, true)) {
     return false;
@@ -480,8 +487,9 @@ bool TopicManager::registerSubscriber(const SubscriptionPtr& s, const std::strin
 
   std::vector<std::string> pub_uris;
   for (int i = 0; i < payload.size(); i++) {
-    if (payload[i] != xmlrpc_manager_->getServerURI()) {
-      pub_uris.push_back(std::string(payload[i]));
+    std::string pubUri = payload[i];
+    if (pubUri != rpc_manager_->getServerURI()) {
+      pub_uris.push_back(pubUri);
     }
   }
 
@@ -526,7 +534,7 @@ bool TopicManager::unregisterSubscriber(const std::string& topic)
   XmlRpcValue args, result, payload;
   args[0] = this_node::getName();
   args[1] = topic;
-  args[2] = xmlrpc_manager_->getServerURI();
+  args[2] = rpc_manager_->getServerURI();
 
   return master_link_->execute("unregisterSubscriber", args, result, payload, false);
 }
@@ -563,37 +571,51 @@ bool TopicManager::pubUpdate(const std::string& topic, const std::vector<std::st
   return false;
 }
 
-bool TopicManager::requestTopic(const std::string& topic, const XmlRpcValue& protos, XmlRpcValue& ret)
+XmlRpc::XmlRpcValue TopicManager::requestTopic(const std::string& caller, const std::string& topic, const XmlRpcValue& protos, XmlRpc::XmlRpcServerConnection* connection)
 {
+  RpcValue ret = RpcValue::Array(3);
+  ret[0] = 0;
+  ret[1] = "";
+  ret[2] = 0;
+
+  std::string goodAddress;
+
+  network::NetAddress localAddress;
+  if (resolve_ip_ && network::readLocalAddress(connection->getfd(), localAddress)) {
+    goodAddress = localAddress.address;
+  } else {
+    goodAddress = network::getHost();
+  }
+
   for (int proto_idx = 0; proto_idx < protos.size(); proto_idx++) {
-    XmlRpcValue proto = protos[proto_idx]; // save typing
+    RpcValue proto = protos[proto_idx]; // save typing
     if (proto.getType() != XmlRpcValue::TypeArray) {
       MINIROS_DEBUG("requestTopic protocol list was not a list of lists");
-      return false;
+      return ret;
     }
 
     if (proto[0].getType() != XmlRpcValue::TypeString) {
       MINIROS_DEBUG("requestTopic received a protocol list in which a sublist "
                     "did not start with a string");
-      return false;
+      return ret;
     }
 
     std::string proto_name = proto[0];
     if (proto_name == std::string("TCPROS")) {
       XmlRpcValue tcpros_params;
       tcpros_params[0] = std::string("TCPROS");
-      tcpros_params[1] = network::getHost();
+      tcpros_params[1] = goodAddress;
       tcpros_params[2] = int(connection_manager_->getTCPPort());
       ret[0] = int(1);
       ret[1] = std::string();
       ret[2] = tcpros_params;
-      return true;
+      return ret;
     } else if (proto_name == std::string("UDPROS")) {
       if (proto.size() != 5 || proto[1].getType() != XmlRpcValue::TypeBase64 ||
           proto[2].getType() != XmlRpcValue::TypeString || proto[3].getType() != XmlRpcValue::TypeInt ||
           proto[4].getType() != XmlRpcValue::TypeInt) {
         MINIROS_DEBUG("Invalid protocol parameters for UDPROS");
-        return false;
+        return ret;
       }
       std::vector<char> header_bytes = proto[1];
       std::shared_ptr<uint8_t[]> buffer(new uint8_t[header_bytes.size()]);
@@ -602,13 +624,13 @@ bool TopicManager::requestTopic(const std::string& topic, const XmlRpcValue& pro
       std::string err;
       if (!h.parse(buffer, header_bytes.size(), err)) {
         MINIROS_DEBUG("Unable to parse UDPROS connection header: %s", err.c_str());
-        return false;
+        return ret;
       }
 
       PublicationPtr pub_ptr = lookupPublication(topic);
       if (!pub_ptr) {
         MINIROS_DEBUG("Unable to find advertised topic %s for UDPROS connection", topic.c_str());
-        return false;
+        return ret;
       }
 
       std::string host = proto[2];
@@ -619,7 +641,7 @@ bool TopicManager::requestTopic(const std::string& topic, const XmlRpcValue& pro
       if (!pub_ptr->validateHeader(h, error_msg)) {
         MINIROS_DEBUG("Error validating header from [%s:%d] for topic [%s]: %s", host.c_str(), port, topic.c_str(),
           error_msg.c_str());
-        return false;
+        return ret;
       }
 
       int max_datagram_size = proto[4];
@@ -628,13 +650,13 @@ bool TopicManager::requestTopic(const std::string& topic, const XmlRpcValue& pro
         connection_manager_->getUDPServerTransport()->createOutgoing(host, port, conn_id, max_datagram_size);
       if (!transport) {
         MINIROS_DEBUG("Error creating outgoing transport for [%s:%d]", host.c_str(), port);
-        return false;
+        return ret;
       }
       connection_manager_->udprosIncomingConnection(transport, h);
 
       XmlRpcValue udpros_params;
       udpros_params[0] = std::string("UDPROS");
-      udpros_params[1] = network::getHost();
+      udpros_params[1] = goodAddress;
       udpros_params[2] = connection_manager_->getUDPServerTransport()->getServerPort();
       udpros_params[3] = conn_id;
       udpros_params[4] = max_datagram_size;
@@ -651,7 +673,7 @@ bool TopicManager::requestTopic(const std::string& topic, const XmlRpcValue& pro
       ret[0] = int(1);
       ret[1] = std::string();
       ret[2] = udpros_params;
-      return true;
+      return ret;
     } else {
       MINIROS_DEBUG("an unsupported protocol was offered: [%s]", proto_name.c_str());
     }
@@ -660,7 +682,7 @@ bool TopicManager::requestTopic(const std::string& topic, const XmlRpcValue& pro
   MINIROS_DEBUG("Currently, roscpp only supports TCPROS. The caller to "
                 "requestTopic did not support TCPROS, so there are no "
                 "protocols in common.");
-  return false;
+  return ret;
 }
 
 void TopicManager::publish(
@@ -926,13 +948,6 @@ void TopicManager::pubUpdateCallback(const XmlRpc::XmlRpcValue& params, XmlRpc::
   if (pubUpdate(params[1], pubs)) {
     result = xmlrpc::responseInt(1, "", 0);
   } else {
-    result = xmlrpc::responseInt(0, console::g_last_error_message, 0);
-  }
-}
-
-void TopicManager::requestTopicCallback(const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result)
-{
-  if (!requestTopic(params[1], params[2], result)) {
     result = xmlrpc::responseInt(0, console::g_last_error_message, 0);
   }
 }

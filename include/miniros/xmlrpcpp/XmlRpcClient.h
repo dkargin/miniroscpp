@@ -96,10 +96,17 @@ namespace XmlRpc {
     std::string _host;
     std::string _uri;
     int _port;
+
   public:
     const std::string &getHost() { return _host; }
     const std::string &getUri()  { return _uri; }
     int getPort() const { return _port; }
+
+    /// Client is ready to send new request.
+    bool isReady() const
+    {
+      return _connectionState == IDLE || _connectionState == NO_CONNECTION;
+    }
     
     // The xml-encoded request, http header of response, and response xml
     std::string _request;

@@ -17,14 +17,14 @@ RegistrationManager::RegistrationManager()
 {
 }
 
-bool RegistrationManager::reverse_lookup(const std::string& caller_api) const
-{
-  return true;
-}
-
 std::shared_ptr<NodeRef> RegistrationManager::getNodeByName(const std::string& node) const
 {
   std::scoped_lock<std::mutex> lock(m_guard);
+  return getNodeByNameUnsafe(node);
+}
+
+std::shared_ptr<NodeRef> RegistrationManager::getNodeByNameUnsafe(const std::string& node) const
+{
   auto it = m_nodes.find(node);
   if (it != m_nodes.end())
     return it->second;
@@ -34,20 +34,28 @@ std::shared_ptr<NodeRef> RegistrationManager::getNodeByName(const std::string& n
 std::shared_ptr<NodeRef> RegistrationManager::getNodeByAPI(const std::string& api) const
 {
   std::scoped_lock<std::mutex> lock(m_guard);
+  return getNodeByAPIUnsafe(api);
+}
+
+std::shared_ptr<NodeRef> RegistrationManager::getNodeByAPIUnsafe(const std::string& api) const
+{
   for (auto it = m_nodes.begin(); it != m_nodes.end(); it++) {
-    if (it->second->api == api)
+    if (it->second->getApi() == api)
       return it->second;
   }
   return {};
 }
 
-void RegistrationManager::_register(Registrations& r, const std::string& key, const std::string& caller_id, const std::string& caller_api,
+
+std::shared_ptr<NodeRef> RegistrationManager::_register(Registrations& r, const std::string& key, const std::string& caller_id, const std::string& caller_api,
   const std::string& service_api)
 {
   bool changed = false;
   std::shared_ptr<NodeRef> node_ref = registerNodeApi(caller_id, caller_api, changed);
-  if (!node_ref)
-    return;
+  if (!node_ref) {
+    MINIROS_ERROR("Failed to register NodeRef(node=%s api=%s)", caller_id.c_str(), caller_api.c_str());
+    return {};
+  }
 
   node_ref->add(r.type(), key);
 
@@ -58,6 +66,7 @@ void RegistrationManager::_register(Registrations& r, const std::string& key, co
     param_subscribers.unregister_all(caller_id);
   }
   r.registerObj(key, caller_id, caller_api, service_api);
+  return node_ref;
 }
 
 ReturnStruct RegistrationManager::unregisterObject(Registrations& r, const std::string& key,
@@ -67,7 +76,7 @@ ReturnStruct RegistrationManager::unregisterObject(Registrations& r, const std::
 
   ReturnStruct ret;
   if (m_nodes.count(caller_id)) {
-    auto node_ref = m_nodes[caller_id];
+    std::shared_ptr<NodeRef> node_ref = m_nodes[caller_id];
     ret = r.unregisterObj(key, caller_id, caller_api, service_api);
     if (ret.statusCode == 1) {
       node_ref->remove(r.type(), key);
@@ -83,28 +92,28 @@ ReturnStruct RegistrationManager::unregisterObject(Registrations& r, const std::
   return ret;
 }
 
-void RegistrationManager::register_service(const std::string& service, const std::string& caller_id,
+std::shared_ptr<NodeRef> RegistrationManager::register_service(const std::string& service, const std::string& caller_id,
   const std::string& caller_api, const std::string& service_api)
 {
-  _register(services, service, caller_id, caller_api, service_api);
+  return _register(services, service, caller_id, caller_api, service_api);
 }
 
-void RegistrationManager::register_publisher(const std::string& topic, const std::string& caller_id,
+std::shared_ptr<NodeRef> RegistrationManager::register_publisher(const std::string& topic, const std::string& caller_id,
   const std::string& caller_api)
 {
-  _register(publishers, topic, caller_id, caller_api);
+  return _register(publishers, topic, caller_id, caller_api);
 }
 
-void RegistrationManager::register_subscriber(const std::string& topic, const std::string& caller_id,
+std::shared_ptr<NodeRef> RegistrationManager::register_subscriber(const std::string& topic, const std::string& caller_id,
   const std::string& caller_api)
 {
-  _register(subscribers, topic, caller_id, caller_api);
+  return _register(subscribers, topic, caller_id, caller_api);
 }
 
-void RegistrationManager::register_param_subscriber(const std::string& param, const std::string& caller_id,
+std::shared_ptr<NodeRef> RegistrationManager::register_param_subscriber(const std::string& param, const std::string& caller_id,
   const std::string& caller_api)
 {
-  _register(param_subscribers, param, caller_id, caller_api);
+  return _register(param_subscribers, param, caller_id, caller_api);
 }
 
 ReturnStruct RegistrationManager::unregister_service(const std::string& service, const std::string& caller_id,
@@ -142,15 +151,13 @@ std::shared_ptr<NodeRef> RegistrationManager::registerNodeApi(const std::string&
 
   std::string bumped_api = "";
   if (node_ref) {
-    if (node_ref->api == caller_api) {
+    if (node_ref->getApi() == caller_api) {
       rtn = false;
       return node_ref;
     } else {
-      bumped_api = node_ref->api;
+      bumped_api = node_ref->getApi();
       MINIROS_WARN_NAMED("reg", "New node registered with name=\"%s\" api=%s", caller_id.c_str(), caller_api.c_str());
-      // TODO: Send signal to make this node shut down.
-      // thread_pool.queue_task(bumped_api, shutdown_node_task, (bumped_api, caller_id, "new node registered with same
-      // name"))
+      m_nodesToShutdown.insert(node_ref);
     }
   }
 
@@ -159,6 +166,41 @@ std::shared_ptr<NodeRef> RegistrationManager::registerNodeApi(const std::string&
 
   rtn = !bumped_api.empty();
   return node_ref;
+}
+
+std::set<std::shared_ptr<NodeRef>> RegistrationManager::pullShutdownNodes()
+{
+  std::set<std::shared_ptr<NodeRef>> result;
+  std::scoped_lock<std::mutex> lock(m_guard);
+  std::swap(result, m_nodesToShutdown);
+  return result;
+}
+
+std::vector<std::shared_ptr<NodeRef>> RegistrationManager::getTopicPublishers(const std::string& topic) const
+{
+  std::scoped_lock<std::mutex> lock(m_guard);
+
+  std::vector<std::shared_ptr<NodeRef>> result;
+  std::vector<std::string> sub_api = publishers.getApis(topic);
+  for (const auto& api: sub_api) {
+    result.push_back(getNodeByAPIUnsafe(api));
+  }
+  return result;
+}
+
+std::vector<std::shared_ptr<NodeRef>> RegistrationManager::getTopicSubscribers(const std::string& topic) const
+{
+  std::scoped_lock<std::mutex> lock(m_guard);
+
+  std::vector<std::shared_ptr<NodeRef>> result;
+  std::vector<std::string> sub_api = subscribers.getApis(topic);
+  for (const auto& api: sub_api) {
+    auto node = getNodeByNameUnsafe(api);
+    if (node) {
+      result.push_back(node);
+    }
+  }
+  return result;
 }
 
 } // namespace master

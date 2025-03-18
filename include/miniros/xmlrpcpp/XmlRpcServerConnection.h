@@ -10,6 +10,7 @@
 #include <string>
 
 #include "miniros/transport/http_tools.h"
+#include "miniros/transport/net_address.h"
 
 #include "xmlrpcpp/XmlRpcValue.h"
 #include "xmlrpcpp/XmlRpcSource.h"
@@ -49,7 +50,11 @@ public:
   //!   @param eventType Type of IO event that occurred. @see XmlRpcDispatch::EventType.
   unsigned handleEvent(unsigned eventType) override;
 
-  const miniros::net::NetAddress& getClientAddress() const;
+  /// Get address of client's endpoint.
+  const miniros::network::NetAddress& getClientAddress() const;
+
+  /// Get address of this server.
+  const miniros::network::NetAddress& getHostAddress() const;
 
 protected:
 
@@ -83,9 +88,11 @@ protected:
   ServerConnectionState _connectionState;
 
   /// Address of endpoint.
-  miniros::net::NetAddress _netAddress;
+  miniros::network::NetAddress _clientAddress;
+  /// Address of a server.
+  miniros::network::NetAddress _hostAddress;
 
-  miniros::net::HttpFrame _httpFrame;
+  miniros::network::HttpFrame _httpFrame;
 
   // Response
   std::string _response;

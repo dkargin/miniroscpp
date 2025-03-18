@@ -2,6 +2,7 @@
 // Created by dkargin on 2/25/25.
 //
 
+#include <cassert>
 #include <fstream>
 
 #include "registration_manager.h"
@@ -91,7 +92,7 @@ std::string ParameterStorage::searchParam(const std::string& ns, const std::stri
             return None
    */
 
-  // there are more efficient implementations, but our hiearchy
+  // there are more efficient implementations, but our hierarchy
   // is not very deep and this is fairly clean code to read.
   // - we only search for the first namespace in the key to check for a match
 
@@ -147,7 +148,7 @@ Error ParameterStorage::setParam(const std::string& caller_id, const std::string
   ss << " from " << caller_id;
 
   std::string fullKey = miniros::names::resolve(caller_id, key, false);
-  MINIROS_INFO_NAMED("rosparam", "setParam \"%s\" (\"%s\", \"%s\")", fullKey.c_str(), caller_id.c_str(), key.c_str());
+  MINIROS_INFO_NAMED("rosparam", "setParam(\"%s\") from \"%s\", key=\"%s\"", fullKey.c_str(), caller_id.c_str(), key.c_str());
   std::scoped_lock<std::mutex> m_lock(m_parameterLock);
 
   if (fullKey == "/") {
@@ -155,7 +156,7 @@ Error ParameterStorage::setParam(const std::string& caller_id, const std::string
       m_parameterRoot = value;
       checkParamUpdates(fullKey, &m_parameterRoot);
     } else {
-      MINIROS_ERROR_NAMED("rosparam", "setParam %s - cannot set root of parameter tree to non-dictionary", ss.str().c_str());
+      MINIROS_ERROR_NAMED("rosparam", "setParam(\"%s\") - cannot set root of parameter tree to non-dictionary", ss.str().c_str());
       return Error::InvalidValue;
     }
   } else {
@@ -261,7 +262,7 @@ std::pair<ParameterStorage::RpcValue*, ParameterStorage::RpcValue*> ParameterSto
 ParameterStorage::RpcValue ParameterStorage::getParam(const std::string& caller_id, const std::string& key) const
 {
   std::string fullKey = miniros::names::resolve(caller_id, key, false);
-  MINIROS_INFO_NAMED("rosparam", "getParam \"%s\" (client=\"%s\", \"%s\"", fullKey.c_str(), caller_id.c_str(), key.c_str());
+  MINIROS_INFO_NAMED("rosparam", "getParam(\"%s\") client=\"%s\", key=\"%s\"", fullKey.c_str(), caller_id.c_str(), key.c_str());
 
   names::Path fullPath;
   fullPath.fromString(fullKey);
@@ -277,7 +278,7 @@ ParameterStorage::RpcValue ParameterStorage::getParam(const std::string& caller_
 const ParameterStorage::RpcValue* ParameterStorage::subscribeParam(
   const std::string& caller_id, const std::string& caller_api, const std::string& key)
 {
-  MINIROS_INFO_NAMED("rosparam", "subscribeParam %s from %s, api=%s", key.c_str(), caller_id.c_str(), caller_api.c_str());
+  MINIROS_INFO_NAMED("rosparam", "subscribeParam(\"%s\") from %s, api=%s", key.c_str(), caller_id.c_str(), caller_api.c_str());
   std::string fullKey = miniros::names::resolve(caller_id, key, false);
 
   names::Path path;
@@ -296,7 +297,7 @@ const ParameterStorage::RpcValue* ParameterStorage::subscribeParam(
 bool ParameterStorage::unsubscribeParam(
   const std::string& caller_id, const std::string& caller_api, const std::string& key)
 {
-  MINIROS_INFO_NAMED("rosparam", "unsubscribeParam %s from %s, api=%s", key.c_str(), caller_id.c_str(), caller_api.c_str());
+  MINIROS_INFO_NAMED("rosparam", "unsubscribeParam(\"%s\") from %s, api=%s", key.c_str(), caller_id.c_str(), caller_api.c_str());
 
   std::string fullKey = miniros::names::resolve(caller_id, key, false);
 
@@ -366,8 +367,8 @@ void ParameterStorage::dumpParamStateUnsafe(const char* file) const
 {
   std::ofstream out(file);
 
-  RpcValue::JsonState jstate;
-  RpcValue::JsonSettings jsettings;
+  miniros::JsonState jstate;
+  miniros::JsonSettings jsettings;
   m_parameterRoot.writeJson(out, jstate, jsettings);
 }
 

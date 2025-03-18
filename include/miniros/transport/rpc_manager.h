@@ -71,7 +71,6 @@ public:
   virtual bool check() = 0;
 };
 typedef std::shared_ptr<ASyncXMLRPCConnection> ASyncXMLRPCConnectionPtr;
-typedef std::set<ASyncXMLRPCConnectionPtr> S_ASyncXMLRPCConnection;
 
 class MINIROS_DECL CachedXmlRpcClient
 {
@@ -259,20 +258,19 @@ private:
   std::mutex xmlrpc_call_mutex_;
 #endif
   XmlRpc::XmlRpcServer server_;
-  typedef std::vector<CachedXmlRpcClient> V_CachedXmlRpcClient;
-  V_CachedXmlRpcClient clients_;
+  std::vector<CachedXmlRpcClient> clients_;
   std::mutex clients_mutex_;
 
   std::atomic_bool shutting_down_;
 
   miniros::WallDuration master_retry_timeout_;
 
-  S_ASyncXMLRPCConnection added_connections_;
+  std::set<ASyncXMLRPCConnectionPtr> added_connections_;
   std::mutex added_connections_mutex_;
-  S_ASyncXMLRPCConnection removed_connections_;
+  std::set<ASyncXMLRPCConnectionPtr> removed_connections_;
   std::mutex removed_connections_mutex_;
 
-  S_ASyncXMLRPCConnection connections_;
+  std::set<ASyncXMLRPCConnectionPtr> connections_;
 
 
   struct FunctionInfo

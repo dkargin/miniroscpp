@@ -29,22 +29,20 @@
 
 #include "internal_config.h"
 
-#include "miniros/transport/network.h"
 #include "miniros/file_log.h"
 #include "miniros/internal/exceptions.h"
-#include "miniros/transport/io.h"     // cross-platform headers needed
+#include "miniros/transport/io.h" // cross-platform headers needed
+#include "miniros/transport/network.h"
 #include <miniros/console.h>
 #include <miniros/rosassert.h>
 
 #ifdef HAVE_IFADDRS_H
-  #include <ifaddrs.h>
+#include <ifaddrs.h>
 #endif
 
-namespace miniros
-{
+namespace miniros {
 
-namespace network
-{
+namespace network {
 
 std::string g_host;
 uint16_t g_tcpros_server_port = 0;
@@ -65,7 +63,7 @@ bool splitURI(const std::string& uri, std::string& host, uint32_t& port)
   std::string::size_type colon_pos = host.find_first_of(":");
   if (colon_pos == std::string::npos)
     return false;
-  std::string port_str = host.substr(colon_pos+1);
+  std::string port_str = host.substr(colon_pos + 1);
   std::string::size_type slash_pos = port_str.find_first_of("/");
   if (slash_pos != std::string::npos)
     port_str = port_str.erase(slash_pos);
@@ -79,10 +77,9 @@ uint16_t getTCPROSPort()
   return g_tcpros_server_port;
 }
 
-static bool isPrivateIP(const char *ip)
+static bool isPrivateIP(const char* ip)
 {
-  bool b = !strncmp("192.168", ip, 7) || !strncmp("10.", ip, 3) ||
-           !strncmp("169.254", ip, 7);
+  bool b = !strncmp("192.168", ip, 7) || !strncmp("10.", ip, 3) || !strncmp("169.254", ip, 7);
   return b;
 }
 
@@ -90,35 +87,31 @@ std::string determineHost()
 {
   std::string ip_env;
   // First, did the user set ROS_HOSTNAME?
-  if ( get_environment_variable(ip_env, "ROS_HOSTNAME")) {
+  if (get_environment_variable(ip_env, "ROS_HOSTNAME")) {
     MINIROS_DEBUG_NAMED("roscxx", "determineIP: using value of ROS_HOSTNAME:%s:", ip_env.c_str());
-    if (ip_env.size() == 0)
-    {
+    if (ip_env.size() == 0) {
       MINIROS_WARN("invalid ROS_HOSTNAME (an empty string)");
     }
     return ip_env;
   }
 
   // Second, did the user set ROS_IP?
-  if ( get_environment_variable(ip_env, "ROS_IP")) {
-    MINIROS_DEBUG( "determineIP: using value of ROS_IP:%s:", ip_env.c_str());
-    if (ip_env.size() == 0)
-    {
-        MINIROS_WARN("invalid ROS_IP (an empty string)");
+  if (get_environment_variable(ip_env, "ROS_IP")) {
+    MINIROS_DEBUG("determineIP: using value of ROS_IP:%s:", ip_env.c_str());
+    if (ip_env.size() == 0) {
+      MINIROS_WARN("invalid ROS_IP (an empty string)");
     }
     return ip_env;
   }
 
   // Third, try the hostname
   char host[1024];
-  memset(host,0,sizeof(host));
-  if(gethostname(host,sizeof(host)-1) != 0)
-  {
-      MINIROS_ERROR("determineIP: gethostname failed");
+  memset(host, 0, sizeof(host));
+  if (gethostname(host, sizeof(host) - 1) != 0) {
+    MINIROS_ERROR("determineIP: gethostname failed");
   }
   // We don't want localhost to be our ip
-  else if(strlen(host) && strcmp("localhost", host))
-  {
+  else if (strlen(host) && strcmp("localhost", host)) {
     return std::string(host);
   }
 
@@ -127,14 +120,12 @@ std::string determineHost()
 #ifdef HAVE_IFADDRS_H
   struct ifaddrs *ifa = NULL, *ifp = NULL;
   int rc;
-  if ((rc = getifaddrs(&ifp)) < 0)
-  {
+  if ((rc = getifaddrs(&ifp)) < 0) {
     MINIROS_FATAL("error in getifaddrs: [%s]", strerror(rc));
     MINIROS_BREAK();
   }
   char preferred_ip[200] = {0};
-  for (ifa = ifp; ifa; ifa = ifa->ifa_next)
-  {
+  for (ifa = ifp; ifa; ifa = ifa->ifa_next) {
     char ip_[200];
     socklen_t salen;
     if (!ifa->ifa_addr)
@@ -145,31 +136,27 @@ std::string determineHost()
       salen = sizeof(struct sockaddr_in6);
     else
       continue;
-    if (getnameinfo(ifa->ifa_addr, salen, ip_, sizeof(ip_), NULL, 0,
-                    NI_NUMERICHOST) < 0)
-    {
+    if (getnameinfo(ifa->ifa_addr, salen, ip_, sizeof(ip_), NULL, 0, NI_NUMERICHOST) < 0) {
       MINIROS_DEBUG_NAMED("roscxx", "getnameinfo couldn't get the ip of interface [%s]", ifa->ifa_name);
       continue;
     }
-    //ROS_INFO( "ip of interface [%s] is [%s]", ifa->ifa_name, ip);
-    // prefer non-private IPs over private IPs
-    if (!strcmp("127.0.0.1", ip_) || strchr(ip_,':'))
+    // ROS_INFO( "ip of interface [%s] is [%s]", ifa->ifa_name, ip);
+    //  prefer non-private IPs over private IPs
+    if (!strcmp("127.0.0.1", ip_) || strchr(ip_, ':'))
       continue; // ignore loopback unless we have no other choice
     if (ifa->ifa_addr->sa_family == AF_INET6 && !preferred_ip[0])
       strcpy(preferred_ip, ip_);
     else if (isPrivateIP(ip_) && !preferred_ip[0])
       strcpy(preferred_ip, ip_);
-    else if (!isPrivateIP(ip_) &&
-             (isPrivateIP(preferred_ip) || !preferred_ip[0]))
+    else if (!isPrivateIP(ip_) && (isPrivateIP(preferred_ip) || !preferred_ip[0]))
       strcpy(preferred_ip, ip_);
   }
   freeifaddrs(ifp);
-  if (!preferred_ip[0])
-  {
-      MINIROS_ERROR_NAMED("roscxx", "Couldn't find a preferred IP via the getifaddrs() call; I'm assuming that your IP "
-        "address is 127.0.0.1.  This should work for local processes, "
-        "but will almost certainly not work if you have remote processes."
-        "Report to the ROS development team to seek a fix.");
+  if (!preferred_ip[0]) {
+    MINIROS_ERROR_NAMED("roscxx", "Couldn't find a preferred IP via the getifaddrs() call; I'm assuming that your IP "
+                                  "address is 127.0.0.1.  This should work for local processes, "
+                                  "but will almost certainly not work if you have remote processes."
+                                  "Report to the ROS development team to seek a fix.");
     return std::string("127.0.0.1");
   }
   MINIROS_DEBUG_NAMED("roscxx", "preferred IP is guessed to be %s", preferred_ip);
@@ -177,10 +164,10 @@ std::string determineHost()
 #else
   // @todo Fix IP determination in the case where getifaddrs() isn't
   // available.
-  MINIROS_ERROR( "You don't have the getifaddrs() call; I'm assuming that your IP "
-             "address is 127.0.0.1.  This should work for local processes, "
-             "but will almost certainly not work if you have remote processes."
-             "Report to the ROS development team to seek a fix.");
+  MINIROS_ERROR("You don't have the getifaddrs() call; I'm assuming that your IP "
+                "address is 127.0.0.1.  This should work for local processes, "
+                "but will almost certainly not work if you have remote processes."
+                "Report to the ROS development team to seek a fix.");
   return std::string("127.0.0.1");
 #endif
 }
@@ -188,43 +175,35 @@ std::string determineHost()
 void init(const M_string& remappings)
 {
   M_string::const_iterator it = remappings.find("__hostname");
-  if (it != remappings.end())
-  {
+  if (it != remappings.end()) {
     g_host = it->second;
-  }
-  else
-  {
+  } else {
     it = remappings.find("__ip");
-    if (it != remappings.end())
-    {
+    if (it != remappings.end()) {
       g_host = it->second;
     }
   }
 
   it = remappings.find("__tcpros_server_port");
-  if (it != remappings.end())
-  {
+  if (it != remappings.end()) {
     bool failed = true;
-    try
-    {
+    try {
       auto rawValue = std::stoul(it->second);
-      if (rawValue < 65535)
-      {
-          g_tcpros_server_port = rawValue;
-          failed = false;
+      if (rawValue < 65535) {
+        g_tcpros_server_port = rawValue;
+        failed = false;
       }
+    } catch (std::invalid_argument&) {
+    } catch (std::out_of_range&) {
     }
-    catch (std::invalid_argument&) {}
-    catch (std::out_of_range&) {}
 
-    if (failed)
-    {
-        throw miniros::InvalidPortException("__tcpros_server_port [" + it->second + "] was not specified as a number within the 0-65535 range");
+    if (failed) {
+      throw miniros::InvalidPortException(
+        "__tcpros_server_port [" + it->second + "] was not specified as a number within the 0-65535 range");
     }
   }
 
-  if (g_host.empty())
-  {
+  if (g_host.empty()) {
     g_host = determineHost();
   }
 }

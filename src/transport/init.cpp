@@ -292,6 +292,7 @@ bool isStarted()
   return g_started;
 }
 
+/// Start is issued by a first NodeHandle::construct.
 Error start()
 {
   std::scoped_lock<std::mutex> lock(g_start_mutex);
@@ -397,7 +398,10 @@ Error start()
 
   {
     bool use_sim_time = false;
-    g_master_link->param("/use_sim_time", use_sim_time, use_sim_time);
+    if (!(g_init_options & init_options::NoSimTime))
+    {
+      g_master_link->param("/use_sim_time", use_sim_time, use_sim_time);
+    }
 
     if (use_sim_time)
     {

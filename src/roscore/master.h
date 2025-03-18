@@ -30,6 +30,10 @@ Current status codes:
     1: SUCCESS: Method completed successfully.
 */
 
+namespace XmlRpc {
+class XmlRpcServerConnection;
+}
+
 namespace miniros {
 namespace master {
 
@@ -52,6 +56,12 @@ public:
 
   std::string getUri() const;
 
+  void setResolveNodeIP(bool resolv);
+
+  /// Update queued tasks.
+  void update();
+
+public: /// Request handlers
   RpcValue lookupService(const std::string& caller_id, const std::string& service, Connection*);
 
   /// Register the caller as a provider of the specified service.
@@ -121,8 +131,6 @@ public:
   ///  - node (str) - Name of node to lookup
   /// Returns (int, str, str) (code, statusMessage, URI)
   RpcValue lookupNode(const std::string& caller_id, const std::string& node, Connection* conn);
-
-  RpcValue getTime(Connection*);
 
   /// Parameter API
 

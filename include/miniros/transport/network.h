@@ -25,8 +25,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ROSCPP_NETWORK_H
-#define ROSCPP_NETWORK_H
+#ifndef MINIROS_NETWORK_H
+#define MINIROS_NETWORK_H
 
 #include "miniros/internal/forwards.h"
 

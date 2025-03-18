@@ -166,6 +166,7 @@ set(transport_SRC
 
     transport/names.cpp
     transport/network.cpp
+    transport/net_address.cpp
     transport/node_handle.cpp
     transport/poll_manager.cpp
     transport/poll_set.cpp
@@ -204,7 +205,7 @@ set(transport_SRC
     transport/transport/transport_tcp.cpp
     transport/transport_publisher_link.cpp
     transport/transport_subscriber_link.cpp
-
+    transport/url.cpp
     transport/wall_timer.cpp
     tf2/transform_broadcaster.cpp
   )
@@ -213,8 +214,11 @@ set(transport_SRC
 set(master_SRC
     roscore/master.cpp
     roscore/master_handler.cpp
+    roscore/node_ref.cpp
     roscore/registrations.cpp
     roscore/registration_manager.cpp
+    roscore/resolver.cpp
+    roscore/requester_info.cpp
     roscore/parameter_storage.cpp
     roscore/rosout.cpp
 )

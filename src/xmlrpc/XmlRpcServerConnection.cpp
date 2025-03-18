@@ -38,16 +38,17 @@ XmlRpcServerConnection::XmlRpcServerConnection(int fd, XmlRpcServer* server, boo
   _connectionState = READ_HEADER;
   _bytesWritten = 0;
   _keepAlive = true;
+
   if (fd) {
-    miniros::net::readRemoteAddressv4(fd, _netAddress);
+    miniros::network::readRemoteAddress(fd, _clientAddress);
+    miniros::network::readLocalAddress(fd, _hostAddress);
   }
 
-  if (_netAddress.valid())
-    XmlRpcUtil::log(2,"XmlRpcServerConnection: new socket %d from %s:%d", fd, _netAddress.address.c_str(), _netAddress.port);
+  if (_clientAddress.valid())
+    XmlRpcUtil::log(2,"XmlRpcServerConnection: new socket %d from %s:%d", fd, _clientAddress.address.c_str(), _clientAddress.port);
   else
     XmlRpcUtil::log(2,"XmlRpcServerConnection: new socket %d from unknown endpoint", fd);
 }
-
 
 XmlRpcServerConnection::~XmlRpcServerConnection()
 {
@@ -91,7 +92,7 @@ bool XmlRpcServerConnection::readHeader()
   const char *lp = nullptr;                 // Start of content-length value
   const char *kp = nullptr;                 // Start of connection value
 
-  using HttpFrame = miniros::net::HttpFrame;
+  using HttpFrame = miniros::network::HttpFrame;
 
   HttpFrame::ParserState state = HttpFrame::ParseRequest;
   std::string_view fieldName;
@@ -440,3 +441,12 @@ XmlRpcServerConnection::generateFaultResponse(std::string const& errorMsg, int e
   _response = header + body;
 }
 
+const miniros::network::NetAddress& XmlRpcServerConnection::getClientAddress() const
+{
+  return _clientAddress;
+}
+
+const miniros::network::NetAddress& XmlRpcServerConnection::getHostAddress() const
+{
+  return _hostAddress;
+}
