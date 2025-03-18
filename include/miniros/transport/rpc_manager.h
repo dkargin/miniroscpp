@@ -150,12 +150,14 @@ public:
       try {
         result = (object->*method)(conn);
       } catch (XmlRpc::XmlRpcException ex) {
+        MINIROS_WARN("RPCManager: got exception while handling request: %s", ex.getMessage().c_str());
         result = RpcValue::Array(3);
         result[0] = 0;
         result[1] = ex.getMessage();
         result[2] = ex.getCode();
+        return false;
       }
-      return 0;
+      return true;
     }, object);
   }
 
@@ -168,12 +170,14 @@ public:
         T0 arg0 = param[0].as<T0>();
         result = (object->*method)(arg0, conn);
       } catch (XmlRpc::XmlRpcException ex) {
+        MINIROS_WARN("RPCManager: got exception while handling request: %s", ex.getMessage().c_str());
         result = RpcValue::Array(3);
         result[0] = 0;
         result[1] = ex.getMessage();
         result[2] = ex.getCode();
+        return false;
       }
-      return 0;
+      return true;
     }, object);
   }
 
@@ -186,12 +190,14 @@ public:
         T1 arg1 = param[1].as<T1>();
         result = (object->*method)(arg0, arg1, conn);
       } catch (XmlRpc::XmlRpcException ex) {
+        MINIROS_WARN("RPCManager: got exception while handling request: %s", ex.getMessage().c_str());
         result = RpcValue::Array(3);
         result[0] = 0;
         result[1] = ex.getMessage();
         result[2] = ex.getCode();
+        return false;
       }
-      return 0;
+      return true;
     }, object);
   }
 
@@ -206,12 +212,14 @@ public:
         T2 arg2 = param[2].as<T2>();
         result = (object->*method)(arg0, arg1, arg2, conn);
       } catch (XmlRpc::XmlRpcException ex) {
+        MINIROS_WARN("RPCManager: got exception while handling request: %s", ex.getMessage().c_str());
         result = RpcValue::Array(3);
         result[0] = 0;
         result[1] = ex.getMessage();
         result[2] = ex.getCode();
+        return false;
       }
-      return 0;
+      return true;
     }, object);
   }
 
@@ -227,12 +235,14 @@ public:
         T3 arg3 = param[3].as<T3>();
         result = (object->*method)(arg0, arg1, arg2, arg3, conn);
       } catch (XmlRpc::XmlRpcException ex) {
+        MINIROS_WARN("RPCManager: got exception while handling request: %s", ex.getMessage().c_str());
         result = RpcValue::Array(3);
         result[0] = 0;
         result[1] = ex.getMessage();
         result[2] = ex.getCode();
+        return false;
       }
-      return 0;
+      return true;
     }, object);
   }
 
