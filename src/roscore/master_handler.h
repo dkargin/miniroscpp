@@ -92,6 +92,8 @@ protected:
 
   /// Maps topicName to type md5.
   std::map<std::string, std::string> m_topicTypes;
+  /// Internal guard for m_topicTypes.
+  mutable std::mutex m_guard;
 };
 
 } // namespace master
