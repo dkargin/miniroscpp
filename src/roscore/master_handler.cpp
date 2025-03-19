@@ -73,15 +73,6 @@ std::string MasterHandler::getUri(const std::string& caller_id) const
   return uri;
 }
 
-int MasterHandler::getPid(const std::string& caller_id) const
-{
-#ifdef _WIN32
-  return static_cast<int>(GetCurrentProcessId());
-#else
-  return getpid();
-#endif
-}
-
 void MasterHandler::notifyTopicSubscribers(const std::string& topic, const std::vector<std::shared_ptr<NodeRef>>& subscribers)
 {
   if (subscribers.empty())

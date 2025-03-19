@@ -42,8 +42,6 @@ public:
 
   std::string getUri(const std::string& caller_id) const;
 
-  int getPid(const std::string& caller_id) const;
-
   void notifyTopicSubscribers(const std::string& topic, const std::vector<std::shared_ptr<NodeRef>>& subscribers);
 
   ReturnStruct registerService(const RequesterInfo& requesterInfo, const std::string& service, const std::string& service_api);
