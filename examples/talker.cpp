@@ -2,6 +2,7 @@
  * This tutorial demonstrates simple receipt of messages over the ROS system.
  * It is an adaptation of official ROS tutorial at http://wiki.ros.org/ROS/Tutorials/WritingPublisherSubscriber%28c%2B%2B%29
  */
+#include <chrono>
 #include "miniros/ros.h"
 
 /// Messages for miniros have .hxx file extension to make them distinguishable from original ROS messages.
@@ -11,6 +12,7 @@
 
 int main(int argc, char **argv)
 {
+  auto timeStart = std::chrono::high_resolution_clock::now();
   /**
    * The miniros::init() function needs to see argc and argv so that it can perform
    * any ROS arguments and name remapping that were provided at the command line.
@@ -48,6 +50,10 @@ int main(int argc, char **argv)
    * buffer up before throwing some away.
    */
   miniros::Publisher chatter_pub = n.advertise<std_msgs::String>("chatter", 1000);
+
+  auto timeEnd = std::chrono::high_resolution_clock::now();
+  auto delta = std::chrono::duration_cast<std::chrono::milliseconds>(timeEnd - timeStart);
+  MINIROS_INFO("Node initialized in %dms", (int)delta.count());
 
   miniros::Rate loop_rate(10);
 
