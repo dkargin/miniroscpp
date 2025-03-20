@@ -163,6 +163,8 @@ else()
     DESTINATION lib/cmake/${PROJECT_NAME}
   )
 
+  install(TARGETS miniroscore minibag RUNTIME DESTINATION bin)
+  
   install(TARGETS ${MINIROS_EXPORT} EXPORT ${PROJECT_NAME}
     LIBRARY DESTINATION lib
         ARCHIVE DESTINATION lib
