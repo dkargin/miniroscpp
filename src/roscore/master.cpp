@@ -445,5 +445,10 @@ Master::RpcValue Master::getParamNames(const std::string& caller_id, Connection*
   return res;
 }
 
+void Master::setDumpParameters(bool dump)
+{
+  m_parameterStorage.setDumpParameters(dump);
+}
+
 } // namespace master
 } // namespace miniros

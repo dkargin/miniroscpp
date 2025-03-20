@@ -163,6 +163,8 @@ public: /// Request handlers
   RpcValue unsubscribeParam(const std::string& caller_id, const std::string& caller_api, const std::string& key, Connection*);
 
   RpcValue getParamNames(const std::string& caller_id, Connection*);
+  void setDumpParameters(bool dump);
+
 protected:
   int m_port = -1;
   std::string m_host;
