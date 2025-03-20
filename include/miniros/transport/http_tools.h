@@ -20,38 +20,123 @@ struct MINIROS_DECL HttpFrame {
     ParseRequest, ParseFieldName, ParseFieldValue, ParseBody, ParseInvalid
   };
 
-  /// Current state of a parser.
-  ParserState state = ParseInvalid;
+  /// Represent a position of a token in some external buffer, Token = [start, end)
+  struct Token {
+    int start = -1;
+    /// Position of the next symbol after last
+    int end = -1;
 
-  /// Request headers.
-  std::string header;
+    void assign(int start_, int end_)
+    {
+      start = start_;
+      end = end_;
+    }
+
+    void reset()
+    {
+      start = -1;
+      end = -1;
+    }
+
+    /// Check of token is valid.
+    bool valid() const
+    {
+      return start >= 0 && start < end;
+    }
+
+    /// check if token is empty.
+    bool empty() const
+    {
+      return start == end;
+    }
+
+    /// Return size of a token.
+    size_t size() const
+    {
+      return end - start;
+    }
+  };
+
+  /// Container for the full request.
+  std::string data;
 
   /// Number of bytes expected in the request body (parsed from header).
-  int contentLength = 0;
+  int contentLength() const
+  {
+    return m_contentLength;
+  }
 
-  /// Request body.
-  std::string request;
+  /// Current length of request body.
+  int bodyLength() const;
 
   /// Raw request type: {GET, POST, PUT, ...}
-  std::string_view requestType;
+  Token requestType;
 
   /// Request URL
-  std::string_view requestUrl;
+  Token requestUrl;
 
   /// HTTP Version.
-  std::string_view requestHttpVersion;
+  Token requestHttpVersion;
 
   /// HTTP Field.
   struct Field {
-    std::string_view name;
-    std::string_view value;
+    std::string name;
+    std::string value;
   };
 
   /// Parsed fields.
   std::vector<Field> fields;
 
-  /// Reset all fields
-  void reset();
+  /// Get a pointer to HTTP version part.
+  std::string_view getHttpVersion() const
+  {
+    return getTokenView(data, requestHttpVersion);
+  }
+
+  ParserState state() const
+  {
+    return m_state;
+  }
+
+  static std::string_view getTokenView(const std::string& data, const Token& token);
+
+  /// Continue parsing data.
+  int incrementalParse();
+
+  /// Finish parsing request.
+  /// It will reset all parser-related state and fields and drop all data, related to current packet (if any).
+  void finishReqeust();
+
+  /// Reset only tokens.
+  void resetParseState();
+
+  /// Check if parser has content length field.
+  bool hasContentLength() const;
+
+  /// Get reference to body of request.
+  std::string_view body() const;
+
+  bool keepAlive() const;
+
+protected:
+
+  /// Current position of a parser.
+  int m_currentPosition = 0;
+  /// Current position of request body.
+  int m_bodyPosition = 0;
+
+  /// Current position of a token. Part of incremental state.
+  int m_tokenStart = 0;
+
+  int m_contentLength = -1;
+
+  bool m_keepAlive = true;
+
+  /// Position of name field. We need to keep it while parsing value field.
+  Token m_fieldName;
+
+  /// Current state of a parser.
+  ParserState m_state = HttpFrame::ParseRequest;
 };
 
 } // namespace network

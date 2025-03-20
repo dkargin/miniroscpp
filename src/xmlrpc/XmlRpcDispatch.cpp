@@ -113,9 +113,13 @@ void XmlRpcDispatch::work(double timeout)
       fds[i].fd = sources[i]->getfd();
       fds[i].revents = 0; // some platforms may not clear this in poll()
       fds[i].events = 0;
-      if (it->getMask() & ReadableEvent) fds[i].events |= POLLIN_REQ;
-      if (it->getMask() & WritableEvent) fds[i].events |= POLLOUT_REQ;
-      if (it->getMask() & Exception) fds[i].events |= POLLEX_REQ;
+      unsigned mask = it->getMask();
+      if (mask & ReadableEvent)
+        fds[i].events |= POLLIN_REQ;
+      if (mask & WritableEvent)
+        fds[i].events |= POLLOUT_REQ;
+      if (mask & Exception)
+        fds[i].events |= POLLEX_REQ;
     }
 
     // Check for events

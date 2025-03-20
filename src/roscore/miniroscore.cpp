@@ -44,6 +44,10 @@ int main(int argc, const char ** argv) {
     ("rosout", po::value<bool>()->default_value(true), "Enable rosout log aggregator")
     ("dir", po::value<std::string>(), "Path to working directory")
     ("resolve", po::value<bool>()->default_value(false), "Resolve node IP address")
+    ("dump_parameters", po::value<bool>()->default_value(false), "Dump all ROSParam values on every update")
+    // Unify rosmaster RPC manager and rosout RPC manager.
+    // rosout creates its own RPC manager by default.
+    ("unified_rpc", po::value<bool>()->default_value(false), "Resolve node IP address")
     ;
 
   po::variables_map vm;
@@ -91,15 +95,24 @@ int main(int argc, const char ** argv) {
     XmlRpc::setVerbosity(level);
   }
 
+  bool dumpParameters = vm["dump_parameters"].as<bool>();
+
   MINIROS_INFO("Creating RPCManager");
 
-  // Standalone RPC manger for rosmaster.
-  auto masterRpcManager = std::make_shared<miniros::RPCManager>();
+  // Standalone RPC manager for rosmaster.
+  bool unifiedRpc = vm["unified_rpc"].as<bool>();
+
+  std::shared_ptr<miniros::RPCManager> masterRpcManager;
+  if (unifiedRpc)
+    masterRpcManager = miniros::RPCManager::instance();
+  else
+    masterRpcManager = std::make_shared<miniros::RPCManager>();
 
   MINIROS_INFO("Creating Master object");
   miniros::master::Master master(masterRpcManager);
 
   master.setResolveNodeIP(resolve);
+  master.setDumpParameters(dumpParameters);
 
   MINIROS_INFO("Starting Master thread");
   master.start();
@@ -116,16 +129,19 @@ int main(int argc, const char ** argv) {
   }
 
   miniros::CallbackQueue* callbackQueue = miniros::getGlobalCallbackQueue();
-  if (!callbackQueue) {
+  if (useRosout && !callbackQueue) {
     return EXIT_FAILURE;
   }
 
-  MINIROS_INFO("All components have started");
   miniros::notifyNodeStarted();
+  MINIROS_INFO("All components have started");
 
   miniros::WallDuration period(0.02);
   while (!g_sigintReceived && master.ok()) {
-    callbackQueue->callAvailable(period);
+    if (callbackQueue)
+      callbackQueue->callAvailable(period);
+    else
+      period.sleep();
     master.update();
   }
 

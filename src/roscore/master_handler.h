@@ -42,8 +42,6 @@ public:
 
   std::string getUri(const std::string& caller_id) const;
 
-  int getPid(const std::string& caller_id) const;
-
   void notifyTopicSubscribers(const std::string& topic, const std::vector<std::shared_ptr<NodeRef>>& subscribers);
 
   ReturnStruct registerService(const RequesterInfo& requesterInfo, const std::string& service, const std::string& service_api);
@@ -92,6 +90,8 @@ protected:
 
   /// Maps topicName to type md5.
   std::map<std::string, std::string> m_topicTypes;
+  /// Internal guard for m_topicTypes.
+  mutable std::mutex m_guard;
 };
 
 } // namespace master

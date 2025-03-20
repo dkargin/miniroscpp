@@ -3,6 +3,7 @@
 //
 
 #include <algorithm>
+#include <cassert>
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -72,15 +73,6 @@ std::string MasterHandler::getUri(const std::string& caller_id) const
   return uri;
 }
 
-int MasterHandler::getPid(const std::string& caller_id) const
-{
-#ifdef _WIN32
-  return static_cast<int>(GetCurrentProcessId());
-#else
-  return getpid();
-#endif
-}
-
 void MasterHandler::notifyTopicSubscribers(const std::string& topic, const std::vector<std::shared_ptr<NodeRef>>& subscribers)
 {
   if (subscribers.empty())
@@ -144,14 +136,18 @@ ReturnStruct MasterHandler::registerSubscriber(const RequesterInfo& requesterInf
   if (!ref)
     return ReturnStruct(0, "Internal error");
 
-  MINIROS_INFO_NAMED("handler", "registerSubscriber(\"%s\") caller_id=%s caller_api=%s",
-    topic.c_str(), requesterInfo.callerId.c_str(), requesterInfo.callerApi.c_str());
+  MINIROS_INFO_NAMED("handler", "registerSubscriber(\"%s\") caller_id=%s caller_api=%s, type=%s",
+    topic.c_str(), requesterInfo.callerId.c_str(), requesterInfo.callerApi.c_str(), topic_type.c_str());
 
   if (auto hostInfo = m_resolver.updateHost(requesterInfo))
     ref->updateHost(hostInfo);
 
-  if (!m_topicTypes.count(topic_type))
-    m_topicTypes[topic] = topic_type;
+  {
+    assert(!topic.empty() && !topic_type.empty());
+    std::scoped_lock<std::mutex> lock(m_guard);
+    if (!m_topicTypes.count(topic))
+      m_topicTypes[topic] = topic_type;
+  }
 
   std::vector<std::shared_ptr<NodeRef>> publishers = m_regManager->getTopicPublishers(topic);
 
@@ -191,11 +187,15 @@ int MasterHandler::unregisterSubscriber(const RequesterInfo& requesterInfo, cons
 ReturnStruct MasterHandler::registerPublisher(const RequesterInfo& requesterInfo, const std::string& topic,
   const std::string& topic_type)
 {
-  MINIROS_INFO_NAMED("handler", "registerPublisher(\"%s\") caller_id=%s caller_api=%s",
-    topic.c_str(), requesterInfo.callerId.c_str(), requesterInfo.callerApi.c_str());
+  MINIROS_INFO_NAMED("handler", "registerPublisher(\"%s\") caller_id=%s caller_api=%s type=%s",
+    topic.c_str(), requesterInfo.callerId.c_str(), requesterInfo.callerApi.c_str(), topic_type.c_str());
 
-  if (!m_topicTypes.count(topic_type))
-    m_topicTypes[topic] = topic_type;
+  {
+    std::scoped_lock<std::mutex> lock(m_guard);
+    assert(!topic.empty() && !topic_type.empty());
+    if (!m_topicTypes.count(topic))
+      m_topicTypes[topic] = topic_type;
+  }
 
   std::shared_ptr<NodeRef> ref = m_regManager->register_publisher(topic, requesterInfo.callerId, requesterInfo.callerApi);
   if (!ref) {
@@ -268,6 +268,7 @@ std::vector<std::vector<std::string>> MasterHandler::getPublishedTopics(
 
   std::vector<std::vector<std::string>> rtn;
 
+  std::scoped_lock<std::mutex> lock(m_guard);
   for (const auto& [Key, Value] : e) {
     if (startsWith(Key, prefix)) {
       for (const auto& s : Value) {
@@ -285,7 +286,7 @@ std::vector<std::vector<std::string>> MasterHandler::getPublishedTopics(
 std::map<std::string, std::string> MasterHandler::getTopicTypes(const std::string& caller_id) const
 {
   MINIROS_INFO_NAMED("handler", "getTopicTypes from %s", caller_id.c_str());
-
+  std::scoped_lock<std::mutex> lock(m_guard);
   return m_topicTypes;
 }
 

@@ -59,8 +59,9 @@ void PollManager::start()
 void PollManager::shutdown()
 {
   // Logging system can dead here.
+#ifdef POLL_SERIOUS_DEBUG
   std::cout << "PollManager shutdown" << std::endl;
-
+#endif
   if (shutting_down_) return;
 
   if (thread_.joinable() && thread_.get_id() != std::this_thread::get_id())
@@ -68,9 +69,13 @@ void PollManager::shutdown()
     shutting_down_ = true;
     thread_.join();
     poll_watchers_.disconnectAll();
+#ifdef POLL_SERIOUS_DEBUG
     std::cout << "PollManager shutdown complete" << std::endl;;
+#endif
   } else {
+#ifdef POLL_SERIOUS_DEBUG
     std::cout << "PollManager skipped from other thread" << std::endl;
+#endif
   }
 }
 

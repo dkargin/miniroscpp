@@ -186,7 +186,9 @@ Error ParameterStorage::checkParamUpdates(const std::string& fullKey, const RpcV
    *  subscribers:
    *    /node/param2
    */
-  this->dumpParamStateUnsafe("params.json");
+  if (m_dumpParameters)
+    dumpParamStateUnsafe("params.json");
+
   if (m_parameterListeners.empty() || !paramUpdateFn)
     return Error::Ok;
   names::Path path;
@@ -367,11 +369,15 @@ void ParameterStorage::dumpParamStateUnsafe(const char* file) const
 {
   std::ofstream out(file);
 
-  miniros::JsonState jstate;
-  miniros::JsonSettings jsettings;
+  JsonState jstate;
+  JsonSettings jsettings;
   m_parameterRoot.writeJson(out, jstate, jsettings);
 }
 
+void ParameterStorage::setDumpParameters(bool dump)
+{
+  m_dumpParameters = dump;
+}
 
 } // namespace master
 } // namespace miniros

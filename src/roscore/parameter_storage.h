@@ -65,6 +65,8 @@ public:
   /// @returns a pair with pointer to parameter and pointer to its owner.
   std::pair<RpcValue*, RpcValue*> findParameter(const names::Path& name, bool create) const;
 
+  void setDumpParameters(bool dump);
+
 protected:
   /// Collection of all parameters.
   RpcValue m_parameterRoot;
@@ -76,6 +78,9 @@ protected:
   mutable std::mutex m_parameterLock;
 
   RegistrationManager* m_regManager;
+
+  /// Dump all parameters to JSON on each update.
+  bool m_dumpParameters = false;
 };
 
 } // namespace master
