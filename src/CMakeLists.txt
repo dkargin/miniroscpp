@@ -309,7 +309,5 @@ set(MINIROS_LIBRARY roscxx PARENT_SCOPE)
 set(MINIROS_EXPORT
     roscxx
     bag_storage
-    miniroscore
-    minibag
     ${rosbag_INTERNAL_LIBS}
     PARENT_SCOPE)

@@ -8,8 +8,9 @@
   <maintainer email="dmitry.n.kargin@gmail.com">Dmitry Kargin</maintainer>
   <license>BSD</license>
 
-  <url>Nope</url>
+  <url>https://github.com/dkargin/miniroscpp</url>
   <author>John Faust</author>
   <author>Dmitry Kargin</author>
-  <buildtool_depend>catkin</buildtool_depend>
+  <buildtool_depend>cmake</buildtool_depend>
+
 </package>
