@@ -16,8 +16,7 @@ namespace network {
 
 void HttpFrame::finishReqeust()
 {
-  if (m_state == ParseBody) {
-    assert(data.length() == m_bodyPosition + m_contentLength);
+  if (m_state == ParseComplete) {
     size_t currentLength = m_bodyPosition;
     if (m_contentLength >= 0)
       currentLength += m_contentLength;
@@ -43,6 +42,7 @@ void HttpFrame::resetParseState()
 
   m_currentPosition = 0;
   m_bodyPosition = 0;
+  m_bodyEnd = 0;
   m_tokenStart = 0;
 
   m_contentLength = -1;
@@ -101,10 +101,6 @@ int HttpFrame::incrementalParse()
 
   const char* tokenStart = start + m_tokenStart;
 
-  if (m_state != HttpFrame::ParseRequest) {
-    std::cout << "Double entrance" << std::endl;
-  }
-
   for (; cp < end;) {
     if (m_state == HttpFrame::ParseRequest) {
       if (strncmp(cp, "\r\n", 2) == 0) {
@@ -162,18 +158,40 @@ int HttpFrame::incrementalParse()
         m_state = HttpFrame::ParseFieldName;
         continue;
       }
-    } else
+    } else // Any other state.
       break;
     cp++;
+  }
+  m_tokenStart = tokenStart - start;
+
+  if (m_state == HttpFrame::ParseBody) {
+    if (m_contentLength >= 0) {
+      // Need body and got all the data.
+      if (m_bodyPosition + m_contentLength <= data.length()) {
+        m_state = HttpFrame::ParseComplete;
+        m_bodyEnd = m_bodyPosition + m_contentLength;
+        cp = start + m_bodyEnd;
+      } else {
+        // `data` does not contain full body yet, but need to advance `cp`.
+        cp = start + data.length();
+      }
+    } else {
+      m_state = HttpFrame::ParseComplete;
+      m_bodyEnd = m_bodyPosition;
+      cp = start + m_bodyEnd;
+    }
   }
 
   int position = cp - start;
   int bytesParsed = position - m_currentPosition;
-
-  m_tokenStart = tokenStart - start;
   m_currentPosition = position;
 
   return bytesParsed;
+}
+
+bool HttpFrame::hasHeader() const
+{
+  return m_state == HttpFrame::ParseBody || m_state == ParseComplete;
 }
 
 } // namespace network

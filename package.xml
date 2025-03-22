@@ -12,5 +12,6 @@
   <author>John Faust</author>
   <author>Dmitry Kargin</author>
   <buildtool_depend>cmake</buildtool_depend>
+  <buildtool_depend>catkin</buildtool_depend>
 
 </package>

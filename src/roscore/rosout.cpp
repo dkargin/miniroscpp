@@ -153,8 +153,8 @@ void Rosout::rosoutCallback(const rosgraph_msgs::Log::ConstPtr& msg)
   if (!omit_topics_)
   {
     ss << "[topics: ";
-    std::vector<std::string>::const_iterator it = msg->topics.begin();
-    std::vector<std::string>::const_iterator end = msg->topics.end();
+    auto it = msg->topics.begin();
+    auto end = msg->topics.end();
     for ( ; it != end; ++it )
     {
       const std::string& topic = *it;

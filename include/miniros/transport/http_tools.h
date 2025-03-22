@@ -17,7 +17,18 @@ namespace network {
 /// Intermediate storage for HTTP data.
 struct MINIROS_DECL HttpFrame {
   enum ParserState {
-    ParseRequest, ParseFieldName, ParseFieldValue, ParseBody, ParseInvalid
+    /// Parsing request line.
+    ParseRequest,
+    /// Parsing name of request field.
+    ParseFieldName,
+    /// Parsing value of request field.
+    ParseFieldValue,
+    /// Reading body of request.
+    ParseBody,
+    /// Finished reading request + body (or only request part if ContentLength=0 or GET).
+    ParseComplete,
+    /// Parser is in invalid state.
+    ParseInvalid
   };
 
   /// Represent a position of a token in some external buffer, Token = [start, end)
@@ -98,6 +109,9 @@ struct MINIROS_DECL HttpFrame {
     return m_state;
   }
 
+  /// Return true if all header is parsed.
+  bool hasHeader() const;
+
   static std::string_view getTokenView(const std::string& data, const Token& token);
 
   /// Continue parsing data.
@@ -124,6 +138,8 @@ protected:
   int m_currentPosition = 0;
   /// Current position of request body.
   int m_bodyPosition = 0;
+  /// End position of request body.
+  int m_bodyEnd = 0;
 
   /// Current position of a token. Part of incremental state.
   int m_tokenStart = 0;

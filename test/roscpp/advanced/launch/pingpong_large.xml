@@ -1,6 +1,5 @@
 <launch>
-  <node pkg="test_roscpp" type="test_roscpp-pub_sub" name="pub_sub" args="1000"/>
-  <test test-name="pingpong_large" pkg="test_roscpp"
-  type="test_roscpp-sub_pub" args="100 5.0"/>
+  <node pkg="miniros" type="advanced-pub_sub" name="pub_sub" args="1000"/>
+  <test test-name="pingpong_large" pkg="miniros" type="advanced-sub_pub" args="100 5.0"/>
 </launch>
 

@@ -85,8 +85,11 @@ TopicManager::~TopicManager()
   shutdown();
 }
 
-void TopicManager::start(PollManagerPtr pm, MasterLinkPtr master_link, ConnectionManagerPtr cm, RPCManagerPtr rpcm)
+Error TopicManager::start(PollManagerPtr pm, MasterLinkPtr master_link, ConnectionManagerPtr cm, RPCManagerPtr rpcm)
 {
+  if (!pm || !cm || !rpcm)
+    return Error::InvalidValue;
+
   std::scoped_lock<std::mutex> shutdown_lock(shutting_down_mutex_);
   shutting_down_ = false;
   resolve_ip_ = false;
@@ -120,6 +123,7 @@ void TopicManager::start(PollManagerPtr pm, MasterLinkPtr master_link, Connectio
   if (master_link_) {
     resolve_ip_ = master_link->param<bool>("/resolve_ip", false);
   }
+  return Error::Ok;
 }
 
 void TopicManager::shutdown()
@@ -577,6 +581,10 @@ XmlRpc::XmlRpcValue TopicManager::requestTopic(const std::string& caller, const 
   ret[0] = 0;
   ret[1] = "";
   ret[2] = 0;
+
+  if (!connection_manager_) {
+    return ret;
+  }
 
   std::string goodAddress;
 

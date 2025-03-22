@@ -1,5 +1,5 @@
 <launch>
-  <test test-name="service_exception" pkg="test_roscpp" type="test_roscpp-service_exception"/>
+  <test test-name="service_exception" pkg="miniros" type="advanced-service_exception"/>
 </launch>
 
 
