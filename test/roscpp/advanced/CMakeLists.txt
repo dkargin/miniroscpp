@@ -86,10 +86,10 @@ miniros_add_test(${TEST_GROUP}-service_wait_a_adv_b SOURCES service_wait_a_adv_b
 
 # Zombie (node crashed) service
 add_executable(${TEST_GROUP}-service_adv_zombie service_adv_zombie.cpp)
-target_link_libraries(${TEST_GROUP}-service_adv_zombie miniros::roscxx ${GTEST_LIBRARIES})
+target_link_libraries(${TEST_GROUP}-service_adv_zombie roscxx ${GTEST_LIBRARIES})
 
 add_executable(${TEST_GROUP}-service_call_expect_b service_call_expect_b.cpp)
-target_link_libraries(${TEST_GROUP}-service_call_expect_b miniros::roscxx ${GTEST_LIBRARIES})
+target_link_libraries(${TEST_GROUP}-service_call_expect_b roscxx ${GTEST_LIBRARIES})
 
 # Test command-line name remapping
 miniros_add_test(${TEST_GROUP}-name_remapping SOURCES name_remapping.cpp WITH_MASTER DISABLED)

@@ -35,11 +35,6 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
   option(MINIROS_USE_LIBSYSTEMD "Signal systemd when node has actually started" ON)
 endif()
 
-
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
-
 if (MINIROS_PATCH_RPATH)
   set(CMAKE_BUILD_RPATH_USE_ORIGIN ON)
   set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
@@ -80,6 +75,10 @@ if (MINIROS_USE_CATKIN)
   else()
     message(STATUS "Catkin was not found")
   endif(catkin_FOUND)
+else()
+  set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
+  set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
+  set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
 endif()
 
 
@@ -103,6 +102,17 @@ find_package(Threads REQUIRED)
 add_subdirectory(external)
 add_subdirectory(src)
 
+# Some workaround for adding include directores from different folders
+target_include_directories(bag_storage PUBLIC
+    $<BUILD_INTERFACE:${MINIROS_INCLUDE_DIRS}>
+    $<INSTALL_INTERFACE:include>
+)
+
+target_include_directories(roscxx PUBLIC
+    $<BUILD_INTERFACE:${MINIROS_INCLUDE_DIRS}>
+    $<INSTALL_INTERFACE:include>
+)
+
 if (catkin_FOUND)
   # Catkin does all the packaging by itself. Also we do not need to install pregenerated messages,
   # since we are able to run gencxx directly here.
@@ -115,16 +125,6 @@ if (catkin_FOUND)
     RUNTIME DESTINATION ${CATKIN_GLOBAL_BIN_DESTINATION}
   )
 else()
-  # Some workaround for adding include directores from different folders
-  target_include_directories(bag_storage PUBLIC 
-    $<BUILD_INTERFACE:${MINIROS_INCLUDE_DIRS}>
-    $<INSTALL_INTERFACE:include>
-  )
-
-  target_include_directories(roscxx PUBLIC
-    $<BUILD_INTERFACE:${MINIROS_INCLUDE_DIRS}>
-    $<INSTALL_INTERFACE:include>
-  )
   # ... for the build tree
   set(CONF_INCLUDE_DIRS "${PROJECT_SOURCE_DIR}" "${PROJECT_BINARY_DIR}")
   set(GENERATED_INCLUDE "generated")
