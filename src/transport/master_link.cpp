@@ -201,6 +201,8 @@ Error MasterLink::execute(const std::string& method, const RpcValue& request, Rp
   if (!manager)
     return Error::InternalError;
   XmlRpc::XmlRpcClient* c = manager->getXMLRPCClient(master_host, master_port, "/");
+  if (!c)
+    return Error::InvalidURI;
   bool printed = false;
   bool slept = false;
   bool ok = true;
