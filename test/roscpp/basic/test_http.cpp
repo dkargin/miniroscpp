@@ -39,6 +39,124 @@ TEST(net, parseGoodURL)
   EXPECT_TRUE(url.scheme.empty());
 }
 
+const char* request1 = "POST /RPC2 HTTP/1.1\r\n" \
+  "Host: localhost:11311\r\n" \
+  "Accept-Encoding: gzip\r\n" \
+  "Content-Type: text/xml\r\n" \
+  "User-Agent: Python-xmlrpc/3.12\r\n" \
+  "Content-Length: 167\r\n" \
+  "\r\n" \
+  "<?xml version='1.0'?>\n" \
+  "<methodCall>\n" \
+  "<methodName>getSystemState</methodName>\n" \
+  "<params>\n" \
+  "<param>\n" \
+  "<value><string>/rostopic</string></value>\n" \
+  "</param>\n" \
+  "</params>\n" \
+  "</methodCall>\n";
+
+const char* request2 =
+  "POST /RPC2 HTTP/1.1\r\n"
+  "Host: localhost:11311\r\n"
+  "Accept-Encoding: gzip\r\n"
+  "Content-Type: text/xml\r\n"
+  "User-Agent: Python-xmlrpc/3.12\r\n"
+  "Content-Length: 166\r\n"
+  "\r\n"
+  "<?xml version='1.0'?>\n"
+  "<methodCall>\n"
+  "<methodName>getTopicTypes</methodName>\n"
+  "<params>\n"
+  "<param>\n"
+  "<value><string>/rostopic</string></value>\n"
+  "</param>\n"
+  "</params>\n"
+  "</methodCall>\n";
+
+// Note slightly different line endings in request body. It has \r\n line endings, contrary to bodies
+// of request1 and request2.
+const char* request3 = "POST / HTTP/1.1\r\n"
+  "User-Agent: XMLRPC++ 0.7\r\n"
+  "Host: localhost:11311\r\n"
+  "Content-Type: text/xml\r\n"
+  "Content-length: 183\r\n"
+  "\r\n"
+  "<?xml version=\"1.0\"?>\r\n"
+  "<methodCall><methodName>hasParam</methodName>\r\n"
+  "<params><param><value>/rosout</value></param><param><value>/tcp_keepalive</value></param></params></methodCall>\r\n";
+
+TEST(net, parseRequest)
+{
+  network::HttpFrame httpFrame;
+
+  std::string req(request3);
+  httpFrame.data.append(req);
+
+  int parsed = httpFrame.incrementalParse();
+
+  EXPECT_EQ(parsed, req.size());
+  EXPECT_EQ(httpFrame.state(), network::HttpFrame::ParseComplete);
+}
+
+TEST(net, parseFragmented)
+{
+  network::HttpFrame httpFrame;
+  std::string fullReq(request3);
+
+  const int N = 3;
+  size_t chunkSize = fullReq.size() / N;
+
+  size_t totalParsed = 0;
+  for (size_t i = 0; i < fullReq.size(); i += chunkSize) {
+    size_t next = i + chunkSize;
+    if (next >= fullReq.size()) {
+      next = fullReq.size();
+    }
+    std::string part = fullReq.substr(i, next - i);
+    httpFrame.data.append(part);
+
+    int parsed = httpFrame.incrementalParse();
+    EXPECT_GT(parsed, 0);
+    totalParsed += parsed;
+  }
+
+  EXPECT_EQ(totalParsed, fullReq.size());
+  EXPECT_EQ(httpFrame.state(), network::HttpFrame::ParseComplete);
+}
+
+
+TEST(net, parseMultipleRequests)
+{
+  network::HttpFrame httpFrame;
+
+  std::string req1(request1);
+  std::string req2(request2);
+  std::string req3(request3);
+
+  httpFrame.data.append(req1);
+  httpFrame.data.append(req2);
+  httpFrame.data.append(req3);
+
+  int parsed = httpFrame.incrementalParse();
+  std::string_view body1 = httpFrame.body();
+  EXPECT_EQ(parsed, req1.size());
+  EXPECT_EQ(httpFrame.state(), network::HttpFrame::ParseComplete);
+  httpFrame.finishReqeust();
+
+  parsed = httpFrame.incrementalParse();
+  std::string_view body2 = httpFrame.body();
+  EXPECT_EQ(parsed, req2.size());
+  EXPECT_EQ(httpFrame.state(), network::HttpFrame::ParseComplete);
+  httpFrame.finishReqeust();
+
+  parsed = httpFrame.incrementalParse();
+  std::string_view body3 = httpFrame.body();
+  EXPECT_EQ(parsed, req3.size());
+  EXPECT_EQ(httpFrame.state(), network::HttpFrame::ParseComplete);
+}
+
+
 int main(int argc, char** argv)
 {
   testing::InitGoogleTest(&argc, argv);

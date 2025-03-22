@@ -73,7 +73,7 @@ public:
   TopicManager();
   ~TopicManager();
 
-  void start(PollManagerPtr pm, MasterLinkPtr master_link, ConnectionManagerPtr cm, RPCManagerPtr rpcm);
+  Error start(PollManagerPtr pm, MasterLinkPtr master_link, ConnectionManagerPtr cm, RPCManagerPtr rpcm);
   void shutdown();
 
   bool subscribe(const SubscribeOptions& ops);
