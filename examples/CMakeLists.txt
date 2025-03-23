@@ -18,3 +18,8 @@ target_include_directories(talker PRIVATE ${MINIROS_INCLUDE_GENERATED_DIRS})
 add_executable(listener listener.cpp)
 target_link_libraries(listener roscxx)
 target_include_directories(listener PRIVATE ${MINIROS_INCLUDE_GENERATED_DIRS})
+
+# A benchmark for different types of logging.
+add_executable(log_demo log_demo.cpp)
+target_link_libraries(log_demo roscxx)
+target_include_directories(log_demo PRIVATE ${MINIROS_INCLUDE_GENERATED_DIRS})
