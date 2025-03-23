@@ -69,7 +69,7 @@ void Registrations::registerObj(const std::string& key, const std::string& calle
     if (it == providers.end()) {
       providers.push_back(record);
     }
-  } else if (service_api.empty()) {
+  } else {
     map[key].push_back(record);
   }
 

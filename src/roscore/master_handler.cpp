@@ -276,6 +276,7 @@ std::vector<std::vector<std::string>> MasterHandler::getPublishedTopics(
         if (it != m_topicTypes.end()) {
           std::vector<std::string> value = {Key, it->second};
           rtn.push_back(value);
+          break;
         }
       }
     }
