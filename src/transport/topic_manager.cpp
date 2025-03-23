@@ -42,8 +42,6 @@
 #include "miniros/transport/transport_udp.h"
 #include "miniros/transport/net_address.h"
 
-#include "miniros/xmlrpcpp/XmlRpc.h"
-
 #include <miniros/console.h>
 #include <sstream>
 #include <xmlrpcpp/XmlRpcServerConnection.h>
@@ -193,7 +191,6 @@ void TopicManager::processPublishQueues()
 void TopicManager::getAdvertisedTopics(V_string& topics)
 {
   std::scoped_lock<std::mutex> lock(advertised_topic_names_mutex_);
-
   topics.resize(advertised_topic_names_.size());
   std::copy(advertised_topic_names_.begin(), advertised_topic_names_.end(), topics.begin());
 }

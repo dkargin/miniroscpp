@@ -25,7 +25,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#define MINIROS_PACKAGE_NAME "xmlrpc"
+#define MINIROS_PACKAGE_NAME "RPCManager"
 
 #include <sstream>
 
@@ -124,11 +124,11 @@ RPCManager::~RPCManager()
 bool RPCManager::start(int port)
 {
   if (server_thread_.joinable()) {
-    MINIROS_INFO_NAMED("RPCManager", "Manager is running at port %d", port_);
+    MINIROS_INFO("Manager is running at port %d", port_);
     return true;
   }
 
-  MINIROS_INFO_NAMED("RPCManager", "Starting manager at port %d", port);
+  MINIROS_INFO("Starting manager at port %d", port);
   shutting_down_ = false;
   bind("getPid", getPid);
 
