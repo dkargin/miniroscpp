@@ -32,6 +32,8 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define MINIROS_PACKAGE_NAME "init"
+
 #include "miniros/init.h"
 #include "miniros/names.h"
 #include "miniros/transport/rpc_manager.h"
@@ -272,7 +274,7 @@ void basicSigintHandler(int sig)
 {
   (void)sig;
 
-  MINIROS_INFO("Got SIGINT. Initiating shutdown");
+  MINIROS_DEBUG("Got SIGINT. Initiating shutdown");
   miniros::requestShutdown();
 }
 
@@ -333,7 +335,11 @@ Error start()
 
   TopicManagerPtr topicManager = TopicManager::instance();
   ServiceManagerPtr serviceManager = ServiceManager::instance();
-  topicManager->start(pm, g_master_link, connectionManager, rpcm);
+  if (auto err = topicManager->start(pm, g_master_link, connectionManager, rpcm); !err) {
+    MINIROS_ERROR("Failed to start TopicManager: %s", err.toString());
+    shutdown();
+    return Error::SystemError;
+  }
   serviceManager->start(pm, g_master_link, connectionManager, rpcm);
 
   if (!connectionManager->start(pm)) {
@@ -424,7 +430,7 @@ Error start()
   g_internal_queue_thread = std::thread(internalCallbackQueueThreadFunc, internalCallbackQueue);
   getGlobalCallbackQueue()->enable();
 
-  MINIROS_DEBUG("Started node [%s], pid [%d], bound on [%s], xmlrpc port [%d], tcpros port [%d], using [%s] time", 
+  MINIROS_DEBUG("Started node [%s], pid [%d], bound on [%s], xmlrpc port [%d], tcpros port [%d], using [%s] time",
            this_node::getName().c_str(), getpid(), network::getHost().c_str(),
            rpcm->getServerPort(), connectionManager->getTCPPort(),
            Time::useSystemTime() ? "real" : "sim");
@@ -587,7 +593,7 @@ void waitForShutdown()
 {
   while (ok())
   {
-    WallDuration(0.05).sleep();
+    (void)WallDuration(0.05).sleep();
   }
 }
 
@@ -603,7 +609,7 @@ bool ok()
 
 void shutdownLocked(std::unique_lock<std::recursive_mutex>& lock)
 {
-  MINIROS_INFO("Running shutdown procedure");
+  MINIROS_DEBUG("Running shutdown procedure");
   g_shutting_down = true;
 
   miniros::console::shutdown();
@@ -647,7 +653,7 @@ void shutdown()
   shutdownLocked(lock);
 }
 
-MINIROS_DECL MasterLinkPtr getMasterLink()
+MasterLinkPtr getMasterLink()
 {
   return g_master_link;
 }
