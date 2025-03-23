@@ -47,6 +47,7 @@ set(cpp_common_SRC
     header.cpp
     console.cpp
     common.cpp
+    errors.cpp
     console_print.cpp
     file_log.cpp
     serialization.cpp)
