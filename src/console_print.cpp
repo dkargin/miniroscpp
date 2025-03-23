@@ -27,6 +27,10 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <atomic>
+#include <mutex>
+#include <set>
+
 #include "miniros/console.h"
 #define ROSCONSOLE_CONSOLE_IMPL_EXPORTS
 #include "console_impl.h"
@@ -38,7 +42,49 @@ namespace console
 namespace impl
 {
 
-LogAppender* rosconsole_print_appender = 0;
+struct Logger {
+
+  /// Number of published messages into this topic.
+  std::atomic_int messages = 0;
+
+  /// Log level for this  particular logger.
+  Level level = Level::Info;
+
+  explicit Logger(const std::string& name) : m_name(name) {}
+  explicit Logger(const std::string& name, Level level) : m_name(name), level(level) {}
+  Logger(const Logger&) = delete;
+
+  const std::string& name() const { return m_name; }
+
+protected:
+  const std::string m_name;
+};
+
+/// Comparator for loggers
+struct LoggerCmp {
+  using is_transparent = void;
+
+  bool operator () (const Logger& a, const Logger& b) const
+  {
+    return a.name() < b.name();
+  }
+
+  bool operator() (const std::string& lhs, const Logger& rhs) const { return lhs < rhs.name(); }
+  bool operator() (const Logger& lhs, const std::string& rhs) const { return lhs.name() < rhs; }
+};
+
+struct LoggerConfig {
+  std::set<Logger, LoggerCmp> loggers;
+
+  LogAppender* rosconsole_print_appender = nullptr;
+
+  /// Default logging level.
+  Level level = Level::Info;
+
+  std::mutex mutex;
+};
+
+LoggerConfig g_loggerConfig;
 
 void initialize()
 {}
@@ -46,36 +92,49 @@ void initialize()
 void print(void* handle, Level level, const char* str, const char* file, const char* function, int line)
 {
   ::miniros::console::backend::print(0, level, str, file, function, line);
-  if(rosconsole_print_appender)
+  if (g_loggerConfig.rosconsole_print_appender)
   {
-    rosconsole_print_appender->log(level, str, file, function, line);
+    g_loggerConfig.rosconsole_print_appender->log(level, str, file, function, line);
   }
 }
 
 bool isEnabledFor(void* handle, Level level)
 {
-  return level != Level::Debug;
+  if (handle) {
+    const Logger* logger = static_cast<const Logger*>(handle);
+    return level >= logger->level;
+  }
+  return level >= g_loggerConfig.level;
 }
 
 void* getHandle(const std::string& name)
 {
-  return 0;
+  auto it = g_loggerConfig.loggers.find(name);
+  if (it == g_loggerConfig.loggers.end()) {
+    auto p = g_loggerConfig.loggers.emplace(name);
+    return &const_cast<Logger&>(*p.first);
+  }
+  return &const_cast<Logger&>(*it);
 }
 
 std::string getName(void* handle)
 {
+  if (handle) {
+    auto* logger = static_cast<const Logger*>(handle);
+    return logger->name().c_str();
+  }
   return "";
 }
 
 void register_appender(LogAppender* appender)
 {
-  rosconsole_print_appender = appender;
+  g_loggerConfig.rosconsole_print_appender = appender;
 }
 
 void deregister_appender(LogAppender* appender){
-  if(rosconsole_print_appender == appender)
+  if (g_loggerConfig.rosconsole_print_appender == appender)
   {
-    rosconsole_print_appender = 0;
+    g_loggerConfig.rosconsole_print_appender = nullptr;
   }
 }
 
@@ -84,12 +143,22 @@ void shutdown()
 
 bool get_loggers(std::map<std::string, console::Level>& loggers)
 {
+  for (const Logger& l : g_loggerConfig.loggers) {
+    loggers[l.name()] = l.level;
+  }
   return true;
 }
 
 bool set_logger_level(const std::string& name, console::Level level)
 {
-  return false;
+  auto it = g_loggerConfig.loggers.find(name);
+  if (it == g_loggerConfig.loggers.end()) {
+    g_loggerConfig.loggers.emplace(name, level);
+  } else {
+    /// We are only modifying level
+    const_cast<Logger&>(*it).level = level;
+  }
+  return true;
 }
 
 } // namespace impl
