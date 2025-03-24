@@ -8,6 +8,8 @@
 
 #include "registrations.h"
 
+#include <errors.h>
+
 namespace miniros {
 namespace master {
 
@@ -45,6 +47,8 @@ bool Registrations::has_key(const std::string& key) const
 
 std::map<std::string, std::vector<std::string>> Registrations::getState() const
 {
+  // It must return a collection of node names.
+  // Also, node duplicates must be cleaned up.
   std::map<std::string, std::vector<std::string>> result;
 
   for (const auto& pair : map) {
@@ -56,11 +60,15 @@ std::map<std::string, std::vector<std::string>> Registrations::getState() const
   return result;
 }
 
-void Registrations::registerObj(const std::string& key, const std::string& caller_id,
+Error Registrations::registerObj(const std::string& key, const std::string& caller_id,
   const std::string& caller_api, const std::string& service_api)
 {
+  if (key.empty() || caller_id.empty() || caller_api.empty())
+    return Error::InvalidValue;
+
   Record record{caller_id, caller_api};
 
+  assert(!key.empty());
   auto providerIt = map.find(key);
   if (providerIt != map.end() && service_api.empty()) {
     auto& providers = providerIt->second;
@@ -79,10 +87,11 @@ void Registrations::registerObj(const std::string& key, const std::string& calle
   } else if (m_type == Registrations::SERVICE) {
     throw std::runtime_error("service_api must be specified for Registrations.SERVICE");
   }
+  return Error::Ok;
 }
 
-ReturnStruct Registrations::unregisterObj(
-  std::string key, std::string caller_id, std::string caller_api, std::string service_api)
+ReturnStruct Registrations::unregisterObj(const std::string& key, const std::string& caller_id,
+  const std::string& caller_api, const std::string& service_api)
 {
   std::stringstream ss;
   if (!service_api.empty()) {
@@ -126,7 +135,11 @@ void Registrations::unregister_all(const std::string& caller_id)
   std::vector<std::string> dead_keys;
 
   for (auto& [key, providers] : map) {
-    std::remove_if(providers.begin(), providers.end(), [&](const Record& r) { return r.caller_id == caller_id; });
+    auto newEnd = std::remove_if(providers.begin(), providers.end(),
+      [&](const Record& r) {
+        return r.caller_id == caller_id;
+      });
+    providers.erase(newEnd, providers.end());
 
     if (providers.empty())
       dead_keys.push_back(key);

@@ -92,7 +92,10 @@ void MasterHandler::notifyTopicSubscribers(const std::string& topic, const std::
           l[i + 1] = url.str();
         }
       }
-      sendToNode(sub, "publisherUpdate", topic, l);
+      Error err = sendToNode(sub, "publisherUpdate", topic, l);
+      if (err != Error::Ok) {
+        MINIROS_WARN("Failed send publisherUpdate(%s) to node \"%s\"", topic.c_str(), sub->id().c_str());
+      }
     }
   }
 }
@@ -135,6 +138,9 @@ ReturnStruct MasterHandler::registerSubscriber(const RequesterInfo& requesterInf
   std::shared_ptr<NodeRef> ref = m_regManager->register_subscriber(topic, requesterInfo.callerId, requesterInfo.callerApi);
   if (!ref)
     return ReturnStruct(0, "Internal error");
+  if (topic.empty() || topic_type.empty()) {
+    ReturnStruct(-1, "Request error");
+  }
 
   MINIROS_INFO_NAMED("handler", "registerSubscriber(\"%s\") caller_id=%s caller_api=%s, type=%s",
     topic.c_str(), requesterInfo.callerId.c_str(), requesterInfo.callerApi.c_str(), topic_type.c_str());
@@ -143,7 +149,6 @@ ReturnStruct MasterHandler::registerSubscriber(const RequesterInfo& requesterInf
     ref->updateHost(hostInfo);
 
   {
-    assert(!topic.empty() && !topic_type.empty());
     std::scoped_lock<std::mutex> lock(m_guard);
     if (!m_topicTypes.count(topic))
       m_topicTypes[topic] = topic_type;
@@ -190,9 +195,12 @@ ReturnStruct MasterHandler::registerPublisher(const RequesterInfo& requesterInfo
   MINIROS_INFO_NAMED("handler", "registerPublisher(\"%s\") caller_id=%s caller_api=%s type=%s",
     topic.c_str(), requesterInfo.callerId.c_str(), requesterInfo.callerApi.c_str(), topic_type.c_str());
 
+  if (topic.empty() || topic_type.empty()) {
+    ReturnStruct(-1, "Request error");
+  }
+
   {
     std::scoped_lock<std::mutex> lock(m_guard);
-    assert(!topic.empty() && !topic_type.empty());
     if (!m_topicTypes.count(topic))
       m_topicTypes[topic] = topic_type;
   }

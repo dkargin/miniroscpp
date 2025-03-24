@@ -9,6 +9,7 @@
 #include <string>
 #include <vector>
 
+#include "miniros/errors.h"
 #include "miniros/xmlrpcpp/XmlRpcValue.h"
 
 namespace XmlRpc {
@@ -72,10 +73,11 @@ public:
     /// Returns a map: resourceName -> array of URIs who provide/need this resource (subscription, publication, service, ...)
     std::map<std::string, std::vector<std::string>> getState() const;
 
-    void registerObj(const std::string& key, const std::string& caller_id,
+    Error registerObj(const std::string& key, const std::string& caller_id,
       const std::string& caller_api, const std::string& service_api="");
 
-    ReturnStruct unregisterObj(std::string key, std::string caller_id, std::string caller_api, std::string service_api);
+    ReturnStruct unregisterObj(const std::string& key, const std::string& caller_id,
+        const std::string& caller_api, const std::string& service_api);
 
     void unregister_all(const std::string& caller_id);
 
