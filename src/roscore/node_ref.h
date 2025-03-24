@@ -89,6 +89,8 @@ protected:
     std::weak_ptr<HostInfo> m_hostInfo;
 };
 
+using NodeRefPtr = std::shared_ptr<NodeRef>;
+
 } // namespace master
 } // namespace miniros
 

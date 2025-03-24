@@ -1,4 +1,4 @@
 <launch>
-  <test test-name="check_master_false" pkg="test_roscpp" type="test_roscpp-check_master" args="no"/>
+  <test test-name="check_master_false" pkg="miniros" type="advanced-check_master" args="no"/>
 </launch>
 

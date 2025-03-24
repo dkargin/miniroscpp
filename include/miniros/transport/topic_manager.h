@@ -73,7 +73,7 @@ public:
   TopicManager();
   ~TopicManager();
 
-  void start(PollManagerPtr pm, MasterLinkPtr master_link, ConnectionManagerPtr cm, RPCManagerPtr rpcm);
+  Error start(PollManagerPtr pm, MasterLinkPtr master_link, ConnectionManagerPtr cm, RPCManagerPtr rpcm);
   void shutdown();
 
   bool subscribe(const SubscribeOptions& ops);
@@ -216,7 +216,7 @@ private:
    */
   bool pubUpdate(const std::string &topic, const std::vector<std::string> &pubs);
 
-  void pubUpdateCallback(const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result);
+  Error pubUpdateCallback(const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result);
   void requestTopicCallback(const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result);
   void getBusStatsCallback(const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result);
   void getBusInfoCallback(const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result);

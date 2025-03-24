@@ -124,7 +124,7 @@ int main(int argc, const char ** argv) {
     remappings["__master"] = master.getUri();
 
     MINIROS_INFO("Creating Rosout object");
-    miniros::init(remappings, "rosout", miniros::init_options::NoRosout | miniros::init_options::NoSigintHandler);
+    miniros::init(remappings, "miniroscore", miniros::init_options::NoRosout | miniros::init_options::NoSigintHandler);
     r.reset(new miniros::master::Rosout());
   }
 

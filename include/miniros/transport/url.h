@@ -24,6 +24,9 @@ struct MINIROS_DECL URL {
   /// Path part of URL.
   std::string path;
 
+  /// Unparsed query.
+  std::string query;
+
   URL();
 
   bool fromString(const std::string& urlStr, bool defaultPort);

@@ -65,8 +65,9 @@ int setenv(const char *name, const char *value, int overwrite)
 
 TEST(CheckMaster, checkMaster)
 {
-  miniros::MasterLink master_link(miniros::RPCManager::instance());
-  ASSERT_EQ(master_link.check(), g_should_exist);
+  miniros::MasterLinkPtr master_link = miniros::getMasterLink();
+  ASSERT_TRUE(master_link);
+  ASSERT_EQ(master_link->check(), g_should_exist);
 }
 
 int main(int argc, char** argv)

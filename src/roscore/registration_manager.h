@@ -45,7 +45,8 @@ public:
   std::shared_ptr<NodeRef> getNodeByAPI(const std::string& nodeApi) const;
 
   /// Register or update node API.
-  std::shared_ptr<NodeRef> registerNodeApi(const std::string& caller_id, const std::string& caller_api, bool& rtn);
+  /// @returns a pair with {newNode, replacedNode}
+  std::pair<NodeRefPtr, NodeRefPtr> registerNodeApi(const std::string& caller_id, const std::string& caller_api);
 
   /// Internal method for registering an object.
   /// It can allocate new NodeRef for an object, or update an existing one.
@@ -82,6 +83,9 @@ public:
   std::set<std::shared_ptr<NodeRef>> pullShutdownNodes();
 
   std::ostream& writeJson(std::ostream& os, miniros::JsonState& state, const miniros::JsonSettings& settings) const;
+
+  /// Drop all registrations for specified node.
+  void dropRegistrations(const std::shared_ptr<NodeRef>& node);
 
 protected:
 

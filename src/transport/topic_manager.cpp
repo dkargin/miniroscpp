@@ -42,8 +42,6 @@
 #include "miniros/transport/transport_udp.h"
 #include "miniros/transport/net_address.h"
 
-#include "miniros/xmlrpcpp/XmlRpc.h"
-
 #include <miniros/console.h>
 #include <sstream>
 #include <xmlrpcpp/XmlRpcServerConnection.h>
@@ -85,8 +83,11 @@ TopicManager::~TopicManager()
   shutdown();
 }
 
-void TopicManager::start(PollManagerPtr pm, MasterLinkPtr master_link, ConnectionManagerPtr cm, RPCManagerPtr rpcm)
+Error TopicManager::start(PollManagerPtr pm, MasterLinkPtr master_link, ConnectionManagerPtr cm, RPCManagerPtr rpcm)
 {
+  if (!pm || !cm || !rpcm)
+    return Error::InvalidValue;
+
   std::scoped_lock<std::mutex> shutdown_lock(shutting_down_mutex_);
   shutting_down_ = false;
   resolve_ip_ = false;
@@ -120,6 +121,7 @@ void TopicManager::start(PollManagerPtr pm, MasterLinkPtr master_link, Connectio
   if (master_link_) {
     resolve_ip_ = master_link->param<bool>("/resolve_ip", false);
   }
+  return Error::Ok;
 }
 
 void TopicManager::shutdown()
@@ -189,7 +191,6 @@ void TopicManager::processPublishQueues()
 void TopicManager::getAdvertisedTopics(V_string& topics)
 {
   std::scoped_lock<std::mutex> lock(advertised_topic_names_mutex_);
-
   topics.resize(advertised_topic_names_.size());
   std::copy(advertised_topic_names_.begin(), advertised_topic_names_.end(), topics.begin());
 }
@@ -578,6 +579,10 @@ XmlRpc::XmlRpcValue TopicManager::requestTopic(const std::string& caller, const 
   ret[1] = "";
   ret[2] = 0;
 
+  if (!connection_manager_) {
+    return ret;
+  }
+
   std::string goodAddress;
 
   network::NetAddress localAddress;
@@ -939,17 +944,31 @@ void TopicManager::getPublications(XmlRpcValue& pubs)
   }
 }
 
-void TopicManager::pubUpdateCallback(const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result)
+Error TopicManager::pubUpdateCallback(const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result)
 {
+  std::stringstream ss;
+  if (params.size() < 3)
+    return Error::InvalidValue;
+  if (params[1].getType() != XmlRpc::XmlRpcValue::TypeString)
+    return Error::InvalidValue;
+  if (params[2].getType() != XmlRpc::XmlRpcValue::TypeArray)
+    return Error::InvalidValue;
+  std::string topic = params[1];
   std::vector<std::string> pubs;
   for (int idx = 0; idx < params[2].size(); idx++) {
-    pubs.push_back(params[2][idx]);
+    std::string pub = params[2][idx];
+    pubs.push_back(pub);
+    ss << pub << ",";
   }
-  if (pubUpdate(params[1], pubs)) {
+
+  MINIROS_INFO("pubUpdateCallback(%s) publishers={%s}", topic.c_str(), ss.str().c_str());
+
+  if (pubUpdate(topic, pubs)) {
     result = xmlrpc::responseInt(1, "", 0);
   } else {
     result = xmlrpc::responseInt(0, console::g_last_error_message, 0);
   }
+  return Error::Ok;
 }
 
 void TopicManager::getBusStatsCallback(const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result)

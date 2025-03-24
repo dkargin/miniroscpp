@@ -148,7 +148,8 @@ bool MasterLink::getTopics(std::vector<TopicInfo>& topics) const
 {
   RpcValue args, result, payload;
   args[0] = this_node::getName();
-  args[1] = ""; // TODO: Fix this
+  const std::string subgraph = "";
+  args[1] = subgraph;
 
   if (!execute("getPublishedTopics", args, result, payload, true)) {
     return false;
@@ -198,9 +199,15 @@ Error MasterLink::execute(const std::string& method, const RpcValue& request, Rp
   std::string master_host = getHost();
   uint32_t master_port = getPort();
   RPCManagerPtr manager = internal_->rpcManager;
-  if (!manager)
+  if (!manager) {
+    MINIROS_ERROR("[%s] - no manager", method.c_str());
     return Error::InternalError;
+  }
   XmlRpc::XmlRpcClient* c = manager->getXMLRPCClient(master_host, master_port, "/");
+  if (!c) {
+    MINIROS_ERROR("[%s] - failed make connection to host=\"%s:%d\"", method.c_str(), master_host.c_str(), master_port);
+    return Error::InvalidURI;
+  }
   bool printed = false;
   bool slept = false;
   bool ok = true;
@@ -229,13 +236,12 @@ Error MasterLink::execute(const std::string& method, const RpcValue& request, Rp
       }
 
       if (!internal_->retry_timeout.isZero() && (miniros::SteadyTime::now() - start_time) >= internal_->retry_timeout) {
-        MINIROS_ERROR(
-          "[%s] Timed out trying to connect to the master after [%f] seconds", method.c_str(), internal_->retry_timeout.toSec());
+        MINIROS_ERROR("[%s] Timed out trying to connect to the master after [%f] seconds", method.c_str(), internal_->retry_timeout.toSec());
         manager->releaseXMLRPCClient(c);
         return Error::NoMaster;
       }
 
-      miniros::WallDuration(0.05).sleep();
+      (void)miniros::WallDuration(0.05).sleep();
       slept = true;
     } else {
       if (!manager->validateXmlrpcResponse(method, response, payload)) {

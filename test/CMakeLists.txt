@@ -12,7 +12,7 @@ function(miniros_add_test TARGET_NAME)
 	cmake_parse_arguments(${CMAKE_CURRENT_FUNCTION} "${bool_options}" "${single_value_options}" "SOURCES;LIBRARIES" ${ARGN})
 	add_executable(${TARGET_NAME} ${${CMAKE_CURRENT_FUNCTION}_SOURCES})
 	set(optional_libs gtest_main)
-	target_link_libraries(${TARGET_NAME} miniros::roscxx ${GTEST_LIBRARIES})
+	target_link_libraries(${TARGET_NAME} roscxx ${GTEST_LIBRARIES})
 
 	if (NOT ${CMAKE_CURRENT_FUNCTION}_DISABLED)
 		# Test is disabled. It is either not ported properly from rostest or does not suite CTest environment

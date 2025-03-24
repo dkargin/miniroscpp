@@ -74,6 +74,10 @@ namespace XmlRpc {
     //!  @see XmlRpcDispatch::EventType
     unsigned handleEvent(unsigned eventType) override;
 
+    /// Get some printable debug name.
+    /// It often contains file descriptor and URL of endpoint.
+    std::string name() const;
+
   protected:
     // Execution processing helpers
     virtual bool doConnect();

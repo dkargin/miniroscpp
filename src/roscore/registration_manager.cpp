@@ -46,12 +46,10 @@ std::shared_ptr<NodeRef> RegistrationManager::getNodeByAPIUnsafe(const std::stri
   return {};
 }
 
-
 std::shared_ptr<NodeRef> RegistrationManager::_register(Registrations& r, const std::string& key, const std::string& caller_id, const std::string& caller_api,
   const std::string& service_api)
 {
-  bool changed = false;
-  std::shared_ptr<NodeRef> node_ref = registerNodeApi(caller_id, caller_api, changed);
+  auto [node_ref, oldNode] = registerNodeApi(caller_id, caller_api);
   if (!node_ref) {
     MINIROS_ERROR("Failed to register NodeRef(node=%s api=%s)", caller_id.c_str(), caller_api.c_str());
     return {};
@@ -59,14 +57,23 @@ std::shared_ptr<NodeRef> RegistrationManager::_register(Registrations& r, const 
 
   node_ref->add(r.type(), key);
 
-  if (changed) {
-    publishers.unregister_all(caller_id);
-    subscribers.unregister_all(caller_id);
-    services.unregister_all(caller_id);
-    param_subscribers.unregister_all(caller_id);
+  if (oldNode) {
+    dropRegistrations(oldNode);
   }
   r.registerObj(key, caller_id, caller_api, service_api);
   return node_ref;
+}
+
+void RegistrationManager::dropRegistrations(const std::shared_ptr<NodeRef>& node)
+{
+  if (!node)
+    return;
+  std::string name = node->id();
+  MINIROS_INFO("Unregistering everything from superseded node \"%s\" at %s", name.c_str(), node->getApi().c_str());
+  publishers.unregister_all(name);
+  subscribers.unregister_all(name);
+  services.unregister_all(name);
+  param_subscribers.unregister_all(name);
 }
 
 ReturnStruct RegistrationManager::unregisterObject(Registrations& r, const std::string& key,
@@ -141,7 +148,7 @@ ReturnStruct RegistrationManager::unregister_param_subscriber(const std::string&
   return unregisterObject(param_subscribers, param, caller_id, caller_api);
 }
 
-std::shared_ptr<NodeRef> RegistrationManager::registerNodeApi(const std::string& caller_id, const std::string& caller_api, bool& rtn)
+std::pair<NodeRefPtr, NodeRefPtr> RegistrationManager::registerNodeApi(const std::string& caller_id, const std::string& caller_api)
 {
   std::scoped_lock<std::mutex> lock(m_guard);
 
@@ -149,13 +156,12 @@ std::shared_ptr<NodeRef> RegistrationManager::registerNodeApi(const std::string&
   if (m_nodes.count(caller_id))
     node_ref = m_nodes[caller_id];
 
-  std::string bumped_api = "";
+  NodeRefPtr prevNode;
   if (node_ref) {
     if (node_ref->getApi() == caller_api) {
-      rtn = false;
-      return node_ref;
+      return {node_ref, prevNode};
     } else {
-      bumped_api = node_ref->getApi();
+      prevNode = node_ref;
       MINIROS_WARN_NAMED("reg", "New node registered with name=\"%s\" api=%s", caller_id.c_str(), caller_api.c_str());
       m_nodesToShutdown.insert(node_ref);
     }
@@ -164,8 +170,7 @@ std::shared_ptr<NodeRef> RegistrationManager::registerNodeApi(const std::string&
   node_ref.reset(new NodeRef(caller_id, caller_api));
   m_nodes[caller_id] = node_ref;
 
-  rtn = !bumped_api.empty();
-  return node_ref;
+  return {node_ref, prevNode};
 }
 
 std::set<std::shared_ptr<NodeRef>> RegistrationManager::pullShutdownNodes()
@@ -195,7 +200,7 @@ std::vector<std::shared_ptr<NodeRef>> RegistrationManager::getTopicSubscribers(c
   std::vector<std::shared_ptr<NodeRef>> result;
   std::vector<std::string> sub_api = subscribers.getApis(topic);
   for (const auto& api: sub_api) {
-    auto node = getNodeByNameUnsafe(api);
+    auto node = getNodeByAPIUnsafe(api);
     if (node) {
       result.push_back(node);
     }

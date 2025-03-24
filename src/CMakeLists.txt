@@ -47,6 +47,7 @@ set(cpp_common_SRC
     header.cpp
     console.cpp
     common.cpp
+    errors.cpp
     console_print.cpp
     file_log.cpp
     serialization.cpp)
@@ -253,9 +254,9 @@ target_compile_definitions(roscxx PRIVATE rostime_EXPORTS miniros_EXPORTS)
 
 target_include_directories(roscxx
 PRIVATE
-    ${MINIROS_INCLUDE_DIRS}
     ${MINIROS_INCLUDE_ROOT}/miniros
 PUBLIC
+    $<BUILD_INTERFACE:${MINIROS_INCLUDE_DIRS}>
     $<BUILD_INTERFACE:${MINIROS_INCLUDE_ROOT}>
     $<BUILD_INTERFACE:${MINIROS_INCLUDE_GENERATED_DIRS}>
     $<INSTALL_INTERFACE:include/generated>  # <prefix>/include/mylib

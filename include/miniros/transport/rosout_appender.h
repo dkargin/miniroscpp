@@ -62,6 +62,10 @@ public:
   explicit ROSOutAppender(const TopicManagerPtr& tm);
   ~ROSOutAppender() override;
 
+  /// Initialize appender.
+  /// It tries to advertise /rosout topic.
+  Error init();
+
   const std::string& getLastError() const;
 
   void log(console::Level level, const char* str, const char* file, const char* function, int line) override;

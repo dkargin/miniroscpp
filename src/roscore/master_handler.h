@@ -37,8 +37,11 @@ public:
 
   MasterHandler(RPCManagerPtr rpcManager, RegistrationManager* regManager);
 
-  /// Sens command/update to a node.
+  /// Sends immediate command/update to a node.
   Error sendToNode(const std::shared_ptr<NodeRef>& nr, const char* method, const RpcValue& arg1, const RpcValue& arg2 = {});
+
+  /// Enqueues command to a node. It will be executed later in `update()` method.
+  Error enqueueNodeCommand(const std::shared_ptr<NodeRef>& nr, const char* method, const RpcValue& arg1, const RpcValue& arg2 = {});
 
   std::string getUri(const std::string& caller_id) const;
 
@@ -82,11 +85,21 @@ public:
   /// It is called from the main thread, out of any RPC handlers.
   void update();
 
+  struct AsyncCommand {
+    std::shared_ptr<NodeRef> node;
+    std::string command;
+    RpcValue arg1;
+    RpcValue arg2;
+  };
+
 protected:
   AddressResolver m_resolver;
   RegistrationManager* m_regManager;
 
   RPCManagerPtr m_rpcManager;
+
+  /// A  list of commands to be sent later.
+  std::vector<AsyncCommand> m_asyncCommands;
 
   /// Maps topicName to type md5.
   std::map<std::string, std::string> m_topicTypes;

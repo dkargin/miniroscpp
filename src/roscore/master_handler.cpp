@@ -32,6 +32,16 @@ MasterHandler::MasterHandler(RPCManagerPtr rpcManager, RegistrationManager* regM
   m_resolver.scanAdapters();
 }
 
+Error MasterHandler::enqueueNodeCommand(const std::shared_ptr<NodeRef>& nr, const char* method, const RpcValue& arg1, const RpcValue& arg2)
+{
+  if (!nr)
+    return Error::InvalidValue;
+
+  std::scoped_lock<std::mutex> lock(m_guard);
+  m_asyncCommands.emplace_back(AsyncCommand{nr, std::string(method), arg1, arg2});
+  return Error::Ok;
+}
+
 Error MasterHandler::sendToNode(const std::shared_ptr<NodeRef>& nr, const char* method, const RpcValue& arg1, const RpcValue& arg2)
 {
   if (!nr)
@@ -62,9 +72,23 @@ Error MasterHandler::sendToNode(const std::shared_ptr<NodeRef>& nr, const char* 
     return Error::SystemError;
   }
 
-  RpcValue result;
-  if (!client->executeNonBlock(method, args))
+  /*
+  /// This notification can happen inside RPC callback. So blocking call will not work here at all.
+  if (!client->executeNonBlock(method, args)) {
+    MINIROS_WARN("Failed to execute node request %s", method);
     return Error::SystemError;
+  }*/
+
+  RpcValue result;
+  if (!client->execute(method, args, result)) {
+    MINIROS_WARN("Failed to execute node request %s", method);
+    return Error::SystemError;
+  }
+  if (result.size() > 2) {
+    MINIROS_INFO("Response status=%d, msg=%s", result[0].as<int>(), result[1].as<std::string>().c_str());
+  } else {
+    MINIROS_WARN("Unexpected response");
+  }
   return Error::Ok;
 }
 
@@ -92,7 +116,10 @@ void MasterHandler::notifyTopicSubscribers(const std::string& topic, const std::
           l[i + 1] = url.str();
         }
       }
-      sendToNode(sub, "publisherUpdate", topic, l);
+      Error err = this->enqueueNodeCommand(sub, "publisherUpdate", topic, l);
+      if (err != Error::Ok) {
+        MINIROS_WARN("Failed send publisherUpdate(%s) to node \"%s\"", topic.c_str(), sub->id().c_str());
+      }
     }
   }
 }
@@ -135,6 +162,9 @@ ReturnStruct MasterHandler::registerSubscriber(const RequesterInfo& requesterInf
   std::shared_ptr<NodeRef> ref = m_regManager->register_subscriber(topic, requesterInfo.callerId, requesterInfo.callerApi);
   if (!ref)
     return ReturnStruct(0, "Internal error");
+  if (topic.empty() || topic_type.empty()) {
+    ReturnStruct(-1, "Request error");
+  }
 
   MINIROS_INFO_NAMED("handler", "registerSubscriber(\"%s\") caller_id=%s caller_api=%s, type=%s",
     topic.c_str(), requesterInfo.callerId.c_str(), requesterInfo.callerApi.c_str(), topic_type.c_str());
@@ -143,7 +173,6 @@ ReturnStruct MasterHandler::registerSubscriber(const RequesterInfo& requesterInf
     ref->updateHost(hostInfo);
 
   {
-    assert(!topic.empty() && !topic_type.empty());
     std::scoped_lock<std::mutex> lock(m_guard);
     if (!m_topicTypes.count(topic))
       m_topicTypes[topic] = topic_type;
@@ -190,9 +219,12 @@ ReturnStruct MasterHandler::registerPublisher(const RequesterInfo& requesterInfo
   MINIROS_INFO_NAMED("handler", "registerPublisher(\"%s\") caller_id=%s caller_api=%s type=%s",
     topic.c_str(), requesterInfo.callerId.c_str(), requesterInfo.callerApi.c_str(), topic_type.c_str());
 
+  if (topic.empty() || topic_type.empty()) {
+    ReturnStruct(-1, "Request error");
+  }
+
   {
     std::scoped_lock<std::mutex> lock(m_guard);
-    assert(!topic.empty() && !topic_type.empty());
     if (!m_topicTypes.count(topic))
       m_topicTypes[topic] = topic_type;
   }
@@ -276,6 +308,7 @@ std::vector<std::vector<std::string>> MasterHandler::getPublishedTopics(
         if (it != m_topicTypes.end()) {
           std::vector<std::string> value = {Key, it->second};
           rtn.push_back(value);
+          break;
         }
       }
     }
@@ -310,6 +343,21 @@ void MasterHandler::setResolveNodeIP(bool resolve)
 void MasterHandler::update()
 {
   auto shutdownNodes = m_regManager->pullShutdownNodes();
+
+  std::vector<AsyncCommand> commands;
+
+  {
+    std::unique_lock<std::mutex> lock(m_guard);
+    std::swap(commands, m_asyncCommands);
+  }
+
+  for (const auto& command: commands) {
+    if (shutdownNodes.count(command.node)) {
+      continue;
+    }
+    sendToNode(command.node, command.command.c_str(), command.arg1, command.arg2);
+  }
+
   for (std::shared_ptr<NodeRef> nr: shutdownNodes) {
     RpcValue msg;
     std::stringstream ss;
