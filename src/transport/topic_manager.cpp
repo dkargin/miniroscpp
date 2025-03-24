@@ -944,17 +944,31 @@ void TopicManager::getPublications(XmlRpcValue& pubs)
   }
 }
 
-void TopicManager::pubUpdateCallback(const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result)
+Error TopicManager::pubUpdateCallback(const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result)
 {
+  std::stringstream ss;
+  if (params.size() < 3)
+    return Error::InvalidValue;
+  if (params[1].getType() != XmlRpc::XmlRpcValue::TypeString)
+    return Error::InvalidValue;
+  if (params[2].getType() != XmlRpc::XmlRpcValue::TypeArray)
+    return Error::InvalidValue;
+  std::string topic = params[1];
   std::vector<std::string> pubs;
   for (int idx = 0; idx < params[2].size(); idx++) {
-    pubs.push_back(params[2][idx]);
+    std::string pub = params[2][idx];
+    pubs.push_back(pub);
+    ss << pub << ",";
   }
-  if (pubUpdate(params[1], pubs)) {
+
+  MINIROS_INFO("pubUpdateCallback(%s) publishers={%s}", topic.c_str(), ss.str().c_str());
+
+  if (pubUpdate(topic, pubs)) {
     result = xmlrpc::responseInt(1, "", 0);
   } else {
     result = xmlrpc::responseInt(0, console::g_last_error_message, 0);
   }
+  return Error::Ok;
 }
 
 void TopicManager::getBusStatsCallback(const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result)

@@ -121,7 +121,7 @@ Master::RpcValue Master::lookupService(const std::string& caller_id, const std::
   }
   std::string uri = m_handler.lookupService(requesterInfo, service);
 
-  RpcValue res = RpcValue::Array(3);;
+  RpcValue res = RpcValue::Array(3);
   if (uri.empty()) {
     res[0] = -1;
     res[1] = std::string("Failed to lookup service '" + service + "'");
