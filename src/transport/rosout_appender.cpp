@@ -51,11 +51,7 @@ ROSOutAppender::ROSOutAppender(const TopicManagerPtr& tm)
 , publish_thread_(&ROSOutAppender::logThread, this)
 , topic_manager_(tm)
 {
-  AdvertiseOptions ops;
-  ops.init<rosgraph_msgs::Log>(names::resolve("/rosout"), 0);
-  ops.latch = true;
-  SubscriberCallbacksPtr cbs(std::make_shared<SubscriberCallbacks>());
-  TopicManager::instance()->advertise(ops, cbs);
+
 }
 
 ROSOutAppender::~ROSOutAppender()
@@ -69,6 +65,23 @@ ROSOutAppender::~ROSOutAppender()
 
   publish_thread_.join();
 }
+
+Error ROSOutAppender::init()
+{
+  if (!topic_manager_) {
+    return Error::InternalError;
+  }
+  AdvertiseOptions ops;
+  ops.init<rosgraph_msgs::Log>(names::resolve("/rosout"), 0);
+  ops.latch = true;
+  SubscriberCallbacksPtr cbs(std::make_shared<SubscriberCallbacks>());
+  if (!topic_manager_->advertise(ops, cbs)) {
+    MINIROS_ERROR("Failed to advertise /rosout");
+    return Error::InvalidResponse;
+  }
+  return Error::Ok;
+}
+
 
 const std::string&  ROSOutAppender::getLastError() const
 {

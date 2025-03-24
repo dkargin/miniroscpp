@@ -366,7 +366,10 @@ Error start()
 
   if (!(g_init_options & init_options::NoRosout))
   {
-    g_rosout_appender = new ROSOutAppender(topicManager);
+    ROSOutAppender* appender = new ROSOutAppender(topicManager);
+    if (!appender->init()) {}
+    auto prev = g_rosout_appender.exchange(appender);
+    assert(!prev);
     miniros::console::register_appender(g_rosout_appender);
   }
 
