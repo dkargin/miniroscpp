@@ -35,7 +35,8 @@
 #include <algorithm>
 #include <filesystem>
 #include <sys/stat.h>
-#include <time.h>
+
+#include <ctime>
 #include <memory>
 #include <queue>
 #include <set>
@@ -230,19 +231,17 @@ bool Recorder::shouldSubscribeToTopic(std::string const& topic, bool from_node)
   return std::find(std::begin(options_.topics), std::end(options_.topics), topic) != std::end(options_.topics);
 }
 
-template <class T> std::string Recorder::timeToStr(T MINIROS_t)
+template <class T> std::string Recorder::timeToStr(T ros_t)
 {
-  (void)MINIROS_t;
-  std::stringstream msg;
-#ifdef USE_SOPHISTICATED_TIME_FORMAT
-  const boost::posix_time::ptime now = boost::posix_time::second_clock::local_time();
-  boost::posix_time::time_facet* const f = new boost::posix_time::time_facet("%Y-%m-%d-%H-%M-%S");
-  msg.imbue(std::locale(msg.getloc(), f));
-#else
-  const auto now = miniros::Time::now();
-#endif
-  msg << now;
-  return msg.str();
+  (void)ros_t;
+
+  char timeString[1024];
+  
+  // Example of the very popular RFC 3339 format UTC time
+  std::time_t time = std::time({});
+  std::strftime(timeString, sizeof(timeString), "%Y-%m-%d-%H-%M-%S", std::gmtime(&time));
+  
+  return std::string(timeString);
 }
 
 //! Callback to be invoked to save messages into a queue
