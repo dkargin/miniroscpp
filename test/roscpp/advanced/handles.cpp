@@ -32,7 +32,7 @@
 /*
  * Test handles
  */
-
+#include <algorithm>
 #include <string>
 #include <sstream>
 #include <fstream>
