@@ -4,6 +4,7 @@
 
 #include <string>
 #include <sstream>
+#include <fstream>
 #include <regex> // to catch std::regex_error
 
 #include "../replacements/progress_display.h"
@@ -120,19 +121,15 @@ minibag::PlayerOptions parsePlayOptions(int argc, char** argv) {
     if (vm.count("topics"))
     {
       std::vector<std::string> topics = vm["topics"].as< std::vector<std::string> >();
-      for (std::vector<std::string>::iterator i = topics.begin();
-           i != topics.end();
-           i++)
-        opts.topics.push_back(*i);
+      for (const std::string& topic: topics)
+        opts.topics.push_back(topic);
     }
 
     if (vm.count("pause-topics"))
     {
       std::vector<std::string> pause_topics = vm["pause-topics"].as< std::vector<std::string> >();
-      for (std::vector<std::string>::iterator i = pause_topics.begin();
-           i != pause_topics.end();
-           i++)
-        opts.pause_topics.push_back(*i);
+      for (const std::string& topic: pause_topics)
+        opts.pause_topics.push_back(topic);
     }
 
     if (vm.count("rate-control-topic"))
@@ -144,10 +141,8 @@ minibag::PlayerOptions parsePlayOptions(int argc, char** argv) {
     if (vm.count("bags"))
     {
       std::vector<std::string> bags = vm["bags"].as< std::vector<std::string> >();
-      for (std::vector<std::string>::iterator i = bags.begin();
-           i != bags.end();
-           i++)
-          opts.bags.push_back(*i);
+      for (const std::string& bag: bags)
+          opts.bags.push_back(bag);
     } else {
       if (vm.count("topics") || vm.count("pause-topics"))
         throw miniros::Exception("When using --topics or --pause-topics, --bags "
@@ -214,7 +209,8 @@ minibag::RecorderOptions parseRecordOptions(int argc, char** argv) {
       ("duration", po::value<std::string>(), "Record a bag of maximum duration in seconds, unless 'm', or 'h' is appended.")
       ("node", po::value<std::string>(), "Record all topics subscribed to by a specific node.")
       ("tcpnodelay", "Use the TCP_NODELAY transport hint when subscribing to topics.")
-      ("udp", "Use the UDP transport hint when subscribing to topics.");
+      ("udp", "Use the UDP transport hint when subscribing to topics.")
+      ("topic-list", po::value< std::vector<std::string> >()->multitoken(), "path to a file with list of topics to record");
 
 
     po::positional_options_description p;
@@ -397,24 +393,41 @@ minibag::RecorderOptions parseRecordOptions(int argc, char** argv) {
       opts.transport_hints.udp();
     }
 
+    std::vector<std::string> topics;
+    if (vm.count("topic-list")) {
+      std::vector<std::string> listFiles = vm["topic-list"].as< std::vector<std::string> >();
+      for (const std::string& file: listFiles) {
+        std::ifstream in(file.c_str());
+        if (!in) {
+          std::cerr << "Failed to open file with topic list \"" << file.c_str() << "\"" << std::endl;
+          continue;
+        }
+        std::string line;
+        while (std::getline(in, line)) {
+          if (line.empty())
+            continue;
+          topics.push_back(line);
+        }
+      }
+    }
+
     // Every non-option argument is assumed to be a topic
     if (vm.count("topic"))
     {
-      std::vector<std::string> bags = vm["topic"].as< std::vector<std::string> >();
-      std::sort(bags.begin(), bags.end());
-      bags.erase(std::unique(bags.begin(), bags.end()), bags.end());
-      for (std::vector<std::string>::iterator i = bags.begin();
-           i != bags.end();
-           i++)
-        opts.topics.push_back(*i);
+      std::vector<std::string> t = vm["topic"].as< std::vector<std::string> >();
+      for (const std::string& topic: t)
+        topics.push_back(topic);
     }
 
+    std::sort(topics.begin(), topics.end());
+    topics.erase(std::unique(topics.begin(), topics.end()), topics.end());
+    opts.topics = topics;
 
     // check that argument combinations make sense
     if(opts.exclude_regex.mark_count() > 0 &&
             !(opts.record_all || opts.regex)) {
-        fprintf(stderr, "Warning: Exclusion regex given, but no topics to subscribe to.\n"
-                "Adding implicit 'record all'.");
+        std::cerr << "Warning: Exclusion regex given, but no topics to subscribe to.\n"
+                    "Adding implicit 'record all'.";
         opts.record_all = true;
     }
 
