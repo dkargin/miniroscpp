@@ -9,6 +9,7 @@
 #include <vector>
 #include <map>
 #include <array>
+#include <memory>
 
 #include <miniros/types.h>
 #include <miniros/serialization.h>
@@ -38,7 +39,7 @@ struct TriggerResponse_
    typedef uint8_t _success_type;
   _success_type success;
 
-   typedef std::basic_string<char, std::char_traits<char>, typename ContainerAllocator::template rebind<char>::other >  _message_type;
+   typedef std::basic_string<char, std::char_traits<char>, typename std::allocator_traits<ContainerAllocator>::template rebind_alloc<char> > _message_type;
   _message_type message;
 
 
@@ -75,23 +76,13 @@ namespace message_traits
 
 
 
-// BOOLTRAITS {'IsFixedSize': False, 'IsMessage': True, 'HasHeader': False}
+// BOOLTRAITS {'IsMessage': True, 'IsFixedSize': False, 'HasHeader': False}
 // {}
 
-// !!!!!!!!!!! ['__class__', '__delattr__', '__dict__', '__doc__', '__eq__', '__format__', '__getattribute__', '__hash__', '__init__', '__module__', '__ne__', '__new__', '__reduce__', '__reduce_ex__', '__repr__', '__setattr__', '__sizeof__', '__str__', '__subclasshook__', '__weakref__', '_parsed_fields', 'constants', 'fields', 'full_name', 'has_header', 'header_present', 'names', 'package', 'parsed_fields', 'short_name', 'text', 'types']
+// !!!!!!!!!!! ['__class__', '__delattr__', '__dict__', '__dir__', '__doc__', '__eq__', '__format__', '__ge__', '__getattribute__', '__gt__', '__hash__', '__init__', '__init_subclass__', '__le__', '__lt__', '__module__', '__ne__', '__new__', '__reduce__', '__reduce_ex__', '__repr__', '__setattr__', '__sizeof__', '__str__', '__subclasshook__', '__weakref__', '_parsed_fields', 'constants', 'fields', 'full_name', 'has_header', 'header_present', 'names', 'package', 'parsed_fields', 'short_name', 'text', 'types']
 
 
 
-
-template <class ContainerAllocator>
-struct IsFixedSize< ::std_srvs::TriggerResponse_<ContainerAllocator> >
-  : std::false_type
-  { };
-
-template <class ContainerAllocator>
-struct IsFixedSize< ::std_srvs::TriggerResponse_<ContainerAllocator> const>
-  : std::false_type
-  { };
 
 template <class ContainerAllocator>
 struct IsMessage< ::std_srvs::TriggerResponse_<ContainerAllocator> >
@@ -101,6 +92,16 @@ struct IsMessage< ::std_srvs::TriggerResponse_<ContainerAllocator> >
 template <class ContainerAllocator>
 struct IsMessage< ::std_srvs::TriggerResponse_<ContainerAllocator> const>
   : std::true_type
+  { };
+
+template <class ContainerAllocator>
+struct IsFixedSize< ::std_srvs::TriggerResponse_<ContainerAllocator> >
+  : std::false_type
+  { };
+
+template <class ContainerAllocator>
+struct IsFixedSize< ::std_srvs::TriggerResponse_<ContainerAllocator> const>
+  : std::false_type
   { };
 
 template <class ContainerAllocator>
@@ -143,8 +144,8 @@ struct Definition< ::std_srvs::TriggerResponse_<ContainerAllocator> >
 {
   static const char* value()
   {
-    return "bool success\n\
-string message\n\
+    return "bool success   # indicate successful run of triggered service\n\
+string message # informational, e.g. for error messages\n\
 \n\
 ";
   }
@@ -187,7 +188,7 @@ struct Printer< ::std_srvs::TriggerResponse_<ContainerAllocator> >
     s << indent << "success: ";
     Printer<uint8_t>::stream(s, indent + "  ", v.success);
     s << indent << "message: ";
-    Printer<std::basic_string<char, std::char_traits<char>, typename ContainerAllocator::template rebind<char>::other > >::stream(s, indent + "  ", v.message);
+    Printer<std::basic_string<char, std::char_traits<char>, typename std::allocator_traits<ContainerAllocator>::template rebind_alloc<char> >>::stream(s, indent + "  ", v.message);
   }
 };
 

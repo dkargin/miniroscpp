@@ -9,6 +9,7 @@
 #include <vector>
 #include <map>
 #include <array>
+#include <memory>
 
 #include <miniros/types.h>
 #include <miniros/serialization.h>
@@ -28,12 +29,12 @@ struct FixedLengthStringArray_
     }
   FixedLengthStringArray_(const ContainerAllocator& _alloc)
     : foo()  {
-      foo.assign(std::basic_string<char, std::char_traits<char>, typename ContainerAllocator::template rebind<char>::other > (_alloc));
+      foo.assign(std::basic_string<char, std::char_traits<char>, typename std::allocator_traits<ContainerAllocator>::template rebind_alloc<char> >(_alloc));
   }
 
 
 
-   typedef std::array<std::basic_string<char, std::char_traits<char>, typename ContainerAllocator::template rebind<char>::other > , 5>  _foo_type;
+   typedef std::array<std::basic_string<char, std::char_traits<char>, typename std::allocator_traits<ContainerAllocator>::template rebind_alloc<char> >, 5>  _foo_type;
   _foo_type foo;
 
 
@@ -71,7 +72,7 @@ namespace message_traits
 
 
 // BOOLTRAITS {'IsMessage': True, 'IsFixedSize': False, 'HasHeader': False}
-// {'test_roscpp': ['/home/vrobot/miniros_ws/src/test_roscpp/test/msg', '/home/vrobot/miniros_ws/src/test_roscpp/test_serialization/msg', '/home/vrobot/miniros_ws/src/test_roscpp/perf/msg', '/home/vrobot/miniros_ws/src/test_roscpp/perf_serialization/msg'], 'rosgraph_msgs': ['/opt/ros/noetic/share/rosgraph_msgs/cmake/../msg'], 'std_msgs': ['/opt/ros/noetic/share/std_msgs/cmake/../msg']}
+// {'test_roscpp': ['.../test_roscpp/test/msg', '.../test_roscpp/test_serialization/msg', '.../test_roscpp/perf/msg', '.../test_roscpp/perf_serialization/msg'], 'rosgraph_msgs': ['.../ros_comm_msgs/rosgraph_msgs/msg'], 'std_msgs': ['.../std_msgs/msg']}
 
 // !!!!!!!!!!! ['__class__', '__delattr__', '__dict__', '__dir__', '__doc__', '__eq__', '__format__', '__ge__', '__getattribute__', '__gt__', '__hash__', '__init__', '__init_subclass__', '__le__', '__lt__', '__module__', '__ne__', '__new__', '__reduce__', '__reduce_ex__', '__repr__', '__setattr__', '__sizeof__', '__str__', '__subclasshook__', '__weakref__', '_parsed_fields', 'constants', 'fields', 'full_name', 'has_header', 'header_present', 'names', 'package', 'parsed_fields', 'short_name', 'text', 'types']
 
@@ -180,7 +181,7 @@ struct Printer< ::test_roscpp::FixedLengthStringArray_<ContainerAllocator> >
     for (size_t i = 0; i < v.foo.size(); ++i)
     {
       s << indent << "  foo[" << i << "]: ";
-      Printer<std::basic_string<char, std::char_traits<char>, typename ContainerAllocator::template rebind<char>::other > >::stream(s, indent + "  ", v.foo[i]);
+      Printer<std::basic_string<char, std::char_traits<char>, typename std::allocator_traits<ContainerAllocator>::template rebind_alloc<char> >>::stream(s, indent + "  ", v.foo[i]);
     }
   }
 };

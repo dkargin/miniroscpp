@@ -9,6 +9,7 @@
 #include <vector>
 #include <map>
 #include <array>
+#include <memory>
 
 #include <miniros/types.h>
 #include <miniros/serialization.h>
@@ -41,16 +42,16 @@ struct JointTrajectoryPoint_
 
 
 
-   typedef std::vector<double, typename ContainerAllocator::template rebind<double>::other >  _positions_type;
+   typedef std::vector<double, typename std::allocator_traits<ContainerAllocator>::template rebind_alloc<double> > _positions_type;
   _positions_type positions;
 
-   typedef std::vector<double, typename ContainerAllocator::template rebind<double>::other >  _velocities_type;
+   typedef std::vector<double, typename std::allocator_traits<ContainerAllocator>::template rebind_alloc<double> > _velocities_type;
   _velocities_type velocities;
 
-   typedef std::vector<double, typename ContainerAllocator::template rebind<double>::other >  _accelerations_type;
+   typedef std::vector<double, typename std::allocator_traits<ContainerAllocator>::template rebind_alloc<double> > _accelerations_type;
   _accelerations_type accelerations;
 
-   typedef std::vector<double, typename ContainerAllocator::template rebind<double>::other >  _effort_type;
+   typedef std::vector<double, typename std::allocator_traits<ContainerAllocator>::template rebind_alloc<double> > _effort_type;
   _effort_type effort;
 
    typedef miniros::Duration _time_from_start_type;
@@ -90,23 +91,13 @@ namespace message_traits
 
 
 
-// BOOLTRAITS {'IsFixedSize': False, 'IsMessage': True, 'HasHeader': False}
-// {'geometry_msgs': ['/home/vrobot/ros_ws/src/common_msgs/geometry_msgs/msg'], 'trajectory_msgs': ['/home/vrobot/ros_ws/src/common_msgs/trajectory_msgs/msg'], 'std_msgs': ['/home/vrobot/ros_ws/src/std_msgs/msg']}
+// BOOLTRAITS {'IsMessage': True, 'IsFixedSize': False, 'HasHeader': False}
+// {'trajectory_msgs': ['.../common_msgs/trajectory_msgs/msg'], 'std_msgs': ['.../std_msgs/msg'], 'geometry_msgs': ['.../common_msgs/geometry_msgs/msg']}
 
-// !!!!!!!!!!! ['__class__', '__delattr__', '__dict__', '__doc__', '__eq__', '__format__', '__getattribute__', '__hash__', '__init__', '__module__', '__ne__', '__new__', '__reduce__', '__reduce_ex__', '__repr__', '__setattr__', '__sizeof__', '__str__', '__subclasshook__', '__weakref__', '_parsed_fields', 'constants', 'fields', 'full_name', 'has_header', 'header_present', 'names', 'package', 'parsed_fields', 'short_name', 'text', 'types']
-
-
+// !!!!!!!!!!! ['__class__', '__delattr__', '__dict__', '__dir__', '__doc__', '__eq__', '__format__', '__ge__', '__getattribute__', '__gt__', '__hash__', '__init__', '__init_subclass__', '__le__', '__lt__', '__module__', '__ne__', '__new__', '__reduce__', '__reduce_ex__', '__repr__', '__setattr__', '__sizeof__', '__str__', '__subclasshook__', '__weakref__', '_parsed_fields', 'constants', 'fields', 'full_name', 'has_header', 'header_present', 'names', 'package', 'parsed_fields', 'short_name', 'text', 'types']
 
 
-template <class ContainerAllocator>
-struct IsFixedSize< ::trajectory_msgs::JointTrajectoryPoint_<ContainerAllocator> >
-  : std::false_type
-  { };
 
-template <class ContainerAllocator>
-struct IsFixedSize< ::trajectory_msgs::JointTrajectoryPoint_<ContainerAllocator> const>
-  : std::false_type
-  { };
 
 template <class ContainerAllocator>
 struct IsMessage< ::trajectory_msgs::JointTrajectoryPoint_<ContainerAllocator> >
@@ -116,6 +107,16 @@ struct IsMessage< ::trajectory_msgs::JointTrajectoryPoint_<ContainerAllocator> >
 template <class ContainerAllocator>
 struct IsMessage< ::trajectory_msgs::JointTrajectoryPoint_<ContainerAllocator> const>
   : std::true_type
+  { };
+
+template <class ContainerAllocator>
+struct IsFixedSize< ::trajectory_msgs::JointTrajectoryPoint_<ContainerAllocator> >
+  : std::false_type
+  { };
+
+template <class ContainerAllocator>
+struct IsFixedSize< ::trajectory_msgs::JointTrajectoryPoint_<ContainerAllocator> const>
+  : std::false_type
   { };
 
 template <class ContainerAllocator>

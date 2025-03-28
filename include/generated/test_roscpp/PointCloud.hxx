@@ -9,6 +9,7 @@
 #include <vector>
 #include <map>
 #include <array>
+#include <memory>
 
 #include <miniros/types.h>
 #include <miniros/serialization.h>
@@ -43,10 +44,10 @@ struct PointCloud_
    typedef  ::std_msgs::Header_<ContainerAllocator>  _header_type;
   _header_type header;
 
-   typedef std::vector< ::test_roscpp::Point32_<ContainerAllocator> , typename ContainerAllocator::template rebind< ::test_roscpp::Point32_<ContainerAllocator> >::other >  _pts_type;
+   typedef std::vector< ::test_roscpp::Point32_<ContainerAllocator> , typename std::allocator_traits<ContainerAllocator>::template rebind_alloc< ::test_roscpp::Point32_<ContainerAllocator> > > _pts_type;
   _pts_type pts;
 
-   typedef std::vector< ::test_roscpp::ChannelFloat32_<ContainerAllocator> , typename ContainerAllocator::template rebind< ::test_roscpp::ChannelFloat32_<ContainerAllocator> >::other >  _chan_type;
+   typedef std::vector< ::test_roscpp::ChannelFloat32_<ContainerAllocator> , typename std::allocator_traits<ContainerAllocator>::template rebind_alloc< ::test_roscpp::ChannelFloat32_<ContainerAllocator> > > _chan_type;
   _chan_type chan;
 
 
@@ -84,7 +85,7 @@ namespace message_traits
 
 
 // BOOLTRAITS {'IsMessage': True, 'IsFixedSize': False, 'HasHeader': True}
-// {'test_roscpp': ['/home/vrobot/miniros_ws/src/test_roscpp/test/msg', '/home/vrobot/miniros_ws/src/test_roscpp/test_serialization/msg', '/home/vrobot/miniros_ws/src/test_roscpp/perf/msg', '/home/vrobot/miniros_ws/src/test_roscpp/perf_serialization/msg'], 'rosgraph_msgs': ['/opt/ros/noetic/share/rosgraph_msgs/cmake/../msg'], 'std_msgs': ['/opt/ros/noetic/share/std_msgs/cmake/../msg']}
+// {'test_roscpp': ['.../test_roscpp/test/msg', '.../test_roscpp/test_serialization/msg', '.../test_roscpp/perf/msg', '.../test_roscpp/perf_serialization/msg'], 'rosgraph_msgs': ['.../ros_comm_msgs/rosgraph_msgs/msg'], 'std_msgs': ['.../std_msgs/msg']}
 
 // !!!!!!!!!!! ['__class__', '__delattr__', '__dict__', '__dir__', '__doc__', '__eq__', '__format__', '__ge__', '__getattribute__', '__gt__', '__hash__', '__init__', '__init_subclass__', '__le__', '__lt__', '__module__', '__ne__', '__new__', '__reduce__', '__reduce_ex__', '__repr__', '__setattr__', '__sizeof__', '__str__', '__subclasshook__', '__weakref__', '_parsed_fields', 'constants', 'fields', 'full_name', 'has_header', 'header_present', 'names', 'package', 'parsed_fields', 'short_name', 'text', 'types']
 

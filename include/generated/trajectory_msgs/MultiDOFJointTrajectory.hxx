@@ -9,6 +9,7 @@
 #include <vector>
 #include <map>
 #include <array>
+#include <memory>
 
 #include <miniros/types.h>
 #include <miniros/serialization.h>
@@ -42,10 +43,10 @@ struct MultiDOFJointTrajectory_
    typedef  ::std_msgs::Header_<ContainerAllocator>  _header_type;
   _header_type header;
 
-   typedef std::vector<std::basic_string<char, std::char_traits<char>, typename ContainerAllocator::template rebind<char>::other > , typename ContainerAllocator::template rebind<std::basic_string<char, std::char_traits<char>, typename ContainerAllocator::template rebind<char>::other > >::other >  _joint_names_type;
+   typedef std::vector<std::basic_string<char, std::char_traits<char>, typename std::allocator_traits<ContainerAllocator>::template rebind_alloc<char> >, typename std::allocator_traits<ContainerAllocator>::template rebind_alloc<std::basic_string<char, std::char_traits<char>, typename std::allocator_traits<ContainerAllocator>::template rebind_alloc<char> >> > _joint_names_type;
   _joint_names_type joint_names;
 
-   typedef std::vector< ::trajectory_msgs::MultiDOFJointTrajectoryPoint_<ContainerAllocator> , typename ContainerAllocator::template rebind< ::trajectory_msgs::MultiDOFJointTrajectoryPoint_<ContainerAllocator> >::other >  _points_type;
+   typedef std::vector< ::trajectory_msgs::MultiDOFJointTrajectoryPoint_<ContainerAllocator> , typename std::allocator_traits<ContainerAllocator>::template rebind_alloc< ::trajectory_msgs::MultiDOFJointTrajectoryPoint_<ContainerAllocator> > > _points_type;
   _points_type points;
 
 
@@ -82,23 +83,13 @@ namespace message_traits
 
 
 
-// BOOLTRAITS {'IsFixedSize': False, 'IsMessage': True, 'HasHeader': True}
-// {'geometry_msgs': ['/home/vrobot/ros_ws/src/common_msgs/geometry_msgs/msg'], 'trajectory_msgs': ['/home/vrobot/ros_ws/src/common_msgs/trajectory_msgs/msg'], 'std_msgs': ['/home/vrobot/ros_ws/src/std_msgs/msg']}
+// BOOLTRAITS {'IsMessage': True, 'IsFixedSize': False, 'HasHeader': True}
+// {'trajectory_msgs': ['.../common_msgs/trajectory_msgs/msg'], 'std_msgs': ['.../std_msgs/msg'], 'geometry_msgs': ['.../common_msgs/geometry_msgs/msg']}
 
-// !!!!!!!!!!! ['__class__', '__delattr__', '__dict__', '__doc__', '__eq__', '__format__', '__getattribute__', '__hash__', '__init__', '__module__', '__ne__', '__new__', '__reduce__', '__reduce_ex__', '__repr__', '__setattr__', '__sizeof__', '__str__', '__subclasshook__', '__weakref__', '_parsed_fields', 'constants', 'fields', 'full_name', 'has_header', 'header_present', 'names', 'package', 'parsed_fields', 'short_name', 'text', 'types']
-
-
+// !!!!!!!!!!! ['__class__', '__delattr__', '__dict__', '__dir__', '__doc__', '__eq__', '__format__', '__ge__', '__getattribute__', '__gt__', '__hash__', '__init__', '__init_subclass__', '__le__', '__lt__', '__module__', '__ne__', '__new__', '__reduce__', '__reduce_ex__', '__repr__', '__setattr__', '__sizeof__', '__str__', '__subclasshook__', '__weakref__', '_parsed_fields', 'constants', 'fields', 'full_name', 'has_header', 'header_present', 'names', 'package', 'parsed_fields', 'short_name', 'text', 'types']
 
 
-template <class ContainerAllocator>
-struct IsFixedSize< ::trajectory_msgs::MultiDOFJointTrajectory_<ContainerAllocator> >
-  : std::false_type
-  { };
 
-template <class ContainerAllocator>
-struct IsFixedSize< ::trajectory_msgs::MultiDOFJointTrajectory_<ContainerAllocator> const>
-  : std::false_type
-  { };
 
 template <class ContainerAllocator>
 struct IsMessage< ::trajectory_msgs::MultiDOFJointTrajectory_<ContainerAllocator> >
@@ -108,6 +99,16 @@ struct IsMessage< ::trajectory_msgs::MultiDOFJointTrajectory_<ContainerAllocator
 template <class ContainerAllocator>
 struct IsMessage< ::trajectory_msgs::MultiDOFJointTrajectory_<ContainerAllocator> const>
   : std::true_type
+  { };
+
+template <class ContainerAllocator>
+struct IsFixedSize< ::trajectory_msgs::MultiDOFJointTrajectory_<ContainerAllocator> >
+  : std::false_type
+  { };
+
+template <class ContainerAllocator>
+struct IsFixedSize< ::trajectory_msgs::MultiDOFJointTrajectory_<ContainerAllocator> const>
+  : std::false_type
   { };
 
 template <class ContainerAllocator>
@@ -269,7 +270,7 @@ struct Printer< ::trajectory_msgs::MultiDOFJointTrajectory_<ContainerAllocator> 
     for (size_t i = 0; i < v.joint_names.size(); ++i)
     {
       s << indent << "  joint_names[" << i << "]: ";
-      Printer<std::basic_string<char, std::char_traits<char>, typename ContainerAllocator::template rebind<char>::other > >::stream(s, indent + "  ", v.joint_names[i]);
+      Printer<std::basic_string<char, std::char_traits<char>, typename std::allocator_traits<ContainerAllocator>::template rebind_alloc<char> >>::stream(s, indent + "  ", v.joint_names[i]);
     }
     s << indent << "points[]" << std::endl;
     for (size_t i = 0; i < v.points.size(); ++i)
