@@ -9,6 +9,7 @@
 #include <vector>
 #include <map>
 #include <array>
+#include <memory>
 
 #include <miniros/types.h>
 #include <miniros/serialization.h>
@@ -77,23 +78,13 @@ namespace message_traits
 
 
 
-// BOOLTRAITS {'IsFixedSize': False, 'IsMessage': True, 'HasHeader': False}
-// {'nav_msgs': ['/home/vrobot/ros_ws/src/common_msgs/nav_msgs/msg', '/home/vrobot/ros_ws/devel/share/nav_msgs/msg'], 'std_msgs': ['/home/vrobot/ros_ws/src/std_msgs/msg'], 'actionlib_msgs': ['/home/vrobot/ros_ws/src/common_msgs/actionlib_msgs/msg'], 'geometry_msgs': ['/home/vrobot/ros_ws/src/common_msgs/geometry_msgs/msg']}
+// BOOLTRAITS {'IsMessage': True, 'IsFixedSize': False, 'HasHeader': False}
+// {'nav_msgs': ['.../common_msgs/nav_msgs/msg', '/home/vrobot/miniros_ws/devel/share/nav_msgs/msg'], 'geometry_msgs': ['.../common_msgs/geometry_msgs/msg'], 'std_msgs': ['.../std_msgs/msg'], 'actionlib_msgs': ['.../common_msgs/actionlib_msgs/msg']}
 
-// !!!!!!!!!!! ['__class__', '__delattr__', '__dict__', '__doc__', '__eq__', '__format__', '__getattribute__', '__hash__', '__init__', '__module__', '__ne__', '__new__', '__reduce__', '__reduce_ex__', '__repr__', '__setattr__', '__sizeof__', '__str__', '__subclasshook__', '__weakref__', '_parsed_fields', 'constants', 'fields', 'full_name', 'has_header', 'header_present', 'names', 'package', 'parsed_fields', 'short_name', 'text', 'types']
-
-
+// !!!!!!!!!!! ['__class__', '__delattr__', '__dict__', '__dir__', '__doc__', '__eq__', '__format__', '__ge__', '__getattribute__', '__gt__', '__hash__', '__init__', '__init_subclass__', '__le__', '__lt__', '__module__', '__ne__', '__new__', '__reduce__', '__reduce_ex__', '__repr__', '__setattr__', '__sizeof__', '__str__', '__subclasshook__', '__weakref__', '_parsed_fields', 'constants', 'fields', 'full_name', 'has_header', 'header_present', 'names', 'package', 'parsed_fields', 'short_name', 'text', 'types']
 
 
-template <class ContainerAllocator>
-struct IsFixedSize< ::nav_msgs::SetMapRequest_<ContainerAllocator> >
-  : std::false_type
-  { };
 
-template <class ContainerAllocator>
-struct IsFixedSize< ::nav_msgs::SetMapRequest_<ContainerAllocator> const>
-  : std::false_type
-  { };
 
 template <class ContainerAllocator>
 struct IsMessage< ::nav_msgs::SetMapRequest_<ContainerAllocator> >
@@ -103,6 +94,16 @@ struct IsMessage< ::nav_msgs::SetMapRequest_<ContainerAllocator> >
 template <class ContainerAllocator>
 struct IsMessage< ::nav_msgs::SetMapRequest_<ContainerAllocator> const>
   : std::true_type
+  { };
+
+template <class ContainerAllocator>
+struct IsFixedSize< ::nav_msgs::SetMapRequest_<ContainerAllocator> >
+  : std::false_type
+  { };
+
+template <class ContainerAllocator>
+struct IsFixedSize< ::nav_msgs::SetMapRequest_<ContainerAllocator> const>
+  : std::false_type
   { };
 
 template <class ContainerAllocator>
@@ -145,7 +146,7 @@ struct Definition< ::nav_msgs::SetMapRequest_<ContainerAllocator> >
 {
   static const char* value()
   {
-    return "\n\
+    return "# Set a new map together with an initial pose\n\
 nav_msgs/OccupancyGrid map\n\
 geometry_msgs/PoseWithCovarianceStamped initial_pose\n\
 \n\

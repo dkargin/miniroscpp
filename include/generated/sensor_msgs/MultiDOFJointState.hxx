@@ -9,6 +9,7 @@
 #include <vector>
 #include <map>
 #include <array>
+#include <memory>
 
 #include <miniros/types.h>
 #include <miniros/serialization.h>
@@ -48,16 +49,16 @@ struct MultiDOFJointState_
    typedef  ::std_msgs::Header_<ContainerAllocator>  _header_type;
   _header_type header;
 
-   typedef std::vector<std::basic_string<char, std::char_traits<char>, typename ContainerAllocator::template rebind<char>::other > , typename ContainerAllocator::template rebind<std::basic_string<char, std::char_traits<char>, typename ContainerAllocator::template rebind<char>::other > >::other >  _joint_names_type;
+   typedef std::vector<std::basic_string<char, std::char_traits<char>, typename std::allocator_traits<ContainerAllocator>::template rebind_alloc<char> >, typename std::allocator_traits<ContainerAllocator>::template rebind_alloc<std::basic_string<char, std::char_traits<char>, typename std::allocator_traits<ContainerAllocator>::template rebind_alloc<char> >> > _joint_names_type;
   _joint_names_type joint_names;
 
-   typedef std::vector< ::geometry_msgs::Transform_<ContainerAllocator> , typename ContainerAllocator::template rebind< ::geometry_msgs::Transform_<ContainerAllocator> >::other >  _transforms_type;
+   typedef std::vector< ::geometry_msgs::Transform_<ContainerAllocator> , typename std::allocator_traits<ContainerAllocator>::template rebind_alloc< ::geometry_msgs::Transform_<ContainerAllocator> > > _transforms_type;
   _transforms_type transforms;
 
-   typedef std::vector< ::geometry_msgs::Twist_<ContainerAllocator> , typename ContainerAllocator::template rebind< ::geometry_msgs::Twist_<ContainerAllocator> >::other >  _twist_type;
+   typedef std::vector< ::geometry_msgs::Twist_<ContainerAllocator> , typename std::allocator_traits<ContainerAllocator>::template rebind_alloc< ::geometry_msgs::Twist_<ContainerAllocator> > > _twist_type;
   _twist_type twist;
 
-   typedef std::vector< ::geometry_msgs::Wrench_<ContainerAllocator> , typename ContainerAllocator::template rebind< ::geometry_msgs::Wrench_<ContainerAllocator> >::other >  _wrench_type;
+   typedef std::vector< ::geometry_msgs::Wrench_<ContainerAllocator> , typename std::allocator_traits<ContainerAllocator>::template rebind_alloc< ::geometry_msgs::Wrench_<ContainerAllocator> > > _wrench_type;
   _wrench_type wrench;
 
 
@@ -94,23 +95,13 @@ namespace message_traits
 
 
 
-// BOOLTRAITS {'IsFixedSize': False, 'IsMessage': True, 'HasHeader': True}
-// {'std_msgs': ['/home/vrobot/ros_ws/src/std_msgs/msg'], 'geometry_msgs': ['/home/vrobot/ros_ws/src/common_msgs/geometry_msgs/msg'], 'sensor_msgs': ['/home/vrobot/ros_ws/src/common_msgs/sensor_msgs/msg']}
+// BOOLTRAITS {'IsMessage': True, 'IsFixedSize': False, 'HasHeader': True}
+// {'sensor_msgs': ['.../common_msgs/sensor_msgs/msg'], 'geometry_msgs': ['.../common_msgs/geometry_msgs/msg'], 'std_msgs': ['.../std_msgs/msg']}
 
-// !!!!!!!!!!! ['__class__', '__delattr__', '__dict__', '__doc__', '__eq__', '__format__', '__getattribute__', '__hash__', '__init__', '__module__', '__ne__', '__new__', '__reduce__', '__reduce_ex__', '__repr__', '__setattr__', '__sizeof__', '__str__', '__subclasshook__', '__weakref__', '_parsed_fields', 'constants', 'fields', 'full_name', 'has_header', 'header_present', 'names', 'package', 'parsed_fields', 'short_name', 'text', 'types']
-
-
+// !!!!!!!!!!! ['__class__', '__delattr__', '__dict__', '__dir__', '__doc__', '__eq__', '__format__', '__ge__', '__getattribute__', '__gt__', '__hash__', '__init__', '__init_subclass__', '__le__', '__lt__', '__module__', '__ne__', '__new__', '__reduce__', '__reduce_ex__', '__repr__', '__setattr__', '__sizeof__', '__str__', '__subclasshook__', '__weakref__', '_parsed_fields', 'constants', 'fields', 'full_name', 'has_header', 'header_present', 'names', 'package', 'parsed_fields', 'short_name', 'text', 'types']
 
 
-template <class ContainerAllocator>
-struct IsFixedSize< ::sensor_msgs::MultiDOFJointState_<ContainerAllocator> >
-  : std::false_type
-  { };
 
-template <class ContainerAllocator>
-struct IsFixedSize< ::sensor_msgs::MultiDOFJointState_<ContainerAllocator> const>
-  : std::false_type
-  { };
 
 template <class ContainerAllocator>
 struct IsMessage< ::sensor_msgs::MultiDOFJointState_<ContainerAllocator> >
@@ -120,6 +111,16 @@ struct IsMessage< ::sensor_msgs::MultiDOFJointState_<ContainerAllocator> >
 template <class ContainerAllocator>
 struct IsMessage< ::sensor_msgs::MultiDOFJointState_<ContainerAllocator> const>
   : std::true_type
+  { };
+
+template <class ContainerAllocator>
+struct IsFixedSize< ::sensor_msgs::MultiDOFJointState_<ContainerAllocator> >
+  : std::false_type
+  { };
+
+template <class ContainerAllocator>
+struct IsFixedSize< ::sensor_msgs::MultiDOFJointState_<ContainerAllocator> const>
+  : std::false_type
   { };
 
 template <class ContainerAllocator>
@@ -293,7 +294,7 @@ struct Printer< ::sensor_msgs::MultiDOFJointState_<ContainerAllocator> >
     for (size_t i = 0; i < v.joint_names.size(); ++i)
     {
       s << indent << "  joint_names[" << i << "]: ";
-      Printer<std::basic_string<char, std::char_traits<char>, typename ContainerAllocator::template rebind<char>::other > >::stream(s, indent + "  ", v.joint_names[i]);
+      Printer<std::basic_string<char, std::char_traits<char>, typename std::allocator_traits<ContainerAllocator>::template rebind_alloc<char> >>::stream(s, indent + "  ", v.joint_names[i]);
     }
     s << indent << "transforms[]" << std::endl;
     for (size_t i = 0; i < v.transforms.size(); ++i)

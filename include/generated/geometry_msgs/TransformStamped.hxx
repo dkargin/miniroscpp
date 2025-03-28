@@ -9,6 +9,7 @@
 #include <vector>
 #include <map>
 #include <array>
+#include <memory>
 
 #include <miniros/types.h>
 #include <miniros/serialization.h>
@@ -42,7 +43,7 @@ struct TransformStamped_
    typedef  ::std_msgs::Header_<ContainerAllocator>  _header_type;
   _header_type header;
 
-   typedef std::basic_string<char, std::char_traits<char>, typename ContainerAllocator::template rebind<char>::other >  _child_frame_id_type;
+   typedef std::basic_string<char, std::char_traits<char>, typename std::allocator_traits<ContainerAllocator>::template rebind_alloc<char> > _child_frame_id_type;
   _child_frame_id_type child_frame_id;
 
    typedef  ::geometry_msgs::Transform_<ContainerAllocator>  _transform_type;
@@ -82,23 +83,13 @@ namespace message_traits
 
 
 
-// BOOLTRAITS {'IsFixedSize': False, 'IsMessage': True, 'HasHeader': True}
-// {'std_msgs': ['/home/vrobot/ros_ws/src/std_msgs/msg'], 'geometry_msgs': ['/home/vrobot/ros_ws/src/common_msgs/geometry_msgs/msg']}
+// BOOLTRAITS {'IsMessage': True, 'IsFixedSize': False, 'HasHeader': True}
+// {'geometry_msgs': ['.../common_msgs/geometry_msgs/msg'], 'std_msgs': ['.../std_msgs/msg']}
 
-// !!!!!!!!!!! ['__class__', '__delattr__', '__dict__', '__doc__', '__eq__', '__format__', '__getattribute__', '__hash__', '__init__', '__module__', '__ne__', '__new__', '__reduce__', '__reduce_ex__', '__repr__', '__setattr__', '__sizeof__', '__str__', '__subclasshook__', '__weakref__', '_parsed_fields', 'constants', 'fields', 'full_name', 'has_header', 'header_present', 'names', 'package', 'parsed_fields', 'short_name', 'text', 'types']
-
-
+// !!!!!!!!!!! ['__class__', '__delattr__', '__dict__', '__dir__', '__doc__', '__eq__', '__format__', '__ge__', '__getattribute__', '__gt__', '__hash__', '__init__', '__init_subclass__', '__le__', '__lt__', '__module__', '__ne__', '__new__', '__reduce__', '__reduce_ex__', '__repr__', '__setattr__', '__sizeof__', '__str__', '__subclasshook__', '__weakref__', '_parsed_fields', 'constants', 'fields', 'full_name', 'has_header', 'header_present', 'names', 'package', 'parsed_fields', 'short_name', 'text', 'types']
 
 
-template <class ContainerAllocator>
-struct IsFixedSize< ::geometry_msgs::TransformStamped_<ContainerAllocator> >
-  : std::false_type
-  { };
 
-template <class ContainerAllocator>
-struct IsFixedSize< ::geometry_msgs::TransformStamped_<ContainerAllocator> const>
-  : std::false_type
-  { };
 
 template <class ContainerAllocator>
 struct IsMessage< ::geometry_msgs::TransformStamped_<ContainerAllocator> >
@@ -108,6 +99,16 @@ struct IsMessage< ::geometry_msgs::TransformStamped_<ContainerAllocator> >
 template <class ContainerAllocator>
 struct IsMessage< ::geometry_msgs::TransformStamped_<ContainerAllocator> const>
   : std::true_type
+  { };
+
+template <class ContainerAllocator>
+struct IsFixedSize< ::geometry_msgs::TransformStamped_<ContainerAllocator> >
+  : std::false_type
+  { };
+
+template <class ContainerAllocator>
+struct IsFixedSize< ::geometry_msgs::TransformStamped_<ContainerAllocator> const>
+  : std::false_type
   { };
 
 template <class ContainerAllocator>
@@ -247,7 +248,7 @@ struct Printer< ::geometry_msgs::TransformStamped_<ContainerAllocator> >
     s << std::endl;
     Printer< ::std_msgs::Header_<ContainerAllocator> >::stream(s, indent + "  ", v.header);
     s << indent << "child_frame_id: ";
-    Printer<std::basic_string<char, std::char_traits<char>, typename ContainerAllocator::template rebind<char>::other > >::stream(s, indent + "  ", v.child_frame_id);
+    Printer<std::basic_string<char, std::char_traits<char>, typename std::allocator_traits<ContainerAllocator>::template rebind_alloc<char> >>::stream(s, indent + "  ", v.child_frame_id);
     s << indent << "transform: ";
     s << std::endl;
     Printer< ::geometry_msgs::Transform_<ContainerAllocator> >::stream(s, indent + "  ", v.transform);

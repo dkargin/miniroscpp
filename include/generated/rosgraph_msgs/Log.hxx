@@ -9,6 +9,7 @@
 #include <vector>
 #include <map>
 #include <array>
+#include <memory>
 
 #include <miniros/types.h>
 #include <miniros/serialization.h>
@@ -54,22 +55,22 @@ struct Log_
    typedef int8_t _level_type;
   _level_type level;
 
-   typedef std::basic_string<char, std::char_traits<char>, typename ContainerAllocator::template rebind<char>::other >  _name_type;
+   typedef std::basic_string<char, std::char_traits<char>, typename std::allocator_traits<ContainerAllocator>::template rebind_alloc<char> > _name_type;
   _name_type name;
 
-   typedef std::basic_string<char, std::char_traits<char>, typename ContainerAllocator::template rebind<char>::other >  _msg_type;
+   typedef std::basic_string<char, std::char_traits<char>, typename std::allocator_traits<ContainerAllocator>::template rebind_alloc<char> > _msg_type;
   _msg_type msg;
 
-   typedef std::basic_string<char, std::char_traits<char>, typename ContainerAllocator::template rebind<char>::other >  _file_type;
+   typedef std::basic_string<char, std::char_traits<char>, typename std::allocator_traits<ContainerAllocator>::template rebind_alloc<char> > _file_type;
   _file_type file;
 
-   typedef std::basic_string<char, std::char_traits<char>, typename ContainerAllocator::template rebind<char>::other >  _function_type;
+   typedef std::basic_string<char, std::char_traits<char>, typename std::allocator_traits<ContainerAllocator>::template rebind_alloc<char> > _function_type;
   _function_type function;
 
    typedef uint32_t _line_type;
   _line_type line;
 
-   typedef std::vector<std::basic_string<char, std::char_traits<char>, typename ContainerAllocator::template rebind<char>::other > , typename ContainerAllocator::template rebind<std::basic_string<char, std::char_traits<char>, typename ContainerAllocator::template rebind<char>::other > >::other >  _topics_type;
+   typedef std::vector<std::basic_string<char, std::char_traits<char>, typename std::allocator_traits<ContainerAllocator>::template rebind_alloc<char> >, typename std::allocator_traits<ContainerAllocator>::template rebind_alloc<std::basic_string<char, std::char_traits<char>, typename std::allocator_traits<ContainerAllocator>::template rebind_alloc<char> >> > _topics_type;
   _topics_type topics;
 
 
@@ -123,23 +124,13 @@ namespace message_traits
 
 
 
-// BOOLTRAITS {'IsFixedSize': False, 'IsMessage': True, 'HasHeader': True}
-// {'rosgraph_msgs': ['/home/vrobot/ros_ws/src/ros_comm_msgs/rosgraph_msgs/msg'], 'std_msgs': ['/home/vrobot/ros_ws/src/std_msgs/msg']}
+// BOOLTRAITS {'IsMessage': True, 'IsFixedSize': False, 'HasHeader': True}
+// {'rosgraph_msgs': ['.../ros_comm_msgs/rosgraph_msgs/msg'], 'std_msgs': ['.../std_msgs/msg']}
 
-// !!!!!!!!!!! ['__class__', '__delattr__', '__dict__', '__doc__', '__eq__', '__format__', '__getattribute__', '__hash__', '__init__', '__module__', '__ne__', '__new__', '__reduce__', '__reduce_ex__', '__repr__', '__setattr__', '__sizeof__', '__str__', '__subclasshook__', '__weakref__', '_parsed_fields', 'constants', 'fields', 'full_name', 'has_header', 'header_present', 'names', 'package', 'parsed_fields', 'short_name', 'text', 'types']
-
-
+// !!!!!!!!!!! ['__class__', '__delattr__', '__dict__', '__dir__', '__doc__', '__eq__', '__format__', '__ge__', '__getattribute__', '__gt__', '__hash__', '__init__', '__init_subclass__', '__le__', '__lt__', '__module__', '__ne__', '__new__', '__reduce__', '__reduce_ex__', '__repr__', '__setattr__', '__sizeof__', '__str__', '__subclasshook__', '__weakref__', '_parsed_fields', 'constants', 'fields', 'full_name', 'has_header', 'header_present', 'names', 'package', 'parsed_fields', 'short_name', 'text', 'types']
 
 
-template <class ContainerAllocator>
-struct IsFixedSize< ::rosgraph_msgs::Log_<ContainerAllocator> >
-  : std::false_type
-  { };
 
-template <class ContainerAllocator>
-struct IsFixedSize< ::rosgraph_msgs::Log_<ContainerAllocator> const>
-  : std::false_type
-  { };
 
 template <class ContainerAllocator>
 struct IsMessage< ::rosgraph_msgs::Log_<ContainerAllocator> >
@@ -149,6 +140,16 @@ struct IsMessage< ::rosgraph_msgs::Log_<ContainerAllocator> >
 template <class ContainerAllocator>
 struct IsMessage< ::rosgraph_msgs::Log_<ContainerAllocator> const>
   : std::true_type
+  { };
+
+template <class ContainerAllocator>
+struct IsFixedSize< ::rosgraph_msgs::Log_<ContainerAllocator> >
+  : std::false_type
+  { };
+
+template <class ContainerAllocator>
+struct IsFixedSize< ::rosgraph_msgs::Log_<ContainerAllocator> const>
+  : std::false_type
   { };
 
 template <class ContainerAllocator>
@@ -276,20 +277,20 @@ struct Printer< ::rosgraph_msgs::Log_<ContainerAllocator> >
     s << indent << "level: ";
     Printer<int8_t>::stream(s, indent + "  ", v.level);
     s << indent << "name: ";
-    Printer<std::basic_string<char, std::char_traits<char>, typename ContainerAllocator::template rebind<char>::other > >::stream(s, indent + "  ", v.name);
+    Printer<std::basic_string<char, std::char_traits<char>, typename std::allocator_traits<ContainerAllocator>::template rebind_alloc<char> >>::stream(s, indent + "  ", v.name);
     s << indent << "msg: ";
-    Printer<std::basic_string<char, std::char_traits<char>, typename ContainerAllocator::template rebind<char>::other > >::stream(s, indent + "  ", v.msg);
+    Printer<std::basic_string<char, std::char_traits<char>, typename std::allocator_traits<ContainerAllocator>::template rebind_alloc<char> >>::stream(s, indent + "  ", v.msg);
     s << indent << "file: ";
-    Printer<std::basic_string<char, std::char_traits<char>, typename ContainerAllocator::template rebind<char>::other > >::stream(s, indent + "  ", v.file);
+    Printer<std::basic_string<char, std::char_traits<char>, typename std::allocator_traits<ContainerAllocator>::template rebind_alloc<char> >>::stream(s, indent + "  ", v.file);
     s << indent << "function: ";
-    Printer<std::basic_string<char, std::char_traits<char>, typename ContainerAllocator::template rebind<char>::other > >::stream(s, indent + "  ", v.function);
+    Printer<std::basic_string<char, std::char_traits<char>, typename std::allocator_traits<ContainerAllocator>::template rebind_alloc<char> >>::stream(s, indent + "  ", v.function);
     s << indent << "line: ";
     Printer<uint32_t>::stream(s, indent + "  ", v.line);
     s << indent << "topics[]" << std::endl;
     for (size_t i = 0; i < v.topics.size(); ++i)
     {
       s << indent << "  topics[" << i << "]: ";
-      Printer<std::basic_string<char, std::char_traits<char>, typename ContainerAllocator::template rebind<char>::other > >::stream(s, indent + "  ", v.topics[i]);
+      Printer<std::basic_string<char, std::char_traits<char>, typename std::allocator_traits<ContainerAllocator>::template rebind_alloc<char> >>::stream(s, indent + "  ", v.topics[i]);
     }
   }
 };

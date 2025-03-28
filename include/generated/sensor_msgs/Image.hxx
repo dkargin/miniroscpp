@@ -9,6 +9,7 @@
 #include <vector>
 #include <map>
 #include <array>
+#include <memory>
 
 #include <miniros/types.h>
 #include <miniros/serialization.h>
@@ -55,7 +56,7 @@ struct Image_
    typedef uint32_t _width_type;
   _width_type width;
 
-   typedef std::basic_string<char, std::char_traits<char>, typename ContainerAllocator::template rebind<char>::other >  _encoding_type;
+   typedef std::basic_string<char, std::char_traits<char>, typename std::allocator_traits<ContainerAllocator>::template rebind_alloc<char> > _encoding_type;
   _encoding_type encoding;
 
    typedef uint8_t _is_bigendian_type;
@@ -64,7 +65,7 @@ struct Image_
    typedef uint32_t _step_type;
   _step_type step;
 
-   typedef std::vector<uint8_t, typename ContainerAllocator::template rebind<uint8_t>::other >  _data_type;
+   typedef std::vector<uint8_t, typename std::allocator_traits<ContainerAllocator>::template rebind_alloc<uint8_t> > _data_type;
   _data_type data;
 
 
@@ -101,23 +102,13 @@ namespace message_traits
 
 
 
-// BOOLTRAITS {'IsFixedSize': False, 'IsMessage': True, 'HasHeader': True}
-// {'std_msgs': ['/home/vrobot/ros_ws/src/std_msgs/msg'], 'geometry_msgs': ['/home/vrobot/ros_ws/src/common_msgs/geometry_msgs/msg'], 'sensor_msgs': ['/home/vrobot/ros_ws/src/common_msgs/sensor_msgs/msg']}
+// BOOLTRAITS {'IsMessage': True, 'IsFixedSize': False, 'HasHeader': True}
+// {'sensor_msgs': ['.../common_msgs/sensor_msgs/msg'], 'geometry_msgs': ['.../common_msgs/geometry_msgs/msg'], 'std_msgs': ['.../std_msgs/msg']}
 
-// !!!!!!!!!!! ['__class__', '__delattr__', '__dict__', '__doc__', '__eq__', '__format__', '__getattribute__', '__hash__', '__init__', '__module__', '__ne__', '__new__', '__reduce__', '__reduce_ex__', '__repr__', '__setattr__', '__sizeof__', '__str__', '__subclasshook__', '__weakref__', '_parsed_fields', 'constants', 'fields', 'full_name', 'has_header', 'header_present', 'names', 'package', 'parsed_fields', 'short_name', 'text', 'types']
-
-
+// !!!!!!!!!!! ['__class__', '__delattr__', '__dict__', '__dir__', '__doc__', '__eq__', '__format__', '__ge__', '__getattribute__', '__gt__', '__hash__', '__init__', '__init_subclass__', '__le__', '__lt__', '__module__', '__ne__', '__new__', '__reduce__', '__reduce_ex__', '__repr__', '__setattr__', '__sizeof__', '__str__', '__subclasshook__', '__weakref__', '_parsed_fields', 'constants', 'fields', 'full_name', 'has_header', 'header_present', 'names', 'package', 'parsed_fields', 'short_name', 'text', 'types']
 
 
-template <class ContainerAllocator>
-struct IsFixedSize< ::sensor_msgs::Image_<ContainerAllocator> >
-  : std::false_type
-  { };
 
-template <class ContainerAllocator>
-struct IsFixedSize< ::sensor_msgs::Image_<ContainerAllocator> const>
-  : std::false_type
-  { };
 
 template <class ContainerAllocator>
 struct IsMessage< ::sensor_msgs::Image_<ContainerAllocator> >
@@ -127,6 +118,16 @@ struct IsMessage< ::sensor_msgs::Image_<ContainerAllocator> >
 template <class ContainerAllocator>
 struct IsMessage< ::sensor_msgs::Image_<ContainerAllocator> const>
   : std::true_type
+  { };
+
+template <class ContainerAllocator>
+struct IsFixedSize< ::sensor_msgs::Image_<ContainerAllocator> >
+  : std::false_type
+  { };
+
+template <class ContainerAllocator>
+struct IsFixedSize< ::sensor_msgs::Image_<ContainerAllocator> const>
+  : std::false_type
   { };
 
 template <class ContainerAllocator>
@@ -263,7 +264,7 @@ struct Printer< ::sensor_msgs::Image_<ContainerAllocator> >
     s << indent << "width: ";
     Printer<uint32_t>::stream(s, indent + "  ", v.width);
     s << indent << "encoding: ";
-    Printer<std::basic_string<char, std::char_traits<char>, typename ContainerAllocator::template rebind<char>::other > >::stream(s, indent + "  ", v.encoding);
+    Printer<std::basic_string<char, std::char_traits<char>, typename std::allocator_traits<ContainerAllocator>::template rebind_alloc<char> >>::stream(s, indent + "  ", v.encoding);
     s << indent << "is_bigendian: ";
     Printer<uint8_t>::stream(s, indent + "  ", v.is_bigendian);
     s << indent << "step: ";

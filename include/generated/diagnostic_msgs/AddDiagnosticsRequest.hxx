@@ -9,6 +9,7 @@
 #include <vector>
 #include <map>
 #include <array>
+#include <memory>
 
 #include <miniros/types.h>
 #include <miniros/serialization.h>
@@ -33,7 +34,7 @@ struct AddDiagnosticsRequest_
 
 
 
-   typedef std::basic_string<char, std::char_traits<char>, typename ContainerAllocator::template rebind<char>::other >  _load_namespace_type;
+   typedef std::basic_string<char, std::char_traits<char>, typename std::allocator_traits<ContainerAllocator>::template rebind_alloc<char> > _load_namespace_type;
   _load_namespace_type load_namespace;
 
 
@@ -70,23 +71,13 @@ namespace message_traits
 
 
 
-// BOOLTRAITS {'IsFixedSize': False, 'IsMessage': True, 'HasHeader': False}
-// {'std_msgs': ['/home/vrobot/ros_ws/src/std_msgs/msg'], 'diagnostic_msgs': ['/home/vrobot/ros_ws/src/common_msgs/diagnostic_msgs/msg']}
+// BOOLTRAITS {'IsMessage': True, 'IsFixedSize': False, 'HasHeader': False}
+// {'diagnostic_msgs': ['.../common_msgs/diagnostic_msgs/msg'], 'std_msgs': ['.../std_msgs/msg']}
 
-// !!!!!!!!!!! ['__class__', '__delattr__', '__dict__', '__doc__', '__eq__', '__format__', '__getattribute__', '__hash__', '__init__', '__module__', '__ne__', '__new__', '__reduce__', '__reduce_ex__', '__repr__', '__setattr__', '__sizeof__', '__str__', '__subclasshook__', '__weakref__', '_parsed_fields', 'constants', 'fields', 'full_name', 'has_header', 'header_present', 'names', 'package', 'parsed_fields', 'short_name', 'text', 'types']
-
-
+// !!!!!!!!!!! ['__class__', '__delattr__', '__dict__', '__dir__', '__doc__', '__eq__', '__format__', '__ge__', '__getattribute__', '__gt__', '__hash__', '__init__', '__init_subclass__', '__le__', '__lt__', '__module__', '__ne__', '__new__', '__reduce__', '__reduce_ex__', '__repr__', '__setattr__', '__sizeof__', '__str__', '__subclasshook__', '__weakref__', '_parsed_fields', 'constants', 'fields', 'full_name', 'has_header', 'header_present', 'names', 'package', 'parsed_fields', 'short_name', 'text', 'types']
 
 
-template <class ContainerAllocator>
-struct IsFixedSize< ::diagnostic_msgs::AddDiagnosticsRequest_<ContainerAllocator> >
-  : std::false_type
-  { };
 
-template <class ContainerAllocator>
-struct IsFixedSize< ::diagnostic_msgs::AddDiagnosticsRequest_<ContainerAllocator> const>
-  : std::false_type
-  { };
 
 template <class ContainerAllocator>
 struct IsMessage< ::diagnostic_msgs::AddDiagnosticsRequest_<ContainerAllocator> >
@@ -96,6 +87,16 @@ struct IsMessage< ::diagnostic_msgs::AddDiagnosticsRequest_<ContainerAllocator> 
 template <class ContainerAllocator>
 struct IsMessage< ::diagnostic_msgs::AddDiagnosticsRequest_<ContainerAllocator> const>
   : std::true_type
+  { };
+
+template <class ContainerAllocator>
+struct IsFixedSize< ::diagnostic_msgs::AddDiagnosticsRequest_<ContainerAllocator> >
+  : std::false_type
+  { };
+
+template <class ContainerAllocator>
+struct IsFixedSize< ::diagnostic_msgs::AddDiagnosticsRequest_<ContainerAllocator> const>
+  : std::false_type
   { };
 
 template <class ContainerAllocator>
@@ -138,22 +139,22 @@ struct Definition< ::diagnostic_msgs::AddDiagnosticsRequest_<ContainerAllocator>
 {
   static const char* value()
   {
-    return "\n\
+    return "# This service is used as part of the process for loading analyzers at runtime,\n\
+# and should be used by a loader script or program, not as a standalone service.\n\
+# Information about dynamic addition of analyzers can be found at\n\
+# http://wiki.ros.org/diagnostics/Tutorials/Adding%20Analyzers%20at%20Runtime\n\
 \n\
-\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-\n\
-\n\
+# The load_namespace parameter defines the namespace where parameters for the\n\
+# initialization of analyzers in the diagnostic aggregator have been loaded. The\n\
+# value should be a global name (i.e. /my/name/space), not a relative\n\
+# (my/name/space) or private (~my/name/space) name. Analyzers will not be added\n\
+# if a non-global name is used. The call will also fail if the namespace\n\
+# contains parameters that follow a namespace structure that does not conform to\n\
+# that expected by the analyzer definitions. See\n\
+# http://wiki.ros.org/diagnostics/Tutorials/Configuring%20Diagnostic%20Aggregators\n\
+# and http://wiki.ros.org/diagnostics/Tutorials/Using%20the%20GenericAnalyzer\n\
+# for examples of the structure of yaml files which are expected to have been\n\
+# loaded into the namespace.\n\
 string load_namespace\n\
 ";
   }
@@ -193,7 +194,7 @@ struct Printer< ::diagnostic_msgs::AddDiagnosticsRequest_<ContainerAllocator> >
   template<typename Stream> static void stream(Stream& s, const std::string& indent, const ::diagnostic_msgs::AddDiagnosticsRequest_<ContainerAllocator>& v)
   {
     s << indent << "load_namespace: ";
-    Printer<std::basic_string<char, std::char_traits<char>, typename ContainerAllocator::template rebind<char>::other > >::stream(s, indent + "  ", v.load_namespace);
+    Printer<std::basic_string<char, std::char_traits<char>, typename std::allocator_traits<ContainerAllocator>::template rebind_alloc<char> >>::stream(s, indent + "  ", v.load_namespace);
   }
 };
 

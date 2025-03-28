@@ -9,6 +9,7 @@
 #include <vector>
 #include <map>
 #include <array>
+#include <memory>
 
 #include <miniros/types.h>
 #include <miniros/serialization.h>
@@ -40,7 +41,7 @@ struct GoalStatusArray_
    typedef  ::std_msgs::Header_<ContainerAllocator>  _header_type;
   _header_type header;
 
-   typedef std::vector< ::actionlib_msgs::GoalStatus_<ContainerAllocator> , typename ContainerAllocator::template rebind< ::actionlib_msgs::GoalStatus_<ContainerAllocator> >::other >  _status_list_type;
+   typedef std::vector< ::actionlib_msgs::GoalStatus_<ContainerAllocator> , typename std::allocator_traits<ContainerAllocator>::template rebind_alloc< ::actionlib_msgs::GoalStatus_<ContainerAllocator> > > _status_list_type;
   _status_list_type status_list;
 
 
@@ -77,23 +78,13 @@ namespace message_traits
 
 
 
-// BOOLTRAITS {'IsFixedSize': False, 'IsMessage': True, 'HasHeader': True}
-// {'actionlib_msgs': ['/home/vrobot/ros_ws/src/common_msgs/actionlib_msgs/msg'], 'std_msgs': ['/home/vrobot/ros_ws/src/std_msgs/msg']}
+// BOOLTRAITS {'IsMessage': True, 'IsFixedSize': False, 'HasHeader': True}
+// {'actionlib_msgs': ['.../common_msgs/actionlib_msgs/msg'], 'std_msgs': ['.../std_msgs/msg']}
 
-// !!!!!!!!!!! ['__class__', '__delattr__', '__dict__', '__doc__', '__eq__', '__format__', '__getattribute__', '__hash__', '__init__', '__module__', '__ne__', '__new__', '__reduce__', '__reduce_ex__', '__repr__', '__setattr__', '__sizeof__', '__str__', '__subclasshook__', '__weakref__', '_parsed_fields', 'constants', 'fields', 'full_name', 'has_header', 'header_present', 'names', 'package', 'parsed_fields', 'short_name', 'text', 'types']
-
-
+// !!!!!!!!!!! ['__class__', '__delattr__', '__dict__', '__dir__', '__doc__', '__eq__', '__format__', '__ge__', '__getattribute__', '__gt__', '__hash__', '__init__', '__init_subclass__', '__le__', '__lt__', '__module__', '__ne__', '__new__', '__reduce__', '__reduce_ex__', '__repr__', '__setattr__', '__sizeof__', '__str__', '__subclasshook__', '__weakref__', '_parsed_fields', 'constants', 'fields', 'full_name', 'has_header', 'header_present', 'names', 'package', 'parsed_fields', 'short_name', 'text', 'types']
 
 
-template <class ContainerAllocator>
-struct IsFixedSize< ::actionlib_msgs::GoalStatusArray_<ContainerAllocator> >
-  : std::false_type
-  { };
 
-template <class ContainerAllocator>
-struct IsFixedSize< ::actionlib_msgs::GoalStatusArray_<ContainerAllocator> const>
-  : std::false_type
-  { };
 
 template <class ContainerAllocator>
 struct IsMessage< ::actionlib_msgs::GoalStatusArray_<ContainerAllocator> >
@@ -103,6 +94,16 @@ struct IsMessage< ::actionlib_msgs::GoalStatusArray_<ContainerAllocator> >
 template <class ContainerAllocator>
 struct IsMessage< ::actionlib_msgs::GoalStatusArray_<ContainerAllocator> const>
   : std::true_type
+  { };
+
+template <class ContainerAllocator>
+struct IsFixedSize< ::actionlib_msgs::GoalStatusArray_<ContainerAllocator> >
+  : std::false_type
+  { };
+
+template <class ContainerAllocator>
+struct IsFixedSize< ::actionlib_msgs::GoalStatusArray_<ContainerAllocator> const>
+  : std::false_type
   { };
 
 template <class ContainerAllocator>

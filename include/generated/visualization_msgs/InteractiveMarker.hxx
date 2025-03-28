@@ -9,6 +9,7 @@
 #include <vector>
 #include <map>
 #include <array>
+#include <memory>
 
 #include <miniros/types.h>
 #include <miniros/serialization.h>
@@ -55,19 +56,19 @@ struct InteractiveMarker_
    typedef  ::geometry_msgs::Pose_<ContainerAllocator>  _pose_type;
   _pose_type pose;
 
-   typedef std::basic_string<char, std::char_traits<char>, typename ContainerAllocator::template rebind<char>::other >  _name_type;
+   typedef std::basic_string<char, std::char_traits<char>, typename std::allocator_traits<ContainerAllocator>::template rebind_alloc<char> > _name_type;
   _name_type name;
 
-   typedef std::basic_string<char, std::char_traits<char>, typename ContainerAllocator::template rebind<char>::other >  _description_type;
+   typedef std::basic_string<char, std::char_traits<char>, typename std::allocator_traits<ContainerAllocator>::template rebind_alloc<char> > _description_type;
   _description_type description;
 
    typedef float _scale_type;
   _scale_type scale;
 
-   typedef std::vector< ::visualization_msgs::MenuEntry_<ContainerAllocator> , typename ContainerAllocator::template rebind< ::visualization_msgs::MenuEntry_<ContainerAllocator> >::other >  _menu_entries_type;
+   typedef std::vector< ::visualization_msgs::MenuEntry_<ContainerAllocator> , typename std::allocator_traits<ContainerAllocator>::template rebind_alloc< ::visualization_msgs::MenuEntry_<ContainerAllocator> > > _menu_entries_type;
   _menu_entries_type menu_entries;
 
-   typedef std::vector< ::visualization_msgs::InteractiveMarkerControl_<ContainerAllocator> , typename ContainerAllocator::template rebind< ::visualization_msgs::InteractiveMarkerControl_<ContainerAllocator> >::other >  _controls_type;
+   typedef std::vector< ::visualization_msgs::InteractiveMarkerControl_<ContainerAllocator> , typename std::allocator_traits<ContainerAllocator>::template rebind_alloc< ::visualization_msgs::InteractiveMarkerControl_<ContainerAllocator> > > _controls_type;
   _controls_type controls;
 
 
@@ -104,23 +105,13 @@ namespace message_traits
 
 
 
-// BOOLTRAITS {'IsFixedSize': False, 'IsMessage': True, 'HasHeader': True}
-// {'std_msgs': ['/home/vrobot/ros_ws/src/std_msgs/msg'], 'geometry_msgs': ['/home/vrobot/ros_ws/src/common_msgs/geometry_msgs/msg'], 'visualization_msgs': ['/home/vrobot/ros_ws/src/common_msgs/visualization_msgs/msg']}
+// BOOLTRAITS {'IsMessage': True, 'IsFixedSize': False, 'HasHeader': True}
+// {'visualization_msgs': ['.../common_msgs/visualization_msgs/msg'], 'geometry_msgs': ['.../common_msgs/geometry_msgs/msg'], 'std_msgs': ['.../std_msgs/msg']}
 
-// !!!!!!!!!!! ['__class__', '__delattr__', '__dict__', '__doc__', '__eq__', '__format__', '__getattribute__', '__hash__', '__init__', '__module__', '__ne__', '__new__', '__reduce__', '__reduce_ex__', '__repr__', '__setattr__', '__sizeof__', '__str__', '__subclasshook__', '__weakref__', '_parsed_fields', 'constants', 'fields', 'full_name', 'has_header', 'header_present', 'names', 'package', 'parsed_fields', 'short_name', 'text', 'types']
-
-
+// !!!!!!!!!!! ['__class__', '__delattr__', '__dict__', '__dir__', '__doc__', '__eq__', '__format__', '__ge__', '__getattribute__', '__gt__', '__hash__', '__init__', '__init_subclass__', '__le__', '__lt__', '__module__', '__ne__', '__new__', '__reduce__', '__reduce_ex__', '__repr__', '__setattr__', '__sizeof__', '__str__', '__subclasshook__', '__weakref__', '_parsed_fields', 'constants', 'fields', 'full_name', 'has_header', 'header_present', 'names', 'package', 'parsed_fields', 'short_name', 'text', 'types']
 
 
-template <class ContainerAllocator>
-struct IsFixedSize< ::visualization_msgs::InteractiveMarker_<ContainerAllocator> >
-  : std::false_type
-  { };
 
-template <class ContainerAllocator>
-struct IsFixedSize< ::visualization_msgs::InteractiveMarker_<ContainerAllocator> const>
-  : std::false_type
-  { };
 
 template <class ContainerAllocator>
 struct IsMessage< ::visualization_msgs::InteractiveMarker_<ContainerAllocator> >
@@ -130,6 +121,16 @@ struct IsMessage< ::visualization_msgs::InteractiveMarker_<ContainerAllocator> >
 template <class ContainerAllocator>
 struct IsMessage< ::visualization_msgs::InteractiveMarker_<ContainerAllocator> const>
   : std::true_type
+  { };
+
+template <class ContainerAllocator>
+struct IsFixedSize< ::visualization_msgs::InteractiveMarker_<ContainerAllocator> >
+  : std::false_type
+  { };
+
+template <class ContainerAllocator>
+struct IsFixedSize< ::visualization_msgs::InteractiveMarker_<ContainerAllocator> const>
+  : std::false_type
   { };
 
 template <class ContainerAllocator>
@@ -489,9 +490,9 @@ struct Printer< ::visualization_msgs::InteractiveMarker_<ContainerAllocator> >
     s << std::endl;
     Printer< ::geometry_msgs::Pose_<ContainerAllocator> >::stream(s, indent + "  ", v.pose);
     s << indent << "name: ";
-    Printer<std::basic_string<char, std::char_traits<char>, typename ContainerAllocator::template rebind<char>::other > >::stream(s, indent + "  ", v.name);
+    Printer<std::basic_string<char, std::char_traits<char>, typename std::allocator_traits<ContainerAllocator>::template rebind_alloc<char> >>::stream(s, indent + "  ", v.name);
     s << indent << "description: ";
-    Printer<std::basic_string<char, std::char_traits<char>, typename ContainerAllocator::template rebind<char>::other > >::stream(s, indent + "  ", v.description);
+    Printer<std::basic_string<char, std::char_traits<char>, typename std::allocator_traits<ContainerAllocator>::template rebind_alloc<char> >>::stream(s, indent + "  ", v.description);
     s << indent << "scale: ";
     Printer<float>::stream(s, indent + "  ", v.scale);
     s << indent << "menu_entries[]" << std::endl;
