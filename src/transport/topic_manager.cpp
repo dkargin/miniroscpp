@@ -958,10 +958,12 @@ Error TopicManager::pubUpdateCallback(const XmlRpc::XmlRpcValue& params, XmlRpc:
   for (int idx = 0; idx < params[2].size(); idx++) {
     std::string pub = params[2][idx];
     pubs.push_back(pub);
-    ss << pub << ",";
+    if (idx != 0)
+      ss << ",";
+    ss << pub;
   }
 
-  MINIROS_INFO("pubUpdateCallback(%s) publishers={%s}", topic.c_str(), ss.str().c_str());
+  MINIROS_DEBUG("pubUpdateCallback(%s) publishers={%s}", topic.c_str(), ss.str().c_str());
 
   if (pubUpdate(topic, pubs)) {
     result = xmlrpc::responseInt(1, "", 0);
