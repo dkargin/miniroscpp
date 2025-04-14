@@ -104,16 +104,14 @@ void MasterHandler::notifyTopicSubscribers(const std::string& topic, const std::
 
   // Note that list of URI can be different for different clients because of IP resolution and configuration of the network.
   std::vector<std::shared_ptr<NodeRef>> publishers = m_regManager->getTopicPublishers(topic);
-  RpcValue l = RpcValue::Array(publishers.size() + 1);
-
+  RpcValue l = RpcValue::Array(0);
   for (std::shared_ptr<NodeRef> sub: subscribers) {
     if (sub) {
-      l[0] = sub->getApi();
-      l[1] = "";
+      int j = 0;
       for (int i = 0; i < publishers.size(); i++) {
         if (publishers[i]) {
           network::URL url = m_resolver.resolveAddressFor(publishers[i], sub);
-          l[i + 1] = url.str();
+          l[j++] = url.str();
         }
       }
       Error err = this->enqueueNodeCommand(sub, "publisherUpdate", topic, l);
