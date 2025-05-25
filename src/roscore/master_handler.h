@@ -38,7 +38,8 @@ public:
   MasterHandler(RPCManagerPtr rpcManager, RegistrationManager* regManager);
 
   /// Sends immediate command/update to a node.
-  Error sendToNode(const std::shared_ptr<NodeRef>& nr, const char* method, const RpcValue& arg1, const RpcValue& arg2 = {});
+  Error sendToNode(const std::shared_ptr<NodeRef>& nr, const char* method,
+    const RpcValue& arg1, const RpcValue& arg2 = {});
 
   /// Enqueues command to a node. It will be executed later in `update()` method.
   Error enqueueNodeCommand(const std::shared_ptr<NodeRef>& nr, const char* method, const RpcValue& arg1, const RpcValue& arg2 = {});
@@ -87,8 +88,12 @@ public:
 
   struct AsyncCommand {
     std::shared_ptr<NodeRef> node;
+
+    /// Name of XMLRPC command.
     std::string command;
+    /// First argument.
     RpcValue arg1;
+    /// Second argument.
     RpcValue arg2;
   };
 

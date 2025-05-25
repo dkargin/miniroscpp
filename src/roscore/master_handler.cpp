@@ -42,7 +42,8 @@ Error MasterHandler::enqueueNodeCommand(const std::shared_ptr<NodeRef>& nr, cons
   return Error::Ok;
 }
 
-Error MasterHandler::sendToNode(const std::shared_ptr<NodeRef>& nr, const char* method, const RpcValue& arg1, const RpcValue& arg2)
+Error MasterHandler::sendToNode(const std::shared_ptr<NodeRef>& nr, const char* method,
+  const RpcValue& arg1, const RpcValue& arg2)
 {
   if (!nr)
     return Error::InvalidValue;
@@ -52,17 +53,16 @@ Error MasterHandler::sendToNode(const std::shared_ptr<NodeRef>& nr, const char* 
   args[1] = arg1;
   args[2] = arg2;
 
-  uint32_t peer_port = 0;
-  std::string peer_host;
+  network::URL url;
   std::string nodeApi = nr->getApi();
-  if (!miniros::network::splitURI(nodeApi, peer_host, peer_port)) {
+  if (!url.fromString(nodeApi, false)) {
     MINIROS_ERROR_NAMED("handler", "Failed to splitURI of node \"%s\"", nodeApi.c_str());
     return Error::InvalidURI;
   }
 
   // It is expected that client is in idle state, so we can send request immediately without waiting for a response for
   // some previous request.
-  XmlRpc::XmlRpcClient* client = m_rpcManager->getXMLRPCClient(peer_host, peer_port, nodeApi);
+  XmlRpc::XmlRpcClient* client = m_rpcManager->getXMLRPCClient(url.host, url.port, url.path);
   if (!client) {
     MINIROS_ERROR_NAMED("handler", "Failed to create client to notify node \"%s\"", nodeApi.c_str());
     return Error::SystemError;
