@@ -90,6 +90,7 @@ TEST(net, parseRequest)
 {
   network::HttpFrame httpFrame;
 
+  httpFrame.resetParseState(true);
   std::string req(request3);
   httpFrame.data.append(req);
 
@@ -97,11 +98,14 @@ TEST(net, parseRequest)
 
   EXPECT_EQ(parsed, req.size());
   EXPECT_EQ(httpFrame.state(), network::HttpFrame::ParseComplete);
+  EXPECT_EQ(httpFrame.requestMethod, network::HttpMethod::Post);
 }
 
 TEST(net, parseFragmented)
 {
   network::HttpFrame httpFrame;
+  httpFrame.resetParseState(true);
+
   std::string fullReq(request3);
 
   const int N = 3;
@@ -123,12 +127,14 @@ TEST(net, parseFragmented)
 
   EXPECT_EQ(totalParsed, fullReq.size());
   EXPECT_EQ(httpFrame.state(), network::HttpFrame::ParseComplete);
+  EXPECT_EQ(httpFrame.requestMethod, network::HttpMethod::Post);
 }
 
 
 TEST(net, parseMultipleRequests)
 {
   network::HttpFrame httpFrame;
+  httpFrame.resetParseState(true);
 
   std::string req1(request1);
   std::string req2(request2);
@@ -142,13 +148,15 @@ TEST(net, parseMultipleRequests)
   std::string_view body1 = httpFrame.body();
   EXPECT_EQ(parsed, req1.size());
   EXPECT_EQ(httpFrame.state(), network::HttpFrame::ParseComplete);
-  httpFrame.finishReqeust();
+  EXPECT_EQ(httpFrame.contentLength(), 167);
+  EXPECT_EQ(httpFrame.requestMethod, network::HttpMethod::Post);
+  httpFrame.finishRequest();
 
   parsed = httpFrame.incrementalParse();
   std::string_view body2 = httpFrame.body();
   EXPECT_EQ(parsed, req2.size());
   EXPECT_EQ(httpFrame.state(), network::HttpFrame::ParseComplete);
-  httpFrame.finishReqeust();
+  httpFrame.finishRequest();
 
   parsed = httpFrame.incrementalParse();
   std::string_view body3 = httpFrame.body();
@@ -156,6 +164,40 @@ TEST(net, parseMultipleRequests)
   EXPECT_EQ(httpFrame.state(), network::HttpFrame::ParseComplete);
 }
 
+
+const char* response1 =
+  "200 OK\r\n"
+  "Access-Control-Allow-Origin: *\r\n"
+  "Connection: Keep-Alive\r\n"
+  "Content-Encoding: gzip\r\n"
+  "Content-Type: text/html; charset=utf-8\r\n"
+  "Date: Mon, 18 Jul 2016 16:06:00 GMT"
+  "Etag: \"c561c68d0ba92bbeb8b0f612a9199f722e3a621a\"\r\n"
+  "Keep-Alive: timeout=5, max=997\r\n"
+  "Last-Modified: Mon, 18 Jul 2016 02:36:04 GMT\r\n"
+  "Server: Apache\r\n"
+  "Set-Cookie: my-key=my value; expires=Mon, 17-Jul-2017 16:06:00 GMT; Max-Age=31449600; Path=/; secure\r\n"
+  "Transfer-Encoding: chunked\r\n"
+  "Vary: Cookie, Accept-Encoding\r\n"
+  "X-Backend-Server: developer2.webapp.scl3.mozilla.com\r\n"
+  "X-Cache-Info: not cacheable; meta data too large\r\n"
+  "X-kuma-revision: 1085259\r\n"
+  "x-frame-options: DENY\r\n"
+  "\r\n";
+TEST(net, parseResponse)
+{
+  network::HttpFrame httpFrame;
+
+  httpFrame.resetParseState(false);
+  const std::string req(response1);
+  httpFrame.data.append(response1);
+
+  int parsed = httpFrame.incrementalParse();
+
+  EXPECT_EQ(parsed, req.size());
+  EXPECT_EQ(httpFrame.state(), network::HttpFrame::ParseComplete);
+  EXPECT_EQ(httpFrame.responseCode, 200);
+}
 
 int main(int argc, char** argv)
 {

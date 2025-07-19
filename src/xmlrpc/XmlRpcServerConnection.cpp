@@ -38,6 +38,7 @@ XmlRpcServerConnection::XmlRpcServerConnection(int fd, XmlRpcServer* server, boo
   _connectionState = READ_HEADER;
   _bytesWritten = 0;
   _keepAlive = true;
+  _httpFrame.finishRequest();
 
   if (fd) {
     miniros::network::readRemoteAddress(fd, _clientAddress);
@@ -129,7 +130,7 @@ bool XmlRpcServerConnection::readRequest()
     bool eof;
     if ( ! XmlRpcSocket::nbRead(this->getfd(), _httpFrame.data, &eof)) {
       XmlRpcUtil::error("XmlRpcServerConnection(%d)::readRequest: read error (%s).", _fd, XmlRpcSocket::getErrorMsg().c_str());
-      _httpFrame.finishReqeust();
+      _httpFrame.finishRequest();
       return false;
     }
     _httpFrame.incrementalParse();
@@ -138,7 +139,7 @@ bool XmlRpcServerConnection::readRequest()
     if (_httpFrame.state() == miniros::network::HttpFrame::ParseBody) {
       if (eof) {
         XmlRpcUtil::error("XmlRpcServerConnection(%d)::readRequest: EOF while reading request", _fd);
-        _httpFrame.finishReqeust();
+        _httpFrame.finishRequest();
         return false;   // Either way we close the connection
       }
       XmlRpcUtil::log(3, "XmlRpcServerConnection(%d)::readRequest got only %d/%d bytes.", _fd, _httpFrame.bodyLength(), _httpFrame.contentLength());
@@ -178,7 +179,7 @@ bool XmlRpcServerConnection::writeResponse()
 
   // Prepare to read the next request
   if (_bytesWritten == static_cast<int>(_response.length())) {
-    _httpFrame.finishReqeust();
+    _httpFrame.finishRequest();
     _response = "";
     _connectionState = READ_HEADER;
   }

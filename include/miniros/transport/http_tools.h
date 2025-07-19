@@ -14,11 +14,28 @@
 namespace miniros {
 namespace network {
 
+enum class HttpMethod {
+  Invalid, //< Invalid method type.
+  Get,
+  Head,
+  Options,
+  Trace,
+  Put,
+  Delete,
+  Post,
+  Patch,
+  Connect
+};
+
 /// Intermediate storage for HTTP data.
 struct MINIROS_DECL HttpFrame {
   enum ParserState {
+    /// Parser is in invalid state.
+    ParseInvalid,
     /// Parsing request line.
-    ParseRequest,
+    ParseRequestHeader,
+    /// Parsing response line.
+    ParseResponseHeader,
     /// Parsing name of request field.
     ParseFieldName,
     /// Parsing value of request field.
@@ -26,9 +43,7 @@ struct MINIROS_DECL HttpFrame {
     /// Reading body of request.
     ParseBody,
     /// Finished reading request + body (or only request part if ContentLength=0 or GET).
-    ParseComplete,
-    /// Parser is in invalid state.
-    ParseInvalid
+    ParseComplete
   };
 
   /// Represent a position of a token in some external buffer, Token = [start, end)
@@ -68,6 +83,9 @@ struct MINIROS_DECL HttpFrame {
     }
   };
 
+  /// Parse http method.
+  static HttpMethod parseMethod(const char* data, const Token& token);
+
   /// Container for the full request.
   std::string data;
 
@@ -80,11 +98,19 @@ struct MINIROS_DECL HttpFrame {
   /// Current length of request body.
   int bodyLength() const;
 
-  /// Raw request type: {GET, POST, PUT, ...}
-  Token requestType;
+  Token requestMethodToken;
 
-  /// Request URL
-  Token requestUrl;
+  /// Response code: 200, ...
+  Token responseCodeToken;
+  int responseCode = 0;
+
+  /// Response status: OK, ...
+  Token responseStatus;
+  /// Request method: {GET, POST, PUT, ...}
+  HttpMethod requestMethod = HttpMethod::Invalid;
+
+  /// Requested path
+  Token requestPath;
 
   /// HTTP Version.
   Token requestHttpVersion;
@@ -119,10 +145,17 @@ struct MINIROS_DECL HttpFrame {
 
   /// Finish parsing request.
   /// It will reset all parser-related state and fields and drop all data, related to current packet (if any).
-  void finishReqeust();
+  void finishRequest()
+  {
+    finish(true);
+  }
+
+  void finish(bool request);
+
 
   /// Reset only tokens.
-  void resetParseState();
+  /// @param request - should reset to request or response.
+  void resetParseState(bool request);
 
   /// Check if parser has content length field.
   bool hasContentLength() const;
@@ -152,7 +185,7 @@ protected:
   Token m_fieldName;
 
   /// Current state of a parser.
-  ParserState m_state = HttpFrame::ParseRequest;
+  ParserState m_state = HttpFrame::ParseInvalid;
 };
 
 } // namespace network
