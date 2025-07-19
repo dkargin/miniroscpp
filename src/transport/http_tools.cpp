@@ -14,7 +14,40 @@
 namespace miniros {
 namespace network {
 
-void HttpFrame::finishReqeust()
+template <int N>
+bool tokenCmp(const char* a, const HttpFrame::Token& ta, const char b[N])
+{
+  if (ta.empty()) {
+    return N == 0;
+  }
+  const int size = std::min<int>(ta.size(), N);
+  return strncasecmp(a + ta.start,b, size) == 0;
+}
+
+HttpMethod HttpFrame::parseMethod(const char* data, const Token& token)
+{
+  if (tokenCmp<3>(data, token, "GET"))
+    return HttpMethod::Get;
+  if (tokenCmp<4>(data, token, "POST"))
+    return HttpMethod::Post;
+  if (tokenCmp<4>(data, token, "HEAD"))
+    return HttpMethod::Head;
+  if (tokenCmp<3>(data, token, "PUT"))
+    return HttpMethod::Put;
+  if (tokenCmp<6>(data, token, "DELETE"))
+    return HttpMethod::Delete;
+  if (tokenCmp<7>(data, token, "CONNECT"))
+    return HttpMethod::Connect;
+  if (tokenCmp<7>(data, token, "OPTIONS"))
+    return HttpMethod::Options;
+  if (tokenCmp<5>(data, token, "TRACE"))
+    return HttpMethod::Trace;
+  if (tokenCmp<5>(data, token, "PATCH"))
+    return HttpMethod::Patch;
+  return HttpMethod::Invalid;
+}
+
+void HttpFrame::finish(bool request)
 {
   if (m_state == ParseComplete) {
     size_t currentLength = m_bodyPosition;
@@ -30,15 +63,20 @@ void HttpFrame::finishReqeust()
   } else {
     data.clear();
   }
-  resetParseState();
+  resetParseState(request);
 }
 
-void HttpFrame::resetParseState()
+void HttpFrame::resetParseState(bool request)
 {
   fields.clear();
-  requestType = {};
-  requestUrl = {};
+  requestMethod = HttpMethod::Invalid;
+  requestMethodToken = {};
+  requestPath = {};
   requestHttpVersion = {};
+
+  responseStatus = {};
+  responseCodeToken = {};
+  responseCode = 0;
 
   m_currentPosition = 0;
   m_bodyPosition = 0;
@@ -51,7 +89,7 @@ void HttpFrame::resetParseState()
 
   m_keepAlive = true;
 
-  m_state = HttpFrame::ParseRequest;
+  m_state = request ? ParseRequestHeader : ParseResponseHeader;
 }
 
 std::string_view HttpFrame::getTokenView(const std::string& data, const Token& token)
@@ -98,25 +136,42 @@ int HttpFrame::incrementalParse()
   const char *start = data.c_str();
   const char *end = start + data.length();
   const char* cp = start + m_currentPosition;
-
   const char* tokenStart = start + m_tokenStart;
 
-  for (; cp < end;) {
-    if (m_state == HttpFrame::ParseRequest) {
+  while (cp < end) {
+    if (m_state == HttpFrame::ParseRequestHeader) {
+      // Parsing request line: "GET /home.html HTTP/1.1"
       if (strncmp(cp, "\r\n", 2) == 0) {
         requestHttpVersion.assign(tokenStart - start, cp - start);
         cp += 2;
         tokenStart = cp;
         m_state = HttpFrame::ParseFieldName;
         continue;
-      } if (requestType.empty() && *cp == ' ') {
-        requestType.assign(tokenStart - start, cp - start);
+      } if (requestMethodToken.empty() && *cp == ' ') {
+        requestMethodToken.assign(tokenStart - start, cp - start);
+        requestMethod = parseMethod(start, requestMethodToken);
         tokenStart = cp + 1;
-      } else if (requestUrl.empty() && *cp == ' ') {
-        requestUrl.assign(tokenStart - start, cp - start);
+      } else if (requestPath.empty() && *cp == ' ') {
+        requestPath.assign(tokenStart - start, cp - start);
         tokenStart = cp + 1;
       } else {
-        // Error?
+        // continue parsing.
+      }
+    }
+    else if (m_state == HttpFrame::ParseResponseHeader) {
+      // Parsing response line: "200 OK"
+      if (strncmp(cp, "\r\n", 2) == 0) {
+        responseStatus.assign(tokenStart - start, cp - start);
+        cp += 2;
+        tokenStart = cp;
+        m_state = HttpFrame::ParseFieldName;
+        continue;
+      } if (responseCodeToken.empty() && *cp == ' ') {
+        responseCodeToken.assign(tokenStart - start, cp - start);
+        responseCode = atoi(tokenStart);
+        tokenStart = cp + 1;
+      } else {
+        // continue parsing.
       }
     }
     else if (m_state == HttpFrame::ParseFieldName) {
