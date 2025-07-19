@@ -397,16 +397,8 @@ minibag::RecorderOptions parseRecordOptions(int argc, char** argv) {
     if (vm.count("topic-list")) {
       std::vector<std::string> listFiles = vm["topic-list"].as< std::vector<std::string> >();
       for (const std::string& file: listFiles) {
-        std::ifstream in(file.c_str());
-        if (!in) {
+        if (!miniros::names::readTopicList(file, topics)) {
           std::cerr << "Failed to open file with topic list \"" << file.c_str() << "\"" << std::endl;
-          continue;
-        }
-        std::string line;
-        while (std::getline(in, line)) {
-          if (line.empty())
-            continue;
-          topics.push_back(line);
         }
       }
     }

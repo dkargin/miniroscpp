@@ -137,6 +137,26 @@ TEST(Names, testExtraction)
   EXPECT_STREQ(rightA.c_str(), srcPath.c_str());
 }
 
+TEST(Names, testGoodTopicList)
+{
+  const std::string rawList = R"(
+# Topics from first sensor
+/imu
+/temp
+# Topics from the second sensor
+/robot2/imu
+/robot2/mag
+/robot2/odom # Comment line 2
+
+# Only a single topic is parsed per line. Second topic in line is discarded.
+/topic2 /topic3
+)";
+  std::vector<std::string> topics;
+  names::readTopicListStr(rawList, topics);
+  ASSERT_EQ(topics.size(), 6);
+  ASSERT_EQ(topics.back(), std::string("/topic2"));
+}
+
 int main(int argc, char** argv)
 {
   testing::InitGoogleTest(&argc, argv);

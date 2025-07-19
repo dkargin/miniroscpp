@@ -44,12 +44,13 @@ SET(rostime_SRC
 
 set(cpp_common_SRC
     debug.cpp
+    errors.cpp
     header.cpp
     console.cpp
     common.cpp
-    errors.cpp
     console_print.cpp
     file_log.cpp
+    names.cpp
     serialization.cpp)
 
 set(rosbag_SRC "")
@@ -165,7 +166,6 @@ set(transport_SRC
     transport/master_link.cpp
     transport/message_deserializer.cpp
 
-    transport/names.cpp
     transport/network.cpp
     transport/net_address.cpp
     transport/node_handle.cpp

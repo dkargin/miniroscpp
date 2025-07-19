@@ -156,6 +156,18 @@ protected:
   std::vector<std::string_view> m_ns;
 };
 
+/// Read list of topics from file.
+/// It is used by `minibag record` command.
+/// @param file - path to a file with a list of topics.
+/// @param topics - output array with topics.
+MINIROS_DECL bool readTopicList(const std::string& file, std::vector<std::string>& topics);
+
+/// Read topic list from a string.
+/// @param data - a buffer with topic list
+/// @param topics - output array with topics.
+MINIROS_DECL bool readTopicListStr(const std::string& data, std::vector<std::string>& topics);
+
+
 } // namespace names
 
 } // namespace miniros
