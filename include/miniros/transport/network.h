@@ -42,6 +42,7 @@ namespace network
 MINIROS_DECL bool splitURI(const std::string& uri, std::string& host, uint32_t& port);
 MINIROS_DECL const std::string& getHost();
 MINIROS_DECL uint16_t getTCPROSPort();
+MINIROS_DECL uint16_t getRPCPort();
 
 } // namespace network
 

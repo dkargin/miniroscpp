@@ -46,6 +46,7 @@ namespace network {
 
 std::string g_host;
 uint16_t g_tcpros_server_port = 0;
+uint16_t g_rpc_server_port = 0;
 
 const std::string& getHost()
 {
@@ -75,6 +76,11 @@ bool splitURI(const std::string& uri, std::string& host, uint32_t& port)
 uint16_t getTCPROSPort()
 {
   return g_tcpros_server_port;
+}
+
+uint16_t getRPCPort()
+{
+  return g_rpc_server_port;
 }
 
 static bool isPrivateIP(const char* ip)
@@ -200,6 +206,25 @@ void init(const M_string& remappings)
     if (failed) {
       throw miniros::InvalidPortException(
         "__tcpros_server_port [" + it->second + "] was not specified as a number within the 0-65535 range");
+    }
+  }
+
+  it = remappings.find("__rpc_server_port");
+  if (it != remappings.end()) {
+    bool failed = true;
+    try {
+      auto rawValue = std::stoul(it->second);
+      if (rawValue < 65535) {
+        g_rpc_server_port = rawValue;
+        failed = false;
+      }
+    } catch (std::invalid_argument&) {
+    } catch (std::out_of_range&) {
+    }
+
+    if (failed) {
+      throw miniros::InvalidPortException(
+        "__rpc_server_port [" + it->second + "] was not specified as a number within the 0-65535 range");
     }
   }
 
