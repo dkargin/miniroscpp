@@ -28,6 +28,7 @@
 #include <cassert>
 #include <cstring>
 #include <sstream>
+#include <fstream>
 
 #include "miniros/names.h"
 #include "miniros/this_node.h"
@@ -35,9 +36,7 @@
 namespace miniros
 {
 
-namespace names
-{
-
+namespace names {
 M_string g_remappings;
 M_string g_unresolved_remappings;
 
@@ -211,11 +210,11 @@ std::string parentNamespace(const std::string& name)
   std::string error;
   if (!validate(name, error))
   {
-  	throw InvalidNameException(error);
+    throw InvalidNameException(error);
   }
 
   if (!name.compare(""))  return "";
-  if (!name.compare("/")) return "/"; 
+  if (!name.compare("/")) return "/";
 
   std::string stripped_name;
 
@@ -335,7 +334,7 @@ std::string Path::right(int i) const
   size_t leftLen = end - v.data();
   std::string s = std::string(v.data(), leftLen);
   if (pos == 0 && isAbsolute())
-     return std::string("/") + s;
+    return std::string("/") + s;
   return s;
 }
 
@@ -412,6 +411,59 @@ bool operator != (const Path& a, const Path& b)
 bool operator < (const Path& a, const Path& b)
 {
   return a.m_fullPath < b.m_fullPath;
+}
+
+bool readTopicList(std::istream& in, std::vector<std::string>& topics)
+{
+  std::string line;
+  while (std::getline(in, line)) {
+    if (line.empty())
+      continue;
+    std::string result;
+    bool valid = true;
+    bool firstSpace = true;
+    for (auto ch: line) {
+      if (firstSpace && std::isspace(ch)) {
+        // Do nothing.
+        continue;
+      }
+      firstSpace = false;
+      if (std::isalnum(ch) || ch == '_' || ch == '/') {
+        result += ch;
+      }
+      else if (ch == '#' || std::isspace(ch)) {
+        // Starting of comment block or trailing space.
+        break;
+      } else {
+        valid = false;
+        break;
+      }
+    }
+    if (valid && !result.empty()) {
+      std::string error;
+      if (miniros::names::validate(result, error)) {
+        topics.push_back(result);
+      } else {
+        std::cerr << "Invalid topic name \"" << result << "\" : " << error << std::endl;
+      }
+    }
+  }
+  return true;
+}
+
+bool readTopicListStr(const std::string& data, std::vector<std::string>& topics)
+{
+  std::istringstream iss(data);
+  return readTopicList(iss, topics);
+}
+
+bool readTopicList(const std::string& file, std::vector<std::string>& topics)
+{
+  std::ifstream in(file.c_str());
+  if (!in) {
+    return false;
+  }
+  return readTopicList(in, topics);
 }
 
 } // namespace names
