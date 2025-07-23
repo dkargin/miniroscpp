@@ -60,6 +60,9 @@ XmlRpcClient::XmlRpcClient(const char* host, int port, const char* uri/*=0*/)
   else
     _uri = "/RPC2";
 
+  std::stringstream ss;
+
+  updateName();
   // Default to keeping the connection open until an explicit close is done
   setKeepOpen();
 }
@@ -69,6 +72,20 @@ XmlRpcClient::~XmlRpcClient()
 {
   this->close();
 }
+
+void XmlRpcClient::updateName()
+{
+  std::stringstream ss;
+  if (_fd >= 0)
+    ss << "[" << _fd << "] ";
+  if (_uri.empty() || _uri[0] == '/') {
+    ss << _host << ":" << _port;
+  } else {
+    ss << _uri;
+  }
+  _name = ss.str();
+}
+
 
 // Close the owned fd
 void
@@ -183,18 +200,9 @@ XmlRpcClient::executeCheckDone(XmlRpcValue& result)
   return true;
 }
 
-std::string XmlRpcClient::name() const
+const std::string& XmlRpcClient::name() const
 {
-  std::stringstream ss;
-
-  if (_fd >= 0)
-    ss << "[" << _fd << "] ";
-  if (_uri.empty() || _uri[0] == '/') {
-    ss << _host << ":" << _port;
-  } else {
-    ss << _uri;
-  }
-  return ss.str();
+  return _name;
 }
 
 // XmlRpcSource interface implementation
@@ -214,8 +222,11 @@ XmlRpcClient::handleEvent(unsigned eventType)
     return 0;
   }
 
-  if (_connectionState == WRITE_REQUEST)
+  bool finishedSending = false;
+  if (_connectionState == WRITE_REQUEST) {
     if ( ! writeRequest()) return 0;
+    finishedSending = true;
+  }
 
   if (_connectionState == READ_HEADER)
     if ( ! readHeader()) return 0;
@@ -230,9 +241,10 @@ XmlRpcClient::handleEvent(unsigned eventType)
 
 
 // Create the socket connection to the server if necessary
-bool
-XmlRpcClient::setupConnection()
+bool XmlRpcClient::setupConnection()
 {
+  _timeRequestStart = std::chrono::steady_clock::now();
+
   // If an error occurred last time through, or if the server closed the connection, close our end
   if ((_connectionState != NO_CONNECTION && _connectionState != IDLE) || _eof)
     close();
@@ -283,6 +295,7 @@ XmlRpcClient::doConnect()
     return false;
   }
 
+  updateName();
   return true;
 }
 
@@ -366,6 +379,7 @@ XmlRpcClient::writeRequest()
   if (_bytesWritten == int(_request.length())) {
     _header = "";
     _response = "";
+    _timeRequestSent = std::chrono::steady_clock::now();
     _connectionState = READ_HEADER;
   } else {
     // On partial write, remove the portion of the output that was written from
@@ -403,7 +417,8 @@ bool XmlRpcClient::readHeader()
     return false;
   }
 
-  XmlRpcUtil::log(4, "XmlRpcClient(%s)::readHeader: client has read %d bytes", name().c_str(), _header.length());
+  double timeRead = std::chrono::duration<double>(std::chrono::steady_clock::now() - _timeRequestStart).count() * 1000;
+  XmlRpcUtil::log(4, "XmlRpcClient(%s)::readHeader: client has read %d bytes, t=%fms", name().c_str(), _header.length(), timeRead);
 
   char *hp = (char*)_header.c_str();  // Start of header
   char *ep = hp + _header.length();   // End of string
@@ -453,6 +468,7 @@ bool XmlRpcClient::readHeader()
   _response = bp;
   _header = "";   // should parse out any interesting bits from the header (connection, etc)...
   _connectionState = READ_RESPONSE;
+  _timeResponseHeader = std::chrono::steady_clock::now();
   return true;    // Continue monitoring this source
 }
 
@@ -489,7 +505,14 @@ XmlRpcClient::readResponse()
   XmlRpcUtil::log(3, "XmlRpcClient(%s)::readResponse (read %d bytes)", name().c_str(), _response.length());
   XmlRpcUtil::log(5, "response:\n%s", _response.c_str());
 
+  _timeResponseBody = std::chrono::steady_clock::now();
   _connectionState = IDLE;
+
+  double timeSent = std::chrono::duration<double>(_timeRequestSent - _timeRequestStart).count() * 1000;
+  double timeHeader = std::chrono::duration<double>(_timeResponseHeader - _timeRequestStart).count() * 1000;
+  double timeBody = std::chrono::duration<double>(_timeResponseBody - _timeRequestStart).count() * 1000;
+
+  XmlRpcUtil::log(5, "Response sent=%f recvH=%f recvB=%f", timeSent, timeHeader, timeBody);
 
   return false;    // Stop monitoring this source (causes return from work)
 }

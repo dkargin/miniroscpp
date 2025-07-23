@@ -572,7 +572,8 @@ bool TopicManager::pubUpdate(const std::string& topic, const std::vector<std::st
   return false;
 }
 
-XmlRpc::XmlRpcValue TopicManager::requestTopic(const std::string& caller, const std::string& topic, const XmlRpcValue& protos, XmlRpc::XmlRpcServerConnection* connection)
+XmlRpc::XmlRpcValue TopicManager::requestTopic(const std::string& caller, const std::string& topic, const XmlRpcValue& protos,
+  const network::ClientInfo& clientInfo)
 {
   RpcValue ret = RpcValue::Array(3);
   ret[0] = 0;
@@ -586,7 +587,7 @@ XmlRpc::XmlRpcValue TopicManager::requestTopic(const std::string& caller, const 
   std::string goodAddress;
 
   network::NetAddress localAddress;
-  if (resolve_ip_ && network::readLocalAddress(connection->getfd(), localAddress)) {
+  if (resolve_ip_ && network::readLocalAddress(clientInfo.fd, localAddress)) {
     goodAddress = localAddress.address;
   } else {
     goodAddress = network::getHost();

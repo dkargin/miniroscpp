@@ -34,7 +34,16 @@ struct MINIROS_DECL Error {
     ShutdownInterrupt,
     /// Incorrect or unexpected response.
     InvalidResponse,
+    /// Network address in use. Matches EADDRINUSE error.
+    AddressInUse,
+    /// End of file or socket is closed.
+    EndOfFile,
+    /// Next IO attempt will block.
+    WouldBlock,
   };
+
+  Error() :code(Ok)
+  {}
 
   Error(Error_t c) : code(c)
   {}
