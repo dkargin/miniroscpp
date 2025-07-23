@@ -10,6 +10,12 @@
 
 #include "XmlRpcDecl.h"
 
+namespace miniros {
+namespace network {
+struct ClientInfo;
+}
+}
+
 #ifndef MAKEDEPEND
 # include <string>
 #endif
@@ -22,13 +28,15 @@ namespace XmlRpc {
   // The XmlRpcServer processes client requests to call RPCs
   class XmlRpcServer;
 
+  class XmlRpcMethods;
+
   class XmlRpcServerConnection;
 
   //! Abstract class representing a single RPC method
   class XMLRPCPP_DECL XmlRpcServerMethod {
   public:
     //! Constructor
-    XmlRpcServerMethod(std::string const& name, XmlRpcServer* server = 0);
+    XmlRpcServerMethod(std::string const& name, XmlRpcMethods* server = 0);
 
     //! Destructor
     virtual ~XmlRpcServerMethod();
@@ -37,7 +45,7 @@ namespace XmlRpc {
     const std::string& name() { return _name; }
 
     //! Execute the method. Subclasses must provide a definition for this method.
-    virtual void execute(const XmlRpcValue& params, XmlRpcValue& result, XmlRpcServerConnection* connection) = 0;
+    virtual void execute(const XmlRpcValue& params, XmlRpcValue& result, const miniros::network::ClientInfo& connection) = 0;
 
     //! Returns a help string for the method.
     //! Subclasses should define this method if introspection is being used.
@@ -45,7 +53,7 @@ namespace XmlRpc {
 
   protected:
     std::string _name;
-    XmlRpcServer* _server;
+    XmlRpcMethods* _server;
   };
 } // namespace XmlRpc
 

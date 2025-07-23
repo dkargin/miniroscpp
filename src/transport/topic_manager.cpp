@@ -28,10 +28,11 @@
 #define MINIROS_PACKAGE_NAME "topic_manager"
 
 #include "miniros/transport/topic_manager.h"
+#include "miniros/network/net_address.h"
+#include "miniros/network/network.h"
 #include "miniros/master_link.h"
 #include "miniros/this_node.h"
 #include "miniros/transport/connection_manager.h"
-#include "miniros/transport/network.h"
 #include "miniros/transport/poll_manager.h"
 #include "miniros/transport/publication.h"
 #include "miniros/transport/rosout_appender.h"
@@ -40,11 +41,9 @@
 #include "miniros/transport/subscription.h"
 #include "miniros/transport/transport_tcp.h"
 #include "miniros/transport/transport_udp.h"
-#include "miniros/transport/net_address.h"
 
 #include <miniros/console.h>
 #include <sstream>
-#include <xmlrpcpp/XmlRpcServerConnection.h>
 
 using namespace XmlRpc; // A battle to be fought later
 
@@ -572,7 +571,8 @@ bool TopicManager::pubUpdate(const std::string& topic, const std::vector<std::st
   return false;
 }
 
-XmlRpc::XmlRpcValue TopicManager::requestTopic(const std::string& caller, const std::string& topic, const XmlRpcValue& protos, XmlRpc::XmlRpcServerConnection* connection)
+XmlRpc::XmlRpcValue TopicManager::requestTopic(const std::string& caller, const std::string& topic, const XmlRpcValue& protos,
+  const network::ClientInfo& clientInfo)
 {
   RpcValue ret = RpcValue::Array(3);
   ret[0] = 0;
@@ -586,7 +586,7 @@ XmlRpc::XmlRpcValue TopicManager::requestTopic(const std::string& caller, const 
   std::string goodAddress;
 
   network::NetAddress localAddress;
-  if (resolve_ip_ && network::readLocalAddress(connection->getfd(), localAddress)) {
+  if (resolve_ip_ && network::readLocalAddress(clientInfo.fd, localAddress)) {
     goodAddress = localAddress.address;
   } else {
     goodAddress = network::getHost();

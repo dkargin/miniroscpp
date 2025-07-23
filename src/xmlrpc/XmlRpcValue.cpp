@@ -43,7 +43,7 @@ namespace XmlRpc {
   static const char MEMBER_ETAG[]   = "</member>";
   static const char STRUCT_ETAG[]   = "</struct>";
 
-  XmlRpcValue XmlRpcValue::Array(int size)
+  XmlRpcValue XmlRpcValue::Array(size_t size)
   {
     XmlRpcValue value;
     value.setSize(size);

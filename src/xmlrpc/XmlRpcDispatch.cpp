@@ -98,13 +98,17 @@ void XmlRpcDispatch::work(double timeout)
   _inWork = true;
   int timeout_ms = static_cast<int>(floor(timeout * 1000.));
 
+  std::vector<pollfd> fds;
+  std::vector<XmlRpcSource *> sources;
+
   // Only work while there is something to monitor
   while (!_sources.empty()) {
 
     // Construct the sets of descriptors we are interested in
-    const unsigned source_cnt = _sources.size();
-    std::vector<pollfd> fds(source_cnt);
-    std::vector<XmlRpcSource *> sources(source_cnt);
+    const size_t source_cnt = _sources.size();
+
+    fds.resize(source_cnt);
+    sources.resize(source_cnt);
 
     SourceList::iterator it;
     std::size_t i = 0;
@@ -226,18 +230,10 @@ void XmlRpcDispatch::clear()
 
 double XmlRpcDispatch::getTime()
 {
-#ifdef USE_FTIME
-  struct timeb	tbuff;
-
-  ftime(&tbuff);
-  return ((double) tbuff.time + ((double)tbuff.millitm / 1000.0) +
-	  ((double) tbuff.timezone * 60));
-#else
   uint32_t sec, nsec;
 
   miniros::clock::steadytime(sec, nsec);
   return ((double)sec + (double)nsec / 1e9);
-#endif /* USE_FTIME */
 }
 
 

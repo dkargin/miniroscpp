@@ -36,14 +36,12 @@ namespace XmlRpc {
   // Class representing argument and result values
   class XmlRpcValue;
 
-
-  //! A class to handle XML RPC requests
-  class XMLRPCPP_DECL XmlRpcServer : public XmlRpcSource {
+  class XMLRPCPP_DECL XmlRpcMethods {
   public:
     //! Create a server object.
-    XmlRpcServer();
+    XmlRpcMethods();
     //! Destructor.
-    virtual ~XmlRpcServer();
+    virtual ~XmlRpcMethods();
 
     //! Specify whether introspection is enabled or not. Default is not enabled.
     void enableIntrospection(bool enabled=true);
@@ -60,6 +58,31 @@ namespace XmlRpc {
     //! Look up a method by name
     XmlRpcServerMethod* findMethod(const std::string& name) const;
 
+    //! Introspection support
+    void listMethods(XmlRpcValue& result);
+
+  protected:
+
+    // Collection of methods. This could be a set keyed on method name if we wanted...
+    typedef std::map< std::string, XmlRpcServerMethod* > MethodMap;
+    MethodMap _methods;
+
+    // system methods
+    XmlRpcServerMethod* _listMethods;
+    XmlRpcServerMethod* _methodHelp;
+
+    // Whether the introspection API is supported by this server
+    bool _introspectionEnabled;
+  };
+
+  //! A class to handle XML RPC requests
+  class XMLRPCPP_DECL XmlRpcServer : public XmlRpcSource, public XmlRpcMethods {
+  public:
+    //! Create a server object.
+    XmlRpcServer();
+    //! Destructor.
+    virtual ~XmlRpcServer();
+
     //! Create a socket, bind to the specified port, and
     //! set it in listen mode to make it available for clients.
     bool bindAndListen(int port, int backlog = 5);
@@ -72,9 +95,6 @@ namespace XmlRpc {
 
     //! Close all connections with clients and the socket file descriptor
     void shutdown();
-
-    //! Introspection support
-    void listMethods(XmlRpcValue& result);
 
     // XmlRpcSource interface implementation
 
@@ -99,19 +119,9 @@ namespace XmlRpc {
     //! Count number of free file descriptors
     int countFreeFDs();
 
-    // Whether the introspection API is supported by this server
-    bool _introspectionEnabled;
 
     // Event dispatcher
     XmlRpcDispatch _disp;
-
-    // Collection of methods. This could be a set keyed on method name if we wanted...
-    typedef std::map< std::string, XmlRpcServerMethod* > MethodMap;
-    MethodMap _methods;
-
-    // system methods
-    XmlRpcServerMethod* _listMethods;
-    XmlRpcServerMethod* _methodHelp;
 
     int _port;
 

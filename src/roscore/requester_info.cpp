@@ -7,13 +7,15 @@
 namespace miniros {
 namespace master {
 
-Error RequesterInfo::assign(const std::string& callerId, int connectionFd)
+Error RequesterInfo::assign(const std::string& caller, const network::ClientInfo& client)
 {
-  this->callerId = callerId;
-  if (!network::readRemoteAddress(connectionFd, clientAddress))
-    return Error::SystemError;
-  if (!network::readLocalAddress(connectionFd, localAddress))
-    return Error::SystemError;
+  callerId = caller;
+  if (!client.sameProcess) {
+    if (!network::readRemoteAddress(client.fd, clientAddress))
+      return Error::SystemError;
+    if (!network::readLocalAddress(client.fd, localAddress))
+      return Error::SystemError;
+  }
   return Error::Ok;
 }
 } // namespace master

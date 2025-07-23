@@ -26,14 +26,11 @@ namespace master {
 /// Stores state of rosmaster and handles part of requests.
 class MINIROS_DECL MasterHandler
 {
-protected:
-  std::string uri;
-
 public:
   using RpcValue = XmlRpc::XmlRpcValue;
   using RpcConnection = XmlRpc::XmlRpcServerConnection;
 
-  MasterHandler(RPCManagerPtr rpcManager, RegistrationManager* regManager);
+  MasterHandler(RPCManagerPtr rpcManager, RegistrationManager* regManager, AddressResolver* resolver);
 
   /// Sends immediate command/update to a node.
   Error sendToNode(const std::shared_ptr<NodeRef>& nr, const char* method,
@@ -41,8 +38,6 @@ public:
 
   /// Enqueues command to a node. It will be executed later in `update()` method.
   Error enqueueNodeCommand(const std::shared_ptr<NodeRef>& nr, const char* method, const RpcValue& arg1, const RpcValue& arg2 = {});
-
-  std::string getUri(const std::string& caller_id) const;
 
   void notifyTopicSubscribers(const std::string& topic, const std::vector<std::shared_ptr<NodeRef>>& subscribers);
 
@@ -75,9 +70,6 @@ public:
 
   SystemState getSystemState(const RequesterInfo& requesterInfo) const;
 
-  /// Enable IP resolving mode.
-  void setResolveNodeIP(bool resolve);
-
   /// Updates internal tasks.
   /// It is called from the main thread, out of any RPC handlers.
   void update();
@@ -94,7 +86,7 @@ public:
   };
 
 protected:
-  AddressResolver m_resolver;
+  AddressResolver* m_resolver;
   RegistrationManager* m_regManager;
 
   RPCManagerPtr m_rpcManager;

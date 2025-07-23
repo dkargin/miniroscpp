@@ -42,13 +42,14 @@
 #include <set>
 #include <sstream>
 #include <string>
+#include <thread>
 
 #include <regex>
 #include "minibag/recorder.h"
 
 #include <miniros/topic_tools/shape_shifter.h>
 
-#include "miniros/transport/network.h"
+#include "miniros/network/network.h"
 #include "miniros/transport/rpc_manager.h"
 
 using std::cout;

@@ -153,6 +153,19 @@ set(transport_SRC
     shape_shifter.cpp
     observer.cpp
 
+    http/endpoints/xmlrpc.cpp
+    http/endpoints/filesystem.cpp
+    http/http_filters.cpp
+    http/http_server.cpp
+    http/http_server_connection.cpp
+    http/http_tools.cpp
+
+    network/network.cpp
+    network/net_adapter.cpp
+    network/net_address.cpp
+    network/socket.cpp
+    network/url.cpp
+
     transport/advertise_service_options.cpp
     transport/callback_queue.cpp
     transport/connection.cpp
@@ -162,13 +175,10 @@ set(transport_SRC
     transport/intraprocess_publisher_link.cpp
     transport/internal_timer_manager.cpp
     transport/io.cpp
-    transport/http_tools.cpp
 
     transport/master_link.cpp
     transport/message_deserializer.cpp
 
-    transport/network.cpp
-    transport/net_address.cpp
     transport/node_handle.cpp
     transport/poll_manager.cpp
     transport/poll_set.cpp
@@ -207,15 +217,17 @@ set(transport_SRC
     transport/transport/transport_tcp.cpp
     transport/transport_publisher_link.cpp
     transport/transport_subscriber_link.cpp
-    transport/url.cpp
     transport/wall_timer.cpp
     tf2/transform_broadcaster.cpp
   )
 
 # minimaster contains core rosmaster API. It can be embedded to some other apps.
 set(master_SRC
+    roscore/discovery.cpp
     roscore/master.cpp
+    roscore/master_endpoints.cpp
     roscore/master_handler.cpp
+    roscore/master_html_printers.cpp
     roscore/node_ref.cpp
     roscore/registrations.cpp
     roscore/registration_manager.cpp

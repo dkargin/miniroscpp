@@ -19,14 +19,137 @@
 
 using namespace XmlRpc;
 
+XmlRpcMethods::XmlRpcMethods()
+:_introspectionEnabled(false),
+ _listMethods(0),
+ _methodHelp(0)
+{}
+
+XmlRpcMethods::~XmlRpcMethods()
+{
+  _methods.clear();
+  delete _listMethods;
+  delete _methodHelp;
+}
+
+
+// Add a command to the RPC server
+void XmlRpcMethods::addMethod(XmlRpcServerMethod* method)
+{
+  _methods[method->name()] = method;
+}
+
+// Remove a command from the RPC server
+void XmlRpcMethods::removeMethod(XmlRpcServerMethod* method)
+{
+  MethodMap::iterator i = _methods.find(method->name());
+  if (i != _methods.end())
+    _methods.erase(i);
+}
+
+// Remove a command from the RPC server by name
+void XmlRpcMethods::removeMethod(const std::string& methodName)
+{
+  MethodMap::iterator i = _methods.find(methodName);
+  if (i != _methods.end())
+    _methods.erase(i);
+}
+
+XmlRpcServerMethod* XmlRpcMethods::findMethod(const std::string& name) const
+{
+  MethodMap::const_iterator i = _methods.find(name);
+  if (i == _methods.end())
+    return 0;
+  return i->second;
+}
+
+
+// Introspection support
+static const std::string LIST_METHODS("system.listMethods");
+static const std::string METHOD_HELP("system.methodHelp");
+static const std::string MULTICALL("system.multicall");
+
+
+// List all methods available on a server
+class ListMethods : public XmlRpcServerMethod
+{
+public:
+  ListMethods(XmlRpcMethods* s) : XmlRpcServerMethod(LIST_METHODS, s) {}
+
+  void execute(const XmlRpcValue&, XmlRpcValue& result, const miniros::network::ClientInfo& ) override
+  {
+    _server->listMethods(result);
+  }
+
+  std::string help() const override { return std::string("List all methods available on a server as an array of strings"); }
+};
+
+
+// Retrieve the help string for a named method
+class MethodHelp : public XmlRpcServerMethod
+{
+public:
+  MethodHelp(XmlRpcMethods* s) : XmlRpcServerMethod(METHOD_HELP, s) {}
+
+  void execute(const XmlRpcValue& params, XmlRpcValue& result, const miniros::network::ClientInfo&) override
+  {
+    if (params[0].getType() != XmlRpcValue::TypeString)
+      throw XmlRpcException(METHOD_HELP + ": Invalid argument type");
+
+    XmlRpcServerMethod* m = _server->findMethod(params[0].as<std::string>());
+    if ( ! m)
+      throw XmlRpcException(METHOD_HELP + ": Unknown method name");
+
+    result = m->help();
+  }
+
+  std::string help() const override { return std::string("Retrieve the help string for a named method"); }
+};
+
+
+// Specify whether introspection is enabled or not. Default is enabled.
+void XmlRpcMethods::enableIntrospection(bool enabled)
+{
+  if (_introspectionEnabled == enabled)
+    return;
+
+  _introspectionEnabled = enabled;
+
+  if (enabled)
+  {
+    if ( ! _listMethods)
+    {
+      _listMethods = new ListMethods(this);
+      _methodHelp = new MethodHelp(this);
+    } else {
+      addMethod(_listMethods);
+      addMethod(_methodHelp);
+    }
+  }
+  else
+  {
+    removeMethod(LIST_METHODS);
+    removeMethod(METHOD_HELP);
+  }
+}
+
+void XmlRpcMethods::listMethods(XmlRpcValue& result)
+{
+  int i = 0;
+  result.setSize(_methods.size()+1);
+  for (MethodMap::iterator it=_methods.begin(); it != _methods.end(); ++it)
+    result[i++] = it->first;
+
+  // Multicall support is built into XmlRpcServerConnection
+  result[i] = MULTICALL;
+}
+
+
 const int XmlRpcServer::FREE_FD_BUFFER = 32;
 const double XmlRpcServer::ACCEPT_RETRY_INTERVAL_SEC = 1.0;
 
 XmlRpcServer::XmlRpcServer()
-  : _introspectionEnabled(false),
-    _listMethods(0),
-    _methodHelp(0),
-    _port(0),
+  : _port(0),
     _accept_error(false),
     _accept_retry_time_sec(0.0)
 {
@@ -58,48 +181,7 @@ XmlRpcServer::XmlRpcServer()
 XmlRpcServer::~XmlRpcServer()
 {
   this->shutdown();
-  _methods.clear();
-  delete _listMethods;
-  delete _methodHelp;
 }
-
-
-// Add a command to the RPC server
-void 
-XmlRpcServer::addMethod(XmlRpcServerMethod* method)
-{
-  _methods[method->name()] = method;
-}
-
-// Remove a command from the RPC server
-void 
-XmlRpcServer::removeMethod(XmlRpcServerMethod* method)
-{
-  MethodMap::iterator i = _methods.find(method->name());
-  if (i != _methods.end())
-    _methods.erase(i);
-}
-
-// Remove a command from the RPC server by name
-void 
-XmlRpcServer::removeMethod(const std::string& methodName)
-{
-  MethodMap::iterator i = _methods.find(methodName);
-  if (i != _methods.end())
-    _methods.erase(i);
-}
-
-
-// Look up a method by name
-XmlRpcServerMethod* 
-XmlRpcServer::findMethod(const std::string& name) const
-{
-  MethodMap::const_iterator i = _methods.find(name);
-  if (i == _methods.end())
-    return 0;
-  return i->second;
-}
-
 
 // Create a socket, bind to the specified port, and
 // set it in listen mode to make it available for clients.
@@ -299,88 +381,4 @@ XmlRpcServer::shutdown()
   // This closes and destroys all connections as well as closing this socket
   _disp.clear();
 }
-
-
-// Introspection support
-static const std::string LIST_METHODS("system.listMethods");
-static const std::string METHOD_HELP("system.methodHelp");
-static const std::string MULTICALL("system.multicall");
-
-
-// List all methods available on a server
-class ListMethods : public XmlRpcServerMethod
-{
-public:
-  ListMethods(XmlRpcServer* s) : XmlRpcServerMethod(LIST_METHODS, s) {}
-
-  void execute(const XmlRpcValue&, XmlRpcValue& result, XmlRpcServerConnection* /*conn*/) override
-  {
-    _server->listMethods(result);
-  }
-
-  std::string help() const override { return std::string("List all methods available on a server as an array of strings"); }
-};
-
-
-// Retrieve the help string for a named method
-class MethodHelp : public XmlRpcServerMethod
-{
-public:
-  MethodHelp(XmlRpcServer* s) : XmlRpcServerMethod(METHOD_HELP, s) {}
-
-  void execute(const XmlRpcValue& params, XmlRpcValue& result, XmlRpcServerConnection* /*conn*/) override
-  {
-    if (params[0].getType() != XmlRpcValue::TypeString)
-      throw XmlRpcException(METHOD_HELP + ": Invalid argument type");
-
-    XmlRpcServerMethod* m = _server->findMethod(params[0].as<std::string>());
-    if ( ! m)
-      throw XmlRpcException(METHOD_HELP + ": Unknown method name");
-
-    result = m->help();
-  }
-
-  std::string help() const override { return std::string("Retrieve the help string for a named method"); }
-};
-
-    
-// Specify whether introspection is enabled or not. Default is enabled.
-void XmlRpcServer::enableIntrospection(bool enabled)
-{
-  if (_introspectionEnabled == enabled)
-    return;
-
-  _introspectionEnabled = enabled;
-
-  if (enabled)
-  {
-    if ( ! _listMethods)
-    {
-      _listMethods = new ListMethods(this);
-      _methodHelp = new MethodHelp(this);
-    } else {
-      addMethod(_listMethods);
-      addMethod(_methodHelp);
-    }
-  }
-  else
-  {
-    removeMethod(LIST_METHODS);
-    removeMethod(METHOD_HELP);
-  }
-}
-
-
-void XmlRpcServer::listMethods(XmlRpcValue& result)
-{
-  int i = 0;
-  result.setSize(_methods.size()+1);
-  for (MethodMap::iterator it=_methods.begin(); it != _methods.end(); ++it)
-    result[i++] = it->first;
-
-  // Multicall support is built into XmlRpcServerConnection
-  result[i] = MULTICALL;
-}
-
-
 

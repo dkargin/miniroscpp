@@ -9,12 +9,12 @@
 
 #include <string>
 
-#include "miniros/transport/http_tools.h"
-#include "miniros/transport/net_address.h"
+#include "../network/net_address.h"
+#include "miniros/http/http_tools.h"
 
-#include "xmlrpcpp/XmlRpcValue.h"
-#include "xmlrpcpp/XmlRpcSource.h"
 #include "xmlrpcpp/XmlRpcDecl.h"
+#include "xmlrpcpp/XmlRpcSource.h"
+#include "xmlrpcpp/XmlRpcValue.h"
 
 namespace XmlRpc {
 
@@ -92,7 +92,7 @@ protected:
   /// Address of a server.
   miniros::network::NetAddress _hostAddress;
 
-  miniros::network::HttpFrame _httpFrame;
+  miniros::http::HttpFrame _httpFrame;
 
   // Response
   std::string _response;

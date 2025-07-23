@@ -49,8 +49,8 @@
 #include <string>
 #include <vector>
 
+#include "miniros/network/net_address.h"
 #include "miniros/common.h"
-#include "miniros/transport/net_address.h"
 #include "miniros/errors.h"
 
 #ifdef WIN32
@@ -238,7 +238,7 @@ inline void close_signal_pair(signal_fd_t signal_pair[2]) {
 namespace network {
 
 /// Fill in net address by values from socket API.
-MINIROS_DECL bool fillAddress(const sockaddr_in& sysAddr, NetAddress& address);
+MINIROS_DECL Error fillAddress(const sockaddr& sysAddr, NetAddress& address);
 
 }
 } // namespace miniros
