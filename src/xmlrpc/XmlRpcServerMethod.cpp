@@ -4,8 +4,7 @@
 
 namespace XmlRpc {
 
-
-  XmlRpcServerMethod::XmlRpcServerMethod(std::string const& name, XmlRpcServer* server)
+  XmlRpcServerMethod::XmlRpcServerMethod(std::string const& name, XmlRpcMethods* server)
   {
     _name = name;
     _server = server;

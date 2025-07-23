@@ -30,18 +30,18 @@
 #include <algorithm>
 #include <cstdio>
 
-#include "miniros/transport/service_manager.h"
-#include "miniros/transport/rpc_manager.h"
+#include "miniros/network/network.h"
+#include "miniros/master_link.h"
+#include "miniros/this_node.h"
+#include "miniros/transport/connection.h"
 #include "miniros/transport/connection_manager.h"
 #include "miniros/transport/poll_manager.h"
-#include "miniros/transport/service_publication.h"
+#include "miniros/transport/rpc_manager.h"
 #include "miniros/transport/service_client_link.h"
+#include "miniros/transport/service_manager.h"
+#include "miniros/transport/service_publication.h"
 #include "miniros/transport/service_server_link.h"
-#include "miniros/this_node.h"
-#include "miniros/transport/network.h"
-#include "miniros/master_link.h"
 #include "miniros/transport/transport_tcp.h"
-#include "miniros/transport/connection.h"
 
 #include "miniros/xmlrpcpp/XmlRpc.h"
 

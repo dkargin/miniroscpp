@@ -16,6 +16,7 @@
 
 #include "miniros/common.h"
 #include "miniros/transport/io.h"
+#include "miniros/transport/rpc_manager.h"
 
 /// This define is injected in replacements/CMakeLists.txt
 #ifdef USE_LOCAL_PROGRAM_OPTIONS
@@ -25,6 +26,8 @@ namespace po = program_options;
 #include "boost/program_options.hpp"
 namespace po = boost::program_options;
 #endif
+
+using namespace miniros;
 
 std::atomic_bool g_sigintReceived {false};
 
@@ -75,6 +78,8 @@ protected:
 int main(int argc, const char ** argv) {
   std::signal(SIGINT, systemSignalHandler);
 
+  SteadyTime timeStart = SteadyTime::now();
+
   po::options_description desc("Allowed options");
 
   desc.add_options()
@@ -122,10 +127,10 @@ int main(int argc, const char ** argv) {
   if (vm.count("dir")) {
     std::string wd = vm["dir"].as<std::string>();
 
-    if (!miniros::makeDirectory(wd))
+    if (!makeDirectory(wd))
       return EXIT_FAILURE;
 
-    if (!miniros::changeCurrentDirectory(wd))
+    if (!changeCurrentDirectory(wd))
       return EXIT_FAILURE;
   }
 
@@ -137,19 +142,18 @@ int main(int argc, const char ** argv) {
 
   bool dumpParameters = vm["dump_parameters"].as<bool>();
 
-  MINIROS_INFO("Creating RPCManager");
-
-  // Standalone RPC manager for rosmaster.
-  bool unifiedRpc = vm["unified_rpc"].as<bool>();
-
-  std::shared_ptr<miniros::RPCManager> masterRpcManager;
-  if (unifiedRpc)
-    masterRpcManager = miniros::RPCManager::instance();
-  else
-    masterRpcManager = std::make_shared<miniros::RPCManager>();
+  std::shared_ptr<RPCManager> masterRpcManager = RPCManager::instance();
 
   MINIROS_INFO("Creating Master object");
-  miniros::master::Master master(masterRpcManager);
+  master::Master master(masterRpcManager);
+
+  MINIROS_INFO("Initializing core transport");
+  std::map<std::string, std::string> remappings;
+  if (int port = master.getPort()) {
+    remappings["__rpc_server_port"] = std::to_string(port);
+  }
+
+  init(remappings, "miniroscore", init_options::NoRosout | init_options::NoSigintHandler);
 
   master.setResolveNodeIP(resolve);
   master.setDumpParameters(dumpParameters);
@@ -160,28 +164,46 @@ int main(int argc, const char ** argv) {
   }
 
   MINIROS_INFO("Starting Master thread");
-  master.start();
 
-  std::unique_ptr<miniros::master::Rosout> r;
-  if (useRosout) {
-    std::map<std::string, std::string> remappings;
-
-    remappings["__master"] = master.getUri();
-
-    MINIROS_INFO("Creating Rosout object");
-    miniros::init(remappings, "miniroscore", miniros::init_options::NoRosout | miniros::init_options::NoSigintHandler);
-    r.reset(new miniros::master::Rosout());
+  // Start internal networking.
+  if (Error err = start(); !err) {
+    MINIROS_ERROR("Failed to start internal networking: %s", err.toString());
+    return EXIT_FAILURE;
   }
 
-  miniros::CallbackQueue* callbackQueue = miniros::getGlobalCallbackQueue();
+  // This poll set is expected to be a global instance used by ROS. It is created by invoking `miniros::init` and exists
+  // until application ends or miniros::shutdown() is invoked.
+  PollSet* pollSet = masterRpcManager->getPollSet();
+  if (!pollSet) {
+    MINIROS_FATAL("Failed to get poll set");
+    return EXIT_FAILURE;
+  }
+
+  if (!master.start(pollSet)) {
+    MINIROS_ERROR("Failed to start Master");
+    return EXIT_FAILURE;
+  }
+
+  NodeHandle node;
+
+  std::unique_ptr<master::Rosout> r;
+  if (useRosout) {
+    MINIROS_INFO("Creating Rosout object");
+    r.reset(new master::Rosout(node));
+  }
+
+  master.initEvents(node);
+
+  CallbackQueue* callbackQueue = getGlobalCallbackQueue();
   if (useRosout && !callbackQueue) {
     return EXIT_FAILURE;
   }
 
-  miniros::notifyNodeStarted();
-  MINIROS_INFO("All components have started");
+  notifyNodeStarted();
+  double durStartMs = (SteadyTime::now() - timeStart).toSec() * 1000.;
+  MINIROS_INFO("All components have started in %fms", durStartMs);
 
-  miniros::WallDuration period(0.02);
+  const WallDuration period(0.02);
   while (!g_sigintReceived && master.ok()) {
     if (callbackQueue)
       callbackQueue->callAvailable(period);
@@ -192,7 +214,7 @@ int main(int argc, const char ** argv) {
 
   MINIROS_INFO("Exiting main loop");
 
-  miniros::notifyNodeExiting();
+  notifyNodeExiting();
   r.reset();
   master.stop();
 

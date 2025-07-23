@@ -50,13 +50,15 @@
 
 namespace miniros {
 namespace master {
-Rosout::Rosout() :
+
+Rosout::Rosout(NodeHandle& nh) :
   log_file_name_(miniros::file_log::getLogDirectory() + "/rosout.log"),
-  handle_(NULL),
+  handle_(nullptr),
   max_file_size_(100*1024*1024),
   current_file_size_(0),
   max_backup_index_(10),
   current_backup_index_(0),
+  node_(nh),
   omit_topics_(false)
 {
   init();

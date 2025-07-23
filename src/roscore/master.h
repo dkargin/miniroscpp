@@ -5,10 +5,10 @@
 #ifndef MINIROS_MASTER_H
 #define MINIROS_MASTER_H
 
-#include "master_handler.h"
-#include "parameter_storage.h"
+#include <string>
+#include <memory>
 
-#include "miniros/transport/rpc_manager.h"
+#include "miniros/macros.h"
 
 /*
 More info at:
@@ -31,23 +31,32 @@ Current status codes:
 */
 
 namespace XmlRpc {
-class XmlRpcServerConnection;
+class XmlRpcValue;
+}
+namespace miniros {
+
+class PollSet;
+class RPCManager;
+class NodeHandle;
+
+namespace network {
+struct ClientInfo;
 }
 
-namespace miniros {
 namespace master {
 
 /// Core class of rosmaster/roscore.
 class MINIROS_DECL Master {
-
 public:
+  struct Internal;
+
   using RpcValue = XmlRpc::XmlRpcValue;
-  using Connection = XmlRpc::XmlRpcServerConnection;
+  using ClientInfo = network::ClientInfo;
 
   Master(std::shared_ptr<RPCManager> manager);
   ~Master();
 
-  bool start();
+  bool start(PollSet* poll_set);
   void stop();
   bool ok() const;
 
@@ -55,14 +64,18 @@ public:
   void setupBindings();
 
   std::string getUri() const;
+  int getPort() const;
 
   void setResolveNodeIP(bool resolv);
 
   /// Update queued tasks.
   void update();
 
+  /// Init periodic events.
+  void initEvents(NodeHandle& nh);
+
 public: /// Request handlers
-  RpcValue lookupService(const std::string& caller_id, const std::string& service, Connection*);
+  RpcValue lookupService(const std::string& caller_id, const std::string& service, const ClientInfo& ci);
 
   /// Register the caller as a provider of the specified service.
   /// Parameters
@@ -72,12 +85,12 @@ public: /// Request handlers
   ///  - caller_api (str)  - XML-RPC URI of caller node
   /// Returns (int, str, int) - (code, statusMessage, ignore)
   RpcValue registerService(const std::string& caller_id, const std::string& service,
-    const std::string& service_api, const std::string& caller_api, Connection*);
+    const std::string& service_api, const std::string& caller_api, const ClientInfo&);
 
-  RpcValue unregisterService(
-    const std::string& caller_id, const std::string& service, const std::string& service_api, Connection*);
+  RpcValue unregisterService(const std::string& caller_id, const std::string& service,
+    const std::string& service_api, const ClientInfo&);
 
-  RpcValue getTopicTypes(const std::string& topic, Connection*);
+  RpcValue getTopicTypes(const std::string& caller_id, const ClientInfo&);
 
   /// Callback from master with updated value of subscribed parameter.
   /// Parameters
@@ -85,8 +98,8 @@ public: /// Request handlers
   ///  - parameter_key (str) Parameter name, globally resolved.
   ///  - parameter_value (!XMLRPCLegalValue) New parameter value.
   /// Returns (int, str, int) (code, statusMessage, ignore)
-  RpcValue paramUpdate(
-    const std::string& caller_id, const std::string& parameter_key, const RpcValue& value, Connection*);
+  RpcValue paramUpdate(const std::string& caller_id, const std::string& parameter_key,
+    const RpcValue& value, const ClientInfo&);
 
   /// Retrieve list representation of system state (i.e. publishers, subscribers, and services).
   /// Parameters:
@@ -96,7 +109,7 @@ public: /// Request handlers
   ///   - publishers is of the form [ [topic1, [topic1Publisher1...topic1PublisherN]] ... ]
   ///   - subscribers is of the form [ [topic1, [topic1Subscriber1...topic1SubscriberN]] ... ]
   ///   - services is of the form [ [service1, [service1Provider1...service1ProviderN]] ... ]
-  RpcValue getSystemState(const std::string& caller_id, Connection*);
+  RpcValue getSystemState(const std::string& caller_id, const ClientInfo&);
 
   /// Get list of topics that can be subscribed to. This does not return topics that have no publishers.
   /// See getSystemState() to get more comprehensive list.
@@ -105,23 +118,23 @@ public: /// Request handlers
   ///  - subgraph (str) - Restrict topic names to match within the specified subgraph.
   ///    Subgraph namespace is resolved relative to the caller's namespace. Use empty string to specify all names.
   /// Returns (int, str, [[str, str],]) - (code, statusMessage, [ [topic1, type1]...[topicN, typeN] ])
-  RpcValue getPublishedTopics(const std::string& caller_id, const std::string& subgraph, Connection*);
+  RpcValue getPublishedTopics(const std::string& caller_id, const std::string& subgraph, const ClientInfo&);
 
   /// Register a new publisher to a topic
   RpcValue registerPublisher(const std::string& caller_id, const std::string& topic, const std::string& type,
-    const std::string& caller_api, Connection* /*conn*/);
+    const std::string& caller_api, const ClientInfo& /*conn*/);
 
   /// Unregister an existing publisher
   RpcValue unregisterPublisher(
-    const std::string& caller_id, const std::string& topic, const std::string& caller_api, Connection* /*conn*/);
+    const std::string& caller_id, const std::string& topic, const std::string& caller_api, const ClientInfo& /*conn*/);
 
   /// Register a new subscriber
   RpcValue registerSubscriber(const std::string& caller_id, const std::string& topic, const std::string& type,
-    const std::string& caller_api, Connection* /*conn*/);
+    const std::string& caller_api, const ClientInfo& /*conn*/);
 
   /// Unregister an existing subscriber
   RpcValue unregisterSubscriber(
-    const std::string& caller_id, const std::string& topic, const std::string& caller_api, Connection* /*conn*/);
+    const std::string& caller_id, const std::string& topic, const std::string& caller_api, const ClientInfo& /*conn*/);
 
   /// Get the XML-RPC URI of the node with the associated name/caller_id.
   /// This API is for looking information about publishers and subscribers.
@@ -130,12 +143,12 @@ public: /// Request handlers
   ///  - caller_id (str) - ROS caller ID
   ///  - node (str) - Name of node to lookup
   /// Returns (int, str, str) (code, statusMessage, URI)
-  RpcValue lookupNode(const std::string& caller_id, const std::string& node, Connection* conn);
+  RpcValue lookupNode(const std::string& caller_id, const std::string& node, const ClientInfo& conn);
 
   /// Parameter API
 
   /// Check whether a parameter exists
-  RpcValue hasParam(const std::string& caller_id, const std::string& param, Connection* /*conn*/);
+  RpcValue hasParam(const std::string& caller_id, const std::string& param, const ClientInfo& /*conn*/);
 
   /// Set parameter. NOTE: if value is a dictionary it will be treated as a parameter tree, where key is the parameter namespace. For example
   /// {'x':1,'y':2,'sub':{'z':3}}
@@ -145,36 +158,28 @@ public: /// Request handlers
   ///  - key (str) - Parameter name.
   ///  - value (XMLRPCLegalValue) - Parameter value.
   /// Returns (int, str, int) (code, statusMessage, ignore)
-  RpcValue setParam(const std::string& caller_api, const std::string& key, const RpcValue& value, Connection* /*conn*/);
+  RpcValue setParam(const std::string& caller_api, const std::string& key, const RpcValue& value, const ClientInfo& /*conn*/);
 
   /// Retrieve a value for an existing parameter, if it exists.
-  RpcValue getParam(const std::string& caller_id, const std::string& key, Connection*);
+  RpcValue getParam(const std::string& caller_id, const std::string& key, const ClientInfo&);
 
   /// Delete a parameter, if it exists
   /// Parameters:
   ///  - caller_id (str) - ROS caller ID
   ///  - key (str) - Parameter name.
   /// Returns (int, str, int) - (code, statusMessage, ignore)
-  RpcValue deleteParam(const std::string& caller_id, const std::string& key, Connection*);
+  RpcValue deleteParam(const std::string& caller_id, const std::string& key, const ClientInfo&);
 
-  RpcValue searchParam(const std::string& caller_id, const std::string& key, Connection*);
+  RpcValue searchParam(const std::string& caller_id, const std::string& key, const ClientInfo&);
 
-  RpcValue subscribeParam(const std::string& caller_id, const std::string& caller_api, const std::string& key, Connection*);
-  RpcValue unsubscribeParam(const std::string& caller_id, const std::string& caller_api, const std::string& key, Connection*);
+  RpcValue subscribeParam(const std::string& caller_id, const std::string& caller_api, const std::string& key, const ClientInfo&);
+  RpcValue unsubscribeParam(const std::string& caller_id, const std::string& caller_api, const std::string& key, const ClientInfo&);
 
-  RpcValue getParamNames(const std::string& caller_id, Connection*);
+  RpcValue getParamNames(const std::string& caller_id, const ClientInfo&);
   void setDumpParameters(bool dump);
 
 protected:
-  int m_port = -1;
-  std::string m_host;
-
-  std::shared_ptr<RPCManager> m_rpcManager;
-
-  RegistrationManager m_regManager;
-
-  MasterHandler m_handler;
-  ParameterStorage m_parameterStorage;
+  std::unique_ptr<Internal> internal_;
 };
 
 } // namespace master
