@@ -14,6 +14,7 @@
 #include "miniros/xmlrpcpp/XmlRpcUtil.h"
 
 #include "miniros/common.h"
+#include "miniros/transport/poll_manager.h"
 
 /// This define is injected in replacements/CMakeLists.txt
 #ifdef USE_LOCAL_PROGRAM_OPTIONS
@@ -115,8 +116,14 @@ int main(int argc, const char ** argv) {
   master.setDumpParameters(dumpParameters);
 
   MINIROS_INFO("Starting Master thread");
-  master.start();
+  miniros::PollManagerPtr pm = miniros::PollManager::instance();
+  if (!master.start(&pm->getPollSet())) {
+    MINIROS_ERROR("Failed to start Master");
+    return EXIT_FAILURE;
+  }
 
+  // Manually starting poll manager, since Rosout can already need network connection.
+  pm->start();
   std::unique_ptr<miniros::master::Rosout> r;
   if (useRosout) {
     std::map<std::string, std::string> remappings;

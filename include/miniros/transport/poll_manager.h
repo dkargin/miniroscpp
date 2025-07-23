@@ -45,8 +45,7 @@ namespace miniros
 class PollManager;
 typedef std::shared_ptr<PollManager> PollManagerPtr;
 
-class MINIROS_DECL PollManager
-{
+class MINIROS_DECL PollManager {
 public:
   class PollWatcher : public observer::Connection {
   public:
@@ -69,7 +68,9 @@ private:
   void threadFunc();
 
   PollSet poll_set_;
-  std::atomic_bool shutting_down_;
+
+  std::atomic_bool shutting_down_{false};
+  std::atomic_bool running_{false};
 
   /// Signal raised when this connection is dropped.
   using PollWatchers = observer::Target<PollWatcher>;

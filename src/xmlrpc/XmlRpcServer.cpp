@@ -310,7 +310,7 @@ class ListMethods : public XmlRpcServerMethod
 public:
   ListMethods(XmlRpcServer* s) : XmlRpcServerMethod(LIST_METHODS, s) {}
 
-  void execute(const XmlRpcValue&, XmlRpcValue& result, XmlRpcServerConnection* /*conn*/) override
+  void execute(const XmlRpcValue&, XmlRpcValue& result, const miniros::network::ClientInfo& ) override
   {
     _server->listMethods(result);
   }
@@ -325,7 +325,7 @@ class MethodHelp : public XmlRpcServerMethod
 public:
   MethodHelp(XmlRpcServer* s) : XmlRpcServerMethod(METHOD_HELP, s) {}
 
-  void execute(const XmlRpcValue& params, XmlRpcValue& result, XmlRpcServerConnection* /*conn*/) override
+  void execute(const XmlRpcValue& params, XmlRpcValue& result, const miniros::network::ClientInfo&) override
   {
     if (params[0].getType() != XmlRpcValue::TypeString)
       throw XmlRpcException(METHOD_HELP + ": Invalid argument type");

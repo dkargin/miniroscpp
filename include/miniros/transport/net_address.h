@@ -9,6 +9,7 @@
 #include <string>
 
 #include "miniros/macros.h"
+#include "miniros/transport/io.h"
 
 namespace miniros {
 namespace network {
@@ -71,6 +72,16 @@ MINIROS_DECL bool readLocalAddress(int sockfd, NetAddress& address);
 
 /// Fills in remote address from socket.
 MINIROS_DECL bool readRemoteAddress(int sockfd, NetAddress& address);
+
+/// Fill in net address by values from socket API.
+MINIROS_DECL bool fillAddress(const sockaddr_in& sysAddr, NetAddress& address);
+
+/// Information about connection to client.
+struct ClientInfo {
+  NetAddress remoteAddress;
+  NetAddress localAddress;
+  int fd = 0;
+};
 
 } // namespace network
 } // namespace miniros
