@@ -99,6 +99,16 @@ public:
    */
   bool delEvents(int sock, int events);
 
+
+  /**
+   * \brief Override the whole set of events with new flags.
+   *
+   * setEvents() may be called from any thread.
+   * \param sock The socket to delete events from
+   * \param events The events to delete
+   */
+  bool setEvents(int sock, int events);
+
   /**
    * \brief Process all socket events
    *

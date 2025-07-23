@@ -170,6 +170,31 @@ bool PollSet::delEvents(int sock, int events)
   return true;
 }
 
+bool PollSet::setEvents(int sock, int events)
+{
+  std::scoped_lock<std::mutex> lock(socket_info_mutex_);
+
+  M_SocketInfo::iterator it = socket_info_.find(sock);
+
+  if (it == socket_info_.end())
+  {
+    MINIROS_DEBUG("PollSet: Tried to set events [%d] to fd [%d] which does not exist in this pollset", events, sock);
+    return false;
+  }
+
+  if (it->second.events_ != events) {
+    it->second.events_ = events;
+
+    set_events_on_socket(epfd_, sock, it->second.events_);
+
+    sockets_changed_ = true;
+    signal();
+  }
+
+  return true;
+}
+
+
 void PollSet::signal()
 {
   if (signal_mutex_.try_lock())
