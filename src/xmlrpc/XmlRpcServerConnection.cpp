@@ -203,7 +203,7 @@ void XmlRpcServerConnection::executeRequest()
     else
       generateResponse(resultValue.toXml());
   } catch (const XmlRpcException& fault) {
-    XmlRpcUtil::log(2, "XmlRpcServerConnection(%d)::executeRequest(%d): fault %s.", _fd, fault.getMessage().c_str());
+    XmlRpcUtil::log(2, "XmlRpcServerConnection(%d)::executeRequest: fault %s.", _fd, fault.getMessage().c_str());
     generateFaultResponse(fault.getMessage(), fault.getCode());
   }
   XmlRpcUtil::log(2, "XmlRpcServerConnection(%d)::executeRequest: finished calling method '%s'", _fd, methodName.c_str());
