@@ -29,10 +29,10 @@
 
 #include "internal_config.h"
 
+#include "miniros/network/network.h"
 #include "miniros/file_log.h"
 #include "miniros/internal/exceptions.h"
 #include "miniros/transport/io.h" // cross-platform headers needed
-#include "miniros/transport/network.h"
 #include <miniros/console.h>
 #include <miniros/rosassert.h>
 

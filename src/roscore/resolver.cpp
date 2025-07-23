@@ -15,47 +15,8 @@
 #include "resolver.h"
 
 namespace miniros {
-namespace network {
-// Defined in net_address.cpp
-bool fillAddress(const sockaddr_in& my_addr, NetAddress& address);
-}
 
 namespace master {
-
-bool NetAdapter::matchNetAddress(const network::NetAddress& other) const
-{
-  if (address.type != other.type) {
-    return false;
-  }
-
-  if (!mask.valid() || !address.valid() || !other.valid())
-    return false;
-
-  if (other.type == network::NetAddress::AddressIPv4) {
-    const sockaddr_in* rawAddr = static_cast<const sockaddr_in*>(address.rawAddress);
-    const sockaddr_in* rawMask = static_cast<const sockaddr_in*>(mask.rawAddress);
-    const sockaddr_in* rawOtherAddr = static_cast<const sockaddr_in*>(other.rawAddress);
-
-    uint32_t ip = rawAddr->sin_addr.s_addr;
-    uint32_t netip = rawOtherAddr->sin_addr.s_addr;
-    uint32_t netmask = rawOtherAddr->sin_addr.s_addr;
-    // is on same subnet...
-    if ((netip & netmask) == (ip & netmask))
-      return true;
-  }
-  return false;
-}
-
-bool NetAdapter::hasAccessTo(const HostInfo& host) const
-{
-  for (const auto& address: host.addresses) {
-    if (address.isLocal())
-      continue;
-    if (matchNetAddress(address))
-      return true;
-  }
-  return false;
-}
 
 const std::string& AddressResolver::getHost() const
 {
@@ -79,47 +40,16 @@ Error AddressResolver::scanAdapters()
     // Generate localhost object.
     auto it = m_hosts.find(host);
     if (it == m_hosts.end()) {
-      it = m_hosts.emplace(host, std::make_shared<HostInfo>(host)).first;
+      it = m_hosts.emplace(host, std::make_shared<network::HostInfo>(host)).first;
       it->second->local = true;
     }
     m_hosts["localhost"] = it->second;
   }
 
-#ifdef HAVE_IFADDRS_H
-  // TODO: subscribe to updates on network interfaces.
-  // NETLINK kernel interface can be used to subscribe to notification socket. But it will
-  // require some integration with a local PollSet interface. Meanwhile, windows will need something very different.
-  ifaddrs* addressList = nullptr;
-
-  int ret = getifaddrs(&addressList);
-  if (ret < 0 || addressList == nullptr) {
-    return Error::SystemError;
+  Error err = network::scanAdapters(m_adapters);
+  if (!err) {
+    MINIROS_WARN("ScanAdapters has failed with err=%s", err.toString());
   }
-
-  m_adapters.clear();
-
-  for (ifaddrs *ifa = addressList; ifa; ifa = ifa->ifa_next) {
-    if (!ifa->ifa_addr)
-      continue;
-
-    sa_family_t family = ifa->ifa_addr->sa_family;
-    if (family == AF_INET || family == AF_INET6) {
-      NetAdapter adapter;
-      adapter.name = ifa->ifa_name;
-      if (!fillAddress(*reinterpret_cast<sockaddr_in*>(ifa->ifa_addr), adapter.address)) {
-        continue;
-      }
-      if (!fillAddress(*reinterpret_cast<sockaddr_in*>(ifa->ifa_netmask), adapter.mask)) {
-        continue;
-      }
-      // TODO: Probably read additional flags, like DHCP or whatever.
-      m_adapters.push_back(adapter);
-    }
-  }
-
-  if (addressList)
-    freeifaddrs(addressList);
-#endif
 
   if (!m_adapters.empty()) {
     auto it = m_hosts.find("localhost");
@@ -130,7 +60,7 @@ Error AddressResolver::scanAdapters()
       }
     }
   }
-  return Error::Ok ;
+  return Error::Ok;
 }
 
 network::URL AddressResolver::resolveAddressFor(const std::shared_ptr<NodeRef>& node,
@@ -169,7 +99,7 @@ network::URL AddressResolver::resolveAddressFor(const std::shared_ptr<NodeRef>& 
   if (!nodeHost->addresses.empty()) {
     // Find first usable address.
     for (const auto& addr: nodeHost->addresses) {
-      if (!addr.isLocal()) {
+      if (!addr.isLoopback()) {
         url.host = addr.str();
         break;
       }
@@ -213,7 +143,7 @@ network::URL AddressResolver::resolveAddressFor(const std::shared_ptr<NodeRef>& 
   }
 
   if (nodeHost->local) {
-    for (const auto& adapter: m_adapters) {
+    for (const network::NetAdapter& adapter: m_adapters) {
       if (adapter.hasAccessTo(*requesterHost)) {
         url.host = adapter.address.str();
         return url;
@@ -223,7 +153,7 @@ network::URL AddressResolver::resolveAddressFor(const std::shared_ptr<NodeRef>& 
   } else {
     // Just return any address. That will fork for simple networks.
     for (const auto& addr: nodeHost->addresses) {
-      if (!addr.isLocal()) {
+      if (!addr.isLoopback()) {
         url.host = addr.str();
         return url;
       }
@@ -235,7 +165,7 @@ network::URL AddressResolver::resolveAddressFor(const std::shared_ptr<NodeRef>& 
   return url;
 }
 
-std::shared_ptr<HostInfo> AddressResolver::findHost(const network::NetAddress& address) const
+std::shared_ptr<network::HostInfo> AddressResolver::findHost(const network::NetAddress& address) const
 {
   for (const auto& [name, hostPtr] : m_hosts) {
     if (!hostPtr) {
@@ -271,7 +201,7 @@ void AddressResolver::setResolveIp(bool resolve)
   m_resolveIp = resolve;
 }
 
-std::shared_ptr<HostInfo> AddressResolver::updateHost(const  RequesterInfo& requesterInfo)
+std::shared_ptr<network::HostInfo> AddressResolver::updateHost(const  RequesterInfo& requesterInfo)
 {
   if (requesterInfo.callerApi.empty())
     return {};
@@ -284,7 +214,7 @@ std::shared_ptr<HostInfo> AddressResolver::updateHost(const  RequesterInfo& requ
 
   // check if we got a direct IP address instead of a string hostname.
   bool isIP = network::NetAddress::checkAddressType(url.host) != network::NetAddress::AddressInvalid;
-  bool isSameMachine = requesterInfo.clientAddress.isLocal();
+  bool isSameMachine = requesterInfo.clientAddress.isLoopback();
 
   std::scoped_lock lock(m_mutex);
 
@@ -306,7 +236,7 @@ std::shared_ptr<HostInfo> AddressResolver::updateHost(const  RequesterInfo& requ
 
     // In the same time, we should be ready that some hosts can have their DHCP ip addresses reassigned.
     // TODO: Check if this IP is already used.
-    it = m_hosts.emplace(url.host, std::make_shared<HostInfo>(url.host)).first;
+    it = m_hosts.emplace(url.host, std::make_shared<network::HostInfo>(url.host)).first;
   }
 
   if (!isSameMachine)
@@ -317,10 +247,15 @@ std::shared_ptr<HostInfo> AddressResolver::updateHost(const  RequesterInfo& requ
   return it->second;
 }
 
-HostInfo::HostInfo(const std::string& name)
-  :hostname(name)
-{}
-
+std::set<std::shared_ptr<network::HostInfo>> AddressResolver::getHosts() const
+{
+  std::scoped_lock lock(m_mutex);
+  std::set<std::shared_ptr<network::HostInfo>> result;
+  for (auto [key, pInfo]: m_hosts) {
+    result.insert(pInfo);
+  }
+  return result;
+}
 
 } // namespace master
 } // namespace miniros

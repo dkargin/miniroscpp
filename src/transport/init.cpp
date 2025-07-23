@@ -35,21 +35,21 @@
 #define MINIROS_PACKAGE_NAME "init"
 
 #include "miniros/init.h"
-#include "miniros/names.h"
-#include "miniros/transport/rpc_manager.h"
-#include "miniros/transport/poll_manager.h"
-#include "miniros/transport/connection_manager.h"
-#include "miniros/transport/topic_manager.h"
-#include "miniros/transport/service_manager.h"
-#include "miniros/master_link.h"
-#include "miniros/this_node.h"
-#include "miniros/transport/network.h"
+#include "../../include/miniros/network/network.h"
 #include "miniros/file_log.h"
+#include "miniros/master_link.h"
+#include "miniros/names.h"
+#include "miniros/this_node.h"
 #include "miniros/transport/callback_queue.h"
-#include "miniros/transport/rosout_appender.h"
-#include "miniros/transport/subscribe_options.h"
-#include "miniros/transport/transport_tcp.h"
+#include "miniros/transport/connection_manager.h"
 #include "miniros/transport/internal_timer_manager.h"
+#include "miniros/transport/poll_manager.h"
+#include "miniros/transport/rosout_appender.h"
+#include "miniros/transport/rpc_manager.h"
+#include "miniros/transport/service_manager.h"
+#include "miniros/transport/subscribe_options.h"
+#include "miniros/transport/topic_manager.h"
+#include "miniros/transport/transport_tcp.h"
 #include "miniros/xmlrpcpp/XmlRpcSocket.h"
 
 // Standard ROS services.
@@ -297,6 +297,8 @@ bool isStarted()
 /// Start is issued by a first NodeHandle::construct.
 Error start()
 {
+  SteadyTime time_start = SteadyTime::now();
+
   std::scoped_lock<std::mutex> lock(g_start_mutex);
   if (g_started)
   {
@@ -350,8 +352,9 @@ Error start()
 
   pm->start();
 
+  PollSet& pollSet = pm->getPollSet();
   int rpcPort = network::getRPCPort();
-  if (!rpcm->start(rpcPort)) {
+  if (!rpcm->start(&pollSet, rpcPort)) {
     // We can arrive here only if we are completely unable to host TCP/http server.
     MINIROS_ERROR("Failed to start RPCManager. Something is very wrong with TCP network");
     shutdown();
@@ -448,6 +451,8 @@ end:
     std::scoped_lock<std::recursive_mutex> lock(g_shutting_down_mutex);
   }
 
+  auto start_total = SteadyTime::now() - time_start;
+  MINIROS_INFO("root ::start() done in %fms", start_total.toSec()*1000);
   return Error::Ok;
 }
 

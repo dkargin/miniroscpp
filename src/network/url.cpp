@@ -5,8 +5,7 @@
 #include <cassert>
 #include <sstream>
 
-#include "miniros/transport/url.h"
-
+#include "../../include/miniros/network/url.h"
 
 namespace miniros {
 namespace network {

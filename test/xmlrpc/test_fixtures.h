@@ -23,6 +23,7 @@
 
 #include "xmlrpcpp/XmlRpc.h"
 
+
 #include <mutex>
 #include <thread>
 #include <gtest/gtest.h>
@@ -35,7 +36,7 @@ public:
 
   virtual ~Hello() {}
 
-  void execute(const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result, XmlRpc::XmlRpcServerConnection*) override;
+  void execute(const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result, const miniros::network::ClientInfo&) override;
 
   std::mutex hello_mutex;
 };

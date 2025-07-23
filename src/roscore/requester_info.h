@@ -7,8 +7,8 @@
 
 #include <string>
 
+#include "miniros/network/net_address.h"
 #include "miniros/errors.h"
-#include "miniros/transport/net_address.h"
 
 namespace miniros {
 namespace master {
@@ -26,7 +26,7 @@ struct MINIROS_DECL RequesterInfo {
 
   RequesterInfo() = default;
 
-  Error assign(const std::string& callerId, int connectionFd);
+  Error assign(const std::string& caller, const network::ClientInfo& client);
 };
 
 }

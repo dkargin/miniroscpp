@@ -2,124 +2,196 @@
 // Created by dkargin on 2/11/25.
 //
 
+#include <cassert>
+
 #include "master.h"
-#include "miniros/transport/network.h"
+#include "master_internal.h"
+#include "master_endpoints.h"
+
+#include "master_handler.h"
+#include "node_handle.h"
+#include "parameter_storage.h"
+
+#include "miniros/transport/rpc_manager.h"
+
+#include "../../include/miniros/network/network.h"
+#include "http/http_server.h"
+
+#include "miniros/http/http_endpoint.h"
+#include "miniros/http/http_filters.h"
 
 #include <xmlrpcpp/XmlRpcServerConnection.h>
 
 namespace miniros {
 namespace master {
 
-Master::Master(std::shared_ptr<RPCManager> manager)
-  : m_handler(manager, &m_regManager), m_parameterStorage(&m_regManager)
+Master::Internal::Internal(const std::shared_ptr<RPCManager>& manager)
+    : handler(manager, &regManager, &resolver), parameterStorage(&regManager), discovery(&resolver)
 {
-  m_rpcManager = manager;
+  rpcManager = manager;
+
+  resolver.scanAdapters();
+
+  manager->setMaster();
   // TODO: Read environment.
   // split the URI (if it's valid) into host and port
   // if (!network.splitURI(ROS.ROS_MASTER_URI, ref _host, ref _port))
   {
-    m_host = "localhost";
-    m_port = 11311;
-    MINIROS_WARN("Invalid XMLRPC uri. Using ROS_MASTER_URI=http://%s:%d", m_host.c_str(), m_port);
+    host = "localhost";
+    port = 11311;
+    MINIROS_WARN("Invalid XMLRPC uri. Using ROS_MASTER_URI=http://%s:%d", host.c_str(), port);
   }
 
-  m_parameterStorage.paramUpdateFn =
-    [this] (const std::shared_ptr<NodeRef>& nr, const std::string& fullPath, const RpcValue* value) {
-      this->m_handler.sendToNode(nr, "paramUpdate", fullPath, value ? *value : RpcValue::Dict());
+  parameterStorage.paramUpdateFn =
+    [this](const std::shared_ptr<NodeRef>& nr, const std::string& fullPath, const RpcValue* value)
+    {
+      this->handler.sendToNode(nr, "paramUpdate", fullPath, value ? *value : RpcValue::Dict());
     };
+}
+
+Master::Internal::~Internal()
+{
+  if (timerBroadcasts)
+    timerBroadcasts = {};
+}
+
+void Master::Internal::onBroadcast(const SteadyTimerEvent& evt)
+{
+  discovery.doBroadcast();
+}
+
+Master::Master(std::shared_ptr<RPCManager> manager)
+{
+  internal_ = std::make_unique<Internal>(manager);
 }
 
 Master::~Master()
 {
-  if (m_rpcManager) {
-    m_rpcManager->unbind(this);
+  if (internal_->rpcManager) {
+    internal_->rpcManager->unbind(this);
   }
 }
 
 std::string Master::getUri() const
 {
-  return std::string("http://") + m_host + ":" + std::to_string(m_port);
+  return std::string("http://") + internal_->host + ":" + std::to_string(internal_->port);
 }
 
-bool Master::start()
+int Master::getPort() const
 {
-  if (!m_rpcManager) {
+  return internal_ ? internal_->port : 0;
+}
+
+bool Master::start(PollSet* poll_set)
+{
+  if (!internal_)
+    return false;
+  if (!internal_->rpcManager) {
     MINIROS_ERROR("No RPC Manager was attached");
     return false;
   }
 
-  MINIROS_DEBUG("Creating XmlRpc server");
+  MINIROS_DEBUG("Starting RPC module");
 
   setupBindings();
-
-  if (!m_rpcManager->start(m_port))
-    return false;
 
   // It was done in roslaunch by calling generate_run_id() function.
   // It should be uuid.uuid1()
   std::string uuid = generatePseudoUuid();
-  m_parameterStorage.setParam("master", "/run_id", uuid);
+  internal_->parameterStorage.setParam("master", "/run_id", uuid);
 
-  MINIROS_DEBUG("Master startup complete.");
+  if (!internal_->rpcManager->start(poll_set, internal_->port))
+    return false;
+
+  MINIROS_DEBUG("Starting discovery module");
+  if (!internal_->discovery.start(poll_set, internal_->port)) {
+    stop();
+    return false;
+  }
+
+  MINIROS_DEBUG("Master startup is complete.");
   return true;
 }
 
 void Master::stop()
 {
-  if (m_rpcManager)
-    m_rpcManager->shutdown();
+  if (internal_ && internal_->rpcManager)
+    internal_->rpcManager->shutdown();
 }
 
 bool Master::ok() const
 {
-  return m_rpcManager && !m_rpcManager->isShuttingDown();
+  return internal_ && internal_->rpcManager && !internal_->rpcManager->isShuttingDown();
 }
 
 void Master::setupBindings()
 {
+  if (!internal_)
+    return;
+  RPCManager* rpcManager = internal_->rpcManager.get();
+  if (!rpcManager)
+    return;
   // Core master part.
-  m_rpcManager->bindEx4("registerPublisher", this, &Master::registerPublisher);
-  m_rpcManager->bindEx3("unregisterPublisher", this, &Master::unregisterPublisher);
-  m_rpcManager->bindEx4("registerSubscriber", this, &Master::registerSubscriber);
-  m_rpcManager->bindEx3("unregisterSubscriber", this, &Master::unregisterSubscriber);
-  m_rpcManager->bindEx2("getPublishedTopics", this, &Master::getPublishedTopics);
-  m_rpcManager->bindEx1("getTopicTypes", this, &Master::getTopicTypes);
-  m_rpcManager->bindEx1("getSystemState", this, &Master::getSystemState);
+  rpcManager->bindEx4("registerPublisher", this, &Master::registerPublisher);
+  rpcManager->bindEx3("unregisterPublisher", this, &Master::unregisterPublisher);
+  rpcManager->bindEx4("registerSubscriber", this, &Master::registerSubscriber);
+  rpcManager->bindEx3("unregisterSubscriber", this, &Master::unregisterSubscriber);
+  rpcManager->bindEx2("getPublishedTopics", this, &Master::getPublishedTopics);
+  rpcManager->bindEx1("getTopicTypes", this, &Master::getTopicTypes);
+  rpcManager->bindEx1("getSystemState", this, &Master::getSystemState);
 
-  m_rpcManager->bindEx2("lookupService", this, &Master::lookupService);
-  m_rpcManager->bindEx3("unregisterService", this, &Master::unregisterService);
-  m_rpcManager->bindEx4("registerService", this, &Master::registerService);
-  m_rpcManager->bindEx2("lookupNode", this, &Master::lookupNode);
+  rpcManager->bindEx2("lookupService", this, &Master::lookupService);
+  rpcManager->bindEx3("unregisterService", this, &Master::unregisterService);
+  rpcManager->bindEx4("registerService", this, &Master::registerService);
+  rpcManager->bindEx2("lookupNode", this, &Master::lookupNode);
 
   // Rosparam part.
-  m_rpcManager->bindEx2("hasParam", this, &Master::hasParam);
-  m_rpcManager->bindEx3("setParam", this, &Master::setParam);
-  m_rpcManager->bindEx2("getParam", this, &Master::getParam);
-  m_rpcManager->bindEx2("deleteParam", this, &Master::deleteParam);
-  m_rpcManager->bindEx2("searchParam", this, &Master::searchParam);
-  m_rpcManager->bindEx3("subscribeParam", this, &Master::subscribeParam);
-  m_rpcManager->bindEx3("unsubscribeParam", this, &Master::unsubscribeParam);
-  m_rpcManager->bindEx1("getParamNames", this, &Master::getParamNames);
+  rpcManager->bindEx2("hasParam", this, &Master::hasParam);
+  rpcManager->bindEx3("setParam", this, &Master::setParam);
+  rpcManager->bindEx2("getParam", this, &Master::getParam);
+  rpcManager->bindEx2("deleteParam", this, &Master::deleteParam);
+  rpcManager->bindEx2("searchParam", this, &Master::searchParam);
+  rpcManager->bindEx3("subscribeParam", this, &Master::subscribeParam);
+  rpcManager->bindEx3("unsubscribeParam", this, &Master::unsubscribeParam);
+  rpcManager->bindEx1("getParamNames", this, &Master::getParamNames);
+
+  if (http::HttpServer* server = internal_->rpcManager->getHttpServer()) {
+    internal_->httpRootEndpoint.reset(new MasterRootEndpoint(internal_.get()));
+    internal_->httpNodeInfoEndpoint.reset(new NodeInfoEndpoint(internal_.get()));
+    internal_->httpTopicInfoEndpoint.reset(new TopicInfoEndpoint(internal_.get()));
+
+    server->registerEndpoint(std::make_unique<http::SimpleFilter>(http::HttpMethod::Get, "/"), internal_->httpRootEndpoint);
+    server->registerEndpoint(
+      std::make_unique<http::SimpleFilter>(http::HttpMethod::Get, "/node/", http::SimpleFilter::CheckType::Prefix),
+      internal_->httpNodeInfoEndpoint);
+    server->registerEndpoint(std::make_unique<http::SimpleFilter>(http::HttpMethod::Get, "/topic/", http::SimpleFilter::CheckType::Prefix),
+      internal_->httpTopicInfoEndpoint);
+    server->registerEndpoint(std::make_unique<http::SimpleFilter>(http::HttpMethod::Get, "/favicon.ico"),
+      std::make_shared<MasterFaviconEndpoint>());
+  }
 }
 
 void Master::setResolveNodeIP(bool resolv)
 {
-  m_handler.setResolveNodeIP(resolv);
-  m_parameterStorage.setParam("master", "/resolve_ip", resolv);
+  if (!internal_)
+    return;
+  internal_->resolver.setResolveIp(resolv);
+  internal_->parameterStorage.setParam("master", "/resolve_ip", resolv);
 }
 
 void Master::update()
 {
-  m_handler.update();
+  internal_->handler.update();
 }
 
-Master::RpcValue Master::lookupService(const std::string& caller_id, const std::string& service, Connection* connection)
+Master::RpcValue Master::lookupService(
+  const std::string& caller_id, const std::string& service, const ClientInfo& clientInfo)
 {
   RequesterInfo requesterInfo;
-  if (!requesterInfo.assign(caller_id, connection->getfd())) {
+  if (!requesterInfo.assign(caller_id, clientInfo)) {
     MINIROS_WARN("Failed to read network address of caller %s", caller_id.c_str());
   }
-  std::string uri = m_handler.lookupService(requesterInfo, service);
+  std::string uri = internal_->handler.lookupService(requesterInfo, service);
 
   RpcValue res = RpcValue::Array(3);
   if (uri.empty()) {
@@ -135,42 +207,44 @@ Master::RpcValue Master::lookupService(const std::string& caller_id, const std::
 }
 
 Master::RpcValue Master::registerService(const std::string& caller_id, const std::string& service,
-  const std::string& service_api, const std::string& caller_api, Connection* connection)
+  const std::string& service_api, const std::string& caller_api, const ClientInfo& clientInfo)
 {
   RequesterInfo requesterInfo;
-  if (!requesterInfo.assign(caller_id, connection->getfd())) {
+  if (!requesterInfo.assign(caller_id, clientInfo)) {
     MINIROS_WARN("Failed to read network address of caller %s", caller_id.c_str());
   }
   requesterInfo.callerApi = caller_api;
 
-  ReturnStruct r = m_handler.registerService(requesterInfo, service, service_api);
+  ReturnStruct r = internal_->handler.registerService(requesterInfo, service, service_api);
 
-  RpcValue res = RpcValue::Array(3);;
+  RpcValue res = RpcValue::Array(3);
   res[0] = r.statusCode;
   res[1] = r.statusMessage;
   res[2] = r.value;
   return res;
 }
 
-Master::RpcValue Master::unregisterService(
-  const std::string& caller_id, const std::string& service, const std::string& service_api, Connection* connection)
+Master::RpcValue Master::unregisterService(const std::string& caller_id, const std::string& service,
+  const std::string& service_api, const ClientInfo& clientInfo)
 {
   RequesterInfo requesterInfo;
-  if (!requesterInfo.assign(caller_id, connection->getfd())) {
+  if (!requesterInfo.assign(caller_id, clientInfo)) {
     MINIROS_WARN("Failed to read network address of caller %s", caller_id.c_str());
   }
-  ReturnStruct r = m_handler.unregisterService(requesterInfo, service, service_api);
+  ReturnStruct r = internal_->handler.unregisterService(requesterInfo, service, service_api);
 
-  RpcValue res = RpcValue::Array(3);;
+  RpcValue res = RpcValue::Array(3);
   res[0] = r.statusCode;
   res[1] = r.statusMessage;
   res[2] = r.value;
   return res;
 }
 
-Master::RpcValue Master::getTopicTypes(const std::string& topic, Connection*)
+Master::RpcValue Master::getTopicTypes(const std::string& topic, const ClientInfo&)
 {
-  auto types = m_regManager.getTopicTypes(topic);
+  std::unique_lock<const RegistrationManager> lock(internal_->regManager);
+
+  const auto& types = internal_->regManager.getTopicTypesUnsafe(lock);
 
   RpcValue xmlTopics = RpcValue::Array(types.size());
   int index = 0;
@@ -181,14 +255,14 @@ Master::RpcValue Master::getTopicTypes(const std::string& topic, Connection*)
     xmlTopics[index++] = payload;
   }
 
-  RpcValue res = RpcValue::Array(3);;
+  RpcValue res = RpcValue::Array(3);
   res[0] = 1;
   res[1] = "current system state";
   res[2] = xmlTopics;
   return res;
 }
 
-Master::RpcValue Master::getSystemState(const std::string& caller_id, Connection* connection)
+Master::RpcValue Master::getSystemState(const std::string& caller_id, const ClientInfo& clientInfo)
 {
   RpcValue res = RpcValue::Array(3);
   res[0] = 1;
@@ -213,11 +287,11 @@ Master::RpcValue Master::getSystemState(const std::string& caller_id, Connection
   };
 
   RequesterInfo requesterInfo;
-  if (!requesterInfo.assign(caller_id, connection->getfd())) {
+  if (!requesterInfo.assign(caller_id, clientInfo)) {
     MINIROS_WARN("Failed to read network address of caller %s", caller_id.c_str());
   }
 
-  MasterHandler::SystemState state = m_handler.getSystemState(requesterInfo);
+  MasterHandler::SystemState state = internal_->handler.getSystemState(requesterInfo);
 
   RpcValue listoftypes = RpcValue::Array(3);
 
@@ -229,15 +303,15 @@ Master::RpcValue Master::getSystemState(const std::string& caller_id, Connection
   return res;
 }
 
-Master::RpcValue Master::getPublishedTopics(const std::string& caller_id, const std::string& subgraph, Connection* connection)
+Master::RpcValue Master::getPublishedTopics(const std::string& caller_id, const std::string& subgraph, const ClientInfo& clientInfo)
 {
   RpcValue res = RpcValue::Array(3);
 
   RequesterInfo requesterInfo;
-  if (!requesterInfo.assign(caller_id, connection->getfd())) {
+  if (!requesterInfo.assign(caller_id, clientInfo)) {
     MINIROS_WARN("Failed to read network address of caller %s", caller_id.c_str());
   }
-  auto topics = m_handler.getPublishedTopics(requesterInfo, subgraph);
+  auto topics = internal_->handler.getPublishedTopics(requesterInfo, subgraph);
   res[0] = 1;
   res[1] = "current system state";
 
@@ -255,15 +329,15 @@ Master::RpcValue Master::getPublishedTopics(const std::string& caller_id, const 
 }
 
 Master::RpcValue Master::registerPublisher(const std::string& caller_id, const std::string& topic,
-  const std::string& type, const std::string& caller_api, Connection* connection)
+  const std::string& type, const std::string& caller_api, const ClientInfo& clientInfo)
 {
   RequesterInfo requesterInfo;
-  if (!requesterInfo.assign(caller_id, connection->getfd())) {
+  if (!requesterInfo.assign(caller_id, clientInfo)) {
     MINIROS_WARN("Failed to read network address of caller %s", caller_id.c_str());
   }
   requesterInfo.callerApi = caller_api;
 
-  ReturnStruct st = m_handler.registerPublisher(requesterInfo, topic, type);
+  ReturnStruct st = internal_->handler.registerPublisher(requesterInfo, topic, type);
   RpcValue res = RpcValue::Array(3);
   res[0] = st.statusCode;
   res[1] = st.statusMessage;
@@ -272,15 +346,15 @@ Master::RpcValue Master::registerPublisher(const std::string& caller_id, const s
 }
 
 Master::RpcValue Master::unregisterPublisher(
-  const std::string& caller_id, const std::string& topic, const std::string& caller_api, Connection* connection)
+  const std::string& caller_id, const std::string& topic, const std::string& caller_api, const ClientInfo& clientInfo)
 {
   RequesterInfo requesterInfo;
-  if (!requesterInfo.assign(caller_id, connection->getfd())) {
+  if (!requesterInfo.assign(caller_id, clientInfo)) {
     MINIROS_WARN("Failed to read network address of caller %s", caller_id.c_str());
   }
   requesterInfo.callerApi = caller_api;
 
-  ReturnStruct st = m_handler.unregisterPublisher(requesterInfo, topic);
+  ReturnStruct st = internal_->handler.unregisterPublisher(requesterInfo, topic);
   RpcValue res = RpcValue::Array(3);
   res[0] = st.statusCode;
   res[1] = st.statusMessage;
@@ -289,15 +363,15 @@ Master::RpcValue Master::unregisterPublisher(
 }
 
 Master::RpcValue Master::registerSubscriber(const std::string& caller_id, const std::string& topic,
-  const std::string& type, const std::string& caller_api, Connection* connection)
+  const std::string& type, const std::string& caller_api, const ClientInfo& clientInfo)
 {
   RequesterInfo requesterInfo;
-  if (!requesterInfo.assign(caller_id, connection->getfd())) {
+  if (!requesterInfo.assign(caller_id, clientInfo)) {
     MINIROS_WARN("Failed to read network address of caller %s", caller_id.c_str());
   }
   requesterInfo.callerApi = caller_api;
 
-  ReturnStruct st = m_handler.registerSubscriber(requesterInfo, topic, type);
+  ReturnStruct st = internal_->handler.registerSubscriber(requesterInfo, topic, type);
   RpcValue res = RpcValue::Array(3);
   res[0] = st.statusCode;
   res[1] = st.statusMessage;
@@ -305,16 +379,16 @@ Master::RpcValue Master::registerSubscriber(const std::string& caller_id, const 
   return res;
 }
 
-Master::RpcValue Master::unregisterSubscriber(
-  const std::string& caller_id, const std::string& topic, const std::string& caller_api, Connection* connection)
+Master::RpcValue Master::unregisterSubscriber(const std::string& caller_id, const std::string& topic,
+  const std::string& caller_api, const ClientInfo& clientInfo)
 {
   RequesterInfo requesterInfo;
-  if (!requesterInfo.assign(caller_id, connection->getfd())) {
+  if (!requesterInfo.assign(caller_id, clientInfo)) {
     MINIROS_WARN("Failed to read network address of caller %s", caller_id.c_str());
   }
   requesterInfo.callerApi = caller_api;
 
-  ReturnStruct st = m_handler.unregisterSubscriber(requesterInfo, topic);
+  ReturnStruct st = internal_->handler.unregisterSubscriber(requesterInfo, topic);
   RpcValue res = RpcValue::Array(3);
   res[0] = st.statusCode;
   res[1] = st.statusMessage;
@@ -322,14 +396,14 @@ Master::RpcValue Master::unregisterSubscriber(
   return res;
 }
 
-Master::RpcValue Master::lookupNode(const std::string& caller_id, const std::string& node, Connection* connection)
+Master::RpcValue Master::lookupNode(const std::string& caller_id, const std::string& node, const ClientInfo& clientInfo)
 {
   RequesterInfo requesterInfo;
-  if (!requesterInfo.assign(caller_id, connection->getfd())) {
+  if (!requesterInfo.assign(caller_id, clientInfo)) {
     MINIROS_WARN("Failed to read network address of caller %s", caller_id.c_str());
   }
 
-  std::string api = m_handler.lookupNode(requesterInfo, node);
+  std::string api = internal_->handler.lookupNode(requesterInfo, node);
   RpcValue res = RpcValue::Array(3);
   res[0] = 1;
   res[1] = "lookupNode";
@@ -337,10 +411,10 @@ Master::RpcValue Master::lookupNode(const std::string& caller_id, const std::str
   return res;
 }
 
-Master::RpcValue Master::hasParam(const std::string& caller_id, const std::string& key, Connection* /*conn*/)
+Master::RpcValue Master::hasParam(const std::string& caller_id, const std::string& key, const ClientInfo& /*conn*/)
 {
   RpcValue res = RpcValue::Array(3);
-  bool found = m_parameterStorage.hasParam(caller_id, key);
+  bool found = internal_->parameterStorage.hasParam(caller_id, key);
   res[0] = 1;
   res[1] = key;
   res[2] = found;
@@ -348,20 +422,20 @@ Master::RpcValue Master::hasParam(const std::string& caller_id, const std::strin
 }
 
 Master::RpcValue Master::setParam(
-  const std::string& caller_api, const std::string& key, const RpcValue& value, Connection* /*conn*/)
+  const std::string& caller_api, const std::string& key, const RpcValue& value, const ClientInfo& /*conn*/)
 {
   RpcValue res = RpcValue::Array(3);
   res[0] = 1;
   res[1] = "setParam";
-  m_parameterStorage.setParam(caller_api, key, value);
+  internal_->parameterStorage.setParam(caller_api, key, value);
   res[2] = std::string("parameter ") + key + std::string(" set");
   return res;
 }
 
-Master::RpcValue Master::getParam(const std::string& caller_id, const std::string& key, Connection*)
+Master::RpcValue Master::getParam(const std::string& caller_id, const std::string& key, const ClientInfo&)
 {
   RpcValue res = RpcValue::Array(3);
-  RpcValue value = m_parameterStorage.getParam(caller_id, key);
+  RpcValue value = internal_->parameterStorage.getParam(caller_id, key);
   if (!value.valid()) {
     res[0] = -1;
     res[1] = std::string("Parameter [") + key + std::string("] is not set");
@@ -374,12 +448,12 @@ Master::RpcValue Master::getParam(const std::string& caller_id, const std::strin
   return res;
 }
 
-Master::RpcValue Master::deleteParam(const std::string& caller_id, const std::string& key, Connection*)
+Master::RpcValue Master::deleteParam(const std::string& caller_id, const std::string& key, const ClientInfo&)
 {
   RpcValue res = RpcValue::Array(3);
   res[0] = 1;
   res[2] = 0;
-  if (m_parameterStorage.deleteParam(caller_id, key)) {
+  if (internal_->parameterStorage.deleteParam(caller_id, key)) {
     res[1] = "deleteParam success";
   } else {
     res[1] = "deleteParam param not found";
@@ -387,10 +461,10 @@ Master::RpcValue Master::deleteParam(const std::string& caller_id, const std::st
   return res;
 }
 
-Master::RpcValue Master::searchParam(const std::string& caller_id, const std::string& key, Connection*)
+Master::RpcValue Master::searchParam(const std::string& caller_id, const std::string& key, const ClientInfo&)
 {
   RpcValue res = RpcValue::Array(3);
-  std::string foundKey = m_parameterStorage.searchParam(caller_id, key);
+  std::string foundKey = internal_->parameterStorage.searchParam(caller_id, key);
   if (!foundKey.empty()) {
     res[0] = 1;
     res[1] = "searchParam success";
@@ -403,37 +477,38 @@ Master::RpcValue Master::searchParam(const std::string& caller_id, const std::st
 }
 
 Master::RpcValue Master::subscribeParam(const std::string& caller_id, const std::string& caller_api,
-  const std::string& key, Connection*)
+  const std::string& key, const ClientInfo&)
 {
   RpcValue res = RpcValue::Array(3);
   res[0] = 1;
   res[1] = "subscribeParam done";
-  const RpcValue* val = m_parameterStorage.subscribeParam(caller_id, caller_api, key);
+  const RpcValue* val = internal_->parameterStorage.subscribeParam(caller_id, caller_api, key);
   res[2] = val ? *val : RpcValue::Dict();
   return res;
 }
 
 Master::RpcValue Master::unsubscribeParam(const std::string& caller_id, const std::string& caller_api,
-  const std::string& key, Connection*)
+  const std::string& key, const ClientInfo&)
 {
   RpcValue res = RpcValue::Array(3);
   res[0] = 1;
   res[1] = "unsubscribeParam done";
-  if (m_parameterStorage.unsubscribeParam(caller_id, caller_api, key))
+  if (internal_->parameterStorage.unsubscribeParam(caller_id, caller_api, key))
     res[2] = 1;
   return res;
 }
 
 
-Master::RpcValue Master::getParamNames(const std::string& caller_id, Connection*)
+Master::RpcValue Master::getParamNames(const std::string& caller_id, const ClientInfo&)
 {
+  assert(internal_);
   RpcValue res = RpcValue::Array(3);
   res[0] = 1;
   res[1] = "getParamNames";
 
   RpcValue response;
   int index = 0;
-  for (std::string s : m_parameterStorage.getParamNames(caller_id)) {
+  for (std::string s : internal_->parameterStorage.getParamNames(caller_id)) {
     response[index++] = s;
   }
 
@@ -443,7 +518,16 @@ Master::RpcValue Master::getParamNames(const std::string& caller_id, Connection*
 
 void Master::setDumpParameters(bool dump)
 {
-  m_parameterStorage.setDumpParameters(dump);
+  if (internal_)
+    internal_->parameterStorage.setDumpParameters(dump);
+}
+
+void Master::initEvents(NodeHandle& nh)
+{
+  if (!internal_)
+    return;
+  WallDuration period(0.5);
+  internal_->timerBroadcasts = nh.createSteadyTimer(period, &Internal::onBroadcast, internal_.get());
 }
 
 } // namespace master
