@@ -53,7 +53,10 @@ PollManager::~PollManager()
 void PollManager::start()
 {
   shutting_down_ = false;
-  thread_ = std::thread(&PollManager::threadFunc, this);
+  if (!running_) {
+    thread_ = std::thread(&PollManager::threadFunc, this);
+    running_ = true;
+  }
 }
 
 void PollManager::shutdown()
@@ -69,6 +72,7 @@ void PollManager::shutdown()
     shutting_down_ = true;
     thread_.join();
     poll_watchers_.disconnectAll();
+    running_ = false;
 #ifdef POLL_SERIOUS_DEBUG
     std::cout << "PollManager shutdown complete" << std::endl;;
 #endif
@@ -89,6 +93,7 @@ void PollManager::threadFunc()
 
   while (!shutting_down_)
   {
+
     {
       std::scoped_lock<PollWatchers> lock(poll_watchers_);
       auto it = poll_watchers_.begin();
@@ -107,7 +112,7 @@ void PollManager::threadFunc()
     // While it breaks abstraction, it reduces number of mutexes and threading challenges.
     checkForShutdown();
 
-    constexpr int updatePeriodMS = 100;
+    constexpr int updatePeriodMS = 50;
 
     poll_set_.update(updatePeriodMS);
   }
@@ -116,8 +121,9 @@ void PollManager::threadFunc()
 
 void PollManager::addPollThreadWatcher(PollWatcher* watcher) {
     assert(watcher);
-    if (watcher)
-        this->poll_watchers_.attach(watcher);
+    if (watcher) {
+      this->poll_watchers_.attach(watcher);
+    }
 }
 
 }

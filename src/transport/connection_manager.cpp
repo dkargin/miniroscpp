@@ -28,14 +28,14 @@
 #define MINIROS_PACKAGE_NAME "connection_manager"
 
 #include "miniros/transport/connection_manager.h"
-#include "miniros/transport/poll_manager.h"
+#include "miniros/network/network.h"
+#include "miniros/file_log.h"
 #include "miniros/transport/connection.h"
-#include "miniros/transport/transport_subscriber_link.h"
+#include "miniros/transport/poll_manager.h"
 #include "miniros/transport/service_client_link.h"
+#include "miniros/transport/transport_subscriber_link.h"
 #include "miniros/transport/transport_tcp.h"
 #include "miniros/transport/transport_udp.h"
-#include "miniros/file_log.h"
-#include "miniros/transport/network.h"
 
 namespace miniros
 {

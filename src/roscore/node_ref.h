@@ -10,17 +10,19 @@
 #include <set>
 #include <string>
 
-#include <miniros/macros.h>
-#include <miniros/transport/url.h>
+#include "miniros/network/url.h"
+#include "miniros/macros.h"
 
 #include "registrations.h"
 
 
 namespace miniros {
 
-namespace master {
-
+namespace network {
 struct HostInfo;
+}
+
+namespace master {
 
 /// NodeRef contains specific data about a node: publishers, subscribers, services, etc.
 /// It also stores information about ip addresses of the node.
@@ -65,12 +67,30 @@ public:
     /// Hostname is often determined by API URL. In some cases hostname is a direct IP address.
     std::string getHost() const;
 
-    void updateHost(const std::shared_ptr<HostInfo>& hostInfo);
+    void updateHost(const std::shared_ptr<network::HostInfo>& hostInfo);
 
-    std::weak_ptr<const HostInfo> hostInfo() const;
+    std::weak_ptr<const network::HostInfo> hostInfo() const;
 
     /// Save state in a json form.
     void writeJson(std::ostream& os, miniros::JsonState& state, const miniros::JsonSettings& settings);
+
+    /// Lock internal mutex.
+    void lock() const;
+
+    /// Unlock internal mutex.
+    void unlock() const;
+
+    /// Get access to a subscription set.
+    /// It is thread-unsafe method and should be done inside external lock.
+    const std::set<std::string>& getSubscriptionsUnsafe() const;
+
+    /// Get access to a publication set.
+    /// It is thread-unsafe method and should be done inside external lock.
+    const std::set<std::string>& getPublicationsUnsafe() const;
+
+    /// Get access to a serive set.
+    /// It is thread-unsafe method and should be done inside external lock.
+    const std::set<std::string>& getServicesUnsafe() const;
 
 protected:
     std::set<std::string> m_paramSubscriptions;
@@ -86,7 +106,7 @@ protected:
     /// Resolved IP of a node.
     std::string m_resolvedIp;
 
-    std::weak_ptr<HostInfo> m_hostInfo;
+    std::weak_ptr<network::HostInfo> m_hostInfo;
 
     mutable std::mutex m_guard;
 };

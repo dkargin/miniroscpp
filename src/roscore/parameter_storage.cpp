@@ -233,7 +233,7 @@ std::pair<ParameterStorage::RpcValue*, ParameterStorage::RpcValue*> ParameterSto
 
   size_t i = 0;
   for (; i < name.size(); i++) {
-    std::string key = name.str(i);
+    std::string key = name.str(static_cast<int>(i));
     if (current->hasMember(key)) {
       RpcValue* next = &(*current)[key];
       parent = current;

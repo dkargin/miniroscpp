@@ -205,7 +205,7 @@ int nbRead_calls = 0;
 bool XmlRpcSocket::nbRead(int fd, std::string& s, bool* eof) {
   nbRead_calls--;
   EXPECT_EQ(nbRead_fd, fd);
-  s = nbRead_s;
+  s.append(nbRead_s);
   *eof = nbRead_eof;
   return nbRead_ret;
 }

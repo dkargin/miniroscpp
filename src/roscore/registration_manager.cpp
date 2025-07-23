@@ -282,7 +282,6 @@ size_t RegistrationManager::iterateSubscribers(const std::string_view& topic, co
   return counter;
 }
 
-
 std::vector<std::shared_ptr<NodeRef>> RegistrationManager::listAllNodes() const
 {
   std::scoped_lock<std::mutex> lock(m_guard);

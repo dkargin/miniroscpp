@@ -13,61 +13,35 @@
 #include <vector>
 
 #include "miniros/errors.h"
-#include "miniros/transport/net_address.h"
+
+#include "miniros/network/net_adapter.h"
+#include "miniros/network/host_info.h"
+#include "miniros/network/net_address.h"
+
 #include "node_ref.h"
 #include "requester_info.h"
 
 namespace miniros {
 namespace master {
 
-/// Information about network host.
-struct HostInfo {
-  std::string hostname;
-
-  /// A list IP addresses, usable for external clients.
-  std::set<network::NetAddress, network::AddressCompare> addresses;
-
-  /// This host is local to master.
-  /// It uses loopback or some other kind of local connection for communication.
-  bool local = false;
-
-  HostInfo(const std::string& name);
-};
-
-/// NetAdapter encapsulates all the information about specific network adapter.
-struct NetAdapter {
-  /// Name of the adapter.
-  std::string name;
-  /// Address on the adapter.
-  network::NetAddress address;
-  /// IPv4 netmask.
-  network::NetAddress mask;
-
-  /// Check it is localhost/loopback interface.
-  bool isLoopback() const;
-
-  /// Check if specified address belongs to this address range and mask.
-  bool matchNetAddress(const network::NetAddress& address) const;
-
-  /// Check if this adapter can be used to access specified host.
-  bool hasAccessTo(const HostInfo& host) const;
-};
 
 class MINIROS_DECL AddressResolver {
 public:
+  using Lock = std::unique_lock<AddressResolver>;
+
   /// Scan or update existing network adapters.
   Error scanAdapters();
 
   /// Find adapter for specific address.
-  const NetAdapter* findAdapterForRemoteAddress(const network::NetAddress& address) const;
+  const network::NetAdapter* findAdapterForRemoteAddress(const network::NetAddress& address) const;
 
   /// Find adapter for specific local address.
-  const NetAdapter* findAdapterForLocalAddress(const network::NetAddress& address) const;
+  const network::NetAdapter* findAdapterForLocalAddress(const network::NetAddress& address) const;
 
-  std::shared_ptr<HostInfo> updateHost(const  RequesterInfo& requesterInfo);
+  std::shared_ptr<network::HostInfo> updateHost(const  RequesterInfo& requesterInfo);
 
   /// Finds host by its ip address.
-  std::shared_ptr<HostInfo> findHost(const network::NetAddress& address) const;
+  std::shared_ptr<network::HostInfo> findHost(const network::NetAddress& address) const;
 
   /// Determine good URI for a node.
   /// @returns resolved URI of a node.
@@ -88,15 +62,30 @@ public:
   /// Check if specified address is a localhost.
   bool isLocalhost(const std::string& hostname) const;
 
+  /// List all known hosts.
+  std::set<std::shared_ptr<network::HostInfo>> getHosts() const;
+
+  using AdapterCallback = std::function<void (const network::NetAdapter*)>;
+
+  /// Iterate over all adapters.
+  template <class Callback>
+  void iterateAdapters(const Callback& callback) const
+  {
+    std::scoped_lock lock(m_mutex);
+    for (const network::NetAdapter& adapter : m_adapters) {
+      callback(&adapter);
+    }
+  }
+
 protected:
   /// Name of the host, as reported by a system.
   std::string m_hostname;
 
   /// Collection of network adapters.
-  std::vector<NetAdapter> m_adapters;
+  std::vector<network::NetAdapter> m_adapters;
 
   /// A collection of hosts.
-  std::map<std::string, std::shared_ptr<HostInfo>> m_hosts;
+  std::map<std::string, std::shared_ptr<network::HostInfo>> m_hosts;
 
   bool m_resolveIp = false;
   mutable std::mutex m_mutex;

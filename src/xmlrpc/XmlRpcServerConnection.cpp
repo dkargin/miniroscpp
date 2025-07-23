@@ -2,6 +2,7 @@
 #include <cstring>
 #include <cstdlib>
 
+#include "../../include/miniros/network/net_address.h"
 #include "xmlrpcpp/XmlRpcServerConnection.h"
 
 #include "xmlrpcpp/XmlRpc.h"
@@ -46,7 +47,7 @@ XmlRpcServerConnection::XmlRpcServerConnection(int fd, XmlRpcServer* server, boo
   }
 
   if (_clientAddress.valid())
-    XmlRpcUtil::log(2,"XmlRpcServerConnection: new socket %d from %s:%d", fd, _clientAddress.address.c_str(), _clientAddress.port);
+    XmlRpcUtil::log(2,"XmlRpcServerConnection: new socket %d from %s:%d", fd, _clientAddress.address.c_str(), _clientAddress.port());
   else
     XmlRpcUtil::log(2,"XmlRpcServerConnection: new socket %d from unknown endpoint", fd);
 }
@@ -126,7 +127,7 @@ bool XmlRpcServerConnection::readHeader()
 bool XmlRpcServerConnection::readRequest()
 {
   // If we don't have the entire request yet, read available data
-  if (_httpFrame.state() == miniros::network::HttpFrame::ParseBody) {
+  if (_httpFrame.state() == miniros::http::HttpFrame::ParseBody) {
     bool eof;
     if ( ! XmlRpcSocket::nbRead(this->getfd(), _httpFrame.data, &eof)) {
       XmlRpcUtil::error("XmlRpcServerConnection(%d)::readRequest: read error (%s).", _fd, XmlRpcSocket::getErrorMsg().c_str());
@@ -136,7 +137,7 @@ bool XmlRpcServerConnection::readRequest()
     _httpFrame.incrementalParse();
 
     // If we haven't gotten the entire request yet, return (keep reading)
-    if (_httpFrame.state() == miniros::network::HttpFrame::ParseBody) {
+    if (_httpFrame.state() == miniros::http::HttpFrame::ParseBody) {
       if (eof) {
         XmlRpcUtil::error("XmlRpcServerConnection(%d)::readRequest: EOF while reading request", _fd);
         _httpFrame.finishRequest();
@@ -147,7 +148,7 @@ bool XmlRpcServerConnection::readRequest()
     }
   }
 
-  assert(_httpFrame.state() == miniros::network::HttpFrame::ParseComplete);
+  assert(_httpFrame.state() == miniros::http::HttpFrame::ParseComplete);
   auto body = _httpFrame.body();
   // Otherwise, parse and dispatch the request
   XmlRpcUtil::log(3, "XmlRpcServerConnection(%d)::readRequest read %d/%d bytes.", _fd, _httpFrame.bodyLength(), _httpFrame.contentLength());
@@ -232,15 +233,16 @@ std::string XmlRpcServerConnection::parseRequest(XmlRpcValue& params)
 }
 
 // Execute a named method with the specified params.
-bool
-XmlRpcServerConnection::executeMethod(const std::string& methodName, 
+bool XmlRpcServerConnection::executeMethod(const std::string& methodName,
                                       XmlRpcValue& params, XmlRpcValue& result)
 {
   XmlRpcServerMethod* method = _server->findMethod(methodName);
 
   if ( ! method) return false;
 
-  method->execute(params, result, this);
+  miniros::network::ClientInfo clientInfo;
+  clientInfo.fd = getfd();
+  method->execute(params, result, clientInfo);
 
   // Ensure a valid result value
   if ( !result.valid())

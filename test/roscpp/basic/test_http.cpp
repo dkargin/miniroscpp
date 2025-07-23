@@ -4,9 +4,9 @@
 
 #include <gtest/gtest.h>
 
-#include "miniros/transport/http_tools.h"
-#include "miniros/transport/net_address.h"
-#include "miniros/transport/url.h"
+#include "miniros/network/net_address.h"
+#include "miniros/network/url.h"
+#include "miniros/http/http_tools.h"
 
 using namespace miniros;
 
@@ -96,7 +96,7 @@ const char* request3 = "POST / HTTP/1.1\r\n"
 
 TEST(net, parseRequest)
 {
-  network::HttpFrame httpFrame;
+  http::HttpFrame httpFrame;
 
   httpFrame.resetParseState(true);
   std::string req(request3);
@@ -105,13 +105,13 @@ TEST(net, parseRequest)
   int parsed = httpFrame.incrementalParse();
 
   EXPECT_EQ(parsed, req.size());
-  EXPECT_EQ(httpFrame.state(), network::HttpFrame::ParseComplete);
-  EXPECT_EQ(httpFrame.requestMethod, network::HttpMethod::Post);
+  EXPECT_EQ(httpFrame.state(), http::HttpFrame::ParseComplete);
+  EXPECT_EQ(httpFrame.requestMethod, http::HttpMethod::Post);
 }
 
 TEST(net, parseFragmented)
 {
-  network::HttpFrame httpFrame;
+  http::HttpFrame httpFrame;
   httpFrame.resetParseState(true);
 
   std::string fullReq(request3);
@@ -134,14 +134,14 @@ TEST(net, parseFragmented)
   }
 
   EXPECT_EQ(totalParsed, fullReq.size());
-  EXPECT_EQ(httpFrame.state(), network::HttpFrame::ParseComplete);
-  EXPECT_EQ(httpFrame.requestMethod, network::HttpMethod::Post);
+  EXPECT_EQ(httpFrame.state(), http::HttpFrame::ParseComplete);
+  EXPECT_EQ(httpFrame.requestMethod, http::HttpMethod::Post);
 }
 
 
 TEST(net, parseMultipleRequests)
 {
-  network::HttpFrame httpFrame;
+  http::HttpFrame httpFrame;
   httpFrame.resetParseState(true);
 
   std::string req1(request1);
@@ -155,21 +155,21 @@ TEST(net, parseMultipleRequests)
   int parsed = httpFrame.incrementalParse();
   std::string_view body1 = httpFrame.body();
   EXPECT_EQ(parsed, req1.size());
-  EXPECT_EQ(httpFrame.state(), network::HttpFrame::ParseComplete);
+  EXPECT_EQ(httpFrame.state(), http::HttpFrame::ParseComplete);
   EXPECT_EQ(httpFrame.contentLength(), 167);
-  EXPECT_EQ(httpFrame.requestMethod, network::HttpMethod::Post);
+  EXPECT_EQ(httpFrame.requestMethod, http::HttpMethod::Post);
   httpFrame.finishRequest();
 
   parsed = httpFrame.incrementalParse();
   std::string_view body2 = httpFrame.body();
   EXPECT_EQ(parsed, req2.size());
-  EXPECT_EQ(httpFrame.state(), network::HttpFrame::ParseComplete);
+  EXPECT_EQ(httpFrame.state(), http::HttpFrame::ParseComplete);
   httpFrame.finishRequest();
 
   parsed = httpFrame.incrementalParse();
   std::string_view body3 = httpFrame.body();
   EXPECT_EQ(parsed, req3.size());
-  EXPECT_EQ(httpFrame.state(), network::HttpFrame::ParseComplete);
+  EXPECT_EQ(httpFrame.state(), http::HttpFrame::ParseComplete);
 }
 
 
@@ -194,7 +194,7 @@ const char* response1 =
   "\r\n";
 TEST(net, parseResponse)
 {
-  network::HttpFrame httpFrame;
+  http::HttpFrame httpFrame;
 
   httpFrame.resetParseState(false);
   const std::string req(response1);
@@ -203,7 +203,7 @@ TEST(net, parseResponse)
   int parsed = httpFrame.incrementalParse();
 
   EXPECT_EQ(parsed, req.size());
-  EXPECT_EQ(httpFrame.state(), network::HttpFrame::ParseComplete);
+  EXPECT_EQ(httpFrame.state(), http::HttpFrame::ParseComplete);
   EXPECT_EQ(httpFrame.responseCode, 200);
 }
 
