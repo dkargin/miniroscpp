@@ -37,6 +37,7 @@
 
 #include "miniros/common.h"
 // TODO: Move it to impl section
+#include "http_server.h"
 #include "miniros/xmlrpcpp/XmlRpc.h"
 
 #include <miniros/rostime.h>
@@ -95,14 +96,14 @@ typedef std::shared_ptr<RPCManager> RPCManagerPtr;
 typedef std::function<void(const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result)> XMLRPCFunc;
 
 // Extended RPC callback function.
-typedef std::function<int (const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result, XmlRpc::XmlRpcServerConnection* conn)> XMLRPCFuncEx;
+typedef std::function<int (const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result, const network::ClientInfo& conn)> XMLRPCFuncEx;
 
 
 class MINIROS_DECL RPCManager
 {
 public:
   using RpcValue = XmlRpc::XmlRpcValue;
-  using RpcConnection = XmlRpc::XmlRpcServerConnection;
+  using ClientInfo = network::ClientInfo;
 
   static const RPCManagerPtr& instance();
 
@@ -144,9 +145,9 @@ public:
 
   template <class Object>
   bool bindEx0(const std::string& function_name,
-    Object* object, RpcValue (Object::*method)(RpcConnection* conn))
+    Object* object, RpcValue (Object::*method)(const ClientInfo& conn))
   {
-    return bindEx(function_name, [=](const RpcValue& param, RpcValue& result, RpcConnection* conn) {
+    return bindEx(function_name, [=](const RpcValue& param, RpcValue& result, const ClientInfo& conn) {
       try {
         result = (object->*method)(conn);
       } catch (XmlRpc::XmlRpcException ex) {
@@ -163,9 +164,9 @@ public:
 
   template <class Object, class T0>
   bool bindEx1(const std::string& function_name,
-    Object* object, RpcValue (Object::*method)(const T0& arg0, RpcConnection* conn))
+    Object* object, RpcValue (Object::*method)(const T0& arg0, const ClientInfo& conn))
   {
-    return bindEx(function_name, [=](const RpcValue& param, RpcValue& result, RpcConnection* conn) {
+    return bindEx(function_name, [=](const RpcValue& param, RpcValue& result, const ClientInfo& conn) {
       try {
         T0 arg0 = param[0].as<T0>();
         result = (object->*method)(arg0, conn);
@@ -182,9 +183,9 @@ public:
   }
 
   template <class Object, class T0, class T1>
-  bool bindEx2(const std::string& function_name,Object* object, RpcValue (Object::*method)(const T0& arg0, const T1& arg1, RpcConnection* conn))
+  bool bindEx2(const std::string& function_name,Object* object, RpcValue (Object::*method)(const T0& arg0, const T1& arg1, const ClientInfo& conn))
   {
-    return bindEx(function_name, [=](const RpcValue& param, RpcValue& result, RpcConnection* conn) {
+    return bindEx(function_name, [=](const RpcValue& param, RpcValue& result, const ClientInfo& conn) {
       try {
         T0 arg0 = param[0].as<T0>();
         T1 arg1 = param[1].as<T1>();
@@ -203,9 +204,9 @@ public:
 
   template <class Object, class T0, class T1, class T2>
   bool bindEx3(const std::string& function_name,Object* object,
-    RpcValue (Object::*method)(const T0& arg0, const T1& arg1, const T2& arg2, RpcConnection* conn))
+    RpcValue (Object::*method)(const T0& arg0, const T1& arg1, const T2& arg2, const ClientInfo& conn))
   {
-    return bindEx(function_name, [=](const RpcValue& param, RpcValue& result, RpcConnection* conn) {
+    return bindEx(function_name, [=](const RpcValue& param, RpcValue& result, const ClientInfo& conn) {
       try {
         T0 arg0 = param[0].as<T0>();
         T1 arg1 = param[1].as<T1>();
@@ -225,9 +226,9 @@ public:
 
   template <class Object, class T0, class T1, class T2, class T3>
   bool bindEx4(const std::string& function_name, Object* object,
-    RpcValue (Object::*method)(const T0& arg0, const T1& arg1, const T2& arg2, const T3& arg3, RpcConnection* conn))
+    RpcValue (Object::*method)(const T0& arg0, const T1& arg1, const T2& arg2, const T3& arg3, const ClientInfo& conn))
   {
-    return bindEx(function_name, [=](const RpcValue& param, RpcValue& result, RpcConnection* conn) {
+    return bindEx(function_name, [=](const RpcValue& param, RpcValue& result, const ClientInfo& conn) {
       try {
         T0 arg0 = param[0].as<T0>();
         T1 arg1 = param[1].as<T1>();
@@ -251,7 +252,7 @@ public:
   /// Unbind all callbacks, associated with specific object.
   size_t unbind(const void* object);
 
-  NODISCARD bool start(int port = 0);
+  NODISCARD bool start(PollSet* poll_set, int port = 0);
   void shutdown();
 
   bool isShuttingDown() const;
@@ -268,6 +269,8 @@ private:
   std::mutex xmlrpc_call_mutex_;
 #endif
   XmlRpc::XmlRpcServer server_;
+
+  std::unique_ptr<network::HttpServer> http_server_;
   std::vector<CachedXmlRpcClient> clients_;
   std::mutex clients_mutex_;
 

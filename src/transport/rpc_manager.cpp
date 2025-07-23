@@ -36,6 +36,8 @@
 #include "miniros/transport/network.h"
 #include "miniros/transport/rpc_manager.h"
 
+#include "miniros/transport/xmlrpc_handler.h"
+
 #include "miniros/xmlrpcpp/XmlRpcServerConnection.h"
 
 using namespace XmlRpc;
@@ -66,7 +68,7 @@ public:
   , m_func(cb)
   { }
 
-  void execute(const XmlRpcValue &params, XmlRpcValue &result, XmlRpcServerConnection* connection) override
+  void execute(const XmlRpcValue &params, XmlRpcValue &result, const network::ClientInfo&) override
   {
     if (m_func)
       m_func(params, result);
@@ -85,10 +87,10 @@ public:
   , m_func(cb)
   { }
 
-  void execute(const XmlRpcValue &params, XmlRpcValue &result, XmlRpcServerConnection* connection) override
+  void execute(const XmlRpcValue &params, XmlRpcValue &result, const network::ClientInfo& clientInfo) override
   {
     if (m_func)
-      m_func(params, result, connection);
+      m_func(params, result, clientInfo);
   }
 
 private:
@@ -121,7 +123,7 @@ RPCManager::~RPCManager()
   shutdown();
 }
 
-bool RPCManager::start(int port)
+bool RPCManager::start(PollSet* poll_set, int port)
 {
   if (server_thread_.joinable()) {
     MINIROS_INFO("Manager is running at port %d", port_);
@@ -132,10 +134,22 @@ bool RPCManager::start(int port)
   shutting_down_ = false;
   bind("getPid", getPid);
 
-  if (!server_.bindAndListen(port))
-    return false;
+  if (!http_server_) {
+    http_server_.reset(new network::HttpServer(poll_set));
+  }
 
-  port_ = server_.get_port();
+  auto xmlrpc_enpoint = std::make_shared<network::XmlRpcHandler>(&server_);
+  // miniros endpoints tend to go here.
+  http_server_->registerEndpoint(network::HttpMethod::Post, "/", xmlrpc_enpoint);
+  // Common endpoint for regular ROS endpoints.
+  http_server_->registerEndpoint(network::HttpMethod::Post, "/RPC2", xmlrpc_enpoint);
+
+  if (Error err = http_server_->start(port); !err) {
+    MINIROS_FATAL("Failed to start HTTP server at port %d", port);
+    return false;
+  }
+
+  port_ = http_server_->getPortIp4();
   MINIROS_ASSERT(port_ != 0);
 
   std::stringstream ss;

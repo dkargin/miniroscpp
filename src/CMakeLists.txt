@@ -161,6 +161,8 @@ set(transport_SRC
     transport/intraprocess_publisher_link.cpp
     transport/internal_timer_manager.cpp
     transport/io.cpp
+    transport/http_server.cpp
+    transport/http_server_connection.cpp
     transport/http_tools.cpp
 
     transport/master_link.cpp
@@ -188,6 +190,7 @@ set(transport_SRC
     transport/service_server_link.cpp
 
     transport/single_subscriber_publisher.cpp
+    transport/socket.cpp
     transport/spinner.cpp
     transport/statistics.cpp
     transport/steady_timer.cpp
@@ -208,6 +211,7 @@ set(transport_SRC
     transport/transport_subscriber_link.cpp
     transport/url.cpp
     transport/wall_timer.cpp
+    transport/xmlrpc_handler.cpp
     tf2/transform_broadcaster.cpp
   )
 
