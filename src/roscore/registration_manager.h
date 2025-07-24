@@ -99,6 +99,9 @@ protected:
   /// @returns reference to a node or nullptr if no node is found.
   std::shared_ptr<NodeRef> getNodeByAPIUnsafe(const std::string& nodeApi) const;
 
+  /// Unregister node and all references to it.
+  void unregisterNode(const std::string& nodeApi);
+
 protected:
   mutable std::mutex m_guard;
 

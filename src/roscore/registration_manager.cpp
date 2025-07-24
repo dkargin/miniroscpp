@@ -79,24 +79,41 @@ void RegistrationManager::dropRegistrations(const std::shared_ptr<NodeRef>& node
 ReturnStruct RegistrationManager::unregisterObject(Registrations& r, const std::string& key,
   const std::string& caller_id, const std::string& caller_api, const std::string& service_api)
 {
-  std::scoped_lock<std::mutex> lock(m_guard);
-
+  std::shared_ptr<NodeRef> node_ref;
   ReturnStruct ret;
-  if (m_nodes.count(caller_id)) {
-    std::shared_ptr<NodeRef> node_ref = m_nodes[caller_id];
-    ret = r.unregisterObj(key, caller_id, caller_api, service_api);
-    if (ret.statusCode == 1) {
-      node_ref->remove(r.type(), key);
+
+  {
+    std::scoped_lock<std::mutex> lock(m_guard);
+    if (m_nodes.count(caller_id)) {
+      node_ref = m_nodes[caller_id];
+      ret = r.unregisterObj(key, caller_id, caller_api, service_api);
+      if (ret.statusCode == 1) {
+        node_ref->remove(r.type(), key);
+      }
+    } else {
+      std::stringstream ss;
+      ss << "[" << caller_id << "] is not a registered node";
+      ret = ReturnStruct(0, ss.str(), RpcValue(1));
     }
-    if (node_ref->is_empty()) {
-      m_nodes.erase(caller_id);
-    }
-  } else {
-    std::stringstream ss;
-    ss << "[" << caller_id << "] is not a registered node";
-    ret = ReturnStruct(0, ss.str(), RpcValue(1));
+  }
+
+  if (node_ref->is_empty()) {
+    unregisterNode(caller_id);
   }
   return ret;
+}
+
+void RegistrationManager::unregisterNode(const std::string& nodeApi)
+{
+  std::scoped_lock<std::mutex> lock(m_guard);
+  auto it = m_nodes.find(nodeApi);
+  if (it == m_nodes.end())
+    return;
+  if (!it->second->is_empty())
+    return;
+
+  std::shared_ptr<NodeRef> node_ref = it->second;
+  m_nodes.erase(it);
 }
 
 std::shared_ptr<NodeRef> RegistrationManager::register_service(const std::string& service, const std::string& caller_id,
