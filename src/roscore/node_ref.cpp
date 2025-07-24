@@ -32,7 +32,7 @@ void NodeRef::clear()
 bool NodeRef::is_empty() const
 {
   return m_paramSubscriptions.empty() && m_topicSubscriptions.empty() &&
-         m_topicPublications.empty() + m_services.empty();
+         m_topicPublications.empty() && m_services.empty();
 }
 
 bool NodeRef::add(Registrations::Type type_, const std::string& key)
