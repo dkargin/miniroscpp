@@ -34,6 +34,8 @@ const char* Error::toString() const {
       return "Address in use";
     case Error::EndOfFile:
       return "End of file";
+    case Error::WouldBlock:
+      return "Would block";
   }
   return "Unknown error";
 }

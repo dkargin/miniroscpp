@@ -21,17 +21,21 @@ HttpServerConnection::~HttpServerConnection()
 
 Error HttpServerConnection::readRequest()
 {
+  if (http_frame_.state() == HttpFrame::ParseRequestHeader) {
+    request_start_ = SteadyTime::now();
+  }
   auto [transferred, readErr] = socket_->read(http_frame_.data);
 
   const int fd = socket_->fd();
   const int parsed = http_frame_.incrementalParse();
 
-  MINIROS_DEBUG("HttpServerConnection(%d)::readHeader: ContentLength=%d, parsed=%d", fd, http_frame_.contentLength(), parsed);
+  double dur = (SteadyTime::now() - request_start_).toSec() * 1000;
+  MINIROS_DEBUG("HttpServerConnection(%d)::readHeader: ContentLength=%d, parsed=%d t=%fms", fd, http_frame_.contentLength(), parsed, dur);
 
   // If we haven't gotten the entire request yet, return (keep reading)
-  if (http_frame_.state() != miniros::network::HttpFrame::ParseComplete) {
+  if (http_frame_.state() != HttpFrame::ParseComplete) {
     if (readErr == Error::EndOfFile) {
-      MINIROS_ERROR("HttpServerConnection(%d)::readRequest: EOF while reading request", fd);
+      MINIROS_DEBUG("HttpServerConnection(%d)::readRequest: EOF while reading request", fd);
       http_frame_.finishRequest();
       return Error::EndOfFile;
       // Either way we close the connection
@@ -50,24 +54,33 @@ Error HttpServerConnection::readRequest()
 
 int HttpServerConnection::handleEvents(int evtFlags)
 {
+  bool stateFallback = false;
   if (state_ == State::ReadRequest) {
-    Error err = readRequest();
-    // What to do with EOF?
+    if (evtFlags & POLLIN) {
+      Error err = readRequest();
+      // What to do with EOF?
 
-    if (err == Error::EndOfFile) {
-      // Returning 0 will make this connection be closed.
+      if (err == Error::Ok) {
+        // Request is not finished. Need to wait for another packet.
+        if (state_ == State::ReadRequest) {
+          return POLLIN;
+        }
+      }
+      else if (err == Error::EndOfFile) {
+        // Returning 0 will make this connection be closed.
+        return 0;
+      } else {
+        MINIROS_ERROR("Unexpected error %s", err.toString());
+        return 0;
+      }
+    } else {
+      MINIROS_WARN("HttpServerConnection unhandled events in ReadRequest: %o", evtFlags);
       return 0;
-    }
-
-    // Request is not finished. Need to wait for POLLIN
-    if (state_ == State::ReadRequest) {
-      return POLLIN;
     }
   }
 
   if (state_ == State::ProcessRequest) {
     resetResponse();
-
     // Execute request:
     auto* handler = server_->findEndpoint(http_frame_);
     assert(handler);
@@ -78,65 +91,76 @@ int HttpServerConnection::handleEvents(int evtFlags)
       response_header_.status = "Not Found";
     } else {
       ClientInfo clientInfo;
-      MINIROS_INFO("Handling HTTP request to %s", endpoint.c_str());
+      clientInfo.fd = socket_->fd();
+      clientInfo.remoteAddress = socket_->peerAddress();
+      MINIROS_DEBUG("Handling HTTP request to %s", endpoint.c_str());
       Error err = handler->handle(http_frame_, clientInfo, response_header_, response_body_);
       if (!err) {
         // TODO: What to do?
         // return internal server error.
+        MINIROS_ERROR("Failed to handle HTTP request to %s", err.toString());
       }
     }
     response_header_.writeHeader(response_header_buffer_, response_body_.size());
-    state_ = State::WriteResponseHeader;
+    state_ = State::WriteResponse;
+    stateFallback = true;
   }
 
-  if (state_ == State::WriteResponseHeader) {
-    auto [written, err] = socket_->write(response_header_buffer_.c_str() + data_sent_, response_header_buffer_.size() - data_sent_);
-    if (err == Error::Ok) {
-      if (written > 0) {
-        data_sent_ += written;
-        MINIROS_INFO_NAMED("HttpServerConnection", "Written %d/%d bytes of header",
-          static_cast<int>(written), static_cast<int>(response_header_buffer_.size()));
+  if (state_ == State::WriteResponse) {
+    if (evtFlags & POLLOUT || stateFallback) {
+      std::pair<size_t, Error> r;
+
+      if (response_body_.size() > 0) {
+        r = socket_->write2(
+          response_header_buffer_.c_str(), response_header_buffer_.size(),
+          response_body_.c_str(), response_body_.size(), data_sent_);
+
+      } else {
+        r = socket_->write(response_header_buffer_.c_str() + data_sent_, response_header_buffer_.size() - data_sent_);
       }
 
-      if (data_sent_ < response_header_buffer_.size()) {
-        // Failed to write all data, so we need to yield to spinner.
+      const size_t totalSize = response_header_buffer_.size() + response_body_.size();
+      auto [written, err] = r;
+
+      if (written > 0) {
+        data_sent_ += written;
+        double dur = (SteadyTime::now() - request_start_).toSec() * 1000;
+        MINIROS_DEBUG("HttpServerConnection written %d/%d bytes of header, t=%fms",
+          static_cast<int>(written), static_cast<int>(totalSize), dur);
+      }
+
+      if (err == Error::WouldBlock)
         return POLLOUT;
-      }
-      data_sent_ = 0;
-      // Move to the next state.
-      if (response_header_buffer_.empty()) {
-        // Empty body payload, so switch to waiting for the next request.
-        state_ = State::ReadRequest;
-        http_frame_.finishRequest();
-        return POLLIN;
-      }
-      state_ = State::WriteResponseBody;
-    }
-  }
 
-  if (state_ == State::WriteResponseBody) {
-    auto [written, err] = socket_->write(response_body_.c_str() + data_sent_, response_body_.size() - data_sent_);
-    if (err == Error::Ok) {
-      if (written > 0) {
-        data_sent_ += written;
-        MINIROS_INFO_NAMED("HttpServerConnection", "Written %d/%d bytes of body",
-          static_cast<int>(written), static_cast<int>(response_body_.size()));
-      }
-
-      if (data_sent_ == response_body_.size()) {
-        // Move to the next state.
-        state_ = State::ReadRequest;
-        http_frame_.finishRequest();
+      if (err == Error::Ok) {
+        if (data_sent_ < totalSize) {
+          // Failed to write all data, so we need to yield to spinner.
+          return POLLOUT;
+        }
         data_sent_ = 0;
+        state_ = State::ReadRequest;
+        http_frame_.finishRequest();
+        auto dur = SteadyTime::now() - request_start_;
+        MINIROS_DEBUG("Served HTTP response in %fms", dur.toSec()*1000);
         return POLLIN;
+      } else {
+        MINIROS_ERROR("HttpServerConnection writeResponse error: %s", err.toString());
+        return 0;
       }
-      // Failed to write all data, so we need to yield to spinner.
-      return POLLOUT;
+    } else {
+      MINIROS_WARN("HttpServerConnection unhandled event in WriteResponse: %o", evtFlags);
+      return 0;
     }
   }
 
-  MINIROS_WARN("HttpServerConnection no events to listen");
+  MINIROS_WARN("HttpServerConnection unhandled events: %o in state %d", evtFlags, (int)state_);
   return 0;
+}
+
+void HttpServerConnection::close()
+{
+  socket_->close();
+  socket_.reset();
 }
 
 void HttpServerConnection::resetResponse()

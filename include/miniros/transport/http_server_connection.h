@@ -8,6 +8,8 @@
 #include "miniros/transport/socket.h"
 #include "miniros/transport/http_tools.h"
 
+#include "miniros/steady_timer.h"
+
 namespace miniros {
 namespace network {
 
@@ -28,14 +30,16 @@ public:
   enum class State {
     ReadRequest,
     ProcessRequest,
-    WriteResponseHeader,
-    WriteResponseBody
+    WriteResponse,
   };
 
   /// Incremental reading of request.
   Error readRequest();
 
   void resetResponse();
+
+  /// Close connection.
+  void close();
 
 protected:
   State state_ = State::ReadRequest;
@@ -52,6 +56,7 @@ protected:
   /// Number of bytes sent from current part (header or body).
   size_t data_sent_ = 0;
 
+  SteadyTime request_start_;
   std::shared_ptr<NetSocket> socket_;
 };
 

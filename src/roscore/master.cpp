@@ -14,6 +14,7 @@ Master::Master(std::shared_ptr<RPCManager> manager)
   : m_handler(manager, &m_regManager), m_parameterStorage(&m_regManager)
 {
   m_rpcManager = manager;
+  manager->setMaster();
   // TODO: Read environment.
   // split the URI (if it's valid) into host and port
   // if (!network.splitURI(ROS.ROS_MASTER_URI, ref _host, ref _port))
@@ -114,10 +115,10 @@ void Master::update()
 }
 
 Master::RpcValue Master::lookupService(const std::string& caller_id, const std::string& service,
-  const ClientInfo& connection)
+  const ClientInfo& clientInfo)
 {
   RequesterInfo requesterInfo;
-  if (!requesterInfo.assign(caller_id, connection.fd)) {
+  if (!requesterInfo.assign(caller_id, clientInfo)) {
     MINIROS_WARN("Failed to read network address of caller %s", caller_id.c_str());
   }
   std::string uri = m_handler.lookupService(requesterInfo, service);
@@ -136,10 +137,10 @@ Master::RpcValue Master::lookupService(const std::string& caller_id, const std::
 }
 
 Master::RpcValue Master::registerService(const std::string& caller_id, const std::string& service,
-  const std::string& service_api, const std::string& caller_api, const ClientInfo& connection)
+  const std::string& service_api, const std::string& caller_api, const ClientInfo& clientInfo)
 {
   RequesterInfo requesterInfo;
-  if (!requesterInfo.assign(caller_id, connection.fd)) {
+  if (!requesterInfo.assign(caller_id, clientInfo)) {
     MINIROS_WARN("Failed to read network address of caller %s", caller_id.c_str());
   }
   requesterInfo.callerApi = caller_api;
@@ -154,10 +155,10 @@ Master::RpcValue Master::registerService(const std::string& caller_id, const std
 }
 
 Master::RpcValue Master::unregisterService(const std::string& caller_id, const std::string& service,
-  const std::string& service_api, const ClientInfo& connection)
+  const std::string& service_api, const ClientInfo& clientInfo)
 {
   RequesterInfo requesterInfo;
-  if (!requesterInfo.assign(caller_id, connection.fd)) {
+  if (!requesterInfo.assign(caller_id, clientInfo)) {
     MINIROS_WARN("Failed to read network address of caller %s", caller_id.c_str());
   }
   ReturnStruct r = m_handler.unregisterService(requesterInfo, service, service_api);
@@ -189,7 +190,7 @@ Master::RpcValue Master::getTopicTypes(const std::string& topic, const ClientInf
   return res;
 }
 
-Master::RpcValue Master::getSystemState(const std::string& caller_id, const ClientInfo& connection)
+Master::RpcValue Master::getSystemState(const std::string& caller_id, const ClientInfo& clientInfo)
 {
   RpcValue res = RpcValue::Array(3);
   res[0] = 1;
@@ -214,7 +215,7 @@ Master::RpcValue Master::getSystemState(const std::string& caller_id, const Clie
   };
 
   RequesterInfo requesterInfo;
-  if (!requesterInfo.assign(caller_id, connection.fd)) {
+  if (!requesterInfo.assign(caller_id, clientInfo)) {
     MINIROS_WARN("Failed to read network address of caller %s", caller_id.c_str());
   }
 
@@ -230,12 +231,12 @@ Master::RpcValue Master::getSystemState(const std::string& caller_id, const Clie
   return res;
 }
 
-Master::RpcValue Master::getPublishedTopics(const std::string& caller_id, const std::string& subgraph, const ClientInfo& connection)
+Master::RpcValue Master::getPublishedTopics(const std::string& caller_id, const std::string& subgraph, const ClientInfo& clientInfo)
 {
   RpcValue res = RpcValue::Array(3);
 
   RequesterInfo requesterInfo;
-  if (!requesterInfo.assign(caller_id, connection.fd)) {
+  if (!requesterInfo.assign(caller_id, clientInfo)) {
     MINIROS_WARN("Failed to read network address of caller %s", caller_id.c_str());
   }
   auto topics = m_handler.getPublishedTopics(requesterInfo, subgraph);
@@ -256,12 +257,12 @@ Master::RpcValue Master::getPublishedTopics(const std::string& caller_id, const 
 }
 
 Master::RpcValue Master::registerPublisher(const std::string& caller_id, const std::string& topic,
-  const std::string& type, const std::string& caller_api, const ClientInfo& connection)
+  const std::string& type, const std::string& caller_api, const ClientInfo& clientInfo)
 {
   MINIROS_INFO("PUBLISHING: caller_id=\"%s\" caller_api=%s topic=\"%s\"", caller_id.c_str(), caller_api.c_str(), topic.c_str());
 
   RequesterInfo requesterInfo;
-  if (!requesterInfo.assign(caller_id, connection.fd)) {
+  if (!requesterInfo.assign(caller_id, clientInfo)) {
     MINIROS_WARN("Failed to read network address of caller %s", caller_id.c_str());
   }
   requesterInfo.callerApi = caller_api;
@@ -275,12 +276,12 @@ Master::RpcValue Master::registerPublisher(const std::string& caller_id, const s
 }
 
 Master::RpcValue Master::unregisterPublisher(
-  const std::string& caller_id, const std::string& topic, const std::string& caller_api, const ClientInfo& connection)
+  const std::string& caller_id, const std::string& topic, const std::string& caller_api, const ClientInfo& clientInfo)
 {
   MINIROS_INFO("UNPUBLISHING caller_id=\"%s\" caller_api=%s topic=\"%s\"", caller_id.c_str(), caller_api.c_str(), topic.c_str());
 
   RequesterInfo requesterInfo;
-  if (!requesterInfo.assign(caller_id, connection.fd)) {
+  if (!requesterInfo.assign(caller_id, clientInfo)) {
     MINIROS_WARN("Failed to read network address of caller %s", caller_id.c_str());
   }
   requesterInfo.callerApi = caller_api;
@@ -294,10 +295,10 @@ Master::RpcValue Master::unregisterPublisher(
 }
 
 Master::RpcValue Master::registerSubscriber(const std::string& caller_id, const std::string& topic,
-  const std::string& type, const std::string& caller_api, const ClientInfo& connection)
+  const std::string& type, const std::string& caller_api, const ClientInfo& clientInfo)
 {
   RequesterInfo requesterInfo;
-  if (!requesterInfo.assign(caller_id, connection.fd)) {
+  if (!requesterInfo.assign(caller_id, clientInfo)) {
     MINIROS_WARN("Failed to read network address of caller %s", caller_id.c_str());
   }
   requesterInfo.callerApi = caller_api;
@@ -310,11 +311,11 @@ Master::RpcValue Master::registerSubscriber(const std::string& caller_id, const 
   return res;
 }
 
-Master::RpcValue Master::unregisterSubscriber(
-  const std::string& caller_id, const std::string& topic, const std::string& caller_api, const ClientInfo& connection)
+Master::RpcValue Master::unregisterSubscriber(const std::string& caller_id, const std::string& topic,
+  const std::string& caller_api, const ClientInfo& clientInfo)
 {
   RequesterInfo requesterInfo;
-  if (!requesterInfo.assign(caller_id, connection.fd)) {
+  if (!requesterInfo.assign(caller_id, clientInfo)) {
     MINIROS_WARN("Failed to read network address of caller %s", caller_id.c_str());
   }
   requesterInfo.callerApi = caller_api;
@@ -327,10 +328,10 @@ Master::RpcValue Master::unregisterSubscriber(
   return res;
 }
 
-Master::RpcValue Master::lookupNode(const std::string& caller_id, const std::string& node, const ClientInfo& connection)
+Master::RpcValue Master::lookupNode(const std::string& caller_id, const std::string& node, const ClientInfo& clientInfo)
 {
   RequesterInfo requesterInfo;
-  if (!requesterInfo.assign(caller_id, connection.fd)) {
+  if (!requesterInfo.assign(caller_id, clientInfo)) {
     MINIROS_WARN("Failed to read network address of caller %s", caller_id.c_str());
   }
 

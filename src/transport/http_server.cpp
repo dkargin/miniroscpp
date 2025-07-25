@@ -92,7 +92,7 @@ void HttpServer::acceptClient(NetSocket* sock)
   }
 
   int fd = client->fd();
-  MINIROS_INFO("Accepting new HTTP client fd=%d", client->fd());
+  MINIROS_DEBUG("Accepting new HTTP client fd=%d", client->fd());
 
   client->setNonBlock();
   auto* connection = new HttpServerConnection(this, client);
@@ -112,6 +112,7 @@ void HttpServer::acceptClient(NetSocket* sock)
 Error HttpServer::registerEndpoint(HttpMethod method, const std::string& path, const std::shared_ptr<EndpointHandler>& handler)
 {
   Binding binding{path, method};
+  std::unique_lock<std::mutex> lock(mutex_);
   auto it = endpoints_.find(binding);
   if (it != endpoints_.end()) {
     return Error::AddressInUse;
@@ -134,6 +135,7 @@ HttpServer::EndpointHandler* HttpServer::findEndpoint(const HttpFrame& frame)
 
 void HttpServer::closeConnection(int fd)
 {
+  MINIROS_DEBUG("HttpServer::closeConnection(%d)", fd);
   HttpServerConnection* connection = nullptr;
   std::unique_lock<std::mutex> lock(mutex_);
   auto it = connections_.find(fd);
@@ -141,7 +143,9 @@ void HttpServer::closeConnection(int fd)
     pollSet_->delSocket(fd);
     connection = it->second;
     connections_.erase(fd);
+    connection->close();
   }
+
   if (connection) {
     delete connection;
   }

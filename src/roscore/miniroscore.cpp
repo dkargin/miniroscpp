@@ -99,15 +99,7 @@ int main(int argc, const char ** argv) {
   bool dumpParameters = vm["dump_parameters"].as<bool>();
 
   MINIROS_INFO("Creating RPCManager");
-
-  // Standalone RPC manager for rosmaster.
-  bool unifiedRpc = vm["unified_rpc"].as<bool>();
-
-  std::shared_ptr<miniros::RPCManager> masterRpcManager;
-  if (unifiedRpc)
-    masterRpcManager = miniros::RPCManager::instance();
-  else
-    masterRpcManager = std::make_shared<miniros::RPCManager>();
+  std::shared_ptr<miniros::RPCManager> masterRpcManager = miniros::RPCManager::instance();
 
   MINIROS_INFO("Creating Master object");
   miniros::master::Master master(masterRpcManager);

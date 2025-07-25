@@ -28,6 +28,7 @@
 #ifndef MINIROS_XMLRPC_MANAGER_H
 #define MINIROS_XMLRPC_MANAGER_H
 
+#include <condition_variable>
 #include <string>
 #include <set>
 #include <memory>
@@ -61,18 +62,24 @@ MINIROS_DECL XmlRpc::XmlRpcValue responseBool(int code, const std::string& msg, 
 class XMLRPCCallWrapper;
 typedef std::shared_ptr<XMLRPCCallWrapper> XMLRPCCallWrapperPtr;
 
+/// Asynchronous RPC connection.
+/// The only subclass is Subscription::PendingConnection.
+/// Processing and spinning is done by a spinner from RpcManager::server_.
 class MINIROS_DECL ASyncXMLRPCConnection : public std::enable_shared_from_this<ASyncXMLRPCConnection>
 {
 public:
   virtual ~ASyncXMLRPCConnection() {}
 
-  virtual void addToDispatch(XmlRpc::XmlRpcDispatch* disp) = 0;
-  virtual void removeFromDispatch(XmlRpc::XmlRpcDispatch* disp) = 0;
+  virtual void addToDispatch(PollSet* disp) = 0;
+  virtual void removeFromDispatch(PollSet* disp) = 0;
 
+  // Check if connection can be removed.
   virtual bool check() = 0;
 };
 typedef std::shared_ptr<ASyncXMLRPCConnection> ASyncXMLRPCConnectionPtr;
 
+/// RPC Client for running simple RPC requests to other nodes or master.
+/// It is reused for running several requests in sequence.
 class MINIROS_DECL CachedXmlRpcClient
 {
 public:
@@ -133,6 +140,15 @@ public:
 
   void addASyncConnection(const ASyncXMLRPCConnectionPtr& conn);
   void removeASyncConnection(const ASyncXMLRPCConnectionPtr& conn);
+
+  void setMaster();
+  bool isMaster() const;
+
+  /// Check if RPC API is already pointing to this manager.
+  bool isLocalRPC(const std::string& host, int port) const;
+
+  /// Execute RPC request locally.
+  Error executeLocalRPC(const std::string& method, const RpcValue& request, RpcValue& response);
 
   /// Bind regular callback method.
   bool bind(const std::string& function_name, const XMLRPCFunc& cb);
@@ -258,6 +274,11 @@ public:
   bool isShuttingDown() const;
 
 private:
+
+  bool executeLocalMethod(const std::string& methodName, const RpcValue& request, RpcValue& response);
+
+  bool executeLocalMulticall(const std::string& methodName, const RpcValue& request, RpcValue& response);
+
   void serverThreadFunc();
 
   std::string uri_;
@@ -268,7 +289,7 @@ private:
   // OSX has problems with lots of concurrent xmlrpc calls
   std::mutex xmlrpc_call_mutex_;
 #endif
-  XmlRpc::XmlRpcServer server_;
+  XmlRpc::XmlRpcMethods server_;
 
   std::unique_ptr<network::HttpServer> http_server_;
   std::vector<CachedXmlRpcClient> clients_;
@@ -280,6 +301,7 @@ private:
 
   std::set<ASyncXMLRPCConnectionPtr> added_connections_;
   std::mutex added_connections_mutex_;
+  std::condition_variable connections_event_;
   std::set<ASyncXMLRPCConnectionPtr> removed_connections_;
   std::mutex removed_connections_mutex_;
 
@@ -303,6 +325,8 @@ private:
   std::map<std::string, FunctionInfo> functions_;
 
   std::atomic_bool unbind_requested_;
+
+  bool is_master_ = false;
 };
 
 } // namespace miniros

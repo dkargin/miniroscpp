@@ -28,13 +28,15 @@ namespace XmlRpc {
   // The XmlRpcServer processes client requests to call RPCs
   class XmlRpcServer;
 
+  class XmlRpcMethods;
+
   class XmlRpcServerConnection;
 
   //! Abstract class representing a single RPC method
   class XMLRPCPP_DECL XmlRpcServerMethod {
   public:
     //! Constructor
-    XmlRpcServerMethod(std::string const& name, XmlRpcServer* server = 0);
+    XmlRpcServerMethod(std::string const& name, XmlRpcMethods* server = 0);
 
     //! Destructor
     virtual ~XmlRpcServerMethod();
@@ -51,7 +53,7 @@ namespace XmlRpc {
 
   protected:
     std::string _name;
-    XmlRpcServer* _server;
+    XmlRpcMethods* _server;
   };
 } // namespace XmlRpc
 

@@ -7,6 +7,11 @@
 
 #include "http_server.h"
 
+namespace XmlRpc {
+class XmlRpcMethods;
+class XmlRpcValue;
+}
+
 namespace miniros {
 namespace network {
 
@@ -15,7 +20,7 @@ class XmlRpcHandler : public HttpServer::EndpointHandler {
 public:
   using RpcValue = XmlRpc::XmlRpcValue;
 
-  explicit XmlRpcHandler(XmlRpc::XmlRpcServer* server)
+  explicit XmlRpcHandler(XmlRpc::XmlRpcMethods* server)
     :server_(server)
   {}
 
@@ -29,7 +34,7 @@ public:
   // Execute multiple calls and return the results in an array.
   bool executeMulticall(const ClientInfo& clientInfo, const std::string& methodName, RpcValue& params, RpcValue& result);
 
-  XmlRpc::XmlRpcServer* server_;
+  XmlRpc::XmlRpcMethods* server_;
 };
 
 }

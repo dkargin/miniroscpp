@@ -5,6 +5,8 @@
 #ifndef MINIROS_SOCKET_H
 #define MINIROS_SOCKET_H
 
+#include <memory>
+
 #include "miniros/errors.h"
 #include "miniros/transport/net_address.h"
 
@@ -14,8 +16,14 @@ namespace network {
 /// Owner of a  network socket.
 class MINIROS_DECL NetSocket {
 public:
+  /// Creates object without any bound socket.
   NetSocket();
-  NetSocket(socket_fd_t fd, bool own);
+
+  /// Attach object to existing socket.
+  /// @param fd - socket file descriptor
+  /// @param own - should socket completely own descriptor and close it in destructor.
+  NetSocket(int fd, bool own);
+
   ~NetSocket();
 
   /// No copy allowed.
@@ -37,9 +45,6 @@ public:
   /// Enter listening mode.
   /// Socket must be already created.
   Error listen(int maxQueuedClients);
-
-  /// Update peer address.
-  void setPeerAddress(const NetAddress& address);
 
   /// Get current peer address.
   NetAddress peerAddress() const;
@@ -63,16 +68,15 @@ public:
   /// Write data to a socket.
   std::pair<size_t, Error> write(const char* data, size_t size);
 
+  /// Write two separate buffers to a socket.
+  /// It is often HTTP header and a payload from a separate buffer.
+  std::pair<size_t, Error> write2(const char* header, size_t headerSize,
+    const char* body, size_t bodySize,
+    size_t written = 0);
+
 protected:
-  int fd_ = -1;
-  /// Do we own the FD and close it on exit.
-  bool own_ = false;
-
-  /// Socket is listening for connections.
-  bool listening_ = false;
-
-  /// Address of connected endpoint.
-  NetAddress peer_address_;
+  struct Internal;
+  std::unique_ptr<Internal> internal_;
 };
 
 }

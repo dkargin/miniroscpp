@@ -112,7 +112,7 @@ void PollManager::threadFunc()
     // While it breaks abstraction, it reduces number of mutexes and threading challenges.
     checkForShutdown();
 
-    constexpr int updatePeriodMS = 100;
+    constexpr int updatePeriodMS = 50;
 
     poll_set_.update(updatePeriodMS);
   }
