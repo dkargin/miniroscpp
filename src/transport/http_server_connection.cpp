@@ -21,6 +21,9 @@ HttpServerConnection::~HttpServerConnection()
 
 Error HttpServerConnection::readRequest()
 {
+  if (http_frame_.state() == HttpFrame::ParseRequestHeader) {
+    request_start_ = SteadyTime::now();
+  }
   auto [transferred, readErr] = socket_->read(http_frame_.data);
 
   const int fd = socket_->fd();
@@ -29,7 +32,7 @@ Error HttpServerConnection::readRequest()
   MINIROS_DEBUG("HttpServerConnection(%d)::readHeader: ContentLength=%d, parsed=%d", fd, http_frame_.contentLength(), parsed);
 
   // If we haven't gotten the entire request yet, return (keep reading)
-  if (http_frame_.state() != miniros::network::HttpFrame::ParseComplete) {
+  if (http_frame_.state() != HttpFrame::ParseComplete) {
     if (readErr == Error::EndOfFile) {
       MINIROS_ERROR("HttpServerConnection(%d)::readRequest: EOF while reading request", fd);
       http_frame_.finishRequest();
@@ -78,6 +81,8 @@ int HttpServerConnection::handleEvents(int evtFlags)
       response_header_.status = "Not Found";
     } else {
       ClientInfo clientInfo;
+      clientInfo.fd = socket_->fd();
+      clientInfo.remoteAddress = socket_->peerAddress();
       MINIROS_INFO("Handling HTTP request to %s", endpoint.c_str());
       Error err = handler->handle(http_frame_, clientInfo, response_header_, response_body_);
       if (!err) {
@@ -108,6 +113,8 @@ int HttpServerConnection::handleEvents(int evtFlags)
         // Empty body payload, so switch to waiting for the next request.
         state_ = State::ReadRequest;
         http_frame_.finishRequest();
+        auto dur = SteadyTime::now() - request_start_;
+        MINIROS_INFO("Served HTTP response in %fms", dur.toSec()*1000);
         return POLLIN;
       }
       state_ = State::WriteResponseBody;
@@ -128,6 +135,8 @@ int HttpServerConnection::handleEvents(int evtFlags)
         state_ = State::ReadRequest;
         http_frame_.finishRequest();
         data_sent_ = 0;
+        auto dur = SteadyTime::now() - request_start_;
+        MINIROS_INFO("Served HTTP response in %fms", dur.toSec()*1000);
         return POLLIN;
       }
       // Failed to write all data, so we need to yield to spinner.

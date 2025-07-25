@@ -29,13 +29,14 @@
 
 #include <sstream>
 
+#include "miniros/file_log.h"
 #include "miniros/master_link.h"
 #include "miniros/rosassert.h"
-#include "miniros/file_log.h"
 #include "miniros/transport/io.h"
 #include "miniros/transport/network.h"
 #include "miniros/transport/rpc_manager.h"
 
+#include "minibag/structures.h"
 #include "miniros/transport/xmlrpc_handler.h"
 
 #include "miniros/xmlrpcpp/XmlRpcServerConnection.h"
@@ -82,7 +83,7 @@ private:
 class XMLRPCCallWrapperEx : public XmlRpcServerMethod
 {
 public:
-  XMLRPCCallWrapperEx(const std::string& function_name, const XMLRPCFuncEx& cb, XmlRpcServer *s)
+  XMLRPCCallWrapperEx(const std::string& function_name, const XMLRPCFuncEx& cb, XmlRpcMethods *s)
   : XmlRpcServerMethod(function_name, s)
   , m_func(cb)
   { }
@@ -491,5 +492,119 @@ bool RPCManager::isShuttingDown() const
 {
   return shutting_down_;
 }
+
+XmlRpcValue generateFaultResponse(std::string const& errorMsg, int errorCode=-1)
+{
+  XmlRpcValue faultStruct;
+  faultStruct["faultCode"] = errorCode;
+  faultStruct["faultString"] = errorMsg;
+  return faultStruct;
+}
+
+bool RPCManager::executeLocalMethod(const std::string& methodName, const RpcValue& request, RpcValue& response)
+{
+  XmlRpcServerMethod* method = server_.findMethod(methodName);
+
+  if ( ! method) return false;
+
+  network::ClientInfo clientInfo;
+  clientInfo.sameProcess = true;
+  method->execute(request, response, clientInfo);
+
+  // Ensure a valid result value
+  if ( !response.valid())
+    response = std::string();
+
+  return true;
+}
+
+namespace {
+const char SYSTEM_MULTICALL[] = "system.multicall";
+const char METHODNAME[] = "methodName";
+const char PARAMS[] = "params";
+
+const char FAULTCODE[] = "faultCode";
+const char FAULTSTRING[] = "faultString";
+}
+
+bool RPCManager::executeLocalMulticall(const std::string& method, const RpcValue& request, RpcValue& response)
+{
+  // Multicall XMLRPC requests are the ancient evil. It appeared in the age of HTTP1.0, where TCP connection was terminated
+  // after each request, so sending the sequence of HTTP/XMLRPC requests was very expensive. HTTP1.1 has inherent
+  // KeepAlive=true. And even then, the only multicall request is sent only when node is exiting and trying to unregister
+  // all of its subscriptions, publications and services. It could be done by just creating additional "unregisterMe"
+  // request.
+
+  if (method != SYSTEM_MULTICALL)
+    return false;
+
+  // There ought to be 1 parameter, an array of structs
+  if (request.size() != 1 || request[0].getType() != XmlRpcValue::TypeArray)
+    throw XmlRpcException(std::string(SYSTEM_MULTICALL) + ": Invalid argument (expected an array)");
+
+  int nc = request[0].size();
+  response.setSize(nc);
+
+  for (int i=0; i<nc; ++i) {
+
+    if ( ! request[0][i].hasMember(METHODNAME) || ! request[0][i].hasMember(PARAMS))
+    {
+      response[i][FAULTCODE] = -1;
+      response[i][FAULTSTRING] = std::string(SYSTEM_MULTICALL) +
+              ": Invalid argument (expected a struct with members methodName and params)";
+      continue;
+    }
+
+    const std::string& methodName = request[0][i][METHODNAME];
+    XmlRpcValue& methodParams = request[0][i][PARAMS];
+
+    XmlRpcValue resultValue;
+    resultValue.setSize(1);
+    try {
+      if ( ! executeLocalMethod(methodName, methodParams, resultValue[0]) &&
+           ! executeLocalMulticall(methodName, request, resultValue[0]))
+      {
+        response[i][FAULTCODE] = -1;
+        response[i][FAULTSTRING] = methodName + ": unknown method name";
+      }
+      else {
+        response[i] = resultValue;
+      }
+    } catch (const XmlRpcException& fault) {
+      response[i][FAULTCODE] = fault.getCode();
+      response[i][FAULTSTRING] = fault.getMessage();
+    }
+  }
+
+  return true;
+}
+
+Error RPCManager::executeLocalRPC(const std::string& method, const RpcValue& request, RpcValue& response)
+{
+  try {
+    if (!executeLocalMethod(method, request, response) && ! executeLocalMulticall(method, request, response))
+      response = generateFaultResponse(method + ": unknown method name");
+  } catch (const XmlRpcException& fault) {
+    MINIROS_ERROR("executeLocalRPC::executeLocalRPC: fault %s.", fault.getMessage().c_str());
+    response = generateFaultResponse(fault.getMessage(), fault.getCode());
+  }
+  return Error::Ok;
+}
+
+bool RPCManager::isLocalRPC(const std::string& host, int port) const
+{
+  return getServerPort() == port;
+}
+
+void RPCManager::setMaster()
+{
+  is_master_ = true;
+}
+
+bool RPCManager::isMaster() const
+{
+  return is_master_;
+}
+
 
 } // namespace miniros

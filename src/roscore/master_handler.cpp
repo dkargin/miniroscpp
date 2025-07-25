@@ -185,7 +185,7 @@ ReturnStruct MasterHandler::registerSubscriber(const RequesterInfo& requesterInf
   rtn.statusCode = 1;
 
   rtn.value = RpcValue::Array(publishers.size());
-  for (int i = 0; i < publishers.size(); i++) {
+  for (size_t i = 0; i < publishers.size(); i++) {
     if (publishers[i]) {
       std::string strUrl;
       if (publishers[i] != ref) {
@@ -243,7 +243,7 @@ ReturnStruct MasterHandler::registerPublisher(const RequesterInfo& requesterInfo
   rtn.statusMessage = ss.str();
   rtn.statusCode = 1;
   rtn.value = RpcValue::Array(subscribers.size());
-  for (int i = 0; i < subscribers.size(); i++) {
+  for (size_t i = 0; i < subscribers.size(); i++) {
     if (!subscribers[i])
       continue;
     network::URL url = m_resolver.resolveAddressFor(subscribers[i], requesterInfo.clientAddress, requesterInfo.localAddress);

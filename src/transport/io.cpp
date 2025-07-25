@@ -74,6 +74,7 @@ int last_socket_error()
   return errno;
 #endif
 }
+
 const char* last_socket_error_string()
 {
 #ifdef WIN32

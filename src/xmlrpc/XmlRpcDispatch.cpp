@@ -226,18 +226,10 @@ void XmlRpcDispatch::clear()
 
 double XmlRpcDispatch::getTime()
 {
-#ifdef USE_FTIME
-  struct timeb	tbuff;
-
-  ftime(&tbuff);
-  return ((double) tbuff.time + ((double)tbuff.millitm / 1000.0) +
-	  ((double) tbuff.timezone * 60));
-#else
   uint32_t sec, nsec;
 
   miniros::clock::steadytime(sec, nsec);
   return ((double)sec + (double)nsec / 1e9);
-#endif /* USE_FTIME */
 }
 
 

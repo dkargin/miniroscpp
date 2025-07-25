@@ -77,10 +77,12 @@ MINIROS_DECL bool readRemoteAddress(int sockfd, NetAddress& address);
 MINIROS_DECL bool fillAddress(const sockaddr_in& sysAddr, NetAddress& address);
 
 /// Information about connection to client.
-struct ClientInfo {
+struct MINIROS_DECL ClientInfo {
   NetAddress remoteAddress;
   NetAddress localAddress;
-  int fd = 0;
+  int fd = -1;
+
+  bool sameProcess = false;
 };
 
 } // namespace network

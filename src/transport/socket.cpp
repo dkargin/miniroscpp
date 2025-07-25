@@ -141,7 +141,8 @@ Error NetSocket::tcpListen(int port, NetAddress::Type type, int maxQueuedClients
 std::pair<std::shared_ptr<NetSocket>, Error> NetSocket::accept()
 {
   sockaddr_in addr;
-  size_t addrlen = sizeof(addr);
+
+  socklen_t addrlen = sizeof(addr);
   // accept will truncate the address if the buffer is too small.
   // As we are not using it, no special case for IPv6
   // has to be made.
