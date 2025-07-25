@@ -469,10 +469,10 @@ void TransportTCP::close()
 
         disconnect_cb = disconnect_cb_;
 
-        disconnect_cb_ = Callback();
-        read_cb_ = Callback();
-        write_cb_ = Callback();
-        accept_cb_ = AcceptCallback();
+        disconnect_cb_ = {};
+        read_cb_ = {};
+        write_cb_ = {};
+        accept_cb_ = {};
       }
     }
   }

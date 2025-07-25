@@ -221,10 +221,10 @@ void PollSet::update(int poll_timeout)
   }
   else
   {
-    for (std::vector<socket_pollfd>::iterator it = ofds->begin() ; it != ofds->end(); ++it)
+    for (const socket_pollfd& spfd:  *ofds)
     {
-      int fd = it->fd;
-      int revents = it->revents;
+      int fd = spfd.fd;
+      int revents = spfd.revents;
       SocketUpdateFunc func;
       TransportPtr transport;
       int events = 0;
@@ -235,14 +235,14 @@ void PollSet::update(int poll_timeout)
       }
       {
         std::scoped_lock<std::mutex> lock(socket_info_mutex_);
-        M_SocketInfo::iterator it = socket_info_.find(fd);
+        M_SocketInfo::iterator it2 = socket_info_.find(fd);
         // the socket has been entirely deleted
-        if (it == socket_info_.end())
+        if (it2 == socket_info_.end())
         {
           continue;
         }
 
-        const SocketInfo& info = it->second;
+        const SocketInfo& info = it2->second;
 
         // Store off the function and transport in case the socket is deleted from another thread
         func = info.func_;
@@ -250,13 +250,13 @@ void PollSet::update(int poll_timeout)
         events = info.events_;
       }
 
-      // If these are registered events for this socket, OR the events are ERR/HUP/NVAL,
-      // call through to the registered function
-      if (func
-          && ((events & revents)
+      bool hasEvents = ((events & revents)
               || (revents & POLLERR)
               || (revents & POLLHUP)
-              || (revents & POLLNVAL)))
+              || (revents & POLLNVAL));
+      // If these are registered events for this socket, OR the events are ERR/HUP/NVAL,
+      // call through to the registered function
+      if (func && hasEvents)
       {
         bool skip = false;
         if (revents & (POLLNVAL|POLLERR|POLLHUP))

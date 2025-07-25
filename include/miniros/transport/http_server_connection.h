@@ -30,14 +30,16 @@ public:
   enum class State {
     ReadRequest,
     ProcessRequest,
-    WriteResponseHeader,
-    WriteResponseBody
+    WriteResponse,
   };
 
   /// Incremental reading of request.
   Error readRequest();
 
   void resetResponse();
+
+  /// Close connection.
+  void close();
 
 protected:
   State state_ = State::ReadRequest;

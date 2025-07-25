@@ -64,7 +64,7 @@ XmlRpc::XmlRpcValue responseInt(int code, const std::string& msg, int response)
 class XMLRPCCallWrapper : public XmlRpcServerMethod
 {
 public:
-  XMLRPCCallWrapper(const std::string& function_name, const XMLRPCFunc& cb, XmlRpcServer *s)
+  XMLRPCCallWrapper(const std::string& function_name, const XMLRPCFunc& cb, XmlRpcMethods *s)
   : XmlRpcServerMethod(function_name, s)
   , m_func(cb)
   { }
@@ -172,8 +172,6 @@ void RPCManager::shutdown()
   if (server_thread_.joinable())
       server_thread_.join();
 
-  server_.close();
-
   // kill the last few clients that were started in the shutdown process
   {
     std::scoped_lock<std::mutex> lock(clients_mutex_);
@@ -208,7 +206,7 @@ void RPCManager::shutdown()
     auto end = connections_.end();
     for (; it != end; ++it)
     {
-      (*it)->removeFromDispatch(server_.get_dispatch());
+      (*it)->removeFromDispatch(http_server_->getPollSet());
     }
   }
 
@@ -280,23 +278,20 @@ void RPCManager::serverThreadFunc()
 
   while(!shutting_down_)
   {
+
     {
-      std::scoped_lock<std::mutex> lock(added_connections_mutex_);
+      std::unique_lock<std::mutex> lock(added_connections_mutex_);
+      connections_event_.wait_for(lock, std::chrono::milliseconds(100));
+
       auto it = added_connections_.begin();
       auto end = added_connections_.end();
       for (; it != end; ++it)
       {
-        (*it)->addToDispatch(server_.get_dispatch());
+        (*it)->addToDispatch(http_server_->getPollSet());
         connections_.insert(*it);
       }
 
       added_connections_.clear();
-    }
-
-    // Update the XMLRPC server, blocking for at most 100ms in select()
-    {
-      std::scoped_lock<std::mutex> lock(functions_mutex_);
-      server_.work(0.1);
     }
 
     while (unbind_requested_)
@@ -310,6 +305,7 @@ void RPCManager::serverThreadFunc()
     }
 
     {
+      // Lazy check for removed connections.
       for (auto& connection: connections_)
       {
         if (connection->check())
@@ -323,7 +319,7 @@ void RPCManager::serverThreadFunc()
       auto end = removed_connections_.end();
       for (; it != end; ++it)
       {
-        (*it)->removeFromDispatch(server_.get_dispatch());
+        (*it)->removeFromDispatch(http_server_->getPollSet());
         connections_.erase(*it);
       }
 
@@ -416,12 +412,14 @@ void RPCManager::addASyncConnection(const ASyncXMLRPCConnectionPtr& conn)
 {
   std::scoped_lock<std::mutex> lock(added_connections_mutex_);
   added_connections_.insert(conn);
+  connections_event_.notify_all();
 }
 
 void RPCManager::removeASyncConnection(const ASyncXMLRPCConnectionPtr& conn)
 {
   std::scoped_lock<std::mutex> lock(removed_connections_mutex_);
   removed_connections_.insert(conn);
+  connections_event_.notify_all();
 }
 
 bool RPCManager::bind(const std::string& function_name, const XMLRPCFunc& cb)

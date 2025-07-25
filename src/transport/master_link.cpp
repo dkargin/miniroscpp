@@ -277,7 +277,7 @@ Error MasterLink::execute(const std::string& method, const RpcValue& request, Rp
     return Error::ShutdownInterrupt;
   }
   auto time = SteadyTime::now() - start_time;
-  MINIROS_INFO("Finished \"%s\" in %fms", method.c_str(), time.toSec()*1000.0);
+  //MINIROS_DEBUG("Finished \"%s\" in %fms", method.c_str(), time.toSec()*1000.0);
   return Error::Ok;;
 }
 
@@ -308,11 +308,11 @@ void MasterLink::set(const std::string& key, const RpcValue& v)
   params[2] = v;
 
   {
-    // Lock around the execute to the master in case we get a parameter update on this value between
-    // executing on the master and setting the parameter in the g_params list.
-    std::scoped_lock<std::mutex> lock(internal_->params_mutex);
-
     if (this->execute("setParam", params, result, payload, true)) {
+      // Lock around the execute to the master in case we get a parameter update on this value between
+      // executing on the master and setting the parameter in the g_params list.
+      std::scoped_lock<std::mutex> lock(internal_->params_mutex);
+
       // Update our cached params list now so that if get() is called immediately after param::set()
       // we already have the cached state and our value will be correct
       if (internal_->subscribed_params.find(mapped_key) != internal_->subscribed_params.end()) {

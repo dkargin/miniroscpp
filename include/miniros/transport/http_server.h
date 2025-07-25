@@ -11,11 +11,6 @@
 #include "miniros/transport/http_tools.h"
 #include "poll_set.h"
 
-namespace XmlRpc {
-class XmlRpcServer;
-class XmlRpcValue;
-}
-
 namespace miniros {
 namespace network {
 

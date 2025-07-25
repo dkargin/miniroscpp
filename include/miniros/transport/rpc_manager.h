@@ -28,6 +28,7 @@
 #ifndef MINIROS_XMLRPC_MANAGER_H
 #define MINIROS_XMLRPC_MANAGER_H
 
+#include <condition_variable>
 #include <string>
 #include <set>
 #include <memory>
@@ -69,9 +70,10 @@ class MINIROS_DECL ASyncXMLRPCConnection : public std::enable_shared_from_this<A
 public:
   virtual ~ASyncXMLRPCConnection() {}
 
-  virtual void addToDispatch(XmlRpc::XmlRpcDispatch* disp) = 0;
-  virtual void removeFromDispatch(XmlRpc::XmlRpcDispatch* disp) = 0;
+  virtual void addToDispatch(PollSet* disp) = 0;
+  virtual void removeFromDispatch(PollSet* disp) = 0;
 
+  // Check if connection can be removed.
   virtual bool check() = 0;
 };
 typedef std::shared_ptr<ASyncXMLRPCConnection> ASyncXMLRPCConnectionPtr;
@@ -287,7 +289,7 @@ private:
   // OSX has problems with lots of concurrent xmlrpc calls
   std::mutex xmlrpc_call_mutex_;
 #endif
-  XmlRpc::XmlRpcServer server_;
+  XmlRpc::XmlRpcMethods server_;
 
   std::unique_ptr<network::HttpServer> http_server_;
   std::vector<CachedXmlRpcClient> clients_;
@@ -299,6 +301,7 @@ private:
 
   std::set<ASyncXMLRPCConnectionPtr> added_connections_;
   std::mutex added_connections_mutex_;
+  std::condition_variable connections_event_;
   std::set<ASyncXMLRPCConnectionPtr> removed_connections_;
   std::mutex removed_connections_mutex_;
 

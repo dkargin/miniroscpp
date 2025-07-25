@@ -46,6 +46,7 @@
 #include <vector>
 
 #include "miniros/common.h"
+#include "miniros/transport/net_address.h"
 
 #ifdef WIN32
 	#define WIN32_LEAN_AND_MEAN
@@ -215,6 +216,12 @@ inline void close_signal_pair(signal_fd_t signal_pair[2]) {
 	}
 #endif
 
+namespace network {
+
+/// Fill in net address by values from socket API.
+MINIROS_DECL bool fillAddress(const sockaddr_in& sysAddr, NetAddress& address);
+
+}
 } // namespace miniros
 
 #endif /* MINIROSCPP_IO_H_ */
