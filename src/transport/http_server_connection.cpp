@@ -30,24 +30,24 @@ Error HttpServerConnection::readRequest()
   const int parsed = http_frame_.incrementalParse();
 
   double dur = (SteadyTime::now() - request_start_).toSec() * 1000;
-  MINIROS_INFO("HttpServerConnection(%d)::readHeader: ContentLength=%d, parsed=%d t=%fms", fd, http_frame_.contentLength(), parsed, dur);
+  MINIROS_DEBUG("HttpServerConnection(%d)::readHeader: ContentLength=%d, parsed=%d t=%fms", fd, http_frame_.contentLength(), parsed, dur);
 
   // If we haven't gotten the entire request yet, return (keep reading)
   if (http_frame_.state() != HttpFrame::ParseComplete) {
     if (readErr == Error::EndOfFile) {
-      MINIROS_ERROR("HttpServerConnection(%d)::readRequest: EOF while reading request", fd);
+      MINIROS_DEBUG("HttpServerConnection(%d)::readRequest: EOF while reading request", fd);
       http_frame_.finishRequest();
       return Error::EndOfFile;
       // Either way we close the connection
     }
-    MINIROS_INFO("HttpServerConnection(%d)::readRequest got only %d/%d bytes.", fd, http_frame_.bodyLength(), http_frame_.contentLength());
+    MINIROS_DEBUG("HttpServerConnection(%d)::readRequest got only %d/%d bytes.", fd, http_frame_.bodyLength(), http_frame_.contentLength());
     return Error::Ok;
   }
 
   assert(http_frame_.state() == miniros::network::HttpFrame::ParseComplete);
   auto body = http_frame_.body();
   // Otherwise, parse and dispatch the request
-  MINIROS_INFO("HttpServerConnection(%d)::readRequest read %d/%d bytes.", fd, http_frame_.bodyLength(), http_frame_.contentLength());
+  MINIROS_DEBUG("HttpServerConnection(%d)::readRequest read %d/%d bytes.", fd, http_frame_.bodyLength(), http_frame_.contentLength());
   state_ = State::ProcessRequest;
   return Error::Ok;
 }
@@ -67,7 +67,6 @@ int HttpServerConnection::handleEvents(int evtFlags)
         }
       }
       else if (err == Error::EndOfFile) {
-        MINIROS_WARN("HttpServerConnection(%d) - got EOF", socket_->fd());
         // Returning 0 will make this connection be closed.
         return 0;
       } else {
@@ -94,7 +93,7 @@ int HttpServerConnection::handleEvents(int evtFlags)
       ClientInfo clientInfo;
       clientInfo.fd = socket_->fd();
       clientInfo.remoteAddress = socket_->peerAddress();
-      MINIROS_INFO("Handling HTTP request to %s", endpoint.c_str());
+      MINIROS_DEBUG("Handling HTTP request to %s", endpoint.c_str());
       Error err = handler->handle(http_frame_, clientInfo, response_header_, response_body_);
       if (!err) {
         // TODO: What to do?
@@ -126,7 +125,7 @@ int HttpServerConnection::handleEvents(int evtFlags)
       if (written > 0) {
         data_sent_ += written;
         double dur = (SteadyTime::now() - request_start_).toSec() * 1000;
-        MINIROS_INFO_NAMED("HttpServerConnection", "Written %d/%d bytes of header, t=%fms",
+        MINIROS_DEBUG("HttpServerConnection written %d/%d bytes of header, t=%fms",
           static_cast<int>(written), static_cast<int>(totalSize), dur);
       }
 
@@ -142,7 +141,7 @@ int HttpServerConnection::handleEvents(int evtFlags)
         state_ = State::ReadRequest;
         http_frame_.finishRequest();
         auto dur = SteadyTime::now() - request_start_;
-        MINIROS_INFO("Served HTTP response in %fms", dur.toSec()*1000);
+        MINIROS_DEBUG("Served HTTP response in %fms", dur.toSec()*1000);
         return POLLIN;
       } else {
         MINIROS_ERROR("HttpServerConnection writeResponse error: %s", err.toString());
