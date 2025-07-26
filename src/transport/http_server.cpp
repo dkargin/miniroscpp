@@ -6,6 +6,7 @@
 
 #include "miniros/transport/http_server.h"
 #include "miniros/transport/http_server_connection.h"
+#include "miniros/transport/io.h"
 
 #include "miniros/transport/xmlrpc_handler.h"
 

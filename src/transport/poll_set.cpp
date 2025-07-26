@@ -35,9 +35,12 @@
 #define MINIROS_PACKAGE_NAME "poll_set"
 
 #include <algorithm>
-#include <fcntl.h>
+#include <vector>
+#include <map>
 
 #include "miniros/transport/poll_set.h"
+#include "miniros/transport/io.h"
+
 #include "miniros/file_log.h"
 
 #include "miniros/transport/transport.h"

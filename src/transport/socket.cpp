@@ -20,7 +20,7 @@ namespace miniros {
 namespace network {
 
 struct NetSocket::Internal {
-  int fd = -1;
+  socket_fd_t fd = MINIROS_INVALID_SOCKET;
   /// Do we own the FD and close it on exit.
   bool own = false;
 
@@ -33,9 +33,9 @@ struct NetSocket::Internal {
   /// Close socket and reset all data.
   void close()
   {
-    if (own && fd != ROS_INVALID_SOCKET) {
+    if (own && fd != MINIROS_INVALID_SOCKET) {
       close_socket(fd);
-      fd = ROS_INVALID_SOCKET;
+      fd = MINIROS_INVALID_SOCKET;
     }
     own = false;
     listening = false;
@@ -124,7 +124,7 @@ int NetSocket::port() const
 
 bool NetSocket::valid() const
 {
-  return internal_->fd != ROS_INVALID_SOCKET;
+  return internal_->fd != MINIROS_INVALID_SOCKET;
 }
 
 int NetSocket::fd() const
