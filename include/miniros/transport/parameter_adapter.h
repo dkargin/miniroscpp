@@ -25,8 +25,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ROSCPP_PARAMETER_ADAPTER_H
-#define ROSCPP_PARAMETER_ADAPTER_H
+#ifndef MINIROS_PARAMETER_ADAPTER_H
+#define MINIROS_PARAMETER_ADAPTER_H
 
 #include "miniros/internal/forwards.h"
 #include "miniros/message_event.h"
@@ -176,4 +176,4 @@ struct ParameterAdapter<const miniros::MessageEvent<M>& >
 
 }
 
-#endif // ROSCPP_PARAMETER_ADAPTER_H
+#endif

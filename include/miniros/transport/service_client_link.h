@@ -25,8 +25,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ROSCPP_SERVICE_CLIENT_LINK_H
-#define ROSCPP_SERVICE_CLIENT_LINK_H
+#ifndef MINIROS_SERVICE_CLIENT_LINK_H
+#define MINIROS_SERVICE_CLIENT_LINK_H
 
 #include "miniros/macros.h"
 #include "miniros/common.h"
