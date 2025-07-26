@@ -32,8 +32,8 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ROSCPP_ROSOUT_APPENDER_H
-#define ROSCPP_ROSOUT_APPENDER_H
+#ifndef MINIROS_ROSOUT_APPENDER_H
+#define MINIROS_ROSOUT_APPENDER_H
 
 #include <miniros/message_forward.h>
 #include "miniros/common.h"

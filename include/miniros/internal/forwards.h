@@ -25,8 +25,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ROSCPP_FORWARDS_H
-#define ROSCPP_FORWARDS_H
+#ifndef MINIROS_FORWARDS_H
+#define MINIROS_FORWARDS_H
 
 #include <string>
 #include <vector>

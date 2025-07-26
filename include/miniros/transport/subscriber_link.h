@@ -25,8 +25,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ROSCPP_SUBSCRIBER_LINK_H
-#define ROSCPP_SUBSCRIBER_LINK_H
+#ifndef MINIROS_SUBSCRIBER_LINK_H
+#define MINIROS_SUBSCRIBER_LINK_H
 
 #include "miniros/common.h"
 #include "miniros/macros.h"
@@ -91,6 +91,4 @@ protected:
 
 } // namespace miniros
 
-#endif // ROSCPP_SUBSCRIBER_LINK_H
-
-
+#endif

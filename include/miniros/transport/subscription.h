@@ -25,8 +25,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ROSCPP_SUBSCRIPTION_H
-#define ROSCPP_SUBSCRIPTION_H
+#ifndef MINIROS_SUBSCRIPTION_H
+#define MINIROS_SUBSCRIPTION_H
 
 #include <queue>
 
@@ -246,4 +246,3 @@ private:
 }
 
 #endif
-
