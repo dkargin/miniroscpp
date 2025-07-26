@@ -25,8 +25,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ROSCPP_POLL_MANAGER_H
-#define ROSCPP_POLL_MANAGER_H
+#ifndef MINIROS_POLL_MANAGER_H
+#define MINIROS_POLL_MANAGER_H
 
 #include <atomic>
 #include <thread>

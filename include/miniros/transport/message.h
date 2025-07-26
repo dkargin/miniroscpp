@@ -25,8 +25,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ROSCPP_MESSAGE_H
-#define ROSCPP_MESSAGE_H
+#ifndef MINIROS_MESSAGE_H
+#define MINIROS_MESSAGE_H
 
 // #warning You should not be using this file
 

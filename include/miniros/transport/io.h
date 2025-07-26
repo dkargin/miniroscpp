@@ -37,6 +37,10 @@
 #ifndef MINIROSCPP_IO_H_
 #define MINIROSCPP_IO_H_
 
+/// Some guard against leaking internal headers to user.
+#ifndef MINIROS_INTERNAL_HEADER
+#define MINIROS_INTERNAL_HEADER
+#endif
 /*****************************************************************************
 ** Includes
 *****************************************************************************/
