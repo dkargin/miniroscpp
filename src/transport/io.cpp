@@ -35,7 +35,10 @@
 ** Includes
 *****************************************************************************/
 
+#include "internal_config.h"
+
 #include "miniros/common.h"
+
 
 #include <errno.h>             // for EFAULT and co.
 #include <miniros/rosassert.h> // don't need if we dont call the pipe functions.
