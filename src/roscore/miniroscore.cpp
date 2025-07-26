@@ -14,6 +14,7 @@
 #include "miniros/xmlrpcpp/XmlRpcUtil.h"
 
 #include "miniros/common.h"
+#include "miniros/transport/poll_manager.h"
 
 /// This define is injected in replacements/CMakeLists.txt
 #ifdef USE_LOCAL_PROGRAM_OPTIONS
@@ -98,15 +99,7 @@ int main(int argc, const char ** argv) {
   bool dumpParameters = vm["dump_parameters"].as<bool>();
 
   MINIROS_INFO("Creating RPCManager");
-
-  // Standalone RPC manager for rosmaster.
-  bool unifiedRpc = vm["unified_rpc"].as<bool>();
-
-  std::shared_ptr<miniros::RPCManager> masterRpcManager;
-  if (unifiedRpc)
-    masterRpcManager = miniros::RPCManager::instance();
-  else
-    masterRpcManager = std::make_shared<miniros::RPCManager>();
+  std::shared_ptr<miniros::RPCManager> masterRpcManager = miniros::RPCManager::instance();
 
   MINIROS_INFO("Creating Master object");
   miniros::master::Master master(masterRpcManager);
@@ -115,8 +108,14 @@ int main(int argc, const char ** argv) {
   master.setDumpParameters(dumpParameters);
 
   MINIROS_INFO("Starting Master thread");
-  master.start();
+  miniros::PollManagerPtr pm = miniros::PollManager::instance();
+  if (!master.start(&pm->getPollSet())) {
+    MINIROS_ERROR("Failed to start Master");
+    return EXIT_FAILURE;
+  }
 
+  // Manually starting poll manager, since Rosout can already need network connection.
+  pm->start();
   std::unique_ptr<miniros::master::Rosout> r;
   if (useRosout) {
     std::map<std::string, std::string> remappings;

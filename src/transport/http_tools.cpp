@@ -249,5 +249,39 @@ bool HttpFrame::hasHeader() const
   return m_state == HttpFrame::ParseBody || m_state == ParseComplete;
 }
 
+
+void HttpResponseHeader::reset()
+{
+  statusCode = 200;
+  contentType.clear();
+  server.clear();
+  status.clear();
+}
+
+void HttpResponseHeader::writeHeader(std::string& output, size_t bodySize) const
+{
+  output += "HTTP/1.1 ";
+  output += std::to_string(statusCode);
+  output += status;
+  output += "\r\n";
+
+  if (!server.empty()) {
+    output += "Server: ";
+    output += server; // XMLRPC_VERSION
+    output += "\r\n";
+  }
+  output += "Content-Type: ";
+  output += contentType;
+  output += "\r\n";
+
+  if (bodySize > 0) {
+    output += "Content-Length: ";
+    output += std::to_string(bodySize);
+    output += "\r\n";
+  }
+
+  output += "\r\n";
+}
+
 } // namespace network
 } // namespace miniros

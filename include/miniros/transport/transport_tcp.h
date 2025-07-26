@@ -169,5 +169,4 @@ private:
 
 }
 
-#endif // MINIROS_TRANSPORT_TCP_H
-
+#endif

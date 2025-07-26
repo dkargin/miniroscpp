@@ -2,6 +2,7 @@
 #include <cstring>
 #include <cstdlib>
 
+#include "miniros/transport/net_address.h"
 #include "xmlrpcpp/XmlRpcServerConnection.h"
 
 #include "xmlrpcpp/XmlRpc.h"
@@ -232,15 +233,16 @@ std::string XmlRpcServerConnection::parseRequest(XmlRpcValue& params)
 }
 
 // Execute a named method with the specified params.
-bool
-XmlRpcServerConnection::executeMethod(const std::string& methodName, 
+bool XmlRpcServerConnection::executeMethod(const std::string& methodName,
                                       XmlRpcValue& params, XmlRpcValue& result)
 {
   XmlRpcServerMethod* method = _server->findMethod(methodName);
 
   if ( ! method) return false;
 
-  method->execute(params, result, this);
+  miniros::network::ClientInfo clientInfo;
+  clientInfo.fd = getfd();
+  method->execute(params, result, clientInfo);
 
   // Ensure a valid result value
   if ( !result.valid())

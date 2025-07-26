@@ -25,8 +25,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ROSCPP_EXCEPTIONS_H
-#define ROSCPP_EXCEPTIONS_H
+#ifndef MINIROS_EXCEPTIONS_H
+#define MINIROS_EXCEPTIONS_H
 
 #include <miniros/exception.h>
 

@@ -13,9 +13,11 @@
 # include <string>
 #endif
 
+#include "XmlRpcDecl.h"
 #include "XmlRpcDispatch.h"
 #include "XmlRpcSource.h"
-#include "XmlRpcDecl.h"
+
+#include <chrono>
 
 namespace XmlRpc {
 
@@ -76,9 +78,10 @@ namespace XmlRpc {
 
     /// Get some printable debug name.
     /// It often contains file descriptor and URL of endpoint.
-    std::string name() const;
+    const std::string& name() const;
 
   protected:
+    void updateName();
     // Execution processing helpers
     virtual bool doConnect();
     virtual bool setupConnection();
@@ -140,6 +143,14 @@ namespace XmlRpc {
 
     // Event dispatcher
     XmlRpcDispatch _disp;
+
+    std::chrono::steady_clock::time_point _timeRequestStart;
+    std::chrono::steady_clock::time_point _timeRequestSent;
+    std::chrono::steady_clock::time_point _timeResponseHeader;
+    std::chrono::steady_clock::time_point _timeResponseBody;
+
+    /// Debug name.
+    std::string _name;
 
   };	// class XmlRpcClient
 

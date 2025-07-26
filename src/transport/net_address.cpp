@@ -91,23 +91,23 @@ bool NetAddress::isLocal() const
   return address == "127.0.0.1" || address == "localhost";
 }
 
-bool fillAddress(const sockaddr_in& my_addr, NetAddress& address)
+bool fillAddress(const sockaddr_in& sysAddr, NetAddress& address)
 {
   address.reset();
 
-  if (my_addr.sin_family == AF_INET) {
+  if (sysAddr.sin_family == AF_INET) {
     address.type = NetAddress::AddressIPv4;
-    address.port = ntohs(my_addr.sin_port);
-  } else if (my_addr.sin_family == AF_INET6) {
+    address.port = ntohs(sysAddr.sin_port);
+  } else if (sysAddr.sin_family == AF_INET6) {
     address.type = NetAddress::AddressIPv6;
-    address.port = ntohs(my_addr.sin_port);
+    address.port = ntohs(sysAddr.sin_port);
   } else {
     address.type = NetAddress::AddressInvalid;
     return false;
   }
 
   char ipBuffer[255];
-  if (!inet_ntop(my_addr.sin_family, &my_addr.sin_addr, ipBuffer, sizeof(ipBuffer))) {
+  if (!inet_ntop(sysAddr.sin_family, &sysAddr.sin_addr, ipBuffer, sizeof(ipBuffer))) {
     address.port = 0;
     return false;
   }
@@ -116,7 +116,7 @@ bool fillAddress(const sockaddr_in& my_addr, NetAddress& address)
   size_t size = getAddressSize(address.type);
   sockaddr_in* outAddr = static_cast<sockaddr_in*>(malloc(size));
   address.rawAddress = outAddr;
-  memcpy(outAddr, &my_addr, size);
+  memcpy(outAddr, &sysAddr, size);
   return true;
 }
 

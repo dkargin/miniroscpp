@@ -32,8 +32,8 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ROSCPP_TRANSPORT_UDP_H
-#define ROSCPP_TRANSPORT_UDP_H
+#ifndef MINIROS_TRANSPORT_UDP_H
+#define MINIROS_TRANSPORT_UDP_H
 
 #include <mutex>
 
@@ -173,5 +173,4 @@ private:
 
 }
 
-#endif // ROSCPP_TRANSPORT_UDP_H
-
+#endif

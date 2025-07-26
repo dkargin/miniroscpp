@@ -25,8 +25,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ROSCPP_STATISTICS_H
-#define ROSCPP_STATISTICS_H
+#ifndef MINIROS_STATISTICS_H
+#define MINIROS_STATISTICS_H
 
 #include <list>
 #include <map>

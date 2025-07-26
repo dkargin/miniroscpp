@@ -25,8 +25,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ROSCPP_SERVICE_PUBLICATION_H
-#define ROSCPP_SERVICE_PUBLICATION_H
+#ifndef MINIROS_SERVICE_PUBLICATION_H
+#define MINIROS_SERVICE_PUBLICATION_H
 
 #include "miniros/transport/service_callback_helper.h"
 #include "miniros/common.h"
@@ -110,4 +110,4 @@ typedef std::shared_ptr<ServicePublication> ServicePublicationPtr;
 
 }
 
-#endif // ROSCPP_SERVICE_PUBLICATION_H
+#endif
