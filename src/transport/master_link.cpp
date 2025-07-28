@@ -56,13 +56,11 @@ struct MasterLink::Internal {
 #if defined(__APPLE__)
   std::mutex xmlrpc_call_mutex;
 #endif
-
-  Internal(const std::shared_ptr<RPCManager>& rpcManager) : rpcManager(rpcManager) {}
 };
 
-MasterLink::MasterLink(const std::shared_ptr<RPCManager>& rpcManager) : internal_(nullptr)
+MasterLink::MasterLink() : internal_(nullptr)
 {
-  internal_ = new Internal(rpcManager);
+  internal_ = new Internal();
 }
 
 MasterLink::~MasterLink()
@@ -73,7 +71,7 @@ MasterLink::~MasterLink()
   }
 }
 
-Error MasterLink::initLink(const M_string& remappings)
+Error MasterLink::initLink(const M_string& remappings, const std::shared_ptr<RPCManager>& rpcManager)
 {
   if (!internal_)
     return Error::InternalError;
@@ -108,8 +106,16 @@ Error MasterLink::initLink(const M_string& remappings)
     return Error::InvalidURI;
   }
 
+  internal_->rpcManager = rpcManager;
   return Error::Ok;
 }
+
+/// Stop serving any request.
+void MasterLink::disconnect()
+{
+  internal_->rpcManager.reset();
+}
+
 
 std::string MasterLink::getHost() const
 {
@@ -194,11 +200,16 @@ Error MasterLink::execute(const std::string& method, const RpcValue& request, Rp
 {
   if (!internal_)
     return Error::InternalError;
+
+  RPCManagerPtr manager = internal_->rpcManager;
+  if (!manager) {
+    return Error::NoMaster;
+  }
+
   miniros::SteadyTime start_time = miniros::SteadyTime::now();
 
   std::string master_host = getHost();
   uint32_t master_port = getPort();
-  RPCManagerPtr manager = internal_->rpcManager;
   if (!manager) {
     MINIROS_ERROR("[%s] - no manager", method.c_str());
     return Error::InternalError;
