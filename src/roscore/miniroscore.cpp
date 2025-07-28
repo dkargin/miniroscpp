@@ -98,7 +98,10 @@ int main(int argc, const char ** argv) {
 
   bool dumpParameters = vm["dump_parameters"].as<bool>();
 
-  MINIROS_INFO("Creating RPCManager");
+  MINIROS_INFO("Initializing core transport");
+  const std::map<std::string, std::string> remappings;
+  miniros::init(remappings, "miniroscore", miniros::init_options::NoRosout | miniros::init_options::NoSigintHandler);
+
   std::shared_ptr<miniros::RPCManager> masterRpcManager = miniros::RPCManager::instance();
 
   MINIROS_INFO("Creating Master object");
@@ -109,21 +112,18 @@ int main(int argc, const char ** argv) {
 
   MINIROS_INFO("Starting Master thread");
   miniros::PollManagerPtr pm = miniros::PollManager::instance();
+  if (!pm) {
+    MINIROS_FATAL("No poll manager is available");
+    return EXIT_FAILURE;
+  }
   if (!master.start(&pm->getPollSet())) {
     MINIROS_ERROR("Failed to start Master");
     return EXIT_FAILURE;
   }
 
-  // Manually starting poll manager, since Rosout can already need network connection.
-  pm->start();
   std::unique_ptr<miniros::master::Rosout> r;
   if (useRosout) {
-    std::map<std::string, std::string> remappings;
-
-    remappings["__master"] = master.getUri();
-
     MINIROS_INFO("Creating Rosout object");
-    miniros::init(remappings, "miniroscore", miniros::init_options::NoRosout | miniros::init_options::NoSigintHandler);
     r.reset(new miniros::master::Rosout());
   }
 
