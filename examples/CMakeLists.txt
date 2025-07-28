@@ -23,3 +23,8 @@ target_include_directories(listener PRIVATE ${MINIROS_INCLUDE_GENERATED_DIRS})
 add_executable(log_demo log_demo.cpp)
 target_link_libraries(log_demo roscxx)
 target_include_directories(log_demo PRIVATE ${MINIROS_INCLUDE_GENERATED_DIRS})
+
+# A benchmark for sending messages.
+add_executable(bench_talker bench_talker.cpp)
+target_link_libraries(bench_talker roscxx)
+target_include_directories(bench_talker PRIVATE ${MINIROS_INCLUDE_GENERATED_DIRS})
