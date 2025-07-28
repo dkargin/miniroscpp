@@ -35,15 +35,10 @@
 #ifndef MINIROS_POLL_SET_H
 #define MINIROS_POLL_SET_H
 
-#include <vector>
-#include <map>
 #include <functional>
 #include <mutex>
 
-#include "io.h"
-
 #include "miniros/common.h"
-
 
 namespace miniros
 {
@@ -140,28 +135,8 @@ private:
    */
   void onLocalPipeEvents(int events);
 
-  struct SocketInfo
-  {
-    TransportPtr transport_;
-    SocketUpdateFunc func_;
-    int fd_;
-    int events_;
-  };
-  typedef std::map<int, SocketInfo> M_SocketInfo;
-  M_SocketInfo socket_info_;
-  std::mutex socket_info_mutex_;
-  bool sockets_changed_;
-
-  std::mutex just_deleted_mutex_;
-  typedef std::vector<int> V_int;
-  V_int just_deleted_;
-
-  std::vector<socket_pollfd> ufds_;
-
-  std::mutex signal_mutex_;
-  signal_fd_t signal_pipe_[2];
-
-  int epfd_;
+  struct Internal;
+  std::unique_ptr<Internal> internal_;
 };
 
 }
