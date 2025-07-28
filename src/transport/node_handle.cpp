@@ -492,60 +492,28 @@ SteadyTimer NodeHandle::createSteadyTimer(SteadyTimerOptions& ops) const
 
 void NodeHandle::shutdown()
 {
+  for (auto ptr: collection_->subs_)
   {
-    NodeHandleBackingCollection::V_SubImpl::iterator it = collection_->subs_.begin();
-    NodeHandleBackingCollection::V_SubImpl::iterator end = collection_->subs_.end();
-    for (; it != end; ++it)
-    {
-      Subscriber::ImplPtr impl = it->lock();
-
-      if (impl)
-      {
-        impl->unsubscribe();
-      }
-    }
+    if (Subscriber::ImplPtr impl = ptr.lock())
+      impl->unsubscribe();
   }
 
+  for (auto ptr : collection_->pubs_)
   {
-    NodeHandleBackingCollection::V_PubImpl::iterator it = collection_->pubs_.begin();
-    NodeHandleBackingCollection::V_PubImpl::iterator end = collection_->pubs_.end();
-    for (; it != end; ++it)
-    {
-      Publisher::ImplPtr impl = it->lock();
-
-      if (impl)
-      {
-        impl->unadvertise();
-      }
-    }
+    if (Publisher::ImplPtr impl = ptr.lock())
+      impl->unadvertise();
   }
 
+  for (auto ptr: collection_->srvs_)
   {
-    NodeHandleBackingCollection::V_SrvImpl::iterator it = collection_->srvs_.begin();
-    NodeHandleBackingCollection::V_SrvImpl::iterator end = collection_->srvs_.end();
-    for (; it != end; ++it)
-    {
-      ServiceServer::ImplPtr impl = it->lock();
-
-      if (impl)
-      {
-        impl->unadvertise();
-      }
-    }
+    if (ServiceServer::ImplPtr impl = ptr.lock())
+      impl->unadvertise();
   }
 
+  for (auto ptr: collection_->srv_cs_)
   {
-    NodeHandleBackingCollection::V_SrvCImpl::iterator it = collection_->srv_cs_.begin();
-    NodeHandleBackingCollection::V_SrvCImpl::iterator end = collection_->srv_cs_.end();
-    for (; it != end; ++it)
-    {
-      ServiceClient::ImplPtr impl = it->lock();
-
-      if (impl)
-      {
-        impl->shutdown();
-      }
-    }
+    if (ServiceClient::ImplPtr impl = ptr.lock())
+      impl->shutdown();
   }
 
   ok_ = false;
@@ -553,233 +521,386 @@ void NodeHandle::shutdown()
 
 void NodeHandle::setParam(const std::string& key, const XmlRpc::XmlRpcValue& v) const
 {
-  return getMasterLink()->set(resolveName(key), v);
+  if (auto link = getMasterLink()) {
+    link->set(resolveName(key), v);
+  }
 }
 
 void NodeHandle::setParam(const std::string& key, const std::string& s) const
 {
-  return getMasterLink()->set(resolveName(key), s);
+  if (auto link = getMasterLink()) {
+    link->set(resolveName(key), s);
+  }
 }
 
 void NodeHandle::setParam(const std::string& key, const char* s) const
 {
-  return getMasterLink()->set(resolveName(key), s);
+  if (auto link = getMasterLink()) {
+    link->set(resolveName(key), s);
+  }
 }
 
 void NodeHandle::setParam(const std::string& key, double d) const
 {
-  return getMasterLink()->set(resolveName(key), d);
+  if (auto link = getMasterLink()) {
+    link->set(resolveName(key), d);
+  }
 }
 
 void NodeHandle::setParam(const std::string& key, int i) const
 {
-  return getMasterLink()->set(resolveName(key), i);
+  if (auto link = getMasterLink()) {
+    link->set(resolveName(key), i);
+  }
 }
 
 void NodeHandle::setParam(const std::string& key, bool b) const
 {
-  return getMasterLink()->set(resolveName(key), b);
+  if (auto link = getMasterLink()) {
+    link->set(resolveName(key), b);
+  }
 }
 
 void NodeHandle::setParam(const std::string& key, const std::vector<std::string>& vec) const
 {
-  return getMasterLink()->set(resolveName(key), vec);
+  if (auto link = getMasterLink()) {
+    link->set(resolveName(key), vec);
+  }
 }
 void NodeHandle::setParam(const std::string& key, const std::vector<double>& vec) const
 {
-  return getMasterLink()->set(resolveName(key), vec);
+  if (auto link = getMasterLink()) {
+    link->set(resolveName(key), vec);
+  }
 }
 void NodeHandle::setParam(const std::string& key, const std::vector<float>& vec) const
 {
-  return getMasterLink()->set(resolveName(key), vec);
+  if (auto link = getMasterLink()) {
+    link->set(resolveName(key), vec);
+  }
 }
 void NodeHandle::setParam(const std::string& key, const std::vector<int>& vec) const
 {
-  return getMasterLink()->set(resolveName(key), vec);
+  if (auto link = getMasterLink()) {
+    link->set(resolveName(key), vec);
+  }
 }
 void NodeHandle::setParam(const std::string& key, const std::vector<bool>& vec) const
 {
-  return getMasterLink()->set(resolveName(key), vec);
+  if (auto link = getMasterLink()) {
+    link->set(resolveName(key), vec);
+  }
 }
 
 void NodeHandle::setParam(const std::string& key, const std::map<std::string, std::string>& map) const
 {
-  return getMasterLink()->set(resolveName(key), map);
+  if (auto link = getMasterLink()) {
+    link->set(resolveName(key), map);
+  }
 }
 void NodeHandle::setParam(const std::string& key, const std::map<std::string, double>& map) const
 {
-  return getMasterLink()->set(resolveName(key), map);
+  if (auto link = getMasterLink()) {
+    link->set(resolveName(key), map);
+  }
 }
 void NodeHandle::setParam(const std::string& key, const std::map<std::string, float>& map) const
 {
-  return getMasterLink()->set(resolveName(key), map);
+  if (auto link = getMasterLink()) {
+    link->set(resolveName(key), map);
+  }
 }
 void NodeHandle::setParam(const std::string& key, const std::map<std::string, int>& map) const
 {
-  return getMasterLink()->set(resolveName(key), map);
+  if (auto link = getMasterLink()) {
+    link->set(resolveName(key), map);
+  }
 }
 void NodeHandle::setParam(const std::string& key, const std::map<std::string, bool>& map) const
 {
-  return getMasterLink()->set(resolveName(key), map);
+  if (auto link = getMasterLink()) {
+    link->set(resolveName(key), map);
+  }
 }
 
 bool NodeHandle::hasParam(const std::string& key) const
 {
-  return getMasterLink()->has(resolveName(key));
+  if (auto link = getMasterLink()) {
+    return link->has(resolveName(key));
+  }
+  return false;
 }
 
 bool NodeHandle::deleteParam(const std::string& key) const
 {
-  return getMasterLink()->del(resolveName(key));
+  if (auto link = getMasterLink()) {
+    return link->del(resolveName(key));
+  }
+  return false;
 }
 
 bool NodeHandle::getParamNames(std::vector<std::string>& keys) const
 {
-  return getMasterLink()->getParamNames(keys);
+  if (auto link = getMasterLink()) {
+    return link->getParamNames(keys);
+  }
+  return false;
 }
 
 bool NodeHandle::getParam(const std::string& key, XmlRpc::XmlRpcValue& v) const
 {
-  return getMasterLink()->get(resolveName(key), v);
+  if (auto link = getMasterLink()) {
+    return link->get(resolveName(key), v);
+  }
+  return false;
 }
 
 bool NodeHandle::getParam(const std::string& key, std::string& s) const
 {
-  return getMasterLink()->get(resolveName(key), s);
+  if (auto link = getMasterLink()) {
+    return link->get(resolveName(key), s);
+  }
+  return false;
 }
 
 bool NodeHandle::getParam(const std::string& key, double& d) const
 {
-  return getMasterLink()->get(resolveName(key), d);
+  if (auto link = getMasterLink()) {
+    return link->get(resolveName(key), d);
+  }
+  return false;
 }
 
 bool NodeHandle::getParam(const std::string& key, float& f) const
 {
-  return getMasterLink()->get(resolveName(key), f);
+  if (auto link = getMasterLink()) {
+    return link->get(resolveName(key), f);
+  }
+  return false;
 }
 
 bool NodeHandle::getParam(const std::string& key, int& i) const
 {
-  return getMasterLink()->get(resolveName(key), i);
+  if (auto link = getMasterLink()) {
+    return link->get(resolveName(key), i);
+  }
+  return false;
 }
 
 bool NodeHandle::getParam(const std::string& key, bool& b) const
 {
-  return getMasterLink()->get(resolveName(key), b);
+  if (auto link = getMasterLink()) {
+    return link->get(resolveName(key), b);
+  }
+  return false;
 }
 
 bool NodeHandle::getParam(const std::string& key, std::vector<std::string>& vec) const
 {
-  return getMasterLink()->get(resolveName(key), vec);
+  if (auto link = getMasterLink()) {
+    return link->get(resolveName(key), vec);
+  }
+  return false;
 }
+
 bool NodeHandle::getParam(const std::string& key, std::vector<double>& vec) const
 {
-  return getMasterLink()->get(resolveName(key), vec);
+  if (auto link = getMasterLink()) {
+    return link->get(resolveName(key), vec);
+  }
+  return false;
 }
+
 bool NodeHandle::getParam(const std::string& key, std::vector<float>& vec) const
 {
-  return getMasterLink()->get(resolveName(key), vec);
+  if (auto link = getMasterLink()) {
+    return link->get(resolveName(key), vec);
+  }
+  return false;
 }
+
 bool NodeHandle::getParam(const std::string& key, std::vector<int>& vec) const
 {
-  return getMasterLink()->get(resolveName(key), vec);
+  if (auto link = getMasterLink()) {
+    return link->get(resolveName(key), vec);
+  }
+  return false;
 }
+
 bool NodeHandle::getParam(const std::string& key, std::vector<bool>& vec) const
 {
-  return getMasterLink()->get(resolveName(key), vec);
+  if (auto link = getMasterLink()) {
+    return link->get(resolveName(key), vec);
+  }
+  return false;
 }
 
 bool NodeHandle::getParam(const std::string& key, std::map<std::string, std::string>& map) const
 {
-  return getMasterLink()->get(resolveName(key), map);
+  if (auto link = getMasterLink()) {
+    return link->get(resolveName(key), map);
+  }
+  return false;
 }
+
 bool NodeHandle::getParam(const std::string& key, std::map<std::string, double>& map) const
 {
-  return getMasterLink()->get(resolveName(key), map);
+  if (auto link = getMasterLink()) {
+    return link->get(resolveName(key), map);
+  }
+  return false;
 }
+
 bool NodeHandle::getParam(const std::string& key, std::map<std::string, float>& map) const
 {
-  return getMasterLink()->get(resolveName(key), map);
+  if (auto link = getMasterLink()) {
+    return link->get(resolveName(key), map);
+  }
+  return false;
 }
+
 bool NodeHandle::getParam(const std::string& key, std::map<std::string, int>& map) const
 {
-  return getMasterLink()->get(resolveName(key), map);
+  if (auto link = getMasterLink()) {
+    return link->get(resolveName(key), map);
+  }
+  return false;
 }
+
 bool NodeHandle::getParam(const std::string& key, std::map<std::string, bool>& map) const
 {
-  return getMasterLink()->get(resolveName(key), map);
+  if (auto link = getMasterLink()) {
+    return link->get(resolveName(key), map);
+  }
+  return false;
 }
 
 bool NodeHandle::getParamCached(const std::string& key, XmlRpc::XmlRpcValue& v) const
 {
-  return getMasterLink()->getCached(resolveName(key), v);
+  if (auto link = getMasterLink()) {
+    return link->getCached(resolveName(key), v);
+  }
+  return false;
 }
 
 bool NodeHandle::getParamCached(const std::string& key, std::string& s) const
 {
-  return getMasterLink()->getCached(resolveName(key), s);
+  if (auto link = getMasterLink()) {
+    return link->getCached(resolveName(key), s);
+  }
+  return false;
 }
 
 bool NodeHandle::getParamCached(const std::string& key, double& d) const
 {
-  return getMasterLink()->getCached(resolveName(key), d);
+  if (auto link = getMasterLink()) {
+    return link->getCached(resolveName(key), d);
+  }
+  return false;
 }
 
 bool NodeHandle::getParamCached(const std::string& key, float& f) const
 {
-  return getMasterLink()->getCached(resolveName(key), f);
+  if (auto link = getMasterLink()) {
+    return link->getCached(resolveName(key), f);
+  }
+  return false;
 }
 
 bool NodeHandle::getParamCached(const std::string& key, int& i) const
 {
-  return getMasterLink()->getCached(resolveName(key), i);
+  if (auto link = getMasterLink()) {
+    return link->getCached(resolveName(key), i);
+  }
+  return false;
 }
 
 bool NodeHandle::getParamCached(const std::string& key, bool& b) const
 {
-  return getMasterLink()->getCached(resolveName(key), b);
+  if (auto link = getMasterLink()) {
+    return link->getCached(resolveName(key), b);
+  }
+  return false;
 }
 
 bool NodeHandle::getParamCached(const std::string& key, std::vector<std::string>& vec) const
 {
-  return getMasterLink()->getCached(resolveName(key), vec);
+  if (auto link = getMasterLink()) {
+    return link->getCached(resolveName(key), vec);
+  }
+  return false;
 }
+
 bool NodeHandle::getParamCached(const std::string& key, std::vector<double>& vec) const
 {
-  return getMasterLink()->getCached(resolveName(key), vec);
+  if (auto link = getMasterLink()) {
+    return link->getCached(resolveName(key), vec);
+  }
+  return false;
 }
+
 bool NodeHandle::getParamCached(const std::string& key, std::vector<float>& vec) const
 {
-  return getMasterLink()->getCached(resolveName(key), vec);
+  if (auto link = getMasterLink()) {
+    return link->getCached(resolveName(key), vec);
+  }
+  return false;
 }
+
 bool NodeHandle::getParamCached(const std::string& key, std::vector<int>& vec) const
 {
-  return getMasterLink()->getCached(resolveName(key), vec);
+  if (auto link = getMasterLink()) {
+    return link->getCached(resolveName(key), vec);
+  }
+  return false;
 }
+
 bool NodeHandle::getParamCached(const std::string& key, std::vector<bool>& vec) const
 {
-  return getMasterLink()->getCached(resolveName(key), vec);
+  if (auto link = getMasterLink()) {
+    return link->getCached(resolveName(key), vec);
+  }
+  return false;
 }
 
 bool NodeHandle::getParamCached(const std::string& key, std::map<std::string, std::string>& map) const
 {
-  return getMasterLink()->getCached(resolveName(key), map);
+  if (auto link = getMasterLink()) {
+    return link->getCached(resolveName(key), map);
+  }
+  return false;
 }
+
 bool NodeHandle::getParamCached(const std::string& key, std::map<std::string, double>& map) const
 {
-  return getMasterLink()->getCached(resolveName(key), map);
+  if (auto link = getMasterLink()) {
+    return link->getCached(resolveName(key), map);
+  }
+  return false;
 }
+
 bool NodeHandle::getParamCached(const std::string& key, std::map<std::string, float>& map) const
 {
-  return getMasterLink()->getCached(resolveName(key), map);
+  if (auto link = getMasterLink()) {
+    return link->getCached(resolveName(key), map);
+  }
+  return false;
 }
+
 bool NodeHandle::getParamCached(const std::string& key, std::map<std::string, int>& map) const
 {
-  return getMasterLink()->getCached(resolveName(key), map);
+  if (auto link = getMasterLink()) {
+    return link->getCached(resolveName(key), map);
+  }
+  return false;
 }
+
 bool NodeHandle::getParamCached(const std::string& key, std::map<std::string, bool>& map) const
 {
-  return getMasterLink()->getCached(resolveName(key), map);
+  if (auto link = getMasterLink()) {
+    return link->getCached(resolveName(key), map);
+  }
+  return false;
 }
 
 bool NodeHandle::searchParam(const std::string& key, std::string& result_out) const
@@ -795,7 +916,10 @@ bool NodeHandle::searchParam(const std::string& key, std::string& result_out) co
     remapped = it->second;
   }
 
-  return getMasterLink()->search(resolveName(""), remapped, result_out);
+  if (auto link = getMasterLink()) {
+    return link->search(resolveName(""), remapped, result_out);
+  }
+  return false;
 }
 
 bool NodeHandle::ok() const
@@ -815,4 +939,5 @@ MasterLinkPtr NodeHandle::getMasterLink() const
 {
   return TopicManager::instance()->getMasterLink();
 }
+
 } // namespace miniros
