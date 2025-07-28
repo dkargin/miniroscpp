@@ -51,6 +51,7 @@
 
 #include "miniros/common.h"
 #include "miniros/transport/net_address.h"
+#include "miniros/errors.h"
 
 #ifdef WIN32
   #ifndef NOMINMAX
@@ -159,7 +160,18 @@ typedef std::shared_ptr<std::vector<socket_pollfd> > pollfd_vector_ptr;
 MINIROS_DECL int last_socket_error();
 MINIROS_DECL const char* last_socket_error_string();
 MINIROS_DECL bool last_socket_error_is_would_block();
-MINIROS_DECL pollfd_vector_ptr poll_sockets(int epfd, socket_pollfd *fds, nfds_t nfds, int timeout);
+
+/// Cross-platform poll for events on file descriptors.
+/// @param epfd - file descriptor of EPOLL object. It is unused if EPOLL is not supported.
+/// @param fds - array of file descriptors to poll.
+/// @param nfds - number of file descriptors in fds array.
+/// @param timeout - wait period in milliseconds.
+/// @param events - output events. It is guaranteed to be cleaned before polling any events.
+/// @returns error code, or Error::Ok if everything is fine. Expected codes:
+///   - Error::InvalidValue if empty poll set or no pollable events.
+///   - Error::SystemError if unexpected system error was encountered.
+MINIROS_DECL Error poll_sockets(int epfd, socket_pollfd *fds, nfds_t nfds, int timeout, std::vector<socket_pollfd>& events);
+
 MINIROS_DECL int set_non_blocking(socket_fd_t &socket);
 MINIROS_DECL int close_socket(socket_fd_t &socket);
 MINIROS_DECL int create_signal_pair(signal_fd_t signal_pair[2]);
