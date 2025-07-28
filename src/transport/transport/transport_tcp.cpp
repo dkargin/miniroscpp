@@ -53,7 +53,7 @@ bool TransportTCP::s_use_keepalive_ = true;
 bool TransportTCP::s_use_ipv6_ = false;
 
 TransportTCP::TransportTCP(PollSet* poll_set, int flags)
-: sock_(ROS_INVALID_SOCKET)
+: sock_(MINIROS_INVALID_SOCKET)
 , closed_(false)
 , expecting_read_(false)
 , expecting_write_(false)
@@ -94,7 +94,7 @@ bool TransportTCP::setNonBlocking()
 
 bool TransportTCP::initializeSocket()
 {
-  MINIROS_ASSERT(sock_ != ROS_INVALID_SOCKET);
+  MINIROS_ASSERT(sock_ != MINIROS_INVALID_SOCKET);
 
   if (!setNonBlocking())
   {
@@ -237,7 +237,7 @@ bool TransportTCP::connect(const std::string& host, int port)
   connected_host_ = host;
   connected_port_ = port;
 
-  if (sock_ == ROS_INVALID_SOCKET)
+  if (sock_ == MINIROS_INVALID_SOCKET)
   {
     MINIROS_ERROR("socket() failed with error [%s]",  last_socket_error_string());
     return false;
@@ -332,7 +332,7 @@ bool TransportTCP::connect(const std::string& host, int port)
   // windows might need some time to sleep (input from service robotics hack) add this if testing proves it is necessary.
   // MINIROS_ASSERT((flags_ & SYNCHRONOUS) || ret != 0);
   if (((flags_ & SYNCHRONOUS) && ret != 0) || // synchronous, connect() should return 0
-      (!(flags_ & SYNCHRONOUS) && ret != 0 && last_socket_error() != ROS_SOCKETS_ASYNCHRONOUS_CONNECT_RETURN)) 
+      (!(flags_ & SYNCHRONOUS) && ret != 0 && last_socket_error() != MINIROS_SOCKETS_ASYNCHRONOUS_CONNECT_RETURN))
       // asynchronous, connect() may return 0 or -1. When return -1, WSAGetLastError()=WSAEWOULDBLOCK/errno=EINPROGRESS
   {
     MINIROS_DEBUG("Connect to tcpros publisher [%s:%d] failed with error [%d, %s]", host.c_str(), port, ret, last_socket_error_string());
@@ -398,7 +398,7 @@ bool TransportTCP::listen(int port, int backlog, const AcceptCallback& accept_cb
     sa_len_ = sizeof(sockaddr_in);
   }
 
-  if (sock_ == ROS_INVALID_SOCKET)
+  if (sock_ == MINIROS_INVALID_SOCKET)
   {
     MINIROS_ERROR("socket() failed with error [%s]", last_socket_error_string());
     return false;
@@ -450,14 +450,14 @@ void TransportTCP::close()
       {
         closed_ = true;
 
-        MINIROS_ASSERT(sock_ != ROS_INVALID_SOCKET);
+        MINIROS_ASSERT(sock_ != MINIROS_INVALID_SOCKET);
 
         if (poll_set_)
         {
           poll_set_->delSocket(sock_);
         }
 
-        ::shutdown(sock_, ROS_SOCKETS_SHUT_RDWR);
+        ::shutdown(sock_, MINIROS_SOCKETS_SHUT_RDWR);
         if ( close_socket(sock_) != 0 )
         {
           MINIROS_ERROR("Error closing socket [%d]: [%s]", sock_, last_socket_error_string());
@@ -465,14 +465,14 @@ void TransportTCP::close()
         {
           MINIROS_DEBUG("TCP socket [%d] closed", sock_);
         }
-        sock_ = ROS_INVALID_SOCKET;
+        sock_ = MINIROS_INVALID_SOCKET;
 
         disconnect_cb = disconnect_cb_;
 
-        disconnect_cb_ = Callback();
-        read_cb_ = Callback();
-        write_cb_ = Callback();
-        accept_cb_ = AcceptCallback();
+        disconnect_cb_ = {};
+        read_cb_ = {};
+        write_cb_ = {};
+        accept_cb_ = {};
       }
     }
   }

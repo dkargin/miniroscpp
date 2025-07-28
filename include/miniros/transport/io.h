@@ -50,25 +50,28 @@
 #include <vector>
 
 #include "miniros/common.h"
+#include "miniros/transport/net_address.h"
 
-#ifdef _WIN32
-	#define WIN32_LEAN_AND_MEAN
-	#define NOMINMAX
-	#include <winsock2.h> // For struct timeval
-	#include <ws2tcpip.h> // Must be after winsock2.h because MS didn't put proper inclusion guards in their headers.
-	#include <sys/types.h>
-	#include <io.h>
-	#include <fcntl.h>
-	#include <process.h> // for _getpid
+#ifdef WIN32
+  #ifndef NOMINMAX
+    #define NOMINMAX
+  #endif
+  #define WIN32_LEAN_AND_MEAN
+  #include <winsock2.h> // For struct timeval
+  #include <ws2tcpip.h> // Must be after winsock2.h because MS didn't put proper inclusion guards in their headers.
+  #include <sys/types.h>
+  #include <io.h>
+  #include <fcntl.h>
+  #include <process.h> // for _getpid
 #else
-	#include <poll.h> // should get cmake to explicitly check for poll.h?
-	#include <sys/poll.h>
-	#include <arpa/inet.h>
-	#include <netdb.h>
-    #include <unistd.h>
-    #include <netdb.h>       // getnameinfo in network.cpp
-    #include <netinet/in.h>  // sockaddr_in in network.cpp
-	#include <netinet/tcp.h> // TCP_NODELAY in transport/transport_tcp.cpp
+  #include <poll.h> // should get cmake to explicitly check for poll.h?
+  #include <sys/poll.h>
+  #include <arpa/inet.h>
+  #include <netdb.h>
+  #include <unistd.h>
+  #include <netdb.h>       // getnameinfo in network.cpp
+  #include <netinet/in.h>  // sockaddr_in in network.cpp
+  #include <netinet/tcp.h> // TCP_NODELAY in transport/transport_tcp.cpp
 #endif
 
 /*****************************************************************************
@@ -77,44 +80,44 @@
 
 #ifdef WIN32
     #define getpid _getpid
-	#define ROS_INVALID_SOCKET INVALID_SOCKET
-	#define ROS_SOCKETS_SHUT_RDWR SD_BOTH /* Used by ::shutdown() */
-	#define ROS_SOCKETS_ASYNCHRONOUS_CONNECT_RETURN WSAEWOULDBLOCK
-	#ifndef POLLRDNORM
-		#define POLLRDNORM  0x0100 /* mapped to read fds_set */
-	#endif
-	#ifndef POLLRDBAND
-		#define POLLRDBAND  0x0200 /* mapped to exception fds_set */
-	#endif
-	#ifndef POLLIN
-		#define POLLIN      (POLLRDNORM | POLLRDBAND) /* There is data to read.  */
-	#endif
-	#ifndef POLLPRI
-		#define POLLPRI     0x0400 /* There is urgent data to read.  */
-	#endif
+    #define MINIROS_INVALID_SOCKET INVALID_SOCKET
+    #define MINIROS_SOCKETS_SHUT_RDWR SD_BOTH /* Used by ::shutdown() */
+    #define MINIROS_SOCKETS_ASYNCHRONOUS_CONNECT_RETURN WSAEWOULDBLOCK
+    #ifndef POLLRDNORM
+	    #define POLLRDNORM  0x0100 /* mapped to read fds_set */
+    #endif
+    #ifndef POLLRDBAND
+	    #define POLLRDBAND  0x0200 /* mapped to exception fds_set */
+    #endif
+    #ifndef POLLIN
+	    #define POLLIN      (POLLRDNORM | POLLRDBAND) /* There is data to read.  */
+    #endif
+    #ifndef POLLPRI
+	    #define POLLPRI     0x0400 /* There is urgent data to read.  */
+    #endif
 
-	#ifndef POLLWRNORM
-		#define POLLWRNORM  0x0010 /* mapped to write fds_set */
-	#endif
-	#ifndef POLLOUT
-		#define POLLOUT     (POLLWRNORM) /* Writing now will not block.  */
-	#endif
-	#ifndef POLLWRBAND
-		#define POLLWRBAND  0x0020 /* mapped to write fds_set */
-	#endif
-	#ifndef POLLERR
-		#define POLLERR     0x0001 /* Error condition.  */
-	#endif
-	#ifndef POLLHUP
-		#define POLLHUP     0x0002 /* Hung up.  */
-	#endif
-	#ifndef POLLNVAL
-		#define POLLNVAL    0x0004 /* Invalid polling request.  */
-	#endif
+    #ifndef POLLWRNORM
+	    #define POLLWRNORM  0x0010 /* mapped to write fds_set */
+    #endif
+    #ifndef POLLOUT
+	    #define POLLOUT     (POLLWRNORM) /* Writing now will not block.  */
+    #endif
+    #ifndef POLLWRBAND
+	    #define POLLWRBAND  0x0020 /* mapped to write fds_set */
+    #endif
+    #ifndef POLLERR
+	    #define POLLERR     0x0001 /* Error condition.  */
+    #endif
+    #ifndef POLLHUP
+	    #define POLLHUP     0x0002 /* Hung up.  */
+    #endif
+    #ifndef POLLNVAL
+	    #define POLLNVAL    0x0004 /* Invalid polling request.  */
+    #endif
 #else
-	#define ROS_SOCKETS_SHUT_RDWR SHUT_RDWR /* Used by ::shutdown() */
-	#define ROS_INVALID_SOCKET ((int) -1)
-	#define ROS_SOCKETS_ASYNCHRONOUS_CONNECT_RETURN EINPROGRESS
+	#define MINIROS_SOCKETS_SHUT_RDWR SHUT_RDWR /* Used by ::shutdown() */
+	#define MINIROS_INVALID_SOCKET ((int) -1)
+	#define MINIROS_SOCKETS_ASYNCHRONOUS_CONNECT_RETURN EINPROGRESS
 #endif
 
 /*****************************************************************************
@@ -219,6 +222,12 @@ inline void close_signal_pair(signal_fd_t signal_pair[2]) {
 	}
 #endif
 
+namespace network {
+
+/// Fill in net address by values from socket API.
+MINIROS_DECL bool fillAddress(const sockaddr_in& sysAddr, NetAddress& address);
+
+}
 } // namespace miniros
 
 #endif /* MINIROSCPP_IO_H_ */
