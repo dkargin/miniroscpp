@@ -8,3 +8,9 @@
 
 #cmakedefine MINIROS_USE_LIBSYSTEMD
 #cmakedefine HAVE_LIBSYSTEMD
+
+/// Additional guard against including internal headers.
+/// This header should not be be included into any user code.
+#ifndef MINIROS_INTERNAL_HEADER
+#define MINIROS_INTERNAL_HEADER
+#endif

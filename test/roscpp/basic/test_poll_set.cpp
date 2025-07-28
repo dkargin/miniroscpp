@@ -35,6 +35,8 @@
 
 #include <gtest/gtest.h>
 #include "miniros/transport/poll_set.h"
+#include "miniros/transport/io.h"
+
 #ifndef _WIN32
 # include <sys/socket.h>
 #endif

@@ -91,7 +91,7 @@ TransportUDP::TransportUDP(PollSet* poll_set, int flags, int max_datagram_size)
 
 TransportUDP::~TransportUDP()
 {
-  MINIROS_ASSERT_MSG(sock_ == ROS_INVALID_SOCKET, "TransportUDP socket [%d] was never closed", sock_);
+  MINIROS_ASSERT_MSG(sock_ == MINIROS_INVALID_SOCKET, "TransportUDP socket [%d] was never closed", sock_);
   delete [] reorder_buffer_;
   delete [] data_buffer_;
 }
@@ -156,7 +156,7 @@ bool TransportUDP::connect(const std::string& host, int port, int connection_id)
   sock_ = socket(AF_INET, SOCK_DGRAM, 0);
   connection_id_ = connection_id;
 
-  if (sock_ == ROS_INVALID_SOCKET)
+  if (sock_ == MINIROS_INVALID_SOCKET)
   {
     MINIROS_ERROR("socket() failed with error [%s]",  last_socket_error_string());
     return false;
@@ -245,7 +245,7 @@ bool TransportUDP::createIncoming(int port, bool is_server)
 
   sock_ = socket(AF_INET, SOCK_DGRAM, 0);
 
-  if (sock_ == ROS_INVALID_SOCKET)
+  if (sock_ == MINIROS_INVALID_SOCKET)
   {
     MINIROS_ERROR("socket() failed with error [%s]", last_socket_error_string());
     return false;
@@ -279,7 +279,7 @@ bool TransportUDP::createIncoming(int port, bool is_server)
 
 bool TransportUDP::initializeSocket()
 {
-  MINIROS_ASSERT(sock_ != ROS_INVALID_SOCKET);
+  MINIROS_ASSERT(sock_ != MINIROS_INVALID_SOCKET);
 
   if (!(flags_ & SYNCHRONOUS))
   {
@@ -320,7 +320,7 @@ void TransportUDP::close()
 
         MINIROS_DEBUG("UDP socket [%d] closed", sock_);
 
-        MINIROS_ASSERT(sock_ != ROS_INVALID_SOCKET);
+        MINIROS_ASSERT(sock_ != MINIROS_INVALID_SOCKET);
 
         if (poll_set_)
         {
@@ -332,7 +332,7 @@ void TransportUDP::close()
           MINIROS_ERROR("Error closing socket [%d]: [%s]", sock_, last_socket_error_string());
         }
 
-        sock_ = ROS_INVALID_SOCKET;
+        sock_ = MINIROS_INVALID_SOCKET;
 
         disconnect_cb = disconnect_cb_;
 

@@ -45,6 +45,10 @@
 
 #include "barrier.h"
 
+#ifdef MINIROS_INTERNAL_HEADER
+#error "Internal header has leaked to user headers"
+#endif
+
 using namespace miniros;
 
 class FakeMessage
