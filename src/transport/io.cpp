@@ -176,20 +176,10 @@ void set_events_on_socket(int epfd, int fd, int events)
 /*****************************************************************************
 ** Service Robotics/Libssh Functions
 *****************************************************************************/
-/**
- * @brief A cross platform polling function for sockets.
- *
- * Windows doesn't have a polling function until Vista (WSAPoll) and even then
- * its implementation is not supposed to be great. This works for a broader
- * range of platforms and will suffice.
- * @param epfd - the socket watcher to poll on.
- * @param fds - the socket set (descriptor's and events) to poll for.
- * @param nfds - the number of descriptors to poll for.
- * @param timeout - timeout in milliseconds.
- * @return pollfd_vector_ptr : NULL on error, empty on timeout, a list of structures with received events.
- */
-pollfd_vector_ptr poll_sockets(int epfd, socket_pollfd* fds, nfds_t nfds, int timeout)
+
+Error poll_sockets(int epfd, socket_pollfd* fds, nfds_t nfds, int timeout, std::vector<socket_pollfd>& events)
 {
+  events.clear();
 #if defined(WIN32)
   fd_set readfds, writefds, exceptfds;
   struct timeval tv, *ptv;
@@ -200,9 +190,9 @@ pollfd_vector_ptr poll_sockets(int epfd, socket_pollfd* fds, nfds_t nfds, int ti
 
   UNUSED(epfd);
 
-  if (fds == NULL) {
+  if (fds == nullptr) {
     errno = EFAULT;
-    return ofds;
+    return Error::InvalidValue;
   }
 
   FD_ZERO(&readfds);
@@ -234,8 +224,9 @@ pollfd_vector_ptr poll_sockets(int epfd, socket_pollfd* fds, nfds_t nfds, int ti
   }
 
   if (rc == -1) {
-    errno = EINVAL;
-    return ofds;
+    // No sockets were selected for polling. Is it an error?
+    //errno = EINVAL;
+    return Error::InvalidValue;
   }
   /*********************
   ** Setting the timeout
@@ -255,11 +246,27 @@ pollfd_vector_ptr poll_sockets(int epfd, socket_pollfd* fds, nfds_t nfds, int ti
 
   rc = select(max_fd + 1, &readfds, &writefds, &exceptfds, ptv);
   if (rc < 0) {
-    return ofds;
+    const int err = errno;
+    if (err == EBADF) {
+      // Bad file descriptor.
+      return Error::InvalidValue;
+    }
+    if (err == EINTR) {
+      // A signal was caught; see signal(7).
+      return Error::Ok;
+    }
+    if (err == EINVAL) {
+      // nfds is negative or exceeds the RLIMIT_NOFILE resource limit (see getrlimit(2)).
+      // The value contained within timeout is invalid.
+      return Error::InvalidValue;
+    }
+    // ENOMEM or some unexpected code.
+    return Error::SystemError;
   }
-  ofds.reset(new std::vector<socket_pollfd>);
+
+  // No event. it is OK.
   if (rc == 0) {
-    return ofds;
+    return Error::Ok;
   }
 
   for (rc = 0, i = 0; i < nfds; i++) {
@@ -301,14 +308,12 @@ pollfd_vector_ptr poll_sockets(int epfd, socket_pollfd* fds, nfds_t nfds, int ti
     } else {
       fds[i].revents = POLLNVAL;
     }
-    ofds->push_back(fds[i]);
+    events.push_back(fds[i]);
   }
-  return ofds;
 #elif defined(HAVE_EPOLL)
   UNUSED(nfds);
   UNUSED(fds);
   struct epoll_event ev[nfds];
-  pollfd_vector_ptr ofds;
 
   int fd_cnt = ::epoll_wait(epfd, ev, nfds, timeout);
 
@@ -316,21 +321,18 @@ pollfd_vector_ptr poll_sockets(int epfd, socket_pollfd* fds, nfds_t nfds, int ti
     // EINTR means that we got interrupted by a signal, and is not an error
     if (errno != EINTR) {
       MINIROS_ERROR("Error in epoll_wait! %s", strerror(errno));
-      ofds.reset();
+      return Error::SystemError;
     }
   } else {
-    ofds.reset(new std::vector<socket_pollfd>);
     for (int i = 0; i < fd_cnt; i++) {
       socket_pollfd pfd;
       pfd.fd = ev[i].data.fd;
       pfd.revents = ev[i].events;
-      ofds->push_back(pfd);
+      events.push_back(pfd);
     }
   }
-  return ofds;
 #else
   UNUSED(epfd);
-  pollfd_vector_ptr ofds(new std::vector<socket_pollfd>);
   // Clear the `revents` fields
   for (nfds_t i = 0; i < nfds; i++) {
     fds[i].revents = 0;
@@ -342,18 +344,19 @@ pollfd_vector_ptr poll_sockets(int epfd, socket_pollfd* fds, nfds_t nfds, int ti
     // EINTR means that we got interrupted by a signal, and is not an error
     if (errno != EINTR) {
       MINIROS_ERROR("Error in poll! %s", strerror(errno));
-      ofds.reset();
+      return Error::SystemError;
     }
-  } else {
-    for (nfds_t i = 0; i < nfds; i++) {
-      if (fds[i].revents) {
-        ofds->push_back(fds[i]);
-        fds[i].revents = 0;
-      }
+    return Error::Ok;
+  }
+  for (nfds_t i = 0; i < nfds; i++) {
+    if (fds[i].revents) {
+      events.push_back(fds[i]);
+      fds[i].revents = 0;
     }
   }
-  return ofds;
 #endif // poll_sockets functions
+
+  return Error::Ok;
 }
 /*****************************************************************************
 ** Socket Utilities
