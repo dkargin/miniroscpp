@@ -67,17 +67,20 @@ struct MINIROS_DECL TopicInfo {
  */
 class MasterLink {
 public:
-  MINIROS_DECL MasterLink(const std::shared_ptr<RPCManager>& rpcManager);
+  MINIROS_DECL MasterLink();
 
   MINIROS_DECL ~MasterLink();
 
   using RpcValue = XmlRpc::XmlRpcValue;
 
   /// Init connection to rosmaster.
-  MINIROS_DECL Error initLink(const M_string& remappings);
+  MINIROS_DECL Error initLink(const M_string& remappings, const std::shared_ptr<RPCManager>& rpcManager);
 
   /// Init rosparam part.
   MINIROS_DECL Error initParam(const M_string& remappings);
+
+  /// Stop serving any request.
+  MINIROS_DECL void disconnect();
 
   /** @brief Execute an XMLRPC call on the master
    *
