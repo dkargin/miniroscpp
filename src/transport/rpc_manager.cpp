@@ -27,6 +27,7 @@
 
 #define MINIROS_PACKAGE_NAME "RPCManager"
 
+#include <cassert>
 #include <sstream>
 
 #include "miniros/file_log.h"
@@ -153,8 +154,10 @@ bool RPCManager::start(PollSet* poll_set, int port)
   port_ = http_server_->getPortIp4();
   MINIROS_ASSERT(port_ != 0);
 
+  std::string host = network::getHost();
+  assert(!host.empty());
   std::stringstream ss;
-  ss << "http://" << network::getHost() << ":" << port_ << "/";
+  ss << "http://" << host << ":" << port_ << "/";
   uri_ = ss.str();
 
   server_thread_ = std::thread(&RPCManager::serverThreadFunc, this);
