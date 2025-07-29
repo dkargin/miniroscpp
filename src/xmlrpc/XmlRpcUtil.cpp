@@ -32,7 +32,7 @@ int XmlRpcLogHandler::_verbosity = 0;
 static class DefaultLogHandler : public XmlRpcLogHandler {
 public:
 
-  void log(int level, const char* msg) { 
+  void log(int level, const char* msg) override {
 #ifdef USE_WINDOWS_DEBUG
     if (level <= _verbosity) { OutputDebugString(msg); OutputDebugString("\n"); }
 #else
@@ -49,7 +49,6 @@ public:
 // Message log singleton
 XmlRpcLogHandler* XmlRpcLogHandler::_logHandler = &defaultLogHandler;
 
-
 // Default error handler
 static class DefaultErrorHandler : public XmlRpcErrorHandler {
 public:
@@ -58,8 +57,9 @@ public:
   void error(const char* msg) {
     OutputDebugString(msg); OutputDebugString("\n");
 #else
-  void error(const char*) {
-#endif  
+  void error(const char* msg) {
+#endif
+    std::cerr << msg << std::endl;
     // As far as I can tell, throwing an exception here is a bug, unless
     // the intention is that the program should exit.  Throughout the code,
     // calls to error() are followed by cleanup code that does things like
@@ -93,7 +93,9 @@ void XmlRpcUtil::log(int level, const char* fmt, ...)
     std::vsnprintf(buf,sizeof(buf)-1,fmt,va);
     va_end(va);
     buf[sizeof(buf)-1] = 0;
-    XmlRpcLogHandler::getLogHandler()->log(level, buf);
+    if (XmlRpcLogHandler* handler = XmlRpcLogHandler::getLogHandler()) {
+      handler->log(level, buf);
+    }
   }
 }
 
@@ -106,7 +108,10 @@ void XmlRpcUtil::error(const char* fmt, ...)
   std::vsnprintf(buf,sizeof(buf)-1,fmt,va);
   va_end(va);
   buf[sizeof(buf)-1] = 0;
-  XmlRpcErrorHandler::getErrorHandler()->error(buf);
+
+  if (XmlRpcErrorHandler* handler = XmlRpcErrorHandler::getErrorHandler()) {
+    handler->error(buf);
+  }
 }
 
 
