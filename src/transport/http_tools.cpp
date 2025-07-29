@@ -100,6 +100,13 @@ std::string_view HttpFrame::getTokenView(const std::string& data, const Token& t
   return result;
 }
 
+std::string_view HttpFrame::header() const
+{
+  if (m_bodyPosition > 0)
+    return std::string_view(data.c_str(), m_bodyPosition);
+  return std::string_view(data.c_str(), data.size());
+}
+
 std::string_view HttpFrame::body() const
 {
   int bodySize = bodyLength();

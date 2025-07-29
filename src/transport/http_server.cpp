@@ -96,6 +96,8 @@ void HttpServer::acceptClient(NetSocket* sock)
   MINIROS_DEBUG("Accepting new HTTP client fd=%d", client->fd());
 
   client->setNonBlock();
+  client->setNoDelay(true);
+
   auto* connection = new HttpServerConnection(this, client);
   connections_[fd] = connection;
   pollSet_->addSocket(fd, [this, connection, fd](int flags) {

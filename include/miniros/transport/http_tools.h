@@ -155,6 +155,11 @@ struct MINIROS_DECL HttpFrame {
     finish(true);
   }
 
+  void finishResponse()
+  {
+    finish(false);
+  }
+
   void finish(bool request);
 
 
@@ -164,6 +169,9 @@ struct MINIROS_DECL HttpFrame {
 
   /// Check if parser has content length field.
   bool hasContentLength() const;
+
+  /// Get reference to header of request.
+  std::string_view header() const;
 
   /// Get reference to body of request.
   std::string_view body() const;

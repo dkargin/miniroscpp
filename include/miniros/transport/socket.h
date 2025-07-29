@@ -39,6 +39,9 @@ public:
   /// Enable reusing of socket address.
   Error setReuseAddr();
 
+  /// Set TCP NO_DELAY option.
+  Error setNoDelay(bool nodelay);
+
   /// Allocate tcp port and start listening.
   Error tcpListen(int port, NetAddress::Type type, int maxQueuedClients=100);
 
