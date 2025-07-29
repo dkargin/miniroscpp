@@ -9,10 +9,10 @@
 #endif
 
 
-#ifndef MAKEDEPEND
-# include <string>
-#endif
+#include <string>
+#include <string_view>
 
+#include "miniros/transport/http_tools.h"
 #include "XmlRpcDecl.h"
 #include "XmlRpcDispatch.h"
 #include "XmlRpcSource.h"
@@ -89,12 +89,17 @@ namespace XmlRpc {
     virtual bool generateRequest(const char* method, XmlRpcValue const& params);
     virtual std::string generateHeader(size_t length) const;
     virtual bool writeRequest();
-    virtual bool readHeader();
     virtual bool readResponse();
-    virtual bool parseResponse(XmlRpcValue& result);
+    virtual bool parseResponse(const std::string_view& response, XmlRpcValue& result) const;
 
     // Possible IO states for the connection
-    enum ClientConnectionState { NO_CONNECTION, CONNECTING, WRITE_REQUEST, READ_HEADER, READ_RESPONSE, IDLE };
+    enum ClientConnectionState {
+      NO_CONNECTION,
+      CONNECTING,
+      WRITE_REQUEST,
+      READ_RESPONSE,
+      IDLE
+    };
     ClientConnectionState _connectionState;
 
     static const char * connectionStateStr(ClientConnectionState state);
@@ -117,8 +122,6 @@ namespace XmlRpc {
     
     // The xml-encoded request, http header of response, and response xml
     std::string _request;
-    std::string _header;
-    std::string _response;
 
     // Number of times the client has attempted to send the request
     int _sendAttempts;
@@ -138,9 +141,6 @@ namespace XmlRpc {
     // True if a fault response was returned by the server
     bool _isFault;
 
-    // Number of bytes expected in the response body (parsed from response header)
-    int _contentLength;
-
     // Event dispatcher
     XmlRpcDispatch _disp;
 
@@ -152,8 +152,9 @@ namespace XmlRpc {
     /// Debug name.
     std::string _name;
 
-  };	// class XmlRpcClient
-
+    /// Data + parser state of HTTP response.
+    miniros::network::HttpFrame _httpFrame;
+  };
 }	// namespace XmlRpc
 
 #endif	// _XMLRPCCLIENT_H_

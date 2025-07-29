@@ -31,8 +31,6 @@ const char * XmlRpcClient::connectionStateStr(ClientConnectionState state) {
       return "CONNECTING";
     case WRITE_REQUEST:
       return "WRITE_REQUEST";
-    case READ_HEADER:
-      return "READ_HEADER";
     case READ_RESPONSE:
       return "READ_RESPONSE";
     case IDLE:
@@ -50,8 +48,7 @@ XmlRpcClient::XmlRpcClient(const char* host, int port, const char* uri/*=0*/)
   _bytesWritten(0),
   _executing(false),
   _eof(false),
-  _isFault(false),
-  _contentLength(0)
+  _isFault(false)
 {
   XmlRpcUtil::log(1, "XmlRpcClient new client: host %s, port %d.", host, port);
 
@@ -65,6 +62,8 @@ XmlRpcClient::XmlRpcClient(const char* host, int port, const char* uri/*=0*/)
   updateName();
   // Default to keeping the connection open until an explicit close is done
   setKeepOpen();
+
+  _httpFrame.finishResponse();
 }
 
 
@@ -88,8 +87,7 @@ void XmlRpcClient::updateName()
 
 
 // Close the owned fd
-void
-XmlRpcClient::close()
+void XmlRpcClient::close()
 {
   XmlRpcUtil::log(4, "XmlRpcClient(%s)::close: fd %d.", name().c_str(), getfd());
   _connectionState = NO_CONNECTION;
@@ -137,11 +135,14 @@ XmlRpcClient::execute(const char* method, XmlRpcValue const& params, XmlRpcValue
   double msTime = -1.0;   // Process until exit is called
   _disp.work(msTime);
 
-  if (_connectionState != IDLE || ! parseResponse(result))
+  if (_connectionState != IDLE
+    || _httpFrame.state() != miniros::network::HttpFrame::ParseComplete
+    || !parseResponse(_httpFrame.body(), result))
     return false;
 
   XmlRpcUtil::log(1, "XmlRpcClient(%s)::execute: method %s completed.", name().c_str(), method);
-  _response = "";
+
+  _httpFrame.resetParseState(false);
   return true;
 }
 
@@ -176,8 +177,7 @@ XmlRpcClient::executeNonBlock(const char* method, XmlRpcValue const& params)
   return true;
 }
 
-bool
-XmlRpcClient::executeCheckDone(XmlRpcValue& result)
+bool XmlRpcClient::executeCheckDone(XmlRpcValue& result)
 {
   result.clear();
   // Are we done yet?
@@ -191,12 +191,13 @@ XmlRpcClient::executeCheckDone(XmlRpcValue& result)
     return false;
   }
 
-  if (! parseResponse(result))
+  ;
+  if (!parseResponse(_httpFrame.body(), result))
   {
     // Hopefully the caller can determine that parsing failed.
   }
   //XmlRpcUtil::log(1, "XmlRpcClient::execute: method %s completed.", method);
-  _response = "";
+  _httpFrame.finishResponse();
   return true;
 }
 
@@ -227,9 +228,6 @@ XmlRpcClient::handleEvent(unsigned eventType)
     if ( ! writeRequest()) return 0;
     finishedSending = true;
   }
-
-  if (_connectionState == READ_HEADER)
-    if ( ! readHeader()) return 0;
 
   if (_connectionState == READ_RESPONSE)
     if ( ! readResponse()) return 0;
@@ -300,8 +298,7 @@ XmlRpcClient::doConnect()
 }
 
 // Encode the request to call the specified method with the specified parameters into xml
-bool
-XmlRpcClient::generateRequest(const char* methodName, XmlRpcValue const& params)
+bool XmlRpcClient::generateRequest(const char* methodName, XmlRpcValue const& params)
 {
   std::string body = REQUEST_BEGIN;
   body += methodName;
@@ -338,8 +335,7 @@ XmlRpcClient::generateRequest(const char* methodName, XmlRpcValue const& params)
 }
 
 // Prepend http headers
-std::string
-XmlRpcClient::generateHeader(size_t length) const
+std::string XmlRpcClient::generateHeader(size_t length) const
 {
   std::string header = 
     "POST " + _uri + " HTTP/1.1\r\n"
@@ -359,8 +355,7 @@ XmlRpcClient::generateHeader(size_t length) const
   return header + buff;
 }
 
-bool
-XmlRpcClient::writeRequest()
+bool XmlRpcClient::writeRequest()
 {
   if (_bytesWritten == 0)
     XmlRpcUtil::log(5, "XmlRpcClient(%s)::writeRequest (attempt %d):\n%s\n", name().c_str(), _sendAttempts+1, _request.c_str());
@@ -377,10 +372,8 @@ XmlRpcClient::writeRequest()
 
   // Wait for the result
   if (_bytesWritten == int(_request.length())) {
-    _header = "";
-    _response = "";
     _timeRequestSent = std::chrono::steady_clock::now();
-    _connectionState = READ_HEADER;
+    _connectionState = READ_RESPONSE;
   } else {
     // On partial write, remove the portion of the output that was written from
     // the request buffer.
@@ -390,162 +383,94 @@ XmlRpcClient::writeRequest()
   return true;
 }
 
-
-// Read the header from the response
-bool XmlRpcClient::readHeader()
+bool XmlRpcClient::readResponse()
 {
   // Read available data
-  if ( ! XmlRpcSocket::nbRead(this->getfd(), _header, &_eof) ||
-       (_eof && _header.length() == 0)) {
-
+  size_t oldSize = _httpFrame.data.size();
+  bool readOk = XmlRpcSocket::nbRead(this->getfd(), _httpFrame.data, &_eof);
+  size_t dataRead = _httpFrame.data.length() - oldSize;
+  if ( !readOk || (_eof && dataRead == 0))
+  {
     // If we haven't read any data yet and this is a keep-alive connection, the server may
     // have timed out, so we try one more time.
-    if (getKeepOpen() && _header.length() == 0 && _sendAttempts++ == 0) {
-      XmlRpcUtil::log(4, "XmlRpcClient(%s)::readHeader: re-trying connection", name().c_str());
+    if (getKeepOpen() && _httpFrame.data.length() == 0 && _sendAttempts++ == 0) {
+      XmlRpcUtil::log(4, "XmlRpcClient(%s)::readResponse: re-trying connection", name().c_str());
       XmlRpcSource::close();
       _connectionState = NO_CONNECTION;
       _eof = false;
       return setupConnection();
     }
 
-    XmlRpcUtil::error("Error in XmlRpcClient(%s)::readHeader: error while reading "
-                      "header (%s) on fd %d.", name().c_str(),
-                      XmlRpcSocket::getErrorMsg().c_str(), getfd());
-    // Read failed; this means the socket is in an unrecoverable state.
-    // Close the socket.
-    close();
+    // Its only an error if we already have read some data
+    if (_httpFrame.data.length() > 0)
+      XmlRpcUtil::error("XmlRpcClient(%d)::readHeader: error while reading header (%s).", _fd, XmlRpcSocket::getErrorMsg().c_str());
     return false;
   }
 
   double timeRead = std::chrono::duration<double>(std::chrono::steady_clock::now() - _timeRequestStart).count() * 1000;
-  XmlRpcUtil::log(4, "XmlRpcClient(%s)::readHeader: client has read %d bytes, t=%fms", name().c_str(), _header.length(), timeRead);
+  XmlRpcUtil::log(4, "XmlRpcClient(%s)::readHeader: client has read %d bytes, t=%fms", name().c_str(), dataRead, timeRead);
 
-  char *hp = (char*)_header.c_str();  // Start of header
-  char *ep = hp + _header.length();   // End of string
-  char *bp = 0;                       // Start of body
-  char *lp = 0;                       // Start of content-length value
-
-  for (char *cp = hp; (bp == 0) && (cp < ep); ++cp) {
-    if ((ep - cp > 16) && (strncasecmp(cp, "Content-length: ", 16) == 0))
-      lp = cp + 16;
-    else if ((ep - cp > 4) && (strncmp(cp, "\r\n\r\n", 4) == 0))
-      bp = cp + 4;
-    else if ((ep - cp > 2) && (strncmp(cp, "\n\n", 2) == 0))
-      bp = cp + 2;
+  if (dataRead == 0) {
+    return true;
   }
 
-  // If we haven't gotten the entire header yet, return (keep reading)
-  if (bp == 0) {
-    if (_eof)          // EOF in the middle of a response is an error
-    {
-      XmlRpcUtil::error("Error in XmlRpcClient(%s)::readHeader: EOF while reading header", name().c_str());
-      close();
-      return false;   // Close the connection
-    }
-    
-    return true;  // Keep reading
-  }
+  _httpFrame.incrementalParse();
 
-  // Decode content length
-  if (lp == 0) {
-    XmlRpcUtil::error("Error XmlRpcClient(%s)::readHeader: No Content-length specified", name().c_str());
-    // Close the socket because we can't make further use of it.
-    close();
-    return false;   // We could try to figure it out by parsing as we read, but for now...
-  }
+  XmlRpcUtil::log(4, "XmlRpcClient(%s)::readHeader client read content length: %d", name().c_str(), _httpFrame.contentLength());
 
-  _contentLength = atoi(lp);
-  if (_contentLength <= 0) {
-    XmlRpcUtil::error("Error in XmlRpcClient(%s)::readHeader: Invalid Content-length specified (%d).", name().c_str(), _contentLength);
-    // Close the socket because we can't make further use of it.
-    close();
-    return false;
-  }
-
-  XmlRpcUtil::log(4, "XmlRpcClient(%s)::readHeader client read content length: %d", name().c_str(), _contentLength);
-
-  // Otherwise copy non-header data to response buffer and set state to read response.
-  _response = bp;
-  _header = "";   // should parse out any interesting bits from the header (connection, etc)...
-  _connectionState = READ_RESPONSE;
-  _timeResponseHeader = std::chrono::steady_clock::now();
-  return true;    // Continue monitoring this source
-}
-
-    
-bool
-XmlRpcClient::readResponse()
-{
-  // If we dont have the entire response yet, read available data
-  if (int(_response.length()) < _contentLength) {
-    std::string buff;
-    if ( ! XmlRpcSocket::nbRead(this->getfd(), buff, &_eof)) {
-      XmlRpcUtil::error("Error in XmlRpcClient(%s)::readResponse: read error (%s).", name().c_str(), XmlRpcSocket::getErrorMsg().c_str());
-      // nbRead returned an error, indicating that the socket is in a bad state.
-      // close it and stop monitoring this client.
+  if (_httpFrame.state() == miniros::network::HttpFrame::ParseComplete) {
+    if (_httpFrame.contentLength() <= 0) {
+      XmlRpcUtil::error("Error in XmlRpcClient(%s)::readHeader: Invalid Content-length specified (%d).", name().c_str(), _httpFrame.contentLength());
+      // Close the socket because we can't make further use of it.
       close();
       return false;
     }
-    _response += buff;
 
-    // If we haven't gotten the entire _response yet, return (keep reading)
-    if (int(_response.length()) < _contentLength) {
-      if (_eof) {
-        XmlRpcUtil::error("Error in XmlRpcClient(%s)::readResponse: EOF while reading response", name().c_str());
-        // nbRead returned an eof, indicating that the socket is disconnected.
-        // close it and stop monitoring this client.
-        close();
-        return false;
-      }
-      return true;
-    }
+    _timeResponseBody = std::chrono::steady_clock::now();
+    _connectionState = IDLE;
+
+    // Otherwise, parse and return the result
+    XmlRpcUtil::log(3, "XmlRpcClient(%s)::readResponse (read %d bytes)", name().c_str(), _httpFrame.bodyLength());
+
+    _timeResponseBody = std::chrono::steady_clock::now();
+    _connectionState = IDLE;
+
+    double timeSent = std::chrono::duration<double>(_timeRequestSent - _timeRequestStart).count() * 1000;
+    double timeHeader = std::chrono::duration<double>(_timeResponseHeader - _timeRequestStart).count() * 1000;
+    double timeBody = std::chrono::duration<double>(_timeResponseBody - _timeRequestStart).count() * 1000;
+
+    XmlRpcUtil::log(5, "Response sent=%f recvH=%f recvB=%f", timeSent, timeHeader, timeBody);
   }
-
-  // Otherwise, parse and return the result
-  XmlRpcUtil::log(3, "XmlRpcClient(%s)::readResponse (read %d bytes)", name().c_str(), _response.length());
-  XmlRpcUtil::log(5, "response:\n%s", _response.c_str());
-
-  _timeResponseBody = std::chrono::steady_clock::now();
-  _connectionState = IDLE;
-
-  double timeSent = std::chrono::duration<double>(_timeRequestSent - _timeRequestStart).count() * 1000;
-  double timeHeader = std::chrono::duration<double>(_timeResponseHeader - _timeRequestStart).count() * 1000;
-  double timeBody = std::chrono::duration<double>(_timeResponseBody - _timeRequestStart).count() * 1000;
-
-  XmlRpcUtil::log(5, "Response sent=%f recvH=%f recvB=%f", timeSent, timeHeader, timeBody);
 
   return false;    // Stop monitoring this source (causes return from work)
 }
 
 
 // Convert the response xml into a result value
-bool
-XmlRpcClient::parseResponse(XmlRpcValue& result)
+bool XmlRpcClient::parseResponse(const std::string_view& responseView, XmlRpcValue& result) const
 {
+  std::string response(responseView);
+
   // Parse response xml into result
   int offset = 0;
-  if ( ! XmlRpcUtil::findTag(METHODRESPONSE_TAG,_response,&offset)) {
-    XmlRpcUtil::error("Error in XmlRpcClient(%s)::parseResponse: Invalid response - no methodResponse. Response:\n%s", name().c_str(), _response.c_str());
+  if ( ! XmlRpcUtil::findTag(METHODRESPONSE_TAG, response,&offset)) {
+    XmlRpcUtil::error("Error in XmlRpcClient(%s)::parseResponse: Invalid response - no methodResponse. Response:\n%s", name().c_str(), response.c_str());
     return false;
   }
 
   // Expect either <params><param>... or <fault>...
-  if ((XmlRpcUtil::nextTagIs(PARAMS_TAG,_response,&offset) &&
-       XmlRpcUtil::nextTagIs(PARAM_TAG,_response,&offset)) ||
-      (XmlRpcUtil::nextTagIs(FAULT_TAG,_response,&offset) && (_isFault = true)))
+  if ((XmlRpcUtil::nextTagIs(PARAMS_TAG, response,&offset) && XmlRpcUtil::nextTagIs(PARAM_TAG, response,&offset))
+       || (XmlRpcUtil::nextTagIs(FAULT_TAG, response,&offset) && _isFault == true))
   {
-    if ( ! result.fromXml(_response, &offset)) {
-      XmlRpcUtil::error("Error in XmlRpcClient(%s)::parseResponse: Invalid response value. Response:\n%s", name().c_str(), _response.c_str());
-      _response = "";
+    if ( ! result.fromXml(response, &offset)) {
+      XmlRpcUtil::error("Error in XmlRpcClient(%s)::parseResponse: Invalid response value. Response:\n%s", name().c_str(), response.c_str());
       return false;
     }
   } else {
-    XmlRpcUtil::error("Error in XmlRpcClient(%s)::parseResponse: Invalid response - no param or fault tag. Response:\n%s", name().c_str(), _response.c_str());
-    _response = "";
+    XmlRpcUtil::error("Error in XmlRpcClient(%s)::parseResponse: Invalid response - no param or fault tag. Response:\n%s", name().c_str(), response.c_str());
     return false;
   }
       
-  _response = "";
   return result.valid();
 }
 

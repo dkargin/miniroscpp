@@ -155,6 +155,11 @@ struct MINIROS_DECL HttpFrame {
     finish(true);
   }
 
+  void finishResponse()
+  {
+    finish(false);
+  }
+
   void finish(bool request);
 
 
