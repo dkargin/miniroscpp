@@ -201,6 +201,18 @@ Error NetSocket::setNonBlock()
   return Error::Ok;
 }
 
+Error NetSocket::setNoDelay(bool nodelay)
+{
+  int flag = nodelay ? 1 : 0;
+  int result = setsockopt(internal_->fd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int));
+  if (result < 0)
+  {
+    MINIROS_ERROR("setsockopt failed to set TCP_NODELAY on socket [%d]: %s", internal_->fd, last_socket_error_string());
+    return Error::SystemError;
+  }
+  return Error::Ok;
+}
+
 Error NetSocket::setReuseAddr()
 {
   // Allow this port to be re-bound immediately so server re-starts are not delayed
