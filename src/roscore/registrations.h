@@ -24,7 +24,7 @@ struct ReturnStruct
     std::string statusMessage;
     XmlRpc::XmlRpcValue value;
 
-    ReturnStruct(int _statusCode = 1, std::string _statusMessage = "", XmlRpc::XmlRpcValue _value = {})
+    ReturnStruct(int _statusCode = 1, const std::string& _statusMessage = "", XmlRpc::XmlRpcValue _value = {})
     {
         statusCode = _statusCode;
         statusMessage = _statusMessage;

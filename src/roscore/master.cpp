@@ -123,12 +123,13 @@ Master::RpcValue Master::lookupService(const std::string& caller_id, const std::
 
   RpcValue res = RpcValue::Array(3);
   if (uri.empty()) {
-    res[0] = -1;
+    res[0] = 0;
     res[1] = std::string("Failed to lookup service '" + service + "'");
+    res[2] = RpcValue();
   } else {
     res[0] = 1;
     res[1] = std::string("rosrpc URI: [") + uri + "]";
-    res[3] = uri;
+    res[2] = uri;
   }
   return res;
 }
@@ -277,18 +278,17 @@ Master::RpcValue Master::unregisterPublisher(
 {
   MINIROS_INFO("UNPUBLISHING caller_id=\"%s\" caller_api=%s topic=\"%s\"", caller_id.c_str(), caller_api.c_str(), topic.c_str());
 
-  RpcValue res = RpcValue::Array(3);
   RequesterInfo requesterInfo;
   if (!requesterInfo.assign(caller_id, connection->getfd())) {
     MINIROS_WARN("Failed to read network address of caller %s", caller_id.c_str());
   }
   requesterInfo.callerApi = caller_api;
 
-
-  int ret = m_handler.unregisterPublisher(requesterInfo, topic);
-  res[0] = 1;
-  res[1] = std::string("unregistered ") + caller_id + std::string("as provder of ") + topic;
-  res[2] = ret;
+  ReturnStruct st = m_handler.unregisterPublisher(requesterInfo, topic);
+  RpcValue res = RpcValue::Array(3);
+  res[0] = st.statusCode;
+  res[1] = st.statusMessage;
+  res[2] = st.value;
   return res;
 }
 
@@ -312,17 +312,17 @@ Master::RpcValue Master::registerSubscriber(const std::string& caller_id, const 
 Master::RpcValue Master::unregisterSubscriber(
   const std::string& caller_id, const std::string& topic, const std::string& caller_api, Connection* connection)
 {
-  RpcValue res = RpcValue::Array(3);
   RequesterInfo requesterInfo;
   if (!requesterInfo.assign(caller_id, connection->getfd())) {
     MINIROS_WARN("Failed to read network address of caller %s", caller_id.c_str());
   }
   requesterInfo.callerApi = caller_api;
 
-  int ret = m_handler.unregisterSubscriber(requesterInfo, topic);
-  res[0] = 1;
-  res[1] = std::string("unregistered ") + caller_id + std::string("as provder of ") + topic;
-  res[2] = ret;
+  ReturnStruct st = m_handler.unregisterSubscriber(requesterInfo, topic);
+  RpcValue res = RpcValue::Array(3);
+  res[0] = st.statusCode;
+  res[1] = st.statusMessage;
+  res[2] = st.value;
   return res;
 }
 

@@ -56,11 +56,11 @@ public:
 
   ReturnStruct registerSubscriber(const RequesterInfo& requesterInfo, const std::string& topic, const std::string& topic_type);
 
-  int unregisterSubscriber(const RequesterInfo& requesterInfo, const std::string& topic);
+  ReturnStruct unregisterSubscriber(const RequesterInfo& requesterInfo, const std::string& topic);
 
   ReturnStruct registerPublisher(const RequesterInfo& requesterInfo, const std::string& topic, const std::string& topic_type);
 
-  int unregisterPublisher(const RequesterInfo& requesterInfo, const std::string& topic);
+  ReturnStruct unregisterPublisher(const RequesterInfo& requesterInfo, const std::string& topic);
 
   std::string lookupNode(const RequesterInfo& requesterInfo, const std::string& node_name) const;
 
