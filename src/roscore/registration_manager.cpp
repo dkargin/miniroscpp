@@ -97,8 +97,10 @@ ReturnStruct RegistrationManager::unregisterObject(Registrations& r, const std::
     }
   }
 
-  if (node_ref->is_empty()) {
-    unregisterNode(caller_id);
+  if (node_ref) {
+    if (node_ref->is_empty()) {
+      unregisterNode(caller_id);
+    }
   }
   return ret;
 }

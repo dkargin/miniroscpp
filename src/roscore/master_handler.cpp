@@ -141,7 +141,6 @@ std::string MasterHandler::lookupService(const RequesterInfo& requesterInfo, con
   std::string service_api = m_regManager->services.get_service_api(service);
   std::shared_ptr<NodeRef> node = m_regManager->getNodeByAPI(service_api);
   if (node && requesterInfo.clientAddress.valid()) {
-    // TODO: resolve service_api
     network::URL url = m_resolver.resolveAddressFor(node, requesterInfo.clientAddress, requesterInfo.localAddress);
     return url.str();
   }
@@ -202,13 +201,12 @@ ReturnStruct MasterHandler::registerSubscriber(const RequesterInfo& requesterInf
   return rtn;
 }
 
-int MasterHandler::unregisterSubscriber(const RequesterInfo& requesterInfo, const std::string& topic)
+ReturnStruct MasterHandler::unregisterSubscriber(const RequesterInfo& requesterInfo, const std::string& topic)
 {
   // Subscriber can be unregistered either by a direct call of actual subscriber,
   // or as a part of cleanup procedure from rosnode/rostopic utility. So we do not need to check whether
   // the topic actually belongs to specified caller_id.
-  m_regManager->unregister_subscriber(topic, requesterInfo.callerId, requesterInfo.callerApi);
-  return 1;
+  return m_regManager->unregister_subscriber(topic, requesterInfo.callerId, requesterInfo.callerApi);
 }
 
 ReturnStruct MasterHandler::registerPublisher(const RequesterInfo& requesterInfo, const std::string& topic,
@@ -218,7 +216,7 @@ ReturnStruct MasterHandler::registerPublisher(const RequesterInfo& requesterInfo
     topic.c_str(), requesterInfo.callerId.c_str(), requesterInfo.callerApi.c_str(), topic_type.c_str());
 
   if (topic.empty() || topic_type.empty()) {
-    ReturnStruct(-1, "Request error");
+    return ReturnStruct(-1, "Request error");
   }
 
   {
@@ -254,7 +252,7 @@ ReturnStruct MasterHandler::registerPublisher(const RequesterInfo& requesterInfo
   return rtn;
 }
 
-int MasterHandler::unregisterPublisher(const RequesterInfo& requesterInfo, const std::string& topic)
+ReturnStruct MasterHandler::unregisterPublisher(const RequesterInfo& requesterInfo, const std::string& topic)
 {
   MINIROS_INFO_NAMED("handler", "unregisterPublisher(\"%s\") caller_id=%s caller_api=%s",
     topic.c_str(), requesterInfo.callerId.c_str(), requesterInfo.callerApi.c_str());
@@ -268,7 +266,7 @@ int MasterHandler::unregisterPublisher(const RequesterInfo& requesterInfo, const
     notifyTopicSubscribers(topic, subscribers);
   }
 
-  return 1;
+  return ret;
 }
 
 std::string MasterHandler::lookupNode(const RequesterInfo& requesterInfo, const std::string& node_name) const
