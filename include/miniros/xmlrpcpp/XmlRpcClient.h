@@ -90,7 +90,7 @@ namespace XmlRpc {
     virtual std::string generateHeader(size_t length) const;
     virtual bool writeRequest();
     virtual bool readResponse();
-    virtual bool parseResponse(const std::string_view& response, XmlRpcValue& result) const;
+    virtual bool parseResponse(const std::string_view& response, XmlRpcValue& result, bool& isFault) const;
 
     // Possible IO states for the connection
     enum ClientConnectionState {

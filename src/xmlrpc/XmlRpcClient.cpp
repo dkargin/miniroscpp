@@ -113,6 +113,7 @@ XmlRpcClient::execute(const char* method, XmlRpcValue const& params, XmlRpcValue
 {
   XmlRpcUtil::log(1, "XmlRpcClient(%s)::execute: method %s (_connectionState %s).", name().c_str(), method, connectionStateStr(_connectionState));
 
+  result.clear();
   // This is not a thread-safe operation, if you want to do multithreading, use separate
   // clients for each thread. If you want to protect yourself from multiple threads
   // accessing the same client, replace this code with a real mutex.
@@ -135,14 +136,16 @@ XmlRpcClient::execute(const char* method, XmlRpcValue const& params, XmlRpcValue
   double msTime = -1.0;   // Process until exit is called
   _disp.work(msTime);
 
-  if (_connectionState != IDLE
-    || _httpFrame.state() != miniros::network::HttpFrame::ParseComplete
-    || !parseResponse(_httpFrame.body(), result))
+  if (_connectionState != IDLE  || _httpFrame.state() != miniros::network::HttpFrame::ParseComplete)
+    return false;
+
+  const std::string_view body = _httpFrame.body();
+  if (!parseResponse(body, result, _isFault))
     return false;
 
   XmlRpcUtil::log(1, "XmlRpcClient(%s)::execute: method %s completed.", name().c_str(), method);
 
-  _httpFrame.resetParseState(false);
+  _httpFrame.finishResponse();
   return true;
 }
 
@@ -191,8 +194,7 @@ bool XmlRpcClient::executeCheckDone(XmlRpcValue& result)
     return false;
   }
 
-  ;
-  if (!parseResponse(_httpFrame.body(), result))
+  if (!parseResponse(_httpFrame.body(), result, _isFault))
   {
     // Hopefully the caller can determine that parsing failed.
   }
@@ -447,7 +449,7 @@ bool XmlRpcClient::readResponse()
 
 
 // Convert the response xml into a result value
-bool XmlRpcClient::parseResponse(const std::string_view& responseView, XmlRpcValue& result) const
+bool XmlRpcClient::parseResponse(const std::string_view& responseView, XmlRpcValue& result, bool& isFault) const
 {
   std::string response(responseView);
 
@@ -460,7 +462,7 @@ bool XmlRpcClient::parseResponse(const std::string_view& responseView, XmlRpcVal
 
   // Expect either <params><param>... or <fault>...
   if ((XmlRpcUtil::nextTagIs(PARAMS_TAG, response,&offset) && XmlRpcUtil::nextTagIs(PARAM_TAG, response,&offset))
-       || (XmlRpcUtil::nextTagIs(FAULT_TAG, response,&offset) && _isFault == true))
+       || (XmlRpcUtil::nextTagIs(FAULT_TAG, response,&offset) && (isFault = true))) //< _isFault assignment is intended behaviour
   {
     if ( ! result.fromXml(response, &offset)) {
       XmlRpcUtil::error("Error in XmlRpcClient(%s)::parseResponse: Invalid response value. Response:\n%s", name().c_str(), response.c_str());
