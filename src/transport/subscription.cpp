@@ -66,6 +66,102 @@ using XmlRpc::XmlRpcValue;
 namespace miniros
 {
 
+Subscription::PendingConnection::PendingConnection(XmlRpc::XmlRpcClient* client, TransportUDPPtr udp_transport, const SubscriptionWPtr& parent, const std::string& remote_uri)
+: client_(client)
+, udp_transport_(udp_transport)
+, parent_(parent)
+, remote_uri_(remote_uri)
+{
+  assert(client_);
+}
+
+Subscription::PendingConnection::~PendingConnection()
+{
+  if (client_)
+    delete client_;
+}
+
+XmlRpc::XmlRpcClient* Subscription::PendingConnection::getClient() const
+{
+  return client_;
+}
+
+TransportUDPPtr Subscription::PendingConnection::getUDPTransport() const
+{
+  return udp_transport_;
+}
+
+int convertEventsToXmlRpc(int flags)
+{
+  int oflags = 0;
+  if (flags & POLLIN)
+    oflags |= XmlRpc::XmlRpcDispatch::ReadableEvent;
+  if (flags & POLLOUT)
+    oflags |= XmlRpc::XmlRpcDispatch::WritableEvent;
+  if (flags & POLLERR)
+    oflags |= XmlRpc::XmlRpcDispatch::Exception;
+  return oflags;
+}
+
+int convertEventsToPollSet(int flags)
+{
+  int oflags = 0;
+  if (flags & XmlRpc::XmlRpcDispatch::ReadableEvent)
+    oflags |= POLLIN;
+  if (flags & XmlRpc::XmlRpcDispatch::WritableEvent)
+    oflags |= POLLOUT;
+  if (flags & XmlRpc::XmlRpcDispatch::Exception)
+    oflags |= POLLERR;
+  return oflags;
+}
+
+void Subscription::PendingConnection::addToDispatch(PollSet* pollSet)
+{
+  assert(client_);
+  assert(pollSet);
+
+  int fd = client_->getfd();
+  pollSet->addSocket(fd, [this, pollSet](int flags) {
+    int oflags = convertEventsToXmlRpc(flags);
+    int newEvents = client_->handleEvent(oflags);
+    pollSet->setEvents(client_->getfd(), convertEventsToPollSet(newEvents));
+  });
+  pollSet->setEvents(fd, POLLOUT | POLLERR);
+  //disp->addSource(client_, XmlRpc::XmlRpcDispatch::WritableEvent | XmlRpc::XmlRpcDispatch::Exception);
+}
+
+void Subscription::PendingConnection::removeFromDispatch(PollSet* pollSet)
+{
+  assert(client_);
+  assert(pollSet);
+  int fd = client_->getfd();
+  pollSet->delSocket(fd);
+}
+
+bool Subscription::PendingConnection::check()
+{
+  SubscriptionPtr parent = parent_.lock();
+  if (!parent)
+  {
+    return true;
+  }
+
+  XmlRpc::XmlRpcValue result;
+  if (client_->executeCheckDone(result))
+  {
+    parent->pendingConnectionDone(std::dynamic_pointer_cast<PendingConnection>(shared_from_this()), result);
+    return true;
+  }
+
+  return false;
+}
+
+const std::string& Subscription::PendingConnection::getRemoteURI()
+{
+  return remote_uri_;
+}
+
+
 Subscription::Subscription(const std::string &name, const std::string& md5sum, const std::string& datatype, const TransportHints& transport_hints)
 : name_(name)
 , md5sum_(md5sum)

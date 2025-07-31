@@ -130,6 +130,11 @@ struct MINIROS_DECL HttpFrame {
     return getTokenView(data, requestHttpVersion);
   }
 
+  std::string_view getPath() const
+  {
+    return getTokenView(data, requestPath);
+  }
+
   ParserState state() const
   {
     return m_state;
@@ -150,6 +155,11 @@ struct MINIROS_DECL HttpFrame {
     finish(true);
   }
 
+  void finishResponse()
+  {
+    finish(false);
+  }
+
   void finish(bool request);
 
 
@@ -159,6 +169,9 @@ struct MINIROS_DECL HttpFrame {
 
   /// Check if parser has content length field.
   bool hasContentLength() const;
+
+  /// Get reference to header of request.
+  std::string_view header() const;
 
   /// Get reference to body of request.
   std::string_view body() const;
@@ -186,6 +199,30 @@ protected:
 
   /// Current state of a parser.
   ParserState m_state = HttpFrame::ParseInvalid;
+};
+
+/// Header of HTTP response.
+/// It encapsulates most important parts of HTTP response before serializing it to a buffer.
+struct HttpResponseHeader {
+  /// Internal error.
+  Error error = Error::Ok;
+
+  /// Status code.
+  int statusCode = 200;
+
+  /// Text representation of status.
+  std::string status = "OK";
+
+  std::string server;
+
+  /// Type of the content.
+  std::string contentType;
+
+  /// Reset contents of response.
+  void reset();
+
+  /// Serialize to string.
+  void writeHeader(std::string& output, size_t bodySize) const;
 };
 
 } // namespace network

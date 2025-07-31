@@ -100,6 +100,13 @@ std::string_view HttpFrame::getTokenView(const std::string& data, const Token& t
   return result;
 }
 
+std::string_view HttpFrame::header() const
+{
+  if (m_bodyPosition > 0)
+    return std::string_view(data.c_str(), m_bodyPosition);
+  return std::string_view(data.c_str(), data.size());
+}
+
 std::string_view HttpFrame::body() const
 {
   int bodySize = bodyLength();
@@ -247,6 +254,40 @@ int HttpFrame::incrementalParse()
 bool HttpFrame::hasHeader() const
 {
   return m_state == HttpFrame::ParseBody || m_state == ParseComplete;
+}
+
+
+void HttpResponseHeader::reset()
+{
+  statusCode = 200;
+  contentType.clear();
+  server.clear();
+  status.clear();
+}
+
+void HttpResponseHeader::writeHeader(std::string& output, size_t bodySize) const
+{
+  output += "HTTP/1.1 ";
+  output += std::to_string(statusCode);
+  output += status;
+  output += "\r\n";
+
+  if (!server.empty()) {
+    output += "Server: ";
+    output += server; // XMLRPC_VERSION
+    output += "\r\n";
+  }
+  output += "Content-Type: ";
+  output += contentType;
+  output += "\r\n";
+
+  if (bodySize > 0) {
+    output += "Content-Length: ";
+    output += std::to_string(bodySize);
+    output += "\r\n";
+  }
+
+  output += "\r\n";
 }
 
 } // namespace network

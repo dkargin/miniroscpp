@@ -297,6 +297,8 @@ bool isStarted()
 /// Start is issued by a first NodeHandle::construct.
 Error start()
 {
+  SteadyTime time_start = SteadyTime::now();
+
   std::scoped_lock<std::mutex> lock(g_start_mutex);
   if (g_started)
   {
@@ -350,8 +352,9 @@ Error start()
 
   pm->start();
 
+  PollSet& pollSet = pm->getPollSet();
   int rpcPort = network::getRPCPort();
-  if (!rpcm->start(rpcPort)) {
+  if (!rpcm->start(&pollSet, rpcPort)) {
     // We can arrive here only if we are completely unable to host TCP/http server.
     MINIROS_ERROR("Failed to start RPCManager. Something is very wrong with TCP network");
     shutdown();
@@ -448,6 +451,8 @@ end:
     std::scoped_lock<std::recursive_mutex> lock(g_shutting_down_mutex);
   }
 
+  auto start_total = SteadyTime::now() - time_start;
+  MINIROS_INFO("root ::start() done in %fms", start_total.toSec()*1000);
   return Error::Ok;
 }
 
@@ -500,8 +505,8 @@ void init(const M_string& remappings, const std::string& name, uint32_t options)
     check_ipv6_environment();
     network::init(remappings);
     auto rpcManager = RPCManager::instance();
-    g_master_link.reset(new MasterLink(rpcManager));
-    g_master_link->initLink(remappings);
+    g_master_link.reset(new MasterLink());
+    g_master_link->initLink(remappings, rpcManager);
     // names:: namespace is initialized by this_node
     this_node::init(name, remappings, options);
     file_log::init(remappings);

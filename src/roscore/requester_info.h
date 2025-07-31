@@ -26,7 +26,7 @@ struct MINIROS_DECL RequesterInfo {
 
   RequesterInfo() = default;
 
-  Error assign(const std::string& callerId, int connectionFd);
+  Error assign(const std::string& caller, const network::ClientInfo& client);
 };
 
 }

@@ -17,7 +17,7 @@
 namespace miniros {
 namespace network {
 // Defined in net_address.cpp
-bool fillAddress(const sockaddr_in& my_addr, NetAddress& address);
+bool fillAddress(const sockaddr_in& sysAddr, NetAddress& address);
 }
 
 namespace master {

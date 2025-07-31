@@ -5,7 +5,6 @@
 #ifndef MINIROS_NET_ADDRESS_H
 #define MINIROS_NET_ADDRESS_H
 
-#include <cstdint>
 #include <string>
 
 #include "miniros/macros.h"
@@ -71,6 +70,14 @@ MINIROS_DECL bool readLocalAddress(int sockfd, NetAddress& address);
 
 /// Fills in remote address from socket.
 MINIROS_DECL bool readRemoteAddress(int sockfd, NetAddress& address);
+
+/// Information about connection to client.
+struct MINIROS_DECL ClientInfo {
+  NetAddress remoteAddress;
+  NetAddress localAddress;
+  int fd = -1;
+  bool sameProcess = false;
+};
 
 } // namespace network
 } // namespace miniros

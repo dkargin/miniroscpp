@@ -56,13 +56,11 @@ struct MasterLink::Internal {
 #if defined(__APPLE__)
   std::mutex xmlrpc_call_mutex;
 #endif
-
-  Internal(const std::shared_ptr<RPCManager>& rpcManager) : rpcManager(rpcManager) {}
 };
 
-MasterLink::MasterLink(const std::shared_ptr<RPCManager>& rpcManager) : internal_(nullptr)
+MasterLink::MasterLink() : internal_(nullptr)
 {
-  internal_ = new Internal(rpcManager);
+  internal_ = new Internal();
 }
 
 MasterLink::~MasterLink()
@@ -73,7 +71,7 @@ MasterLink::~MasterLink()
   }
 }
 
-Error MasterLink::initLink(const M_string& remappings)
+Error MasterLink::initLink(const M_string& remappings, const std::shared_ptr<RPCManager>& rpcManager)
 {
   if (!internal_)
     return Error::InternalError;
@@ -108,8 +106,16 @@ Error MasterLink::initLink(const M_string& remappings)
     return Error::InvalidURI;
   }
 
+  internal_->rpcManager = rpcManager;
   return Error::Ok;
 }
+
+/// Stop serving any request.
+void MasterLink::disconnect()
+{
+  internal_->rpcManager.reset();
+}
+
 
 std::string MasterLink::getHost() const
 {
@@ -194,16 +200,33 @@ Error MasterLink::execute(const std::string& method, const RpcValue& request, Rp
 {
   if (!internal_)
     return Error::InternalError;
+
+  RPCManagerPtr manager = internal_->rpcManager;
+  if (!manager) {
+    return Error::NoMaster;
+  }
+
   miniros::SteadyTime start_time = miniros::SteadyTime::now();
 
   std::string master_host = getHost();
   uint32_t master_port = getPort();
-  RPCManagerPtr manager = internal_->rpcManager;
   if (!manager) {
     MINIROS_ERROR("[%s] - no manager", method.c_str());
     return Error::InternalError;
   }
-  XmlRpc::XmlRpcClient* c = manager->getXMLRPCClient(master_host, master_port, "/");
+
+  // Try to execute request without any network.
+  if (manager->isMaster()) {
+    if (Error err = manager->executeLocalRPC(method, request, response); err != Error::Ok) {
+      return Error::InvalidValue;
+    }
+    if (!manager->validateXmlrpcResponse(method, response, payload)) {
+      return Error::InvalidResponse;
+    }
+    return Error::Ok;
+  }
+
+  XmlRpc::XmlRpcClient* c = manager->getXMLRPCClient(master_host, master_port, "/RPC2");
   if (!c) {
     MINIROS_ERROR("[%s] - failed make connection to host=\"%s:%d\"", method.c_str(), master_host.c_str(), master_port);
     return Error::InvalidURI;
@@ -264,6 +287,8 @@ Error MasterLink::execute(const std::string& method, const RpcValue& request, Rp
     MINIROS_ERROR("[%s] Got shutdown request during RPC call", method.c_str());
     return Error::ShutdownInterrupt;
   }
+  auto time = SteadyTime::now() - start_time;
+  //MINIROS_DEBUG("Finished \"%s\" in %fms", method.c_str(), time.toSec()*1000.0);
   return Error::Ok;;
 }
 
@@ -294,11 +319,11 @@ void MasterLink::set(const std::string& key, const RpcValue& v)
   params[2] = v;
 
   {
-    // Lock around the execute to the master in case we get a parameter update on this value between
-    // executing on the master and setting the parameter in the g_params list.
-    std::scoped_lock<std::mutex> lock(internal_->params_mutex);
-
     if (this->execute("setParam", params, result, payload, true)) {
+      // Lock around the execute to the master in case we get a parameter update on this value between
+      // executing on the master and setting the parameter in the g_params list.
+      std::scoped_lock<std::mutex> lock(internal_->params_mutex);
+
       // Update our cached params list now so that if get() is called immediately after param::set()
       // we already have the cached state and our value will be correct
       if (internal_->subscribed_params.find(mapped_key) != internal_->subscribed_params.end()) {

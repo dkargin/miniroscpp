@@ -61,13 +61,17 @@ struct PollSet::Internal {
   };
 
   std::map<int, SocketInfo> socket_info_;
-  std::mutex socket_info_mutex_;
+  mutable std::mutex socket_info_mutex_;
   bool sockets_changed_ = false;
 
   std::mutex just_deleted_mutex_;
   std::vector<int> just_deleted_;
 
   std::vector<socket_pollfd> ufds_;
+
+  /// Storage for results from poll.
+  std::vector<socket_pollfd> ofds_;
+
 
   std::mutex signal_mutex_;
   signal_fd_t signal_pipe_[2] = {MINIROS_INVALID_SOCKET, MINIROS_INVALID_SOCKET};
@@ -78,6 +82,17 @@ struct PollSet::Internal {
     :epfd_(create_socket_watcher())
   {
 
+  }
+
+  const SocketInfo* findSocketInfo(int fd) const
+  {
+    std::scoped_lock<std::mutex> lock(socket_info_mutex_);
+    auto it = socket_info_.find(fd);
+    // the socket has been entirely deleted
+    if (it == socket_info_.end())
+      return nullptr;
+
+    return &it->second;
   }
 };
 
@@ -248,49 +263,35 @@ void PollSet::update(int poll_timeout)
 {
   createNativePollset();
 
-  // Poll across the sockets we're servicing
-  std::shared_ptr<std::vector<socket_pollfd> > ofds = poll_sockets(internal_->epfd_,
-    &internal_->ufds_.front(), internal_->ufds_.size(), poll_timeout);
-
-  if (!ofds)
+  Error err = poll_sockets(internal_->epfd_, &internal_->ufds_.front(), internal_->ufds_.size(), poll_timeout, internal_->ofds_);
+  if (!err)
   {
-    MINIROS_ERROR("poll failed with error %s", last_socket_error_string());
+    MINIROS_ERROR("poll failed with error %s", err.toString());
   }
   else
   {
-    for (const socket_pollfd& spfd:  *ofds)
+    for (const socket_pollfd& spfd: internal_->ofds_)
     {
       int fd = spfd.fd;
       int revents = spfd.revents;
-      SocketUpdateFunc func;
-      TransportPtr transport;
-      int events = 0;
 
       if (revents == 0)
-      {
         continue;
-      }
-      {
-        std::scoped_lock<std::mutex> lock(internal_->socket_info_mutex_);
-        auto it2 = internal_->socket_info_.find(fd);
-        // the socket has been entirely deleted
-        if (it2 == internal_->socket_info_.end())
-        {
-          continue;
-        }
 
-        const Internal::SocketInfo& info = it2->second;
+      const auto* info = internal_->findSocketInfo(fd);
+      if (!info)
+        continue;
 
-        // Store off the function and transport in case the socket is deleted from another thread
-        func = info.func_;
-        transport = info.transport_;
-        events = info.events_;
-      }
+      // Store off the function and transport in case the socket is deleted from another thread
+      SocketUpdateFunc func = info->func_;
+      // This pointer helps keeping transport alive until we exit this block.
+      TransportPtr transport = info->transport_;
+      const int events = info->events_;
 
-      bool hasEvents = ((events & revents)
-              || (revents & POLLERR)
-              || (revents & POLLHUP)
-              || (revents & POLLNVAL));
+      bool hasEvents = events & revents
+              || revents & POLLERR
+              || revents & POLLHUP
+              || revents & POLLNVAL;
       // If these are registered events for this socket, OR the events are ERR/HUP/NVAL,
       // call through to the registered function
       if (func && hasEvents)
@@ -306,15 +307,11 @@ void PollSet::update(int poll_timeout)
           std::scoped_lock<std::mutex> lock(internal_->just_deleted_mutex_);
           auto it = std::find(internal_->just_deleted_.begin(), internal_->just_deleted_.end(), fd);
           if (it != internal_->just_deleted_.end())
-          {
             skip = true;
-          }
         }
 
         if (!skip)
-        {
           func(revents & (events|POLLERR|POLLHUP|POLLNVAL));
-        }
       }
     }
   }

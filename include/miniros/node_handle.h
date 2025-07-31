@@ -2173,7 +2173,7 @@ if (service)  // Enter if advertised service is valid
   template<typename T>
   bool param(const std::string& param_name, T& param_val, const T& default_val) const
   {
-    if (hasParam(param_name))
+    if (ok() && hasParam(param_name))
     {
       if (getParam(param_name, param_val))
       {
