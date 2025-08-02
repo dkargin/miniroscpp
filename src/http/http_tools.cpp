@@ -5,7 +5,7 @@
 #include <cassert>
 #include <cstring>
 
-#include "miniros/transport/http_tools.h"
+#include "miniros/http/http_tools.h"
 
 #if defined(_MSC_VER)
 # define strncasecmp	_strnicmp

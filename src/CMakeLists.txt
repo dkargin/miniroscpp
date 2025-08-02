@@ -152,6 +152,12 @@ set(transport_SRC
     shape_shifter.cpp
     observer.cpp
 
+    http/http_server.cpp
+    http/http_server_connection.cpp
+    http/http_tools.cpp
+    http/xmlrpc_handler.cpp
+
+
     transport/advertise_service_options.cpp
     transport/callback_queue.cpp
     transport/connection.cpp
@@ -161,9 +167,6 @@ set(transport_SRC
     transport/intraprocess_publisher_link.cpp
     transport/internal_timer_manager.cpp
     transport/io.cpp
-    transport/http_server.cpp
-    transport/http_server_connection.cpp
-    transport/http_tools.cpp
 
     transport/master_link.cpp
     transport/message_deserializer.cpp
@@ -211,7 +214,6 @@ set(transport_SRC
     transport/transport_subscriber_link.cpp
     transport/url.cpp
     transport/wall_timer.cpp
-    transport/xmlrpc_handler.cpp
     tf2/transform_broadcaster.cpp
   )
 

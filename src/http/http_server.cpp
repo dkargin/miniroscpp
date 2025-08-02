@@ -4,14 +4,10 @@
 
 #include <cassert>
 
-#include "miniros/transport/http_server.h"
-#include "miniros/transport/http_server_connection.h"
 #include "miniros/transport/io.h"
 
-#include "miniros/transport/xmlrpc_handler.h"
-
-#include "xmlrpcpp/XmlRpcSocket.h"
-#include "xmlrpcpp/XmlRpcUtil.h"
+#include "miniros/http/http_server.h"
+#include "miniros/http/http_server_connection.h"
 
 #define MINIROS_PACKAGE_NAME "http_server"
 

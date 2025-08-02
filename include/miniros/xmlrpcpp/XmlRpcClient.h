@@ -1,6 +1,6 @@
 
-#ifndef _XMLRPCCLIENT_H_
-#define _XMLRPCCLIENT_H_
+#ifndef MINIROS_XMLRPCCLIENT_H_
+#define MINIROS_XMLRPCCLIENT_H_
 //
 // XmlRpc++ Copyright (c) 2002-2003 by Chris Morley
 //
@@ -14,7 +14,8 @@
 #include <string>
 #include <string_view>
 
-#include "miniros/transport/http_tools.h"
+#include "miniros/http/http_tools.h"
+
 #include "XmlRpcDecl.h"
 #include "XmlRpcDispatch.h"
 #include "XmlRpcSource.h"
@@ -163,4 +164,4 @@ namespace XmlRpc {
   };
 }	// namespace XmlRpc
 
-#endif	// _XMLRPCCLIENT_H_
+#endif	// MINIROS_XMLRPCCLIENT_H_

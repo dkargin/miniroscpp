@@ -37,8 +37,9 @@
 #include <atomic>
 
 #include "miniros/common.h"
-// TODO: Move it to impl section
-#include "http_server.h"
+
+#include "miniros/http/http_server.h"
+
 #include "miniros/xmlrpcpp/XmlRpc.h"
 
 #include <miniros/rostime.h>

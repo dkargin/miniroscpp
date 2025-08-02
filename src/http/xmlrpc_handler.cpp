@@ -2,7 +2,8 @@
 // Created by dkargin on 7/22/25.
 //
 
-#include "miniros/transport/xmlrpc_handler.h"
+#include "miniros/http/xmlrpc_handler.h"
+
 #include "miniros/xmlrpcpp/XmlRpcUtil.h"
 #include "miniros/xmlrpcpp/XmlRpcValue.h"
 #include "miniros/xmlrpcpp/XmlRpcServerMethod.h"

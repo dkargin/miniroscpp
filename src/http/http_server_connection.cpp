@@ -4,8 +4,9 @@
 
 #include <cassert>
 
-#include "miniros/transport/http_server.h"
-#include "miniros/transport/http_server_connection.h"
+#include "miniros/http/http_server.h"
+#include "miniros/http/http_server_connection.h"
+
 #include "miniros/transport/io.h"
 
 namespace miniros {

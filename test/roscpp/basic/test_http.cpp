@@ -4,7 +4,7 @@
 
 #include <gtest/gtest.h>
 
-#include "miniros/transport/http_tools.h"
+#include "miniros/http/http_tools.h"
 #include "miniros/transport/net_address.h"
 #include "miniros/transport/url.h"
 

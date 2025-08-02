@@ -8,8 +8,9 @@
 #include <string>
 
 #include "miniros/transport/socket.h"
-#include "miniros/transport/http_tools.h"
-#include "poll_set.h"
+#include "miniros/transport/poll_set.h"
+
+#include "miniros/http/http_tools.h"
 
 namespace miniros {
 namespace network {

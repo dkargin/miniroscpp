@@ -38,7 +38,8 @@
 #include "miniros/transport/rpc_manager.h"
 
 #include "minibag/structures.h"
-#include "miniros/transport/xmlrpc_handler.h"
+
+#include "miniros/http/xmlrpc_handler.h"
 
 #include "miniros/xmlrpcpp/XmlRpcServerConnection.h"
 
