@@ -39,6 +39,14 @@ TEST(net, parseGoodURL)
   EXPECT_TRUE(url.scheme.empty());
 }
 
+TEST(net, parseProblematicURL)
+{
+  const std::string urlOnlyPath = "/RPC2";
+  network::URL url;
+  ASSERT_TRUE(url.fromString(urlOnlyPath, false));
+  EXPECT_STREQ(url.path.c_str(), "/RPC2");
+}
+
 const char* request1 = "POST /RPC2 HTTP/1.1\r\n" \
   "Host: localhost:11311\r\n" \
   "Accept-Encoding: gzip\r\n" \

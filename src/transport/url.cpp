@@ -19,11 +19,13 @@ URL::URL()
 bool URL::fromString(const std::string& uri, bool defaultPort)
 {
   reset();
-  // http://192.156.54.23:11223/RPC2/request?.......
+  //
+  // URL with all parts: http://192.156.54.23:11223/RPC2/request?.......
+  // Extreme URL with only path: /RPC2
   constexpr char schemeMarker[] = "://";
 
   std::string::size_type hostStart = 0;
-  std::string::size_type schemePos = uri.find_first_of(schemeMarker);
+  std::string::size_type schemePos = uri.find(schemeMarker);
   if (schemePos != std::string::npos) {
     hostStart = schemePos + sizeof(schemeMarker) - 1;
     scheme = uri.substr(0, hostStart);
