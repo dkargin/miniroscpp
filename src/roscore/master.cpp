@@ -7,6 +7,7 @@
 #include "master.h"
 
 #include "master_handler.h"
+#include "miniros_favicon.h"
 #include "parameter_storage.h"
 
 #include "miniros/transport/rpc_manager.h"
@@ -35,7 +36,9 @@ struct Master::Internal {
 
   class MasterHttpEndpoint : public http::EndpointHandler {
   public:
-    MasterHttpEndpoint(Internal* internal) : internal(internal) {}
+    MasterHttpEndpoint(Internal* internal) : internal(internal)
+    {
+    }
 
     Error handle(const http::HttpFrame& frame, const network::ClientInfo& clientInfo,
       http::HttpResponseHeader& responseHeader, std::string& body);
@@ -43,21 +46,50 @@ struct Master::Internal {
     Internal* internal = nullptr;
   };
 
+  /// Handles GET /favicon.ico.
+  class MasterFaviconEndpoint : public http::EndpointHandler {
+    Error handle(const http::HttpFrame& frame, const network::ClientInfo& clientInfo,
+      http::HttpResponseHeader& responseHeader, std::string& body);
+  };
+
   std::shared_ptr<MasterHttpEndpoint> httpEndpoint;
 
   Internal(std::shared_ptr<RPCManager> manager);
+
+  /// Render status of master as HTML page.
+  void renderMasterStatus(std::string& output);
 };
 
 Error Master::Internal::MasterHttpEndpoint::handle(const http::HttpFrame& frame, const network::ClientInfo& clientInfo,
   http::HttpResponseHeader& responseHeader, std::string& body)
 {
-  return Error::NotImplemented;
+  if (!internal)
+    return Error::InternalError;
+
+  responseHeader.statusCode = 200;
+  responseHeader.status = "OK";
+  responseHeader.contentType = "text/html";
+  body = "<!doctype html><html><title>Mini ROS master</title><body>";
+  internal->renderMasterStatus(body);
+  body += "</body></html>";
+  return Error::Ok;
 }
 
+Error Master::Internal::MasterFaviconEndpoint::handle(const http::HttpFrame& frame, const network::ClientInfo& clientInfo,
+    http::HttpResponseHeader& responseHeader, std::string& body)
+{
+  responseHeader.statusCode = 200;
+  responseHeader.status = "OK";
+  responseHeader.contentType = " image/x-icon";
+
+  std::string_view vFavicon((const char*)(favicon), sizeof(favicon));
+  body += vFavicon;
+
+  return Error::Ok;
+}
 
 Master::Internal::Internal(std::shared_ptr<RPCManager> manager)
-  : handler(manager, &regManager)
-  , parameterStorage(&regManager)
+    : handler(manager, &regManager), parameterStorage(&regManager)
 {
   rpcManager = manager;
   manager->setMaster();
@@ -71,9 +103,37 @@ Master::Internal::Internal(std::shared_ptr<RPCManager> manager)
   }
 
   parameterStorage.paramUpdateFn =
-    [this] (const std::shared_ptr<NodeRef>& nr, const std::string& fullPath, const RpcValue* value) {
+    [this](const std::shared_ptr<NodeRef>& nr, const std::string& fullPath, const RpcValue* value)
+    {
       this->handler.sendToNode(nr, "paramUpdate", fullPath, value ? *value : RpcValue::Dict());
     };
+}
+
+void Master::Internal::renderMasterStatus(std::string& output)
+{
+  std::stringstream ss;
+  ss << "<h>Nodes</h>\n";
+  ss << "<ul>";
+  for (const std::shared_ptr<NodeRef>& r : regManager.listAllNodes()) {
+    const std::string& name = r->id();
+    std::string url = r->getApi();
+    ss << "<li>";
+    ss << name;
+    ss << ": <a href=\"" << url << "\">" << url << "</a>";
+    ss << "</li>";
+  }
+  ss << "</ul>\n";
+
+  ss << "<h>Topics</h>\n";
+  ss << "<ul>";
+  std::map<std::string, std::string> types = handler.getTopicTypes("root");
+  for (const auto& [topic, type] : types) {
+    ss << "<li>";
+    ss << topic << " (" << type << ")";
+    ss << "</li>";
+  }
+  ss << "</ul>\n";
+  output += ss.str();
 }
 
 Master::Master(std::shared_ptr<RPCManager> manager)
@@ -115,6 +175,8 @@ bool Master::start(PollSet* poll_set)
   if (server) {
     internal_->httpEndpoint.reset(new Internal::MasterHttpEndpoint(internal_.get()));
     server->registerEndpoint(std::make_unique<http::SimpleFilter>("/", http::HttpMethod::Get), internal_->httpEndpoint);
+    server->registerEndpoint(std::make_unique<http::SimpleFilter>("/favicon.ico", http::HttpMethod::Get),
+      std::make_shared<Internal::MasterFaviconEndpoint>());
   }
 
   // It was done in roslaunch by calling generate_run_id() function.
@@ -187,8 +249,8 @@ void Master::update()
   internal_->handler.update();
 }
 
-Master::RpcValue Master::lookupService(const std::string& caller_id, const std::string& service,
-  const ClientInfo& clientInfo)
+Master::RpcValue Master::lookupService(
+  const std::string& caller_id, const std::string& service, const ClientInfo& clientInfo)
 {
   RequesterInfo requesterInfo;
   if (!requesterInfo.assign(caller_id, clientInfo)) {
@@ -220,7 +282,7 @@ Master::RpcValue Master::registerService(const std::string& caller_id, const std
 
   ReturnStruct r = internal_->handler.registerService(requesterInfo, service, service_api);
 
-  RpcValue res = RpcValue::Array(3);;
+  RpcValue res = RpcValue::Array(3);
   res[0] = r.statusCode;
   res[1] = r.statusMessage;
   res[2] = r.value;
@@ -236,16 +298,16 @@ Master::RpcValue Master::unregisterService(const std::string& caller_id, const s
   }
   ReturnStruct r = internal_->handler.unregisterService(requesterInfo, service, service_api);
 
-  RpcValue res = RpcValue::Array(3);;
+  RpcValue res = RpcValue::Array(3);
   res[0] = r.statusCode;
   res[1] = r.statusMessage;
   res[2] = r.value;
   return res;
 }
 
-Master::RpcValue Master::getTopicTypes(const std::string& topic, const ClientInfo&)
+Master::RpcValue Master::getTopicTypes(const std::string& caller_id, const ClientInfo&)
 {
-  std::map<std::string, std::string> types = internal_->handler.getTopicTypes(topic);
+  std::map<std::string, std::string> types = internal_->handler.getTopicTypes(caller_id);
 
   RpcValue xmlTopics = RpcValue::Array(types.size());
   int index = 0;
@@ -256,7 +318,7 @@ Master::RpcValue Master::getTopicTypes(const std::string& topic, const ClientInf
     xmlTopics[index++] = payload;
   }
 
-  RpcValue res = RpcValue::Array(3);;
+  RpcValue res = RpcValue::Array(3);
   res[0] = 1;
   res[1] = "current system state";
   res[2] = xmlTopics;

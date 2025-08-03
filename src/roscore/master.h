@@ -84,7 +84,7 @@ public: /// Request handlers
   RpcValue unregisterService(const std::string& caller_id, const std::string& service,
     const std::string& service_api, const ClientInfo&);
 
-  RpcValue getTopicTypes(const std::string& topic, const ClientInfo&);
+  RpcValue getTopicTypes(const std::string& caller_id, const ClientInfo&);
 
   /// Callback from master with updated value of subscribed parameter.
   /// Parameters
