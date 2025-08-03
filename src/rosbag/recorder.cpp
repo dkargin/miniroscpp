@@ -42,6 +42,7 @@
 #include <set>
 #include <sstream>
 #include <string>
+#include <thread>
 
 #include <regex>
 #include "minibag/recorder.h"

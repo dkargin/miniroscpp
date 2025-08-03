@@ -10,9 +10,9 @@
 #include "miniros/transport/io.h"
 
 namespace miniros {
-namespace network {
+namespace http {
 
-HttpServerConnection::HttpServerConnection(HttpServer* server, std::shared_ptr<NetSocket> socket)
+HttpServerConnection::HttpServerConnection(HttpServer* server, std::shared_ptr<network::NetSocket> socket)
   :server_(server), socket_(socket)
 {
   http_frame_.finishRequest();
@@ -46,7 +46,7 @@ Error HttpServerConnection::readRequest()
     return Error::Ok;
   }
 
-  assert(http_frame_.state() == miniros::network::HttpFrame::ParseComplete);
+  assert(http_frame_.state() == HttpFrame::ParseComplete);
   auto body = http_frame_.body();
   // Otherwise, parse and dispatch the request
   MINIROS_DEBUG("HttpServerConnection(%d)::readRequest read %d/%d bytes.", fd, http_frame_.bodyLength(), http_frame_.contentLength());
@@ -85,22 +85,19 @@ int HttpServerConnection::handleEvents(int evtFlags)
     resetResponse();
     // Execute request:
     auto* handler = server_->findEndpoint(http_frame_);
-    assert(handler);
     std::string endpoint{http_frame_.getPath()};
     if (!handler) {
       MINIROS_ERROR("No handler for endpoint \"%s\"", endpoint.c_str());
-      response_header_.statusCode = 404;
-      response_header_.status = "Not Found";
+      prepareFaultResponse(Error::FileNotFound, response_header_, response_body_);
     } else {
-      ClientInfo clientInfo;
+      network::ClientInfo clientInfo;
       clientInfo.fd = socket_->fd();
       clientInfo.remoteAddress = socket_->peerAddress();
       MINIROS_DEBUG("Handling HTTP request to %s", endpoint.c_str());
       Error err = handler->handle(http_frame_, clientInfo, response_header_, response_body_);
       if (!err) {
-        // TODO: What to do?
-        // return internal server error.
         MINIROS_ERROR("Failed to handle HTTP request to %s", err.toString());
+        prepareFaultResponse(err, response_header_, response_body_);
       }
     }
     response_header_.writeHeader(response_header_buffer_, response_body_.size());
@@ -171,6 +168,41 @@ void HttpServerConnection::resetResponse()
   response_header_buffer_.resize(0);
   response_header_.reset();
   data_sent_ = 0;
+}
+
+void HttpServerConnection::prepareFaultResponse(Error error, HttpResponseHeader& responseHeader, std::string& body) const
+{
+  responseHeader.reset();
+  responseHeader.contentType = "text/html";
+  switch (error.code) {
+    case Error::FileNotFound:
+      responseHeader.statusCode = 404;
+      responseHeader.status = "Not Found";
+      body = "<!doctype html>"
+      "<html>"
+      "<title>404 Not Found</title>"
+      "<body>404 Not Found</body>"
+      "</html>";
+      break;
+    case Error::NotImplemented:
+      responseHeader.statusCode = 501;
+      responseHeader.status = "Not Implemented";
+      body = "<!doctype html>"
+      "<html>"
+      "<title>501 Not Implemented</title>"
+      "<body>501 Not Implemented</body>"
+      "</html>";
+      break;
+    default:
+      responseHeader.statusCode = 500;
+      responseHeader.status = "Internal Server Error";
+      body = "<!doctype html>"
+      "<html>"
+      "<title>500 Internal server error</title>"
+      "<body>500 Internal server error</body>"
+      "</html>";
+      break;
+  }
 }
 
 }

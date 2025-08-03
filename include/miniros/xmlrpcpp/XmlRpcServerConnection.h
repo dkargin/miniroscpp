@@ -92,7 +92,7 @@ protected:
   /// Address of a server.
   miniros::network::NetAddress _hostAddress;
 
-  miniros::network::HttpFrame _httpFrame;
+  miniros::http::HttpFrame _httpFrame;
 
   // Response
   std::string _response;

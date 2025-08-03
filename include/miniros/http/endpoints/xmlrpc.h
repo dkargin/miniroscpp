@@ -5,7 +5,10 @@
 #ifndef MINIROS_XMLRPC_HANDLER_H
 #define MINIROS_XMLRPC_HANDLER_H
 
-#include "http_server.h"
+#include "../http_endpoint.h"
+#include "../http_tools.h"
+
+#include "transport/net_address.h"
 
 namespace XmlRpc {
 class XmlRpcMethods;
@@ -13,12 +16,13 @@ class XmlRpcValue;
 }
 
 namespace miniros {
-namespace network {
+namespace http {
 
 /// Handler for XMLRPC endpoints.
-class XmlRpcHandler : public HttpServer::EndpointHandler {
+class XmlRpcHandler : public EndpointHandler {
 public:
   using RpcValue = XmlRpc::XmlRpcValue;
+  using ClientInfo = network::ClientInfo;
 
   explicit XmlRpcHandler(XmlRpc::XmlRpcMethods* server)
     :server_(server)

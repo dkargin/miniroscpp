@@ -5,15 +5,24 @@
 #ifndef MINIROS_HTTP_SERVER_H
 #define MINIROS_HTTP_SERVER_H
 
+#include <memory>
 #include <string>
 
-#include "miniros/transport/socket.h"
-#include "miniros/transport/poll_set.h"
-
 #include "miniros/http/http_tools.h"
+#include "miniros/http/http_endpoint.h"
+
+#include <regex>
 
 namespace miniros {
+
+class PollSet;
+
 namespace network {
+class NetSocket;
+struct ClientInfo;
+}
+
+namespace http {
 
 class HttpServerConnection;
 
@@ -21,6 +30,7 @@ class HttpServerConnection;
 class HttpServer {
 public:
   HttpServer(PollSet* pollSet);
+  ~HttpServer();
 
   /// Start server on specific port.
   Error start(int port);
@@ -37,52 +47,28 @@ public:
   /// Get poll set.
   PollSet* getPollSet() const;
 
-  class EndpointHandler {
-  public:
-    virtual ~EndpointHandler() {}
-
-    /// Handle request and return pointer to response object.
-    /// Response will be immediately serialized to output buffer in the same thread.
-    /// @param frame - request data
-    /// @param clientInfo - connection information.
-    /// @param responseHeader - header of response.
-    /// @param body - buffer for serialized body.
-    virtual Error handle(const HttpFrame& frame, const ClientInfo& clientInfo,
-      HttpResponseHeader& responseHeader, std::string& body) = 0;
-  };
-
-  Error registerEndpoint(HttpMethod method, const std::string& path, const std::shared_ptr<EndpointHandler>& handler);
+  /// Register endpoint.
+  /// Multiple filters can be used for the same endpoint.
+  /// @param filter - filter object. HTTP server will take care of removal of this object.
+  /// @param handler - handler for specified endpoint.
+  Error registerEndpoint(std::unique_ptr<EndpointFilter>&& filter, const std::shared_ptr<EndpointHandler>& handler);
 
   /// Find endpoint for request.
   EndpointHandler* findEndpoint(const HttpFrame& frame);
 
+protected:
   /// Accept client and add it to event processing.
+  /// For internal usage only.
   /// @param sock - listening socket.
-  void acceptClient(NetSocket* sock);
+  void acceptClient(network::NetSocket* sock);
 
   /// Closes and unregisters a connection.
-  void closeConnection(int fd);
+  /// For internal usage only.
+  void closeConnection(int fd, const char* reason);
 
 protected:
-
-  using Binding = std::pair<std::string, HttpMethod>;
-
-  /// A collection of endpoints.
-  std::map<Binding, std::shared_ptr<EndpointHandler>> endpoints_;
-
-  /// Active connections.
-  std::map<int, HttpServerConnection*> connections_;
-
-  /// Socket for accepting HTTP connections.
-  NetSocket socket_v4_;
-
-  /// IPv6 socket.
-  NetSocket socket_v6_;
-
-  /// Poller to handle events.
-  PollSet* pollSet_;
-
-  std::mutex mutex_;
+  struct Internal;
+  std::unique_ptr<Internal> internal_;
 };
 
 }

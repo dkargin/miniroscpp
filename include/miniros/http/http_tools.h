@@ -12,7 +12,7 @@
 #include "miniros/common.h"
 
 namespace miniros {
-namespace network {
+namespace http {
 
 enum class HttpMethod {
   Invalid, //< Invalid method type.

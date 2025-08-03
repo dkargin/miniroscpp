@@ -36,6 +36,8 @@ const char* Error::toString() const {
       return "End of file";
     case Error::WouldBlock:
       return "Would block";
+    case Error::FileNotFound:
+      return "File not found";
   }
   return "Unknown error";
 }

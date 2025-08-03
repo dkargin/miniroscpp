@@ -5,10 +5,10 @@
 #ifndef MINIROS_MASTER_H
 #define MINIROS_MASTER_H
 
-#include "master_handler.h"
-#include "parameter_storage.h"
+#include <string>
+#include <memory>
 
-#include "miniros/transport/rpc_manager.h"
+#include "miniros/macros.h"
 
 /*
 More info at:
@@ -31,15 +31,21 @@ Current status codes:
 */
 
 namespace XmlRpc {
-class XmlRpcServerConnection;
+class XmlRpcValue;
+}
+namespace miniros {
+
+class PollSet;
+class RPCManager;
+
+namespace network {
+struct ClientInfo;
 }
 
-namespace miniros {
 namespace master {
 
 /// Core class of rosmaster/roscore.
 class MINIROS_DECL Master {
-
 public:
   using RpcValue = XmlRpc::XmlRpcValue;
   using ClientInfo = network::ClientInfo;
@@ -55,6 +61,7 @@ public:
   void setupBindings();
 
   std::string getUri() const;
+  int getPort() const;
 
   void setResolveNodeIP(bool resolv);
 
@@ -166,15 +173,8 @@ public: /// Request handlers
   void setDumpParameters(bool dump);
 
 protected:
-  int m_port = -1;
-  std::string m_host;
-
-  std::shared_ptr<RPCManager> m_rpcManager;
-
-  RegistrationManager m_regManager;
-
-  MasterHandler m_handler;
-  ParameterStorage m_parameterStorage;
+  struct Internal;
+  std::unique_ptr<Internal> internal_;
 };
 
 } // namespace master

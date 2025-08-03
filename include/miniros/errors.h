@@ -40,6 +40,8 @@ struct MINIROS_DECL Error {
     EndOfFile,
     /// Next IO attempt will block.
     WouldBlock,
+    /// File not found or no corresponding endpoint.
+    FileNotFound,
   };
 
   Error() :code(Ok)

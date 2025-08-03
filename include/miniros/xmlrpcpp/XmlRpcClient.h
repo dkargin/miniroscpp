@@ -157,7 +157,7 @@ namespace XmlRpc {
     std::string _name;
 
     /// Data + parser state of HTTP response.
-    miniros::network::HttpFrame _httpFrame;
+    miniros::http::HttpFrame _httpFrame;
 
     /// Guards data inside incoming buffers like _httpFrame.
     std::mutex _dataGuard;

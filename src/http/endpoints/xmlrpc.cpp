@@ -2,13 +2,13 @@
 // Created by dkargin on 7/22/25.
 //
 
-#include "miniros/http/xmlrpc_handler.h"
+#include "../../../include/miniros/http/endpoints/xmlrpc.h"
 
+#include "miniros/xmlrpcpp/XmlRpcException.h"
+#include "miniros/xmlrpcpp/XmlRpcServer.h"
+#include "miniros/xmlrpcpp/XmlRpcServerMethod.h"
 #include "miniros/xmlrpcpp/XmlRpcUtil.h"
 #include "miniros/xmlrpcpp/XmlRpcValue.h"
-#include "miniros/xmlrpcpp/XmlRpcServerMethod.h"
-#include "miniros/xmlrpcpp/XmlRpcServer.h"
-#include "miniros/xmlrpcpp/XmlRpcException.h"
 
 const char METHODNAME_TAG[] = "<methodName>";
 const char PARAMS_TAG[] = "<params>";
@@ -24,7 +24,7 @@ const char FAULTCODE[] = "faultCode";
 const char FAULTSTRING[] = "faultString";
 
 namespace miniros {
-namespace network {
+namespace http {
 
 using namespace XmlRpc;
 

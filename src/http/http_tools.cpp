@@ -12,7 +12,7 @@
 #endif
 
 namespace miniros {
-namespace network {
+namespace http {
 
 template <int N>
 bool tokenCmp(const char* a, const HttpFrame::Token& ta, const char b[N])
@@ -269,6 +269,7 @@ void HttpResponseHeader::writeHeader(std::string& output, size_t bodySize) const
 {
   output += "HTTP/1.1 ";
   output += std::to_string(statusCode);
+  output += " ";
   output += status;
   output += "\r\n";
 

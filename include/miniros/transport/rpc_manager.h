@@ -28,25 +28,20 @@
 #ifndef MINIROS_XMLRPC_MANAGER_H
 #define MINIROS_XMLRPC_MANAGER_H
 
-#include <condition_variable>
 #include <string>
-#include <set>
 #include <memory>
-#include <thread>
-#include <mutex>
-#include <atomic>
 
 #include "miniros/common.h"
 
-#include "miniros/http/http_server.h"
-
 #include "miniros/xmlrpcpp/XmlRpc.h"
 
-#include <miniros/rostime.h>
 
 namespace miniros
 {
 
+namespace http {
+class HttpServer;
+}
 /**
  * \brief internal
  */
@@ -60,6 +55,7 @@ MINIROS_DECL XmlRpc::XmlRpcValue responseInt(int code, const std::string& msg, i
 MINIROS_DECL XmlRpc::XmlRpcValue responseBool(int code, const std::string& msg, bool response);
 }
 
+class PollSet;
 class XMLRPCCallWrapper;
 typedef std::shared_ptr<XMLRPCCallWrapper> XMLRPCCallWrapperPtr;
 
@@ -133,8 +129,8 @@ public:
   /**
    * @brief Get the xmlrpc server URI of this node
    */
-  const std::string& getServerURI() const { return uri_; }
-  uint32_t getServerPort() const { return port_; }
+  const std::string& getServerURI() const;
+  uint32_t getServerPort() const;
 
   XmlRpc::XmlRpcClient* getXMLRPCClient(const std::string& host, const int port, const std::string& uri);
   void releaseXMLRPCClient(XmlRpc::XmlRpcClient* c);
@@ -144,6 +140,10 @@ public:
 
   void setMaster();
   bool isMaster() const;
+
+  /// Get access to HTTP server.
+  /// This pointer lifetime is tied to this instance of RPCManager.
+  http::HttpServer* getHttpServer();
 
   /// Check if RPC API is already pointing to this manager.
   bool isLocalRPC(const std::string& host, int port) const;
@@ -274,6 +274,9 @@ public:
 
   bool isShuttingDown() const;
 
+  /// Get assigned poll set.
+  PollSet* getPollSet() const;
+
 private:
 
   bool executeLocalMethod(const std::string& methodName, const RpcValue& request, RpcValue& response);
@@ -282,52 +285,8 @@ private:
 
   void serverThreadFunc();
 
-  std::string uri_;
-  int port_;
-  std::thread server_thread_;
-
-#if defined(__APPLE__)
-  // OSX has problems with lots of concurrent xmlrpc calls
-  std::mutex xmlrpc_call_mutex_;
-#endif
-  XmlRpc::XmlRpcMethods server_;
-
-  std::unique_ptr<network::HttpServer> http_server_;
-  std::vector<CachedXmlRpcClient> clients_;
-  std::mutex clients_mutex_;
-
-  std::atomic_bool shutting_down_;
-
-  miniros::WallDuration master_retry_timeout_;
-
-  std::set<ASyncXMLRPCConnectionPtr> added_connections_;
-  std::mutex added_connections_mutex_;
-  std::condition_variable connections_event_;
-  std::set<ASyncXMLRPCConnectionPtr> removed_connections_;
-  std::mutex removed_connections_mutex_;
-
-  std::set<ASyncXMLRPCConnectionPtr> connections_;
-
-
-  struct FunctionInfo
-  {
-    std::string name;
-    /// Regular callback.
-    XMLRPCFunc function;
-    /// Extended callback.
-    XMLRPCFuncEx functionEx;
-    /// Object to be tracked.
-    void* object = nullptr;
-
-    std::shared_ptr<XmlRpc::XmlRpcServerMethod> wrapper;
-  };
-
-  std::mutex functions_mutex_;
-  std::map<std::string, FunctionInfo> functions_;
-
-  std::atomic_bool unbind_requested_;
-
-  bool is_master_ = false;
+  struct Internal;
+  std::unique_ptr<Internal> internal_;
 };
 
 } // namespace miniros

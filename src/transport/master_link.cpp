@@ -25,6 +25,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <mutex>
+
 #define MINIROS_PACKAGE_NAME "master_link"
 
 #include "miniros/master_link.h"
@@ -41,7 +43,7 @@
 namespace miniros {
 
 struct MasterLink::Internal {
-  std::shared_ptr<RPCManager> rpcManager;
+  std::weak_ptr<RPCManager> rpcManager;
 
   uint32_t port = 0;
   std::string host;
@@ -201,7 +203,7 @@ Error MasterLink::execute(const std::string& method, const RpcValue& request, Rp
   if (!internal_)
     return Error::InternalError;
 
-  RPCManagerPtr manager = internal_->rpcManager;
+  RPCManagerPtr manager = internal_->rpcManager.lock();
   if (!manager) {
     return Error::NoMaster;
   }
@@ -497,6 +499,10 @@ bool MasterLink::getParamImpl(const std::string& key, RpcValue& v, bool use_cach
 {
   if (!internal_)
     return false;
+  auto rpcManager = internal_->rpcManager.lock();
+  if (!rpcManager)
+    return false;
+  auto URI = rpcManager->getServerURI();
   std::string mapped_key = miniros::names::resolve(key);
   if (mapped_key.empty())
     mapped_key = "/";
@@ -522,7 +528,7 @@ bool MasterLink::getParamImpl(const std::string& key, RpcValue& v, bool use_cach
       if (internal_->subscribed_params.insert(mapped_key).second) {
         RpcValue params, result, payload;
         params[0] = this_node::getName();
-        params[1] = internal_->rpcManager->getServerURI();
+        params[1] = URI;
         params[2] = mapped_key;
 
         if (!this->execute("subscribeParam", params, result, payload, false)) {
@@ -1063,8 +1069,8 @@ Error MasterLink::initParam(const M_string& remappings)
     }
   }
 
-  if (internal_->rpcManager) {
-    internal_->rpcManager->bind("paramUpdate",
+  if (auto manager = internal_->rpcManager.lock()) {
+    manager->bind("paramUpdate",
       [this](const RpcValue& params, RpcValue& result) {
         return paramUpdateCallback(params, result);
       });

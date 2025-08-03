@@ -137,7 +137,7 @@ XmlRpcClient::execute(const char* method, XmlRpcValue const& params, XmlRpcValue
   double msTime = -1.0;   // Process until exit is called
   _disp.work(msTime);
 
-  if (_connectionState != IDLE  || _httpFrame.state() != miniros::network::HttpFrame::ParseComplete)
+  if (_connectionState != IDLE  || _httpFrame.state() != miniros::http::HttpFrame::ParseComplete)
     return false;
 
   {
@@ -429,7 +429,7 @@ bool XmlRpcClient::readResponse()
 
   XmlRpcUtil::log(4, "XmlRpcClient(%s)::readHeader client read content length: %d", name().c_str(), _httpFrame.contentLength());
 
-  if (_httpFrame.state() == miniros::network::HttpFrame::ParseComplete) {
+  if (_httpFrame.state() == miniros::http::HttpFrame::ParseComplete) {
     if (_httpFrame.contentLength() <= 0) {
       XmlRpcUtil::error("Error in XmlRpcClient(%s)::readHeader: Invalid Content-length specified (%d).", name().c_str(), _httpFrame.contentLength());
       // Close the socket because we can't make further use of it.

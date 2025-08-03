@@ -152,11 +152,12 @@ set(transport_SRC
     shape_shifter.cpp
     observer.cpp
 
+    http/endpoints/xmlrpc.cpp
+    http/endpoints/filesystem.cpp
+    http/http_filters.cpp
     http/http_server.cpp
     http/http_server_connection.cpp
     http/http_tools.cpp
-    http/xmlrpc_handler.cpp
-
 
     transport/advertise_service_options.cpp
     transport/callback_queue.cpp

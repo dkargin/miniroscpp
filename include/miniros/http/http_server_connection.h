@@ -6,12 +6,14 @@
 #define MINIROS_HTTP_SERVER_CONNECTION_H
 
 #include "miniros/transport/socket.h"
-#include "miniros/transport/http_tools.h"
+
+#include "miniros/http/http_tools.h"
 
 #include "miniros/steady_timer.h"
 
 namespace miniros {
-namespace network {
+
+namespace http {
 
 class HttpServer;
 
@@ -19,7 +21,7 @@ class HttpServer;
 /// It handles parsing HTTP request from client, picking right endpoint handler and sending response back.
 class HttpServerConnection {
 public:
-  HttpServerConnection(HttpServer* server, std::shared_ptr<NetSocket> socket);
+  HttpServerConnection(HttpServer* server, std::shared_ptr<network::NetSocket> socket);
   ~HttpServerConnection();
 
   /// Handler for socket/poll events.
@@ -41,6 +43,9 @@ public:
   /// Close connection.
   void close();
 
+  /// Fill in fault response.
+  void prepareFaultResponse(Error error, HttpResponseHeader& header, std::string& body) const;
+
 protected:
   State state_ = State::ReadRequest;
 
@@ -57,7 +62,7 @@ protected:
   size_t data_sent_ = 0;
 
   SteadyTime request_start_;
-  std::shared_ptr<NetSocket> socket_;
+  std::shared_ptr<network::NetSocket> socket_;
 };
 
 }
