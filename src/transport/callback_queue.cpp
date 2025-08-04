@@ -116,17 +116,12 @@ void CallbackQueue::addCallback(const CallbackInterfacePtr& callback, uint64_t r
     }
   }
 
-  {
-    std::scoped_lock<std::mutex> lock(mutex_);
+  std::scoped_lock<std::mutex> lock(mutex_);
 
-    if (!enabled_)
-    {
-      return;
-    }
+  if (!enabled_)
+    return;
 
-    callbacks_.push_back(info);
-  }
-
+  callbacks_.push_back(info);
   condition_.notify_one();
 }
 
