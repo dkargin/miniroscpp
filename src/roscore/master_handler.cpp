@@ -15,6 +15,7 @@
 
 #include "miniros/transport/network.h"
 #include "miniros/transport/rpc_manager.h"
+#include "miniros/internal/at_exit.h"
 
 #include <xmlrpcpp/XmlRpcServerConnection.h>
 
@@ -53,6 +54,7 @@ Error MasterHandler::sendToNode(const std::shared_ptr<NodeRef>& nr, const char* 
   args[1] = arg1;
   args[2] = arg2;
 
+
   network::URL url;
   std::string nodeApi = nr->getApi();
   if (!url.fromString(nodeApi, false)) {
@@ -67,6 +69,12 @@ Error MasterHandler::sendToNode(const std::shared_ptr<NodeRef>& nr, const char* 
     MINIROS_ERROR_NAMED("handler", "Failed to create client to notify node \"%s\"", nodeApi.c_str());
     return Error::SystemError;
   }
+
+  AtExit clientDispose([this, client]() {
+    m_rpcManager->releaseXMLRPCClient(client);
+  });
+
+
   if (!client->isReady()) {
     MINIROS_FATAL_NAMED("handler", "RPC client is not in idle state");
     return Error::SystemError;
