@@ -264,7 +264,7 @@ std::pair<ParameterStorage::RpcValue*, ParameterStorage::RpcValue*> ParameterSto
 ParameterStorage::RpcValue ParameterStorage::getParam(const std::string& caller_id, const std::string& key) const
 {
   std::string fullKey = miniros::names::resolve(caller_id, key, false);
-  MINIROS_INFO_NAMED("rosparam", "getParam(\"%s\") client=\"%s\", key=\"%s\"", fullKey.c_str(), caller_id.c_str(), key.c_str());
+  MINIROS_DEBUG_NAMED("rosparam", "getParam(\"%s\") client=\"%s\", key=\"%s\"", fullKey.c_str(), caller_id.c_str(), key.c_str());
 
   names::Path fullPath;
   fullPath.fromString(fullKey);
@@ -280,7 +280,7 @@ ParameterStorage::RpcValue ParameterStorage::getParam(const std::string& caller_
 const ParameterStorage::RpcValue* ParameterStorage::subscribeParam(
   const std::string& caller_id, const std::string& caller_api, const std::string& key)
 {
-  MINIROS_INFO_NAMED("rosparam", "subscribeParam(\"%s\") from %s, api=%s", key.c_str(), caller_id.c_str(), caller_api.c_str());
+  MINIROS_DEBUG_NAMED("rosparam", "subscribeParam(\"%s\") from %s, api=%s", key.c_str(), caller_id.c_str(), caller_api.c_str());
   std::string fullKey = miniros::names::resolve(caller_id, key, false);
 
   names::Path path;
