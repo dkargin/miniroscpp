@@ -35,6 +35,7 @@
 // Make sure we use CLOCK_MONOTONIC for the condition variable wait_for if not Apple.
 #include <functional>
 
+#include "miniros/internal/at_exit.h"
 #include "miniros/transport/callback_queue.h"
 #include "miniros/rosassert.h"
 
@@ -344,19 +345,6 @@ void CallbackQueue::callAvailable(miniros::WallDuration timeout)
     calling_ -= called;
   }
 }
-
-class AtExit
-{
-public:
-    AtExit(std::function<void(void)> exitFn) : m_exitFn(exitFn) {}
-    ~AtExit()
-    {
-        if (m_exitFn)
-            m_exitFn();
-    }
-private:
-    std::function<void(void)> m_exitFn;
-};
 
 CallbackQueue::CallOneResult CallbackQueue::callOneCB(TLS* tls)
 {
