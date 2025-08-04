@@ -1,6 +1,8 @@
 
 #include "xmlrpcpp/XmlRpcUtil.h"
 
+#include <mutex>
+
 #ifndef MAKEDEPEND
 # include <ctype.h>
 # include <iostream>
@@ -34,9 +36,13 @@ public:
 #ifdef USE_WINDOWS_DEBUG
     if (level <= _verbosity) { OutputDebugString(msg); OutputDebugString("\n"); }
 #else
-    if (level <= _verbosity) std::cout << msg << std::endl; 
+    if (level <= _verbosity) {
+      std::scoped_lock lock(_guard);
+      std::cout << msg << std::endl;
+    }
 #endif  
   }
+  std::mutex _guard;
 
 } defaultLogHandler;
 
