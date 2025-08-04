@@ -9,6 +9,8 @@
 #endif
 
 
+#include <atomic>
+
 #ifndef MAKEDEPEND
 # include <string>
 #endif
@@ -92,7 +94,8 @@ namespace XmlRpc {
 
     // Possible IO states for the connection
     enum ClientConnectionState { NO_CONNECTION, CONNECTING, WRITE_REQUEST, READ_HEADER, READ_RESPONSE, IDLE };
-    ClientConnectionState _connectionState;
+
+    std::atomic<ClientConnectionState> _connectionState;
 
     static const char * connectionStateStr(ClientConnectionState state);
 
