@@ -92,10 +92,8 @@ Error MasterHandler::sendToNode(const std::shared_ptr<NodeRef>& nr, const char* 
     MINIROS_WARN("Failed to execute node request %s", method);
     return Error::SystemError;
   }
-  if (result.size() > 2) {
-    MINIROS_INFO("Response status=%d, msg=%s", result[0].as<int>(), result[1].as<std::string>().c_str());
-  } else {
-    MINIROS_WARN("Unexpected response");
+  if (result.size() < 3) {
+    MINIROS_WARN("Unexpected response size=%d for request=\"%s\"", (int)result.size(), method);  
   }
   return Error::Ok;
 }

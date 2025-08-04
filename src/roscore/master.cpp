@@ -257,8 +257,6 @@ Master::RpcValue Master::getPublishedTopics(const std::string& caller_id, const 
 Master::RpcValue Master::registerPublisher(const std::string& caller_id, const std::string& topic,
   const std::string& type, const std::string& caller_api, Connection* connection)
 {
-  MINIROS_INFO("PUBLISHING: caller_id=\"%s\" caller_api=%s topic=\"%s\"", caller_id.c_str(), caller_api.c_str(), topic.c_str());
-
   RequesterInfo requesterInfo;
   if (!requesterInfo.assign(caller_id, connection->getfd())) {
     MINIROS_WARN("Failed to read network address of caller %s", caller_id.c_str());
@@ -276,8 +274,6 @@ Master::RpcValue Master::registerPublisher(const std::string& caller_id, const s
 Master::RpcValue Master::unregisterPublisher(
   const std::string& caller_id, const std::string& topic, const std::string& caller_api, Connection* connection)
 {
-  MINIROS_INFO("UNPUBLISHING caller_id=\"%s\" caller_api=%s topic=\"%s\"", caller_id.c_str(), caller_api.c_str(), topic.c_str());
-
   RequesterInfo requesterInfo;
   if (!requesterInfo.assign(caller_id, connection->getfd())) {
     MINIROS_WARN("Failed to read network address of caller %s", caller_id.c_str());

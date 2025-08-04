@@ -18,7 +18,7 @@ NodeRef::NodeRef(const std::string& _id, const std::string& _api)
 
 NodeRef::~NodeRef()
 {
-  MINIROS_INFO("NodeRef::~NodeRef(%s) api=%s", m_id.c_str(), m_api.c_str());
+  MINIROS_INFO("NodeRef::~NodeRef(\"%s\") api=%s", m_id.c_str(), m_api.c_str());
 }
 
 void NodeRef::clear()
