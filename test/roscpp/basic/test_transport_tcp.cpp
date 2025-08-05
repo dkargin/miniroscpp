@@ -133,6 +133,7 @@ TEST_F(Synchronous, readWhileWriting)
   {
     const uint32_t buf_size = 1024*1024;
     std::shared_ptr<uint8_t[]> read_buf(new uint8_t[buf_size]);
+    memset(read_buf.get(), 0, buf_size);
 
     std::stringstream ss;
     for (int i = 0; i < 100000; ++i)
