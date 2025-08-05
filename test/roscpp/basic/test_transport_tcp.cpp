@@ -118,14 +118,24 @@ TEST_F(Synchronous, writeThenReadPartial)
   ASSERT_STREQ((const char*)buf, msg.substr(0, 1).c_str());
 }
 
-void readThread(TransportTCPPtr transport, uint8_t* buf, uint32_t size, volatile int32_t* read_out, volatile bool* done_read)
-{
-  while (*read_out < (int32_t)size)
+struct TestReader {
+  TransportTCPPtr transport;
+  uint8_t* buf = nullptr;
+  uint32_t size = 0;
+
+  std::atomic<int32_t> read_out = 0;
+  std::atomic<bool> done_read = false;
+
+  void read()
   {
-    *read_out += transport->read(buf + *read_out, size - *read_out);
+    while (read_out < (int32_t)size)
+    {
+      int32_t offset = read_out.load();
+      read_out += transport->read(buf + offset, size - offset);
+    }
+    done_read = true;
   }
-  *done_read = true;
-}
+};
 
 TEST_F(Synchronous, readWhileWriting)
 {
@@ -145,25 +155,24 @@ TEST_F(Synchronous, readWhileWriting)
 
     ASSERT_TRUE(msg.size() < buf_size);
 
-    volatile int32_t read_out = 0;
-    volatile bool done_read = false;
-    std::thread t(readThread, transports_[2], read_buf.get(), msg.size(), &read_out, &done_read);
+    TestReader reader {transports_[2], read_buf.get(), (uint32_t)msg.size()};
+    std::thread t(&TestReader::read, &reader);
 
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
     int32_t written = transports_[1]->write((uint8_t*)msg.c_str(), msg.length());
     ASSERT_EQ(written, (int32_t)msg.length());
 
-    while (!done_read)
+    while (!reader.done_read)
     {
       std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
 
-    ASSERT_EQ(done_read, true);
-    ASSERT_EQ(read_out, (int32_t)msg.length());
+    ASSERT_EQ(reader.done_read, true);
+    ASSERT_EQ(reader.read_out, (int32_t)msg.length());
+    t.join();
 
     ASSERT_STREQ((const char*)read_buf.get(), msg.c_str());
-    t.join();
   }
 }
 
@@ -188,19 +197,13 @@ TEST_F(Synchronous, writeAfterClose)
 class Polled : public testing::Test
 {
 public:
-  Polled()
-  {
-  }
-
-  ~Polled()
-  {
-  }
-
+  Polled() = default;
 
 protected:
 
   void connectionReceived(const TransportTCPPtr& transport)
   {
+    std::unique_lock<std::mutex> lock(guard_);
     transports_[2] = transport;
   }
 
@@ -214,11 +217,13 @@ protected:
 
   void onReadable(const TransportPtr& transport, int index)
   {
+
     ASSERT_EQ(transport, transports_[index]);
 
     uint8_t b = 0;
     while (transport->read(&b, 1) > 0)
     {
+      std::unique_lock<std::mutex> lock(guard_);
       ++bytes_read_[index];
     }
   }
@@ -229,12 +234,13 @@ protected:
 
     uint8_t b = 0;
     transport->write(&b, 1);
-
+    std::unique_lock<std::mutex> lock(guard_);
     ++bytes_written_[index];
   }
 
   void onDisconnect(const TransportPtr& transport, int index)
   {
+    std::unique_lock<std::mutex> lock(guard_);
     ASSERT_EQ(transport, transports_[index]);
 
     disconnected_[index] = true;
@@ -275,12 +281,12 @@ protected:
     poll_thread_ = std::thread(&Polled::pollThread, this);
 
     int count = 0;
-    while (!transports_[2] && count < 100)
+    while (!isTransportValid(2) && count < 100)
     {
       std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
 
-    if (!transports_[2])
+    if (!isTransportValid(2))
     {
       FAIL();
     }
@@ -323,12 +329,27 @@ protected:
   virtual void TearDown()
   {
     for (int i = 0; i < 3; ++i)
-    {
       transports_[i]->close();
-    }
-
     continue_ = false;
     poll_thread_.join();
+  }
+
+  bool isTransportValid(int i) const
+  {
+    std::unique_lock<std::mutex> lock(guard_);
+    return transports_[i] != nullptr;
+  }
+
+  int getBytesRead(int i) const
+  {
+    std::unique_lock<std::mutex> lock(guard_);
+    return bytes_read_[i];
+  }
+
+  int getBytesWritten(int i) const
+  {
+    std::unique_lock<std::mutex> lock(guard_);
+    return bytes_written_[i];
   }
 
   TransportTCPPtr transports_[3];
@@ -336,10 +357,17 @@ protected:
   int bytes_written_[3];
   bool disconnected_[3];
 
+  bool getDisconnected(int i) const
+  {
+    std::unique_lock<std::mutex> lock(guard_);
+    return disconnected_[i];
+  }
+
   PollSet poll_set_;
 
   std::thread poll_thread_;
-  volatile bool continue_;
+  std::atomic<bool> continue_;
+  mutable std::mutex guard_;
 };
 
 TEST_F(Polled, readAndWrite)
@@ -349,18 +377,18 @@ TEST_F(Polled, readAndWrite)
   transports_[1]->disableWrite();
 
   std::this_thread::sleep_for(std::chrono::milliseconds(50));
-  ASSERT_GT(bytes_read_[2], 0);
-  ASSERT_EQ(bytes_read_[2], bytes_written_[1]);
+  ASSERT_GT(getBytesRead(2), 0);
+  ASSERT_EQ(getBytesRead(2), getBytesWritten(1));
 
-  int old_read_val = bytes_read_[2];
+  int old_read_val = getBytesRead(2);
 
   transports_[2]->enableWrite();
   std::this_thread::sleep_for(std::chrono::milliseconds(50));
   transports_[2]->disableWrite();
 
   std::this_thread::sleep_for(std::chrono::milliseconds(50));
-  ASSERT_EQ(bytes_read_[1], bytes_written_[2]);
-  ASSERT_EQ(old_read_val, bytes_read_[2]);
+  ASSERT_EQ(getBytesRead(1), getBytesWritten(2));
+  ASSERT_EQ(old_read_val, getBytesRead(2));
 
   transports_[1]->enableWrite();
   transports_[2]->enableWrite();
@@ -369,79 +397,79 @@ TEST_F(Polled, readAndWrite)
   transports_[2]->disableWrite();
 
   std::this_thread::sleep_for(std::chrono::milliseconds(50));
-  ASSERT_GT(bytes_read_[2], 0);
-  ASSERT_EQ(bytes_read_[2], bytes_written_[1]);
-  ASSERT_GT(bytes_read_[1], 0);
-  ASSERT_EQ(bytes_read_[1], bytes_written_[2]);
+  ASSERT_GT(getBytesRead(2), 0);
+  ASSERT_EQ(getBytesRead(2), getBytesWritten(1));
+  ASSERT_GT(getBytesRead(1), 0);
+  ASSERT_EQ(getBytesRead(1), getBytesWritten(2));
 }
 
 TEST_F(Polled, enableDisableWrite)
 {
   std::this_thread::sleep_for(std::chrono::milliseconds(50));
-  ASSERT_EQ(bytes_read_[1], 0);
-  ASSERT_EQ(bytes_read_[2], 0);
-  ASSERT_EQ(bytes_written_[1], 0);
-  ASSERT_EQ(bytes_written_[2], 0);
+  ASSERT_EQ(getBytesRead(1), 0);
+  ASSERT_EQ(getBytesRead(2), 0);
+  ASSERT_EQ(getBytesWritten(1), 0);
+  ASSERT_EQ(getBytesWritten(2), 0);
 
   transports_[1]->enableWrite();
   std::this_thread::sleep_for(std::chrono::milliseconds(50));
   transports_[1]->disableWrite();
 
   std::this_thread::sleep_for(std::chrono::milliseconds(50));
-  ASSERT_GT(bytes_read_[2], 0);
-  ASSERT_GT(bytes_written_[1], 0);
-  int old_read_val = bytes_read_[2];
-  int old_written_val = bytes_written_[1];
+  ASSERT_GT(getBytesRead(2), 0);
+  ASSERT_GT(getBytesWritten(1), 0);
+  int old_read_val = getBytesRead(2);
+  int old_written_val = getBytesWritten(1);
   std::this_thread::sleep_for(std::chrono::milliseconds(50));
-  ASSERT_EQ(bytes_read_[2], old_read_val);
-  ASSERT_EQ(bytes_written_[1], old_written_val);
+  ASSERT_EQ(getBytesRead(2), old_read_val);
+  ASSERT_EQ(getBytesWritten(1), old_written_val);
 }
 
 TEST_F(Polled, disconnectNoTraffic)
 {
-  ASSERT_EQ(disconnected_[1], false);
-  ASSERT_EQ(disconnected_[2], false);
+  ASSERT_EQ(getDisconnected(1), false);
+  ASSERT_EQ(getDisconnected(2), false);
 
   transports_[1]->close();
-  ASSERT_EQ(disconnected_[1], true);
+  ASSERT_EQ(getDisconnected(1), true);
 
   std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
-  ASSERT_EQ(disconnected_[2], true);
+  ASSERT_EQ(getDisconnected(2), true);
 }
 
 TEST_F(Polled, disconnectWriter)
 {
-  ASSERT_EQ(disconnected_[1], false);
-  ASSERT_EQ(disconnected_[2], false);
+  ASSERT_EQ(getDisconnected(1), false);
+  ASSERT_EQ(getDisconnected(2), false);
 
   transports_[1]->enableWrite();
   std::this_thread::sleep_for(std::chrono::milliseconds(50));
-  ASSERT_GT(bytes_read_[2], 0);
+  ASSERT_GT(getBytesRead(2), 0);
 
   transports_[1]->close();
-  ASSERT_EQ(disconnected_[1], true);
+  ASSERT_EQ(getDisconnected(1), true);
 
   std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
-  ASSERT_EQ(disconnected_[2], true);
+  ASSERT_EQ(getDisconnected(2), true);
 }
 
 TEST_F(Polled, disconnectReader)
 {
-  ASSERT_EQ(disconnected_[1], false);
-  ASSERT_EQ(disconnected_[2], false);
+  ASSERT_EQ(getDisconnected(1), false);
+  ASSERT_EQ(getDisconnected(2), false);
 
   transports_[2]->enableWrite();
   std::this_thread::sleep_for(std::chrono::milliseconds(50));
-  ASSERT_GT(bytes_read_[1], 0);
+  ASSERT_GT(getBytesRead(1), 0);
 
   transports_[1]->close();
-  ASSERT_EQ(disconnected_[1], true);
+  ASSERT_EQ(getDisconnected(1), true);
 
   std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
-  ASSERT_EQ(disconnected_[2], true);
+  ASSERT_EQ(getDisconnected(2), true);
 }
 
 int main(int argc, char** argv)

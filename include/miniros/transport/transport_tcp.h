@@ -35,6 +35,7 @@
 #ifndef MINIROS_TRANSPORT_TCP_H
 #define MINIROS_TRANSPORT_TCP_H
 
+#include <atomic>
 #include <mutex>
 
 #include <miniros/types.h>
@@ -68,7 +69,7 @@ public:
   };
 
   TransportTCP(PollSet* poll_set, int flags = 0);
-  virtual ~TransportTCP();
+  ~TransportTCP() override;
 
   /**
    * \brief Connect to a remote host.
@@ -108,21 +109,21 @@ public:
   int getConnectedPort() { return connected_port_; }
 
   // overrides from Transport
-  virtual int32_t read(uint8_t* buffer, uint32_t size);
-  virtual int32_t write(uint8_t* buffer, uint32_t size);
+  int32_t read(uint8_t* buffer, uint32_t size) override;
+  int32_t write(uint8_t* buffer, uint32_t size) override;
 
-  virtual void enableWrite();
-  virtual void disableWrite();
-  virtual void enableRead();
-  virtual void disableRead();
+  void enableWrite() override;
+  void disableWrite() override;
+  void enableRead() override;
+  void disableRead() override;
 
-  virtual void close();
+  void close() override;
 
-  virtual std::string getTransportInfo();
+  std::string getTransportInfo() override;
 
-  virtual void parseHeader(const Header& header);
+  void parseHeader(const Header& header) override;
 
-  virtual const char* getType() { return "TCPROS"; }
+  const char* getType() override { return "TCPROS"; }
 
 private:
   /**
@@ -145,8 +146,8 @@ private:
   bool closed_;
   std::recursive_mutex close_mutex_;
 
-  bool expecting_read_;
-  bool expecting_write_;
+  std::atomic<bool> expecting_read_;
+  std::atomic<bool> expecting_write_;
 
   bool is_server_;
   sockaddr_storage server_address_;
