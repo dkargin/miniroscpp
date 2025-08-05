@@ -86,6 +86,9 @@ public:
   /// It is called from the main thread, out of any RPC handlers.
   void update();
 
+  AddressResolver* getResolver();
+  const AddressResolver* getResolver() const;
+
   struct AsyncCommand {
     std::shared_ptr<NodeRef> node;
 

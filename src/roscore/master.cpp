@@ -133,6 +133,25 @@ void Master::Internal::renderMasterStatus(std::string& output)
     ss << "</li>";
   }
   ss << "</ul>\n";
+
+  if (AddressResolver* resolver = handler.getResolver()) {
+    ss << "<h>Peers</h>\n";
+    ss << "<ul>";
+
+    for (const std::shared_ptr<HostInfo> host : resolver->getHosts()) {
+      ss << "<li><div>";
+      ss << "<h>" << host->hostname << "</h>";
+      for (const network::NetAddress& address: host->addresses) {
+        // Skip boring addresses.
+        if (address.isLocal())
+          continue;
+        ss << "<p>" << address.str() << "</p>" << std::endl;
+      }
+      ss << "</div></li>";
+    }
+    ss << "</ul>\n";
+  }
+
   output += ss.str();
 }
 

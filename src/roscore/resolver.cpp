@@ -317,6 +317,16 @@ std::shared_ptr<HostInfo> AddressResolver::updateHost(const  RequesterInfo& requ
   return it->second;
 }
 
+std::set<std::shared_ptr<HostInfo>> AddressResolver::getHosts() const
+{
+  std::scoped_lock lock(m_mutex);
+  std::set<std::shared_ptr<HostInfo>> result;
+  for (auto [key, pInfo]: m_hosts) {
+    result.insert(pInfo);
+  }
+  return result;
+}
+
 HostInfo::HostInfo(const std::string& name)
   :hostname(name)
 {}

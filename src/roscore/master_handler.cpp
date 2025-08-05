@@ -369,5 +369,16 @@ void MasterHandler::update()
   }
 }
 
+AddressResolver* MasterHandler::getResolver()
+{
+  return &m_resolver;
+}
+
+const AddressResolver* MasterHandler::getResolver() const
+{
+  return &m_resolver;
+}
+
+
 } // namespace master
 } // namespace miniros
