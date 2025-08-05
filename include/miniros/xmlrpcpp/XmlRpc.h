@@ -1,7 +1,7 @@
 // this file modified by Morgan Quigley on 22 April 2008 to add 
 // a std::exception-derived class
-#ifndef _XMLRPC_H_
-#define _XMLRPC_H_
+#ifndef MINIROS_XMLRPC_H_
+#define MINIROS_XMLRPC_H_
 //
 // XmlRpc++ Copyright (c) 2002-2003 by Chris Morley
 // This library is free software; you can redistribute it and/or
@@ -27,15 +27,6 @@
 # include <string>
 #endif
 
-/*
-#include "xmlrpcpp/XmlRpcClient.h"
-#include "xmlrpcpp/XmlRpcException.h"
-#include "xmlrpcpp/XmlRpcServer.h"
-#include "xmlrpcpp/XmlRpcServerMethod.h"
-#include "xmlrpcpp/XmlRpcValue.h"
-#include "xmlrpcpp/XmlRpcUtil.h"
-*/
-
 #include "XmlRpcClient.h"
 #include "XmlRpcException.h"
 #include "XmlRpcServer.h"
@@ -44,4 +35,4 @@
 #include "XmlRpcUtil.h"
 #include <stdexcept>
 
-#endif // _XMLRPC_H_
+#endif // MINIROS_XMLRPC_H_

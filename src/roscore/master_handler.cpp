@@ -190,7 +190,7 @@ ReturnStruct MasterHandler::registerSubscriber(const RequesterInfo& requesterInf
   rtn.statusCode = 1;
 
   rtn.value = RpcValue::Array(publishers.size());
-  for (int i = 0; i < publishers.size(); i++) {
+  for (size_t i = 0; i < publishers.size(); i++) {
     if (publishers[i]) {
       std::string strUrl;
       if (publishers[i] != ref) {
@@ -247,7 +247,7 @@ ReturnStruct MasterHandler::registerPublisher(const RequesterInfo& requesterInfo
   rtn.statusMessage = ss.str();
   rtn.statusCode = 1;
   rtn.value = RpcValue::Array(subscribers.size());
-  for (int i = 0; i < subscribers.size(); i++) {
+  for (size_t i = 0; i < subscribers.size(); i++) {
     if (!subscribers[i])
       continue;
     network::URL url = m_resolver.resolveAddressFor(subscribers[i], requesterInfo.clientAddress, requesterInfo.localAddress);
@@ -368,6 +368,17 @@ void MasterHandler::update()
     sendToNode(nr, "shutdown", msg);
   }
 }
+
+AddressResolver* MasterHandler::getResolver()
+{
+  return &m_resolver;
+}
+
+const AddressResolver* MasterHandler::getResolver() const
+{
+  return &m_resolver;
+}
+
 
 } // namespace master
 } // namespace miniros

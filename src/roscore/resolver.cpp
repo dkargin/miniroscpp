@@ -17,7 +17,7 @@
 namespace miniros {
 namespace network {
 // Defined in net_address.cpp
-bool fillAddress(const sockaddr_in& my_addr, NetAddress& address);
+bool fillAddress(const sockaddr_in& sysAddr, NetAddress& address);
 }
 
 namespace master {
@@ -315,6 +315,16 @@ std::shared_ptr<HostInfo> AddressResolver::updateHost(const  RequesterInfo& requ
     it->second->local = true;
 
   return it->second;
+}
+
+std::set<std::shared_ptr<HostInfo>> AddressResolver::getHosts() const
+{
+  std::scoped_lock lock(m_mutex);
+  std::set<std::shared_ptr<HostInfo>> result;
+  for (auto [key, pInfo]: m_hosts) {
+    result.insert(pInfo);
+  }
+  return result;
 }
 
 HostInfo::HostInfo(const std::string& name)

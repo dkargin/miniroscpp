@@ -22,14 +22,22 @@ const char* Error::toString() const {
       return "Not supported";
     case Error::ParameterNotFound:
       return "Parameter not found";
-   case Error::InvalidURI:
-     return "Invalid URI";
-   case Error::InternalError:
-     return "Internal error";
-   case Error::ShutdownInterrupt:
-     return "Interrupted by shutdown request";
-   case Error::InvalidResponse:
-     return "Invalid response";
+    case Error::InvalidURI:
+      return "Invalid URI";
+    case Error::InternalError:
+      return "Internal error";
+    case Error::ShutdownInterrupt:
+      return "Interrupted by shutdown request";
+    case Error::InvalidResponse:
+      return "Invalid response";
+    case Error::AddressInUse:
+      return "Address in use";
+    case Error::EndOfFile:
+      return "End of file";
+    case Error::WouldBlock:
+      return "Would block";
+    case Error::FileNotFound:
+      return "File not found";
   }
   return "Unknown error";
 }

@@ -14,6 +14,7 @@
 #include "miniros/xmlrpcpp/XmlRpcUtil.h"
 
 #include "miniros/common.h"
+#include "miniros/transport/rpc_manager.h"
 
 /// This define is injected in replacements/CMakeLists.txt
 #ifdef USE_LOCAL_PROGRAM_OPTIONS
@@ -97,34 +98,45 @@ int main(int argc, const char ** argv) {
 
   bool dumpParameters = vm["dump_parameters"].as<bool>();
 
-  MINIROS_INFO("Creating RPCManager");
-
-  // Standalone RPC manager for rosmaster.
-  bool unifiedRpc = vm["unified_rpc"].as<bool>();
-
-  std::shared_ptr<miniros::RPCManager> masterRpcManager;
-  if (unifiedRpc)
-    masterRpcManager = miniros::RPCManager::instance();
-  else
-    masterRpcManager = std::make_shared<miniros::RPCManager>();
+  std::shared_ptr<miniros::RPCManager> masterRpcManager = miniros::RPCManager::instance();
 
   MINIROS_INFO("Creating Master object");
   miniros::master::Master master(masterRpcManager);
+
+  MINIROS_INFO("Initializing core transport");
+  std::map<std::string, std::string> remappings;
+  if (int port = master.getPort()) {
+    remappings["__rpc_server_port"] = std::to_string(port);
+  }
+  miniros::init(remappings, "miniroscore", miniros::init_options::NoRosout | miniros::init_options::NoSigintHandler);
 
   master.setResolveNodeIP(resolve);
   master.setDumpParameters(dumpParameters);
 
   MINIROS_INFO("Starting Master thread");
-  master.start();
+
+  // Start internal networking.
+  if (miniros::Error err = miniros::start(); !err) {
+    MINIROS_ERROR("Failed to start internal networking: %s", err.toString());
+    return EXIT_FAILURE;
+  }
+
+  // This poll set is expected to be a global poll set used by ROS. It is created by invoking `miniros::init` and exists
+  // until application ends or miniros::shutdown() is invoked.
+  miniros::PollSet* pollSet = masterRpcManager->getPollSet();
+  if (!pollSet) {
+    MINIROS_FATAL("Failed to get poll set");
+    return EXIT_FAILURE;
+  }
+
+  if (!master.start(pollSet)) {
+    MINIROS_ERROR("Failed to start Master");
+    return EXIT_FAILURE;
+  }
 
   std::unique_ptr<miniros::master::Rosout> r;
   if (useRosout) {
-    std::map<std::string, std::string> remappings;
-
-    remappings["__master"] = master.getUri();
-
     MINIROS_INFO("Creating Rosout object");
-    miniros::init(remappings, "miniroscore", miniros::init_options::NoRosout | miniros::init_options::NoSigintHandler);
     r.reset(new miniros::master::Rosout());
   }
 

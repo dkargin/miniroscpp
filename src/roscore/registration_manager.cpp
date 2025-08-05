@@ -227,5 +227,16 @@ std::vector<std::shared_ptr<NodeRef>> RegistrationManager::getTopicSubscribers(c
   return result;
 }
 
+std::vector<std::shared_ptr<NodeRef>> RegistrationManager::listAllNodes() const
+{
+  std::scoped_lock<std::mutex> lock(m_guard);
+  std::vector<std::shared_ptr<NodeRef>> result;
+  result.reserve(m_nodes.size());
+  for (const auto& [name, node]: m_nodes) {
+    result.push_back(node);
+  }
+  return result;
+}
+
 } // namespace master
 } // namespace miniros

@@ -37,6 +37,8 @@
 #include <algorithm>
 #include <vector>
 #include <map>
+#include <mutex>
+#include <optional>
 
 #include "miniros/transport/poll_set.h"
 #include "miniros/transport/io.h"
@@ -54,7 +56,7 @@ namespace miniros
 struct PollSet::Internal {
   struct SocketInfo
   {
-    TransportPtr transport_;
+    TrackedObject object_;
     SocketUpdateFunc func_;
     int fd_;
     int events_;
@@ -84,15 +86,15 @@ struct PollSet::Internal {
 
   }
 
-  const SocketInfo* findSocketInfo(int fd) const
+  /// It returns a copy of SocketInfo to make sure that shared pointer to tracked object having additional reference.
+  std::optional<SocketInfo> findSocketInfo(int fd) const
   {
     std::scoped_lock<std::mutex> lock(socket_info_mutex_);
     auto it = socket_info_.find(fd);
     // the socket has been entirely deleted
     if (it == socket_info_.end())
-      return nullptr;
-
-    return &it->second;
+      return {};
+    return {it->second};
   }
 };
 
@@ -115,12 +117,12 @@ PollSet::~PollSet()
   internal_.reset();
 }
 
-bool PollSet::addSocket(int fd, const SocketUpdateFunc& update_func, const TransportPtr& transport)
+bool PollSet::addSocket(int fd, const SocketUpdateFunc& update_func, const TrackedObject& object)
 {
   Internal::SocketInfo info;
   info.fd_ = fd;
   info.events_ = 0;
-  info.transport_ = transport;
+  info.object_ = object;
   info.func_ = update_func;
 
   {
@@ -278,14 +280,14 @@ void PollSet::update(int poll_timeout)
       if (revents == 0)
         continue;
 
-      const auto* info = internal_->findSocketInfo(fd);
+      auto info = internal_->findSocketInfo(fd);
       if (!info)
         continue;
 
       // Store off the function and transport in case the socket is deleted from another thread
       SocketUpdateFunc func = info->func_;
       // This pointer helps keeping transport alive until we exit this block.
-      TransportPtr transport = info->transport_;
+      TrackedObject object = info->object_;
       const int events = info->events_;
 
       bool hasEvents = events & revents

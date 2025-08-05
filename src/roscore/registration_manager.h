@@ -87,6 +87,9 @@ public:
   /// Drop all registrations for specified node.
   void dropRegistrations(const std::shared_ptr<NodeRef>& node);
 
+  /// List all known nodes.
+  std::vector<std::shared_ptr<NodeRef>> listAllNodes() const;
+
 protected:
 
   /// Find node by its name.

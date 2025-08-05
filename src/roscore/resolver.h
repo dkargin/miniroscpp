@@ -88,6 +88,9 @@ public:
   /// Check if specified address is a localhost.
   bool isLocalhost(const std::string& hostname) const;
 
+  /// List all known hosts.
+  std::set<std::shared_ptr<HostInfo>> getHosts() const;
+
 protected:
   /// Name of the host, as reported by a system.
   std::string m_hostname;

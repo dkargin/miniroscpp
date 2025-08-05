@@ -25,6 +25,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <mutex>
+
 #define MINIROS_PACKAGE_NAME "master_link"
 
 #include "miniros/master_link.h"
@@ -41,7 +43,7 @@
 namespace miniros {
 
 struct MasterLink::Internal {
-  std::shared_ptr<RPCManager> rpcManager;
+  std::weak_ptr<RPCManager> rpcManager;
 
   uint32_t port = 0;
   std::string host;
@@ -201,7 +203,7 @@ Error MasterLink::execute(const std::string& method, const RpcValue& request, Rp
   if (!internal_)
     return Error::InternalError;
 
-  RPCManagerPtr manager = internal_->rpcManager;
+  RPCManagerPtr manager = internal_->rpcManager.lock();
   if (!manager) {
     return Error::NoMaster;
   }
@@ -214,7 +216,19 @@ Error MasterLink::execute(const std::string& method, const RpcValue& request, Rp
     MINIROS_ERROR("[%s] - no manager", method.c_str());
     return Error::InternalError;
   }
-  XmlRpc::XmlRpcClient* c = manager->getXMLRPCClient(master_host, master_port, "/");
+
+  // Try to execute request without any network.
+  if (manager->isMaster()) {
+    if (Error err = manager->executeLocalRPC(method, request, response); err != Error::Ok) {
+      return Error::InvalidValue;
+    }
+    if (!manager->validateXmlrpcResponse(method, response, payload)) {
+      return Error::InvalidResponse;
+    }
+    return Error::Ok;
+  }
+
+  XmlRpc::XmlRpcClient* c = manager->getXMLRPCClient(master_host, master_port, "/RPC2");
   if (!c) {
     MINIROS_ERROR("[%s] - failed make connection to host=\"%s:%d\"", method.c_str(), master_host.c_str(), master_port);
     return Error::InvalidURI;
@@ -275,6 +289,8 @@ Error MasterLink::execute(const std::string& method, const RpcValue& request, Rp
     MINIROS_ERROR("[%s] Got shutdown request during RPC call", method.c_str());
     return Error::ShutdownInterrupt;
   }
+  auto time = SteadyTime::now() - start_time;
+  //MINIROS_DEBUG("Finished \"%s\" in %fms", method.c_str(), time.toSec()*1000.0);
   return Error::Ok;;
 }
 
@@ -305,11 +321,11 @@ void MasterLink::set(const std::string& key, const RpcValue& v)
   params[2] = v;
 
   {
-    // Lock around the execute to the master in case we get a parameter update on this value between
-    // executing on the master and setting the parameter in the g_params list.
-    std::scoped_lock<std::mutex> lock(internal_->params_mutex);
-
     if (this->execute("setParam", params, result, payload, true)) {
+      // Lock around the execute to the master in case we get a parameter update on this value between
+      // executing on the master and setting the parameter in the g_params list.
+      std::scoped_lock<std::mutex> lock(internal_->params_mutex);
+
       // Update our cached params list now so that if get() is called immediately after param::set()
       // we already have the cached state and our value will be correct
       if (internal_->subscribed_params.find(mapped_key) != internal_->subscribed_params.end()) {
@@ -483,6 +499,10 @@ bool MasterLink::getParamImpl(const std::string& key, RpcValue& v, bool use_cach
 {
   if (!internal_)
     return false;
+  auto rpcManager = internal_->rpcManager.lock();
+  if (!rpcManager)
+    return false;
+  auto URI = rpcManager->getServerURI();
   std::string mapped_key = miniros::names::resolve(key);
   if (mapped_key.empty())
     mapped_key = "/";
@@ -508,7 +528,7 @@ bool MasterLink::getParamImpl(const std::string& key, RpcValue& v, bool use_cach
       if (internal_->subscribed_params.insert(mapped_key).second) {
         RpcValue params, result, payload;
         params[0] = this_node::getName();
-        params[1] = internal_->rpcManager->getServerURI();
+        params[1] = URI;
         params[2] = mapped_key;
 
         if (!this->execute("subscribeParam", params, result, payload, false)) {
@@ -1049,8 +1069,8 @@ Error MasterLink::initParam(const M_string& remappings)
     }
   }
 
-  if (internal_->rpcManager) {
-    internal_->rpcManager->bind("paramUpdate",
+  if (auto manager = internal_->rpcManager.lock()) {
+    manager->bind("paramUpdate",
       [this](const RpcValue& params, RpcValue& result) {
         return paramUpdateCallback(params, result);
       });
