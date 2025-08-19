@@ -18,11 +18,13 @@ NodeRef::NodeRef(const std::string& _id, const std::string& _api)
 
 NodeRef::~NodeRef()
 {
+  std::unique_lock lock(m_guard);
   MINIROS_INFO("NodeRef::~NodeRef(\"%s\") api=%s", m_id.c_str(), m_api.c_str());
 }
 
 void NodeRef::clear()
 {
+  std::unique_lock lock(m_guard);
   m_paramSubscriptions.clear();
   m_topicPublications.clear();
   m_topicSubscriptions.clear();
@@ -31,12 +33,14 @@ void NodeRef::clear()
 
 bool NodeRef::is_empty() const
 {
+  std::unique_lock lock(m_guard);
   return m_paramSubscriptions.empty() && m_topicSubscriptions.empty() &&
          m_topicPublications.empty() && m_services.empty();
 }
 
 bool NodeRef::add(Registrations::Type type_, const std::string& key)
 {
+  std::unique_lock lock(m_guard);
   if (type_ == Registrations::TOPIC_SUBSCRIPTIONS) {
     if (!m_topicSubscriptions.count(key)) {
       m_topicSubscriptions.insert(key);
@@ -60,6 +64,7 @@ bool NodeRef::add(Registrations::Type type_, const std::string& key)
 
 bool NodeRef::remove(Registrations::Type type_, const std::string& key)
 {
+  std::unique_lock lock(m_guard);
   if (type_ == Registrations::TOPIC_SUBSCRIPTIONS) {
     m_topicSubscriptions.erase(key);
   } else if (type_ == Registrations::TOPIC_PUBLICATIONS) {
@@ -76,16 +81,19 @@ bool NodeRef::remove(Registrations::Type type_, const std::string& key)
 
 network::URL NodeRef::getUrl() const
 {
+  std::unique_lock lock(m_guard);
   return m_apiUrl;
 }
 
 std::string NodeRef::getApi() const
 {
+  std::unique_lock lock(m_guard);
   return m_api;
 }
 
 std::string NodeRef::getHost() const
 {
+  std::unique_lock lock(m_guard);
   return m_apiUrl.host;
 }
 
@@ -96,11 +104,13 @@ void NodeRef::writeJson(std::ostream& os, miniros::JsonState& state, const minir
 
 void NodeRef::updateHost(const std::shared_ptr<HostInfo>& hostInfo)
 {
+  std::unique_lock lock(m_guard);
   m_hostInfo = hostInfo;
 }
 
 std::weak_ptr<const HostInfo> NodeRef::hostInfo() const
 {
+  std::unique_lock lock(m_guard);
   return m_hostInfo;
 }
 

@@ -6,11 +6,11 @@
 #define MINIROS_NODE_REF_H
 
 #include <memory>
+#include <mutex>
 #include <set>
 #include <string>
 
 #include <miniros/macros.h>
-#include <miniros/transport/net_address.h>
 #include <miniros/transport/url.h>
 
 #include "registrations.h"
@@ -87,6 +87,8 @@ protected:
     std::string m_resolvedIp;
 
     std::weak_ptr<HostInfo> m_hostInfo;
+
+    mutable std::mutex m_guard;
 };
 
 using NodeRefPtr = std::shared_ptr<NodeRef>;
