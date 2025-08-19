@@ -7,6 +7,8 @@
 
 #include <memory>
 #include <mutex>
+#include <string>
+#include <string_view>
 
 #include "node_ref.h"
 #include "requester_info.h"
@@ -38,7 +40,11 @@ public:
 
   /// Find node by its name.
   /// @returns reference to a node or nullptr if no node is found.
-  std::shared_ptr<NodeRef> getNodeByName(const std::string& nodeName) const;
+  std::shared_ptr<NodeRef> getNodeByName(const std::string& name) const;
+
+  /// Find node by its name.
+  /// @returns reference to a node or nullptr if no node is found.
+  std::shared_ptr<NodeRef> getNodeByName(const std::string_view& name) const;
 
   /// Find node by an API URI.
   /// @returns reference to a node or nullptr if no node is found.
@@ -92,7 +98,7 @@ protected:
   /// Find node by its name.
   /// This version does not lock any mutex.
   /// @returns reference to a node or nullptr if no node is found.
-  std::shared_ptr<NodeRef> getNodeByNameUnsafe(const std::string& nodeName) const;
+  std::shared_ptr<NodeRef> getNodeByNameUnsafe(const std::string_view& name) const;
 
   /// Find node by an API URI.
   /// This version does not lock any mutex.
@@ -106,7 +112,7 @@ protected:
   mutable std::mutex m_guard;
 
   /// Maps node name/id to a ref.
-  std::map<std::string, std::shared_ptr<NodeRef>> m_nodes;
+  std::map<std::string, std::shared_ptr<NodeRef>, std::less<>> m_nodes;
 
   /// A collection of nodes queued for shutdown.
   std::set<std::shared_ptr<NodeRef>> m_nodesToShutdown;
