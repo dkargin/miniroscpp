@@ -17,15 +17,21 @@ RegistrationManager::RegistrationManager()
 {
 }
 
-std::shared_ptr<NodeRef> RegistrationManager::getNodeByName(const std::string& node) const
+std::shared_ptr<NodeRef> RegistrationManager::getNodeByName(const std::string& name) const
 {
   std::scoped_lock<std::mutex> lock(m_guard);
-  return getNodeByNameUnsafe(node);
+  return getNodeByNameUnsafe(name);
 }
 
-std::shared_ptr<NodeRef> RegistrationManager::getNodeByNameUnsafe(const std::string& node) const
+std::shared_ptr<NodeRef> RegistrationManager::getNodeByName(const std::string_view& name) const
 {
-  auto it = m_nodes.find(node);
+  std::scoped_lock<std::mutex> lock(m_guard);
+  return getNodeByNameUnsafe(name);
+}
+
+std::shared_ptr<NodeRef> RegistrationManager::getNodeByNameUnsafe(const std::string_view& name) const
+{
+  auto it = m_nodes.find(name);
   if (it != m_nodes.end())
     return it->second;
   return {};
