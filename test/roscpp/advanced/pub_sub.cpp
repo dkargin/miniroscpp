@@ -49,10 +49,10 @@ int main(int argc, char** argv)
 {
   miniros::init(argc, argv, "pub_sub");
 
-  if(argc != 2)
+  if (argc < 2)
   {
     puts(USAGE);
-    exit(-1);
+    return EXIT_FAILURE;
   }
 
   g_array_size = atoi(argv[1]);
@@ -75,4 +75,6 @@ int main(int argc, char** argv)
     });
 
   miniros::spin();
+
+  return EXIT_SUCCESS;
 }

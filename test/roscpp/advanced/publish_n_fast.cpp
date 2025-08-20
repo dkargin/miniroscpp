@@ -67,7 +67,7 @@ main(int argc, char** argv)
   if(argc != 4)
   {
     puts(USAGE);
-    exit(-1);
+    return EXIT_FAILURE;
   }
 
   int msg_count = atoi(argv[1]);
@@ -81,5 +81,5 @@ main(int argc, char** argv)
     });
   miniros::spin();
 
-  return 0;
+  return EXIT_SUCCESS;
 }
