@@ -53,6 +53,7 @@ minibag::PlayerOptions parsePlayOptions(int argc, char** argv) {
       ("wait-for-subscribers", "wait for at least one subscriber on each topic before publishing")
       ("rate-control-topic", po::value<std::string>(), "watch the given topic, and if the last publish was more than <rate-control-max-delay> ago, wait until the topic publishes again to continue playback")
       ("rate-control-max-delay", po::value<float>()->default_value(1.0f), "maximum time difference from <rate-control-topic> before pausing")
+      ("ignore-topics", po::value< std::vector<std::string> >()->multitoken(), "topics to be skipped if playing whole bag")
       ;
 
     po::positional_options_description p;
@@ -117,6 +118,13 @@ minibag::PlayerOptions parsePlayOptions(int argc, char** argv) {
       opts.keep_alive = true;
     if (vm.count("wait-for-subscribers"))
       opts.wait_for_subscribers = true;
+
+    if (vm.count("ignore-topics")) {
+      std::vector<std::string> ignore_topics = vm["ignore-topics"].as< std::vector<std::string> >();
+      for (const std::string& topic: ignore_topics) {
+        opts.ignore_topics.insert(topic);
+      }
+    }
 
     if (vm.count("topics"))
     {

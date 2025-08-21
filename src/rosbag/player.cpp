@@ -197,7 +197,8 @@ void Player::publish() {
     // Advertise all of our messages
     for (const ConnectionInfo* c : view.getConnections())
     {
-        advertise(c);
+        if (!options_.ignore_topics.count(c->topic))
+          advertise(c);
     }
 
     if (options_.rate_control_topic != "")
@@ -251,9 +252,10 @@ void Player::publish() {
                 const auto header_iter = c->header->find("callerid");
                 const auto callerid = (header_iter != c->header->end() ? header_iter->second : string(""));
 
-                latch_topics.emplace(callerid, c->topic);
-
-                advertise(c);
+                if (!options_.ignore_topics.count(c->topic)) {
+                  latch_topics.emplace(callerid, c->topic);
+                  advertise(c);
+                }
             }
         }
 
@@ -320,7 +322,8 @@ void Player::publish() {
             if (!node_handle_.ok())
                 break;
 
-            doPublish(m);
+            if (!options_.ignore_topics.count(m.getTopic()))
+              doPublish(m);
         }
 
         if (options_.keep_alive)
