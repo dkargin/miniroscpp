@@ -98,6 +98,10 @@ struct PlayerOptions
     std::vector<std::string> bags;
     std::vector<std::string> topics;
     std::vector<std::string> pause_topics;
+
+    /// A set of topics to be ignored during playback.
+    /// It is in case of playing all topics from bag.
+    std::set<std::string> ignore_topics;
 };
 
 
