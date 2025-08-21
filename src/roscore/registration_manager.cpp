@@ -253,6 +253,36 @@ std::vector<std::shared_ptr<NodeRef>> RegistrationManager::getTopicSubscribers(c
   return result;
 }
 
+size_t RegistrationManager::iteratePublishers(const std::string_view& topic,
+  const NodeIterator& iterator) const
+{
+  size_t counter = 0;
+  publishers.iterateRecords(topic, [&](const Registrations::Record& rec) {
+    if (auto node = getNodeByAPIUnsafe(rec.api)) {
+      if (!iterator(node))
+        return false;
+    }
+    counter++;
+    return true;
+  });
+  return counter;
+}
+
+size_t RegistrationManager::iterateSubscribers(const std::string_view& topic, const NodeIterator& iterator) const
+{
+  size_t counter = 0;
+  subscribers.iterateRecords(topic, [&](const Registrations::Record& rec) {
+      if (auto node = getNodeByAPIUnsafe(rec.api)) {
+        if (!iterator(node))
+          return false;
+      }
+      counter++;
+      return true;
+    });
+  return counter;
+}
+
+
 std::vector<std::shared_ptr<NodeRef>> RegistrationManager::listAllNodes() const
 {
   std::scoped_lock<std::mutex> lock(m_guard);
@@ -269,6 +299,16 @@ std::map<std::string, std::string, std::less<>> RegistrationManager::getTopicTyp
   MINIROS_DEBUG_NAMED("reg", "getTopicTypes from %s", caller_id.c_str());
   std::scoped_lock<std::mutex> lock(m_guard);
   return m_topicTypes;
+}
+
+std::string RegistrationManager::getTopicType(const std::string_view& name) const
+{
+  std::scoped_lock<std::mutex> lock(m_guard);
+  auto it = m_topicTypes.find(name);
+  if (it != m_topicTypes.end()) {
+    return it->second;
+  }
+  return {};
 }
 
 const std::map<std::string, std::string, std::less<>>& RegistrationManager::getTopicTypesUnsafe(const Lock&) const

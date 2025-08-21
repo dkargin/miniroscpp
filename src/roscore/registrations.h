@@ -8,6 +8,7 @@
 #include <map>
 #include <string>
 #include <vector>
+#include <functional>
 
 #include "miniros/errors.h"
 #include "miniros/xmlrpcpp/XmlRpcValue.h"
@@ -58,7 +59,7 @@ public:
     };
 
     using XmlRpcValue = XmlRpc::XmlRpcValue;
-    std::map<std::string, std::vector<Record> > map;
+    std::map<std::string, std::vector<Record>, std::less<> > map;
     std::map<std::string, Record> service_api_map;
 
     Registrations(Type type_);
@@ -67,6 +68,25 @@ public:
     std::string get_service_api(const std::string& service) const;
 
     std::vector<std::string> getApis(const std::string& key) const;
+
+    /// Iterate over all records with specified key.
+    /// @param key - key to search. It is name of topic or service.
+    /// @param cb - callback object.
+    /// @returns number of objects iterated.
+    template <class Callback>
+    size_t iterateRecords(const std::string_view& key, const Callback& cb) const
+    {
+      size_t result = 0;
+      auto it = map.find(key);
+      if (it != map.end()) {
+        for (const Record& obj: it->second) {
+          result++;
+          if (!cb(obj))
+            break;
+        }
+      }
+      return result;
+    }
 
     bool has_key(const std::string& key) const;
 
