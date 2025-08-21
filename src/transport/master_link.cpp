@@ -292,10 +292,10 @@ void MasterLink::invalidateParentParams(const std::string& key)
   }
 }
 
-void MasterLink::set(const std::string& key, const RpcValue& v)
+Error MasterLink::set(const std::string& key, const RpcValue& v)
 {
   if (!internal_)
-    return;
+    return Error::InternalError;
 
   std::string mapped_key = miniros::names::resolve(key);
 
@@ -304,59 +304,60 @@ void MasterLink::set(const std::string& key, const RpcValue& v)
   params[1] = mapped_key;
   params[2] = v;
 
-  {
-    // Lock around the execute to the master in case we get a parameter update on this value between
-    // executing on the master and setting the parameter in the g_params list.
-    std::scoped_lock<std::mutex> lock(internal_->params_mutex);
+  Error err = this->execute("setParam", params, result, payload, true);
+  if (!err)
+    return err;
 
-    if (this->execute("setParam", params, result, payload, true)) {
-      // Update our cached params list now so that if get() is called immediately after param::set()
-      // we already have the cached state and our value will be correct
-      if (internal_->subscribed_params.find(mapped_key) != internal_->subscribed_params.end()) {
-        internal_->params[mapped_key] = v;
-      }
-      invalidateParentParams(mapped_key);
-    }
+  // Lock around execute to the master in case we get a parameter update on this value between
+  // executing on the master and setting the parameter in the g_params list.
+  std::scoped_lock<std::mutex> lock(internal_->params_mutex);
+
+  // Update our cached params list now so that if get() is called immediately after param::set()
+  // we already have the cached state and our value will be correct
+  if (internal_->subscribed_params.find(mapped_key) != internal_->subscribed_params.end()) {
+    internal_->params[mapped_key] = v;
   }
+  invalidateParentParams(mapped_key);
+  return Error::Ok;
 }
 
-void MasterLink::set(const std::string& key, const std::string& s)
+Error MasterLink::set(const std::string& key, const std::string& s)
 {
   // construct xmlrpc_c::value object of the std::string and
   // call param::set(key, xmlvalue);
   RpcValue v(s);
-  set(key, v);
+  return set(key, v);
 }
 
-void MasterLink::set(const std::string& key, const char* s)
+Error MasterLink::set(const std::string& key, const char* s)
 {
   // construct xmlrpc_c::value object of the std::string and
   // call param::set(key, xmlvalue);
   std::string sxx = std::string(s);
   RpcValue v(sxx);
-  set(key, v);
+  return set(key, v);
 }
 
-void MasterLink::set(const std::string& key, double d)
+Error MasterLink::set(const std::string& key, double d)
 {
   RpcValue v(d);
-  set(key, v);
+  return set(key, v);
 }
 
-void MasterLink::set(const std::string& key, int i)
+Error MasterLink::set(const std::string& key, int i)
 {
   RpcValue v(i);
-  set(key, v);
+  return set(key, v);
 }
 
-void MasterLink::set(const std::string& key, bool b)
+Error MasterLink::set(const std::string& key, bool b)
 {
   RpcValue v(b);
-  set(key, v);
+  return set(key, v);
 }
 
 template <class T>
-void MasterLink::setParamImpl(const std::string& key, const std::vector<T>& vec)
+Error MasterLink::setParamImpl(const std::string& key, const std::vector<T>& vec)
 {
   // Note: the XmlRpcValue starts off as "invalid" and assertArray turns it
   // into an array type with the given size
@@ -368,36 +369,36 @@ void MasterLink::setParamImpl(const std::string& key, const std::vector<T>& vec)
     xml_vec[i] = vec.at(i);
   }
 
-  this->set(key, xml_vec);
+  return this->set(key, xml_vec);
 }
 
-void MasterLink::set(const std::string& key, const std::vector<std::string>& vec)
+Error MasterLink::set(const std::string& key, const std::vector<std::string>& vec)
 {
-  setParamImpl(key, vec);
+  return setParamImpl(key, vec);
 }
 
-void MasterLink::set(const std::string& key, const std::vector<double>& vec)
+Error MasterLink::set(const std::string& key, const std::vector<double>& vec)
 {
-  setParamImpl(key, vec);
+  return setParamImpl(key, vec);
 }
 
-void MasterLink::set(const std::string& key, const std::vector<float>& vec)
+Error MasterLink::set(const std::string& key, const std::vector<float>& vec)
 {
-  setParamImpl(key, vec);
+  return setParamImpl(key, vec);
 }
 
-void MasterLink::set(const std::string& key, const std::vector<int>& vec)
+Error MasterLink::set(const std::string& key, const std::vector<int>& vec)
 {
-  setParamImpl(key, vec);
+  return setParamImpl(key, vec);
 }
 
-void MasterLink::set(const std::string& key, const std::vector<bool>& vec)
+Error MasterLink::set(const std::string& key, const std::vector<bool>& vec)
 {
-  setParamImpl(key, vec);
+  return setParamImpl(key, vec);
 }
 
 template <class T>
-void MasterLink::setParamImpl(const std::string& key, const std::map<std::string, T>& map)
+Error MasterLink::setParamImpl(const std::string& key, const std::map<std::string, T>& map)
 {
   // Note: the XmlRpcValue starts off as "invalid" and assertStruct turns it
   // into a struct type
@@ -409,32 +410,32 @@ void MasterLink::setParamImpl(const std::string& key, const std::map<std::string
     xml_value[it->first] = it->second;
   }
 
-  this->set(key, xml_value);
+  return this->set(key, xml_value);
 }
 
-void MasterLink::set(const std::string& key, const std::map<std::string, std::string>& map)
+Error MasterLink::set(const std::string& key, const std::map<std::string, std::string>& map)
 {
-  setParamImpl(key, map);
+  return setParamImpl(key, map);
 }
 
-void MasterLink::set(const std::string& key, const std::map<std::string, double>& map)
+Error MasterLink::set(const std::string& key, const std::map<std::string, double>& map)
 {
-  setParamImpl(key, map);
+  return setParamImpl(key, map);
 }
 
-void MasterLink::set(const std::string& key, const std::map<std::string, float>& map)
+Error MasterLink::set(const std::string& key, const std::map<std::string, float>& map)
 {
-  setParamImpl(key, map);
+  return setParamImpl(key, map);
 }
 
-void MasterLink::set(const std::string& key, const std::map<std::string, int>& map)
+Error MasterLink::set(const std::string& key, const std::map<std::string, int>& map)
 {
-  setParamImpl(key, map);
+  return setParamImpl(key, map);
 }
 
-void MasterLink::set(const std::string& key, const std::map<std::string, bool>& map)
+Error MasterLink::set(const std::string& key, const std::map<std::string, bool>& map)
 {
-  setParamImpl(key, map);
+  return setParamImpl(key, map);
 }
 
 bool MasterLink::has(const std::string& key)
@@ -1000,53 +1001,49 @@ void MasterLink::paramUpdateCallback(const RpcValue& params, RpcValue& result)
 
 Error MasterLink::initParam(const M_string& remappings)
 {
-  auto it = remappings.begin();
-  auto end = remappings.end();
-  for (; it != end; ++it) {
-    const std::string& name = it->first;
-    const std::string& param = it->second;
-
+  for (const auto& [name, param] : remappings) {
     if (name.size() < 2) {
       continue;
     }
 
-    if (name[0] == '_' && name[1] != '_') {
-      std::string local_name = "~" + name.substr(1);
+    if (name[0] != '_' || name[1] == '_')
+      continue;
 
-      bool success = false;
+    std::string local_name = "~" + name.substr(1);
 
-      try {
-        auto i = std::stoi(param);
-        this->set(names::resolve(local_name), i);
+    bool success = false;
+
+    try {
+      auto i = std::stoi(param);
+      Error err = this->set(names::resolve(local_name), i);
+      if (err == Error::Ok)
         success = true;
-      } catch (std::invalid_argument&) {
-      } catch (std::out_of_range&) {
-      }
-
-      if (success) {
-        continue;
-      }
-
-      try {
-        double d = std::stod(param);
-        this->set(names::resolve(local_name), d);
-        success = true;
-      } catch (std::invalid_argument&) {
-      } catch (std::out_of_range&) {
-      }
-
-      if (success) {
-        continue;
-      }
-
-      if (param == "true" || param == "True" || param == "TRUE") {
-        this->set(names::resolve(local_name), true);
-      } else if (param == "false" || param == "False" || param == "FALSE") {
-        this->set(names::resolve(local_name), false);
-      } else {
-        this->set(names::resolve(local_name), param);
-      }
+    } catch (std::invalid_argument&) {
+    } catch (std::out_of_range&) {
     }
+
+    if (success)
+      continue;
+
+    try {
+      double d = std::stod(param);
+      this->set(names::resolve(local_name), d);
+      success = true;
+    } catch (std::invalid_argument&) {
+    } catch (std::out_of_range&) {
+    }
+
+    if (success)
+      continue;
+
+    if (param == "true" || param == "True" || param == "TRUE") {
+      this->set(names::resolve(local_name), true);
+    } else if (param == "false" || param == "False" || param == "FALSE") {
+      this->set(names::resolve(local_name), false);
+    } else {
+      this->set(names::resolve(local_name), param);
+    }
+
   }
 
   if (internal_->rpcManager) {
