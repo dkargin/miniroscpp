@@ -22,8 +22,6 @@ class XmlRpcServerConnection;
 namespace miniros {
 
 namespace master {
-bool startsWith(const std::string& str, const std::string& prefix);
-bool endsWith(const std::string& str, const std::string& suffix);
 
 /// Stores state of rosmaster and handles part of requests.
 class MINIROS_DECL MasterHandler
@@ -69,8 +67,6 @@ public:
   /// @param subgraph - Optional std::string, only returns topics that start with that name
   std::vector<std::vector<std::string>> getPublishedTopics(const RequesterInfo& requesterInfo, const std::string& subgraph) const;
 
-  std::map<std::string,std::string> getTopicTypes(const std::string& caller_id) const;
-
   struct SystemState {
     std::map<std::string, std::vector<std::string>> publishers;
     std::map<std::string, std::vector<std::string>> subscribers;
@@ -106,8 +102,6 @@ protected:
   /// A  list of commands to be sent later.
   std::vector<AsyncCommand> m_asyncCommands;
 
-  /// Maps topicName to type md5.
-  std::map<std::string, std::string> m_topicTypes;
   /// Internal guard for m_topicTypes.
   mutable std::mutex m_guard;
 };

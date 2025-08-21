@@ -170,7 +170,7 @@ Master::RpcValue Master::unregisterService(
 
 Master::RpcValue Master::getTopicTypes(const std::string& topic, Connection*)
 {
-  std::map<std::string, std::string> types = m_handler.getTopicTypes(topic);
+  auto types = m_regManager.getTopicTypes(topic);
 
   RpcValue xmlTopics = RpcValue::Array(types.size());
   int index = 0;

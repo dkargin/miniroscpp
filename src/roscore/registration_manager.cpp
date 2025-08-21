@@ -5,6 +5,8 @@
 #include "registration_manager.h"
 
 #include "miniros/console.h"
+#include "miniros/names.h"
+
 
 namespace miniros {
 namespace master {
@@ -31,9 +33,17 @@ std::shared_ptr<NodeRef> RegistrationManager::getNodeByName(const std::string_vi
 
 std::shared_ptr<NodeRef> RegistrationManager::getNodeByNameUnsafe(const std::string_view& name) const
 {
+  if (name.empty())
+    return {};
+
+  std::string sname{name};
+  // TODO: Some requests can start with a full path. Some without "/". Need to address that.
   auto it = m_nodes.find(name);
-  if (it != m_nodes.end())
+  if (it != m_nodes.end()) {
     return it->second;
+    MINIROS_INFO_NAMED("reg", "getNodeByName(\"%s\")", sname.c_str());
+  }
+  MINIROS_WARN_NAMED("reg", "getNodeByName(\"%s\") - no such node", sname.c_str());
   return {};
 }
 
@@ -130,15 +140,25 @@ std::shared_ptr<NodeRef> RegistrationManager::register_service(const std::string
   return _register(services, service, caller_id, caller_api, service_api);
 }
 
-std::shared_ptr<NodeRef> RegistrationManager::register_publisher(const std::string& topic, const std::string& caller_id,
-  const std::string& caller_api)
+std::shared_ptr<NodeRef> RegistrationManager::register_publisher(const std::string& topic, const std::string& topic_type,
+  const std::string& caller_id, const std::string& caller_api)
 {
+  {
+    std::scoped_lock<std::mutex> lock(m_guard);
+    if (!m_topicTypes.count(topic))
+      m_topicTypes[topic] = topic_type;
+  }
   return _register(publishers, topic, caller_id, caller_api);
 }
 
-std::shared_ptr<NodeRef> RegistrationManager::register_subscriber(const std::string& topic, const std::string& caller_id,
-  const std::string& caller_api)
+std::shared_ptr<NodeRef> RegistrationManager::register_subscriber(const std::string& topic, const std::string& topic_type,
+  const std::string& caller_id, const std::string& caller_api)
 {
+  {
+    std::scoped_lock<std::mutex> lock(m_guard);
+    if (!m_topicTypes.count(topic))
+      m_topicTypes[topic] = topic_type;
+  }
   return _register(subscribers, topic, caller_id, caller_api);
 }
 
@@ -231,6 +251,59 @@ std::vector<std::shared_ptr<NodeRef>> RegistrationManager::getTopicSubscribers(c
     }
   }
   return result;
+}
+
+std::vector<std::shared_ptr<NodeRef>> RegistrationManager::listAllNodes() const
+{
+  std::scoped_lock<std::mutex> lock(m_guard);
+  std::vector<std::shared_ptr<NodeRef>> result;
+  result.reserve(m_nodes.size());
+  for (const auto& [name, node]: m_nodes) {
+    result.push_back(node);
+  }
+  return result;
+}
+
+std::map<std::string, std::string, std::less<>> RegistrationManager::getTopicTypes(const std::string& caller_id) const
+{
+  MINIROS_DEBUG_NAMED("reg", "getTopicTypes from %s", caller_id.c_str());
+  std::scoped_lock<std::mutex> lock(m_guard);
+  return m_topicTypes;
+}
+
+const std::map<std::string, std::string, std::less<>>& RegistrationManager::getTopicTypesUnsafe(const Lock&) const
+{
+  return m_topicTypes;
+}
+
+std::vector<std::vector<std::string>> RegistrationManager::getPublishedTopics(const std::string& prefix) const
+{
+  std::vector<std::vector<std::string>> rtn;
+
+  std::scoped_lock<std::mutex> lock(m_guard);
+  for (const auto& [Key, Value] : publishers.map) {
+    if (names::startsWith(Key, prefix)) {
+      for (const auto& s : Value) {
+        auto it = m_topicTypes.find(Key);
+        if (it != m_topicTypes.end()) {
+          std::vector<std::string> value = {Key, it->second};
+          rtn.push_back(value);
+          break;
+        }
+      }
+    }
+  }
+  return rtn;
+}
+
+void RegistrationManager::lock() const
+{
+  m_guard.lock();
+}
+
+void RegistrationManager::unlock() const
+{
+  m_guard.unlock();
 }
 
 } // namespace master

@@ -167,6 +167,8 @@ MINIROS_DECL bool readTopicList(const std::string& file, std::vector<std::string
 /// @param topics - output array with topics.
 MINIROS_DECL bool readTopicListStr(const std::string& data, std::vector<std::string>& topics);
 
+MINIROS_DECL bool startsWith(const std::string& str, const std::string& prefix);
+MINIROS_DECL bool endsWith(const std::string& str, const std::string& suffix);
 
 } // namespace names
 
