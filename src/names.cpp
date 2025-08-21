@@ -466,6 +466,11 @@ bool readTopicList(const std::string& file, std::vector<std::string>& topics)
   return readTopicList(in, topics);
 }
 
+bool startsWith(const std::string& str, const std::string& prefix)
+{
+  return str.find(prefix) == 0;
+}
+
 } // namespace names
 
 } // namespace miniros

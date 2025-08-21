@@ -22,11 +22,6 @@
 namespace miniros {
 namespace master {
 
-bool startsWith(const std::string& str, const std::string& prefix)
-{
-  return str.find(prefix) == 0;
-}
-
 MasterHandler::MasterHandler(RPCManagerPtr rpcManager, RegistrationManager* regManager)
   :m_rpcManager(rpcManager), m_regManager(regManager)
 {
@@ -162,7 +157,7 @@ ReturnStruct MasterHandler::unregisterService(const RequesterInfo& requesterInfo
 ReturnStruct MasterHandler::registerSubscriber(const RequesterInfo& requesterInfo, const std::string& topic,
   const std::string& topic_type)
 {
-  std::shared_ptr<NodeRef> ref = m_regManager->register_subscriber(topic, requesterInfo.callerId, requesterInfo.callerApi);
+  std::shared_ptr<NodeRef> ref = m_regManager->register_subscriber(topic, topic_type, requesterInfo.callerId, requesterInfo.callerApi);
   if (!ref)
     return ReturnStruct(0, "Internal error");
   if (topic.empty() || topic_type.empty()) {
@@ -174,12 +169,6 @@ ReturnStruct MasterHandler::registerSubscriber(const RequesterInfo& requesterInf
 
   if (auto hostInfo = m_resolver.updateHost(requesterInfo))
     ref->updateHost(hostInfo);
-
-  {
-    std::scoped_lock<std::mutex> lock(m_guard);
-    if (!m_topicTypes.count(topic))
-      m_topicTypes[topic] = topic_type;
-  }
 
   std::vector<std::shared_ptr<NodeRef>> publishers = m_regManager->getTopicPublishers(topic);
 
@@ -225,13 +214,7 @@ ReturnStruct MasterHandler::registerPublisher(const RequesterInfo& requesterInfo
     return ReturnStruct(-1, "Request error");
   }
 
-  {
-    std::scoped_lock<std::mutex> lock(m_guard);
-    if (!m_topicTypes.count(topic))
-      m_topicTypes[topic] = topic_type;
-  }
-
-  std::shared_ptr<NodeRef> ref = m_regManager->register_publisher(topic, requesterInfo.callerId, requesterInfo.callerApi);
+  std::shared_ptr<NodeRef> ref = m_regManager->register_publisher(topic, topic_type, requesterInfo.callerId, requesterInfo.callerApi);
   if (!ref) {
     return ReturnStruct(0, "Internal error");
   }
@@ -298,31 +281,7 @@ std::vector<std::vector<std::string>> MasterHandler::getPublishedTopics(
   else
     prefix = subgraph;
 
-  const auto& e = m_regManager->publishers.map;
-
-  std::vector<std::vector<std::string>> rtn;
-
-  std::scoped_lock<std::mutex> lock(m_guard);
-  for (const auto& [Key, Value] : e) {
-    if (startsWith(Key, prefix)) {
-      for (const auto& s : Value) {
-        auto it = m_topicTypes.find(Key);
-        if (it != m_topicTypes.end()) {
-          std::vector<std::string> value = {Key, it->second};
-          rtn.push_back(value);
-          break;
-        }
-      }
-    }
-  }
-  return rtn;
-}
-
-std::map<std::string, std::string> MasterHandler::getTopicTypes(const std::string& caller_id) const
-{
-  MINIROS_INFO_NAMED("handler", "getTopicTypes from %s", caller_id.c_str());
-  std::scoped_lock<std::mutex> lock(m_guard);
-  return m_topicTypes;
+  return m_regManager->getPublishedTopics(prefix);
 }
 
 MasterHandler::SystemState MasterHandler::getSystemState(const RequesterInfo& requesterInfo) const

@@ -23,6 +23,8 @@ class MINIROS_DECL RegistrationManager {
 public:
   using RpcValue = XmlRpc::XmlRpcValue;
 
+  using Lock = std::unique_lock<const RegistrationManager>;
+
   RegistrationManager();
 
   Registrations publishers;
@@ -71,9 +73,11 @@ public:
   std::shared_ptr<NodeRef> register_service(const std::string& service, const std::string& caller_id, const std::string& caller_api,
     const std::string& service_api);
 
-  std::shared_ptr<NodeRef> register_publisher(const std::string& topic, const std::string& caller_id, const std::string& caller_api);
+  std::shared_ptr<NodeRef> register_publisher(const std::string& topic, const std::string& topic_type,
+    const std::string& caller_id, const std::string& caller_api);
 
-  std::shared_ptr<NodeRef> register_subscriber(const std::string& topic, const std::string& caller_id, const std::string& caller_api);
+  std::shared_ptr<NodeRef> register_subscriber(const std::string& topic, const std::string& topic_type,
+    const std::string& caller_id, const std::string& caller_api);
 
   std::shared_ptr<NodeRef> register_param_subscriber(const std::string& param, const std::string& caller_id, const std::string& caller_api);
 
@@ -92,6 +96,23 @@ public:
 
   /// Drop all registrations for specified node.
   void dropRegistrations(const std::shared_ptr<NodeRef>& node);
+
+  /// List all known nodes.
+  std::vector<std::shared_ptr<NodeRef>> listAllNodes() const;
+
+  /// Get type of topic.
+  std::string getTopicType(const std::string_view& topic) const;
+
+  std::map<std::string, std::string, std::less<>> getTopicTypes(const std::string& caller_id) const;
+
+  /// Get reference to internal container with topics.
+  /// It is thread-unsafe and should be locked by external lock.
+  const std::map<std::string, std::string, std::less<>>& getTopicTypesUnsafe(const Lock&) const;
+
+  std::vector<std::vector<std::string>> getPublishedTopics(const std::string& prefix) const;
+
+  void lock() const;
+  void unlock() const;
 
 protected:
 
@@ -118,6 +139,9 @@ protected:
   std::set<std::shared_ptr<NodeRef>> m_nodesToShutdown;
 
   Registrations param_subscribers;
+
+  /// Maps topicName to type md5.
+  std::map<std::string, std::string, std::less<>> m_topicTypes;
 };
 
 } // namespace master
