@@ -154,7 +154,7 @@ public:
    * \param v The value to be inserted.
    * \throws InvalidNameException if the key is not a valid graph resource name
    */
-  MINIROS_DECL void set(const std::string& key, const RpcValue& v);
+  MINIROS_DECL Error set(const std::string& key, const RpcValue& v);
 
   /** \brief Set a string value on the parameter server.
    *
@@ -162,7 +162,7 @@ public:
    * \param s The value to be inserted.
    * \throws InvalidNameException if the key is not a valid graph resource name
    */
-  MINIROS_DECL void set(const std::string& key, const std::string& s);
+  MINIROS_DECL Error set(const std::string& key, const std::string& s);
 
   /** \brief Set a string value on the parameter server.
    *
@@ -170,7 +170,7 @@ public:
    * \param s The value to be inserted.
    * \throws InvalidNameException if the key is not a valid graph resource name
    */
-  MINIROS_DECL void set(const std::string& key, const char* s);
+  MINIROS_DECL Error set(const std::string& key, const char* s);
 
   /** \brief Set a double value on the parameter server.
    *
@@ -178,7 +178,7 @@ public:
    * \param d The value to be inserted.
    * \throws InvalidNameException if the key is not a valid graph resource name
    */
-  MINIROS_DECL void set(const std::string& key, double d);
+  MINIROS_DECL Error set(const std::string& key, double d);
 
   /** \brief Set an integer value on the parameter server.
    *
@@ -186,7 +186,7 @@ public:
    * \param i The value to be inserted.
    * \throws InvalidNameException if the key is not a valid graph resource name
    */
-  MINIROS_DECL void set(const std::string& key, int i);
+  MINIROS_DECL Error set(const std::string& key, int i);
 
   /** \brief Set a bool value on the parameter server.
    *
@@ -194,7 +194,7 @@ public:
    * \param b The value to be inserted.
    * \throws InvalidNameException if the key is not a valid graph resource name
    */
-  MINIROS_DECL void set(const std::string& key, bool b);
+  MINIROS_DECL Error set(const std::string& key, bool b);
 
   /** \brief Set a string vector value on the parameter server.
    *
@@ -202,7 +202,7 @@ public:
    * \param vec The vector value to be inserted.
    * \throws InvalidNameException if the key is not a valid graph resource name
    */
-  MINIROS_DECL void set(const std::string& key, const std::vector<std::string>& vec);
+  MINIROS_DECL Error set(const std::string& key, const std::vector<std::string>& vec);
 
   /** \brief Set a double vector value on the parameter server.
    *
@@ -210,7 +210,7 @@ public:
    * \param vec The vector value to be inserted.
    * \throws InvalidNameException if the key is not a valid graph resource name
    */
-  MINIROS_DECL void set(const std::string& key, const std::vector<double>& vec);
+  MINIROS_DECL Error set(const std::string& key, const std::vector<double>& vec);
 
   /** \brief Set a float vector value on the parameter server.
    *
@@ -218,7 +218,7 @@ public:
    * \param vec The vector value to be inserted.
    * \throws InvalidNameException if the key is not a valid graph resource name
    */
-  MINIROS_DECL void set(const std::string& key, const std::vector<float>& vec);
+  MINIROS_DECL Error set(const std::string& key, const std::vector<float>& vec);
 
   /** \brief Set an integer  vector value on the parameter server.
    *
@@ -226,7 +226,7 @@ public:
    * \param vec The vector value to be inserted.
    * \throws InvalidNameException if the key is not a valid graph resource name
    */
-  MINIROS_DECL void set(const std::string& key, const std::vector<int>& vec);
+  MINIROS_DECL Error set(const std::string& key, const std::vector<int>& vec);
 
   /** \brief Set a bool vector value on the parameter server.
    *
@@ -234,7 +234,7 @@ public:
    * \param vec The vector value to be inserted.
    * \throws InvalidNameException if the key is not a valid graph resource name
    */
-  MINIROS_DECL void set(const std::string& key, const std::vector<bool>& vec);
+  MINIROS_DECL Error set(const std::string& key, const std::vector<bool>& vec);
 
   /** \brief Set a string->string map value on the parameter server.
    *
@@ -242,7 +242,7 @@ public:
    * \param map The map value to be inserted.
    * \throws InvalidNameException if the key is not a valid graph resource name
    */
-  MINIROS_DECL void set(const std::string& key, const std::map<std::string, std::string>& map);
+  MINIROS_DECL Error set(const std::string& key, const std::map<std::string, std::string>& map);
 
   /** \brief Set a string->double map value on the parameter server.
    *
@@ -250,7 +250,7 @@ public:
    * \param map The map value to be inserted.
    * \throws InvalidNameException if the key is not a valid graph resource name
    */
-  MINIROS_DECL void set(const std::string& key, const std::map<std::string, double>& map);
+  MINIROS_DECL Error set(const std::string& key, const std::map<std::string, double>& map);
 
   /** \brief Set a string->float map value on the parameter server.
    *
@@ -258,7 +258,7 @@ public:
    * \param map The map value to be inserted.
    * \throws InvalidNameException if the key is not a valid graph resource name
    */
-  MINIROS_DECL void set(const std::string& key, const std::map<std::string, float>& map);
+  MINIROS_DECL Error set(const std::string& key, const std::map<std::string, float>& map);
 
   /** \brief Set a string->int map value on the parameter server.
    *
@@ -266,7 +266,7 @@ public:
    * \param map The map value to be inserted.
    * \throws InvalidNameException if the key is not a valid graph resource name
    */
-  MINIROS_DECL void set(const std::string& key, const std::map<std::string, int>& map);
+  MINIROS_DECL Error set(const std::string& key, const std::map<std::string, int>& map);
 
   /** \brief Set a string->bool map value on the parameter server.
    *
@@ -274,7 +274,7 @@ public:
    * \param map The map value to be inserted.
    * \throws InvalidNameException if the key is not a valid graph resource name
    */
-  MINIROS_DECL void set(const std::string& key, const std::map<std::string, bool>& map);
+  MINIROS_DECL Error set(const std::string& key, const std::map<std::string, bool>& map);
 
   /** \brief Get a string value from the parameter server.
    *
@@ -789,10 +789,10 @@ protected:
   void paramUpdateCallback(const RpcValue& params, RpcValue& result);
 
   template <class T>
-  void setParamImpl(const std::string& key, const std::vector<T>& vec);
+  Error setParamImpl(const std::string& key, const std::vector<T>& vec);
 
   template <class T>
-  void setParamImpl(const std::string& key, const std::map<std::string, T>& map);
+  Error setParamImpl(const std::string& key, const std::map<std::string, T>& map);
 
   bool getParamImpl(const std::string& key, std::string& s, bool use_cache);
   bool getParamImpl(const std::string& key, double& d, bool use_cache);
