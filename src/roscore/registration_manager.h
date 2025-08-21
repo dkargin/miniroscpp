@@ -37,6 +37,14 @@ public:
   /// Get nodes which publish specified topic.
   std::vector<std::shared_ptr<NodeRef>> getTopicPublishers(const std::string& topic) const;
 
+  using NodeIterator = std::function<bool (const std::shared_ptr<NodeRef>& ptr)>;
+
+  /// Iterate over all publishers.
+  size_t iteratePublishers(const std::string_view& topic, const NodeIterator& iterator) const;
+
+  /// Iterate over all subscribers.
+  size_t iterateSubscribers(const std::string_view& topic, const NodeIterator& iterator) const;
+
   /// Get nodes which subscribe to specified topic.
   std::vector<std::shared_ptr<NodeRef>> getTopicSubscribers(const std::string& topic) const;
 
@@ -100,8 +108,7 @@ public:
   /// List all known nodes.
   std::vector<std::shared_ptr<NodeRef>> listAllNodes() const;
 
-  /// Get type of topic.
-  std::string getTopicType(const std::string_view& topic) const;
+  std::string getTopicType(const std::string_view& name) const;
 
   std::map<std::string, std::string, std::less<>> getTopicTypes(const std::string& caller_id) const;
 
