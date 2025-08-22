@@ -52,6 +52,11 @@ MINIROS_DECL Error makeDirectory(const std::string& path);
 
 MINIROS_DECL Error changeCurrentDirectory(const std::string& path);
 
+/// Enable printing backtrace during crash.
+/// For internal usage only.
+MINIROS_DECL Error handleCrashes();
+
+
 }
 
 #endif

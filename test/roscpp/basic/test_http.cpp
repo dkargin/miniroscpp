@@ -210,5 +210,7 @@ TEST(net, parseResponse)
 int main(int argc, char** argv)
 {
   testing::InitGoogleTest(&argc, argv);
+  miniros::handleCrashes();
+
   return RUN_ALL_TESTS();
 }
