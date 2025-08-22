@@ -40,6 +40,7 @@
 #include <cstdio>
 #include <cerrno>
 #include <cstring>
+#include <csignal>
 #include <filesystem>
 #include <cassert>
 #include <sys/types.h>
@@ -54,9 +55,11 @@
 #include <sys/prctl.h>
 #endif
 
-#include <signal.h>
-
 #include "internal_config.h"
+
+#ifdef HAVE_GLIBC_BACKTRACE
+#include <execinfo.h>  // For backtrace()
+#endif
 
 #ifdef MINIROS_USE_LIBSYSTEMD
 
@@ -269,5 +272,55 @@ Error changeCurrentDirectory(const std::string& path)
   std::filesystem::current_path(path);
   return Error::Ok;
 }
+
+#ifdef HAVE_GLIBC_BACKTRACE
+static constexpr size_t MAX_STACKTRACE_DEPTH = 64;
+
+static void writeStackTrace(int file_descriptor) {
+  void* trace[MAX_STACKTRACE_DEPTH];
+  size_t trace_depth = backtrace(trace, MAX_STACKTRACE_DEPTH);
+  // Note that we skip the first frame here so this function won't show up in
+  // the printed trace.
+  backtrace_symbols_fd(trace + 1, trace_depth - 1, file_descriptor);
+}
+
+/******************************************************************************/
+static void fatalSignalHandler(int signal) {
+  // Restore the default signal handler for SIGSEGV in case another one
+  // happens, and for the re-issue below.
+  std::signal(signal, SIG_DFL);
+
+  // WriteStackTrace should theoretically be safe to call here.
+  static constexpr const char error_msg[] =
+      "*** fatalSignalHandler stack trace: ***\n";
+  // Write using safe `write` function. Skip null character.
+  if (write(fileno(stderr), error_msg, sizeof(error_msg) - 1) > 0) {
+    writeStackTrace(fileno(stderr));
+  }
+
+  // Give dummy function time to run. Use "safe" sleep() function.
+  sleep(1);
+
+  // Now that the signal handler has been removed we can simply return. If
+  // SIGSEGV/SIGABRT was triggered by an instruction, it will occur again. This
+  // time it will be handled by the default handler which triggers a core dump.
+  return;
+}
+#endif
+
+Error handleCrashes()
+{
+#ifdef HAVE_GLIBC_BACKTRACE
+  // Use our function to handle segmentation faults.
+  // Could add additional signals like: SIGSEGV, SIGSYS, etc.
+  std::signal(SIGSEGV, fatalSignalHandler);
+  std::signal(SIGABRT, fatalSignalHandler);
+  std::signal(SIGILL, fatalSignalHandler);
+#else
+  return Error::NotSupported;
+#endif
+  return Error::Ok;
+}
+
 
 } // namespace miniros

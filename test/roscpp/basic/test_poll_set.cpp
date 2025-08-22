@@ -533,6 +533,7 @@ TEST_F(Poller, signal)
 int main(int argc, char** argv)
 {
   testing::InitGoogleTest(&argc, argv);
+  miniros::handleCrashes();
 
 #ifndef _WIN32
   signal(SIGPIPE, SIG_IGN);

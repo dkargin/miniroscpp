@@ -475,6 +475,7 @@ TEST_F(Polled, disconnectReader)
 int main(int argc, char** argv)
 {
   testing::InitGoogleTest(&argc, argv);
+  miniros::handleCrashes();
 
 #ifndef _WIN32
   signal(SIGPIPE, SIG_IGN);
