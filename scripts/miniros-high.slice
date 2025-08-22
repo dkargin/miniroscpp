@@ -1,0 +1,7 @@
+[Unit]
+Description=Slice for MiniROS services with high performance reqirements
+
+[Slice]
+
+[Install]
+WantedBy=multi-user.target

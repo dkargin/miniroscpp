@@ -8,5 +8,8 @@ Environment=ROS_MASTER_URI=http://localhost:11311
 ExecStart=@CMAKE_INSTALL_PREFIX@/bin/miniroscore --dir=/var/run/miniroscore
 TimeoutSec=5
 
+[Scope]
+Slice=miniros-low.slice
+
 [Install]
 WantedBy=multi-user.target

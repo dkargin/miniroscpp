@@ -173,6 +173,10 @@ else()
   )
 
   install(FILES "${CMAKE_CURRENT_BINARY_DIR}/miniroscore.service" DESTINATION share/${PROJECT_NAME})
+  install(FILES
+      ${CMAKE_CURRENT_SOURCE_DIR}/scripts/miniros-low.slice
+      ${CMAKE_CURRENT_SOURCE_DIR}/scripts/miniros-high.slice
+      DESTINATION share/${PROJECT_NAME})
 
   # This is local export file, which references files from local build tree.
   #export(EXPORT MiniROSTargets FILE "${CMAKE_CURRENT_BINARY_DIR}/cmake/${PROJECT_NAME}Targets.cmake")
