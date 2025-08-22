@@ -143,7 +143,7 @@ private:
   void socketUpdate(int events);
 
   socket_fd_t sock_;
-  bool closed_;
+  std::atomic<bool> closed_;
   std::recursive_mutex close_mutex_;
 
   std::atomic<bool> expecting_read_;
