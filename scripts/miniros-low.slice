@@ -1,0 +1,8 @@
+[Unit]
+Description=Slice for MiniROS services with low performance reqirements
+
+[Slice]
+MemoryLimit=1G
+
+[Install]
+WantedBy=multi-user.target
