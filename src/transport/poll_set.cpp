@@ -263,7 +263,8 @@ void PollSet::update(int poll_timeout)
 {
   createNativePollset();
 
-  Error err = poll_sockets(internal_->epfd_, &internal_->ufds_.front(), internal_->ufds_.size(), poll_timeout, internal_->ofds_);
+  const nfds_t numFd = internal_->ufds_.size();
+  Error err = poll_sockets(internal_->epfd_, &internal_->ufds_.front(), numFd, poll_timeout, internal_->ofds_);
   if (!err)
   {
     MINIROS_ERROR("poll failed with error %s", err.toString());

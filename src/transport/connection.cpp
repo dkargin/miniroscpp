@@ -166,7 +166,7 @@ void Connection::readTransport()
 
     MINIROS_ASSERT((int32_t)read_size_ >= 0);
     MINIROS_ASSERT((int32_t)read_filled_ >= 0);
-    MINIROS_ASSERT_MSG(read_filled_ <= read_size_, "read_filled_ = %d, read_size_ = %d", read_filled_, read_size_);
+    MINIROS_ASSERT_MSG(read_filled_ <= read_size_, "read_filled_ = %lu, read_size_ = %lu", read_filled_, read_size_);
 
     if (read_filled_ == read_size_ && !dropped_)
     {
@@ -303,7 +303,7 @@ void Connection::read(uint32_t size, const ReadFinishedFunc& callback)
   readTransport();
 }
 
-void Connection::write(const std::shared_ptr<uint8_t[]>& buffer, uint32_t size, const WriteFinishedFunc& callback, bool immediate)
+void Connection::write(const std::shared_ptr<uint8_t[]>& buffer, uint64_t size, const WriteFinishedFunc& callback, bool immediate)
 {
   if (dropped_ || sending_header_error_)
   {
