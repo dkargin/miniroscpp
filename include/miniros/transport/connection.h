@@ -138,7 +138,7 @@ public:
    * \param immediate Whether to immediately try to write as much data as possible to the socket or to pass
    * the data off to the server thread
    */
-  void write(const std::shared_ptr<uint8_t[]>& buffer, uint32_t size, const WriteFinishedFunc& finished_callback, bool immedate = true);
+  void write(const std::shared_ptr<uint8_t[]>& buffer, uint64_t size, const WriteFinishedFunc& finished_callback, bool immedate = true);
 
   class DropWatcher : public observer::Connection {
   public:
@@ -218,9 +218,9 @@ private:
   /// Read buffer that ends up being passed to the read callback
   std::shared_ptr<uint8_t[]> read_buffer_;
   /// Amount of data currently in the read buffer, in bytes
-  uint32_t read_filled_;
+  uint64_t read_filled_;
   /// Size of the read buffer, in bytes
-  uint32_t read_size_;
+  uint64_t read_size_;
   /// Function to call when the read is finished
   ReadFinishedFunc read_callback_;
   /// Mutex used for protecting reading.  Recursive because a read can immediately cause another read through the callback.
@@ -235,9 +235,9 @@ private:
   /// Buffer to write from
   std::shared_ptr<uint8_t[]> write_buffer_;
   /// Amount of data we've written from the write buffer
-  uint32_t write_sent_;
+  uint64_t write_sent_;
   /// Size of the write buffer
-  uint32_t write_size_;
+  uint64_t write_size_;
   /// Function to call when the current write is finished
   WriteFinishedFunc write_callback_;
   std::mutex write_callback_mutex_;

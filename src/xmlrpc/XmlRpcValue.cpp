@@ -99,22 +99,22 @@ namespace XmlRpc {
       throw XmlRpcException("type error");
   }
 
-  void XmlRpcValue::assertArrayConst(int size) const
+  void XmlRpcValue::assertArrayConst(size_t size) const
   {
     if (_type != TypeArray)
       throw XmlRpcException("type error: expected an array");
-    else if (int(_value.asArray->size()) < size)
+    else if (_value.asArray->size() < size)
       throw XmlRpcException("range error: array index too large");
   }
 
 
-  void XmlRpcValue::assertArray(int size)
+  void XmlRpcValue::assertArray(size_t size)
   {
     if (_type == TypeInvalid) {
       _type = TypeArray;
       _value.asArray = new ValueArray(size);
     } else if (_type == TypeArray) {
-      if (int(_value.asArray->size()) < size)
+      if (_value.asArray->size() < size)
         _value.asArray->resize(size);
     } else
       throw XmlRpcException("type error: expected an array");

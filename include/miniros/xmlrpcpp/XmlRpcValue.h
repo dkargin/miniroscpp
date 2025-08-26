@@ -153,7 +153,7 @@ namespace XmlRpc {
     int size() const;
 
     //! Specify the size for array values. Array values will grow beyond this size if needed.
-    void setSize(int size)    { assertArray(size); }
+    void setSize(size_t size)    { assertArray(size); }
 
     //! Check for the existence of a struct member by name.
     bool hasMember(const std::string& name) const;
@@ -179,8 +179,8 @@ namespace XmlRpc {
     // Type checking
     void assertTypeOrInvalid(Type t);
     void assertType(Type t) const;
-    void assertArrayConst(int size) const;
-    void assertArray(int size);
+    void assertArrayConst(size_t size) const;
+    void assertArray(size_t size);
     void assertStructConst() const;
     void assertStruct();
 
