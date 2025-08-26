@@ -113,10 +113,10 @@ struct MINIROS_DECL Path {
   size_t size() const;
 
   /// Return string element.
-  std::string str(int i) const;
+  std::string str(size_t i) const;
 
   /// Return string view element.
-  std::string_view view(int i) const;
+  std::string_view view(size_t i) const;
 
   /// Get final name.
   std::string name() const;

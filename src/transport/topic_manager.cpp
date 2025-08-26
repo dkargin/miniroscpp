@@ -820,7 +820,7 @@ bool TopicManager::unsubscribe(const std::string& topic, const SubscriptionCallb
   return true;
 }
 
-size_t TopicManager::getNumSubscribers(const std::string& topic)
+uint32_t TopicManager::getNumSubscribers(const std::string& topic)
 {
   std::scoped_lock<std::recursive_mutex> lock(advertised_topics_mutex_);
 

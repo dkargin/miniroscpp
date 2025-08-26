@@ -112,7 +112,8 @@ public:
    *
    * @return number of subscribers
    */
-  size_t getNumSubscribers(const std::string &_topic);
+  uint32_t getNumSubscribers(const std::string &_topic);
+
   size_t getNumSubscriptions();
 
   /**

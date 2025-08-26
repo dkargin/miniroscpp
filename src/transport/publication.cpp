@@ -177,10 +177,10 @@ bool Publication::enqueueMessage(const SerializedMessage& m)
     // Deserialize it, write the sequence, and then serialize it again.
     namespace ser = miniros::serialization;
     std_msgs::Header header;
-    ser::IStream istream(m.buf.get() + 4, m.num_bytes - 4);
+    ser::IStream istream(m.buf.get() + 4, static_cast<uint32_t>(m.num_bytes - 4));
     ser::deserialize(istream, header);
     header.seq = seq;
-    ser::OStream ostream(m.buf.get() + 4, m.num_bytes - 4);
+    ser::OStream ostream(m.buf.get() + 4, static_cast<uint32_t>(m.num_bytes - 4));
     ser::serialize(ostream, header);
   }
 
