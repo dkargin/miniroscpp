@@ -112,6 +112,13 @@ public:
    */
   MINIROS_DECL std::string getURI() const;
 
+  /// Check if this link should work with local RPC manager.
+  MINIROS_DECL bool isLocalMaster() const;
+
+  /// Enable local master mode.
+  /// All master requests will be redirected to a local RPC manager.
+  MINIROS_DECL void setLocalMaster(bool local) const;
+
   /** @brief Check whether the master is up
    *
    * This method tries to contact the master.  You can call it any time

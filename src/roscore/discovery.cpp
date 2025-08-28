@@ -29,6 +29,9 @@ struct Discovery::Internal {
   /// Port for discovery broadcast.
   int broadcastPort = 0;
 
+  /// UUID to be broadcasted.
+  UUID uuid;
+
   /// Regular IPv4 socket for sending broadcasts.
   network::NetSocket socket;
 
@@ -67,7 +70,6 @@ struct Discovery::Internal {
       return error;
     }
 
-
     error = socket.bind(port);
     if (!error) {
       detachSockets();
@@ -81,11 +83,38 @@ struct Discovery::Internal {
     }
 
     broadcastPort = port;
+
+    int fd = socket.fd();
+
+    bool added = pollSet->addSocket(fd,
+      [this](int flags)
+      {
+        if (flags & POLLIN) {
+          onSocketEvent(socket, 0, flags);
+        } else {
+          MINIROS_WARN("Discovery socket: unexpected event %d", flags);
+        }
+      });
+
+    if (!added)
+    {
+      MINIROS_ERROR("Failed to register listening socket");
+      return Error::InternalError;
+    }
+
+    if (!pollSet->addEvents(fd, POLLIN)) {
+      MINIROS_ERROR("Failed to add events");
+      return Error::InternalError;
+    }
+
     return Error::Ok;
   }
 
   void onSocketEvent(network::NetSocket& s, int role, int event)
   {
+    std::string rawData;
+    network::NetAddress address;;
+    auto [numBytes, error] = s.recv(rawData, &address);
   }
 
   void detachSocket(network::NetSocket& s)
@@ -119,12 +148,16 @@ Discovery::~Discovery()
   internal_->detachSockets();
 }
 
-Error Discovery::start(PollSet* pollSet, int port)
+Error Discovery::start(PollSet* pollSet, const UUID& uuid, int port)
 {
   if (!internal_) {
     return Error::InternalError;
   }
 
+  if (!uuid.valid())
+    return Error::InvalidValue;
+
+  internal_->uuid = uuid;
   internal_->pollSet = pollSet;
 
   if (Error err = internal_->initSockets(port); err != Error::Ok) {
@@ -132,30 +165,6 @@ Error Discovery::start(PollSet* pollSet, int port)
     return err;
   }
 
-  int fd = internal_->socket.fd();
-
-  bool added = internal_->pollSet->addSocket(fd,
-    [this](int flags)
-    {
-      if (flags & POLLIN) {
-        // TODO: get incoming event.
-        internal_->onSocketEvent(internal_->socket, 0, flags);
-        //this->acceptClient(&internal_->socket_v4);
-      } else {
-        MINIROS_WARN("Discovery socket: unexpected event %d", flags);
-      }
-    });
-
-  if (!added)
-  {
-    MINIROS_ERROR("Failed to register listening socket");
-    return Error::InternalError;
-  }
-
-  if (!internal_->pollSet->addEvents(fd, POLLIN)) {
-    MINIROS_ERROR("Failed to add events");
-    return Error::InternalError;
-  }
 
   return Error::Ok;
 }
@@ -169,12 +178,18 @@ void Discovery::stop()
 struct DiscoveryPacket {
   /// Operation
   int16_t op = 0;
+
   /// Additional flags.
   int16_t flags = 0;
+
   /// Size of packet.
   int16_t size = 0;
+
   /// Sender address.
   sockaddr addr{};
+
+  /// UUID of master instance.
+  UUID uuid;
 };
 #pragma pack(pop)
 
@@ -195,8 +210,9 @@ Error Discovery::doBroadcast()
   packet.size = 0;
 
   int interfaces = 0;
+  int skipped = 0;
   internal_->resolver->iterateAdapters(
-    [&interfaces, &packet, this](const network::NetAdapter* adapter)
+    [&interfaces, &skipped, &packet, this](const network::NetAdapter* adapter)
     {
       if (adapter->isLoopback())
         return;
@@ -217,8 +233,14 @@ Error Discovery::doBroadcast()
           MINIROS_WARN("Failed to broadcast to adapter \"%s\" addr=%s", adapter->name.c_str(), brAddr.str().c_str());
         }
         interfaces++;
+      } else {
+        skipped++;
       }
     });
+
+  if (interfaces == 0) {
+
+  }
 
   MINIROS_INFO("Broadcasted discovery packets to %d interfaces", interfaces);
   return Error::Ok;

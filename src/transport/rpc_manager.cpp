@@ -164,8 +164,6 @@ struct RPCManager::Internal {
   std::map<std::string, FunctionInfo> functions_;
 
   std::atomic_bool unbind_requested_{false};
-
-  bool is_master_ = false;
 };
 
 const RPCManagerPtr& RPCManager::instance()
@@ -674,18 +672,6 @@ Error RPCManager::executeLocalRPC(const std::string& method, const RpcValue& req
 bool RPCManager::isLocalRPC(const std::string& host, int port) const
 {
   return getServerPort() == port;
-}
-
-void RPCManager::setMaster()
-{
-  if (internal_) {
-    internal_->is_master_ = true;
-  }
-}
-
-bool RPCManager::isMaster() const
-{
-  return internal_ ? internal_->is_master_ : false;
 }
 
 const std::string& RPCManager::getServerURI() const
