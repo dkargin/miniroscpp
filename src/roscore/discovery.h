@@ -13,6 +13,7 @@
 namespace miniros {
 
 class PollSet;
+struct UUID;
 
 namespace master {
 
@@ -25,7 +26,7 @@ public:
   ~Discovery();
 
   /// Start discovery.
-  Error start(PollSet* pollSet, int port);
+  Error start(PollSet* pollSet, const UUID& uuid, int port);
 
   /// Stop discovery.
   void stop();

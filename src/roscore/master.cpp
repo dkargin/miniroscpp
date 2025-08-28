@@ -9,15 +9,14 @@
 #include "master_endpoints.h"
 
 #include "master_handler.h"
+#include "master_link.h"
 #include "node_handle.h"
 #include "parameter_storage.h"
 
 #include "miniros/transport/rpc_manager.h"
 
-#include "../../include/miniros/network/network.h"
 #include "http/http_server.h"
 
-#include "miniros/http/http_endpoint.h"
 #include "miniros/http/http_filters.h"
 
 #include <xmlrpcpp/XmlRpcServerConnection.h>
@@ -32,7 +31,10 @@ Master::Internal::Internal(const std::shared_ptr<RPCManager>& manager)
 
   resolver.scanAdapters();
 
-  manager->setMaster();
+  // Forcing global master link to use local RPC manager.
+  auto masterLink = getMasterLink();
+  masterLink->setLocalMaster(true);
+
   // TODO: Read environment.
   // split the URI (if it's valid) into host and port
   // if (!network.splitURI(ROS.ROS_MASTER_URI, ref _host, ref _port))
@@ -97,14 +99,14 @@ bool Master::start(PollSet* poll_set)
 
   // It was done in roslaunch by calling generate_run_id() function.
   // It should be uuid.uuid1()
-  std::string uuid = generatePseudoUuid();
-  internal_->parameterStorage.setParam("master", "/run_id", uuid);
+  internal_->uuid.generate();
+  internal_->parameterStorage.setParam("master", "/run_id", internal_->uuid.toString());
 
   if (!internal_->rpcManager->start(poll_set, internal_->port))
     return false;
 
   MINIROS_DEBUG("Starting discovery module");
-  if (!internal_->discovery.start(poll_set, internal_->port)) {
+  if (!internal_->discovery.start(poll_set, internal_->uuid, internal_->port)) {
     stop();
     return false;
   }

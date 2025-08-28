@@ -161,29 +161,31 @@ void NetAddress::assignRawAddress(Type type, const void* addr, size_t size)
   type_ = type;
 }
 
-Error fillAddress(const sockaddr& sysAddr, NetAddress& address)
+Error fillAddress(const sockaddr* sysAddr, NetAddress& address)
 {
   address.reset();
+  if (!sysAddr)
+    return Error::InvalidAddress;
 
   char ipBuffer[255] = {};
 
   const void* addrPtr = nullptr;
 
-  if (sysAddr.sa_family == AF_INET) {
+  if (sysAddr->sa_family == AF_INET) {
     const sockaddr_in* addr4 = reinterpret_cast<const sockaddr_in*>(&sysAddr);
-    address.assignRawAddress(NetAddress::AddressIPv4, &sysAddr, getAddressSize(NetAddress::Type::AddressIPv4));
+    address.assignRawAddress(NetAddress::AddressIPv4, sysAddr, getAddressSize(NetAddress::Type::AddressIPv4));
     address.setPort(ntohs(addr4->sin_port));
     addrPtr = &addr4->sin_addr;
-  } else if (sysAddr.sa_family == AF_INET6) {
-    const sockaddr_in6* addr6 = reinterpret_cast<const sockaddr_in6*>(&sysAddr);
-    address.assignRawAddress(NetAddress::AddressIPv6, &sysAddr, getAddressSize(NetAddress::Type::AddressIPv6));
+  } else if (sysAddr->sa_family == AF_INET6) {
+    const sockaddr_in6* addr6 = reinterpret_cast<const sockaddr_in6*>(sysAddr);
+    address.assignRawAddress(NetAddress::AddressIPv6, sysAddr, getAddressSize(NetAddress::Type::AddressIPv6));
     address.setPort(ntohs(addr6->sin6_port));
     addrPtr = &addr6->sin6_addr;
   } else {
     return Error::InvalidValue;
   }
 
-  if (!addrPtr || !inet_ntop(sysAddr.sa_family, addrPtr, ipBuffer, sizeof(ipBuffer))) {
+  if (!addrPtr || !inet_ntop(sysAddr->sa_family, addrPtr, ipBuffer, sizeof(ipBuffer))) {
     address.reset();
     return Error::InvalidValue;
   }
@@ -254,7 +256,7 @@ Error readLocalAddress(int sockfd, NetAddress& address)
     return Error::SystemError;
   }
 
-  return fillAddress(my_addr, address);
+  return fillAddress(&my_addr, address);
 }
 
 Error readRemoteAddress(int sockfd, NetAddress& address)
@@ -281,7 +283,7 @@ Error readRemoteAddress(int sockfd, NetAddress& address)
     return Error::InvalidValue;
   }
 
-  return fillAddress(my_addr, address);
+  return fillAddress(&my_addr, address);
 }
 
 int NetAddress::port() const

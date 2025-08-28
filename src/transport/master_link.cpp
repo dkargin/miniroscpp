@@ -55,6 +55,7 @@ struct MasterLink::Internal {
   std::mutex params_mutex;
   std::set<std::string> subscribed_params;
 
+  bool localMaster = false;
 #if defined(__APPLE__)
   std::mutex xmlrpc_call_mutex;
 #endif
@@ -218,7 +219,7 @@ Error MasterLink::execute(const std::string& method, const RpcValue& request, Rp
   }
 
   // Try to execute request without any network.
-  if (manager->isMaster()) {
+  if (isLocalMaster()) {
     if (Error err = manager->executeLocalRPC(method, request, response); err != Error::Ok) {
       return Error::InvalidValue;
     }
@@ -1074,5 +1075,21 @@ Error MasterLink::initParam(const M_string& remappings)
   }
   return Error::Ok;
 }
+
+bool MasterLink::isLocalMaster() const
+{
+  if (!internal_)
+    return false;
+  return internal_->localMaster;
+}
+
+void MasterLink::setLocalMaster(bool local) const
+{
+  if (!internal_) {
+    return;
+  }
+  internal_->localMaster = local;
+}
+
 
 } // namespace miniros

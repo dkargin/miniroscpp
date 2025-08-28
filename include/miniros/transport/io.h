@@ -238,7 +238,7 @@ inline void close_signal_pair(signal_fd_t signal_pair[2]) {
 namespace network {
 
 /// Fill in net address by values from socket API.
-MINIROS_DECL Error fillAddress(const sockaddr& sysAddr, NetAddress& address);
+MINIROS_DECL Error fillAddress(const sockaddr* sysAddr, NetAddress& address);
 
 }
 } // namespace miniros
