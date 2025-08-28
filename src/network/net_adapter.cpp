@@ -23,7 +23,22 @@ namespace network {
 
 bool NetAdapter::isLoopback() const
 {
-  return address.isLoopback();
+  return flags_.f.loop;
+}
+
+void NetAdapter::setLoopback(bool loopback)
+{
+  flags_.f.loop = loopback;
+}
+
+bool NetAdapter::isUp() const
+{
+  return flags_.f.up;
+}
+
+void NetAdapter::setUp(bool up)
+{
+  flags_.f.up = up;
 }
 
 bool NetAdapter::isValid() const
@@ -102,26 +117,26 @@ Error scanAdapters(std::vector<network::NetAdapter>& adapters)
       network::NetAdapter adapter;
       adapter.name = ifa->ifa_name;
 
-      adapter.loopback = (ifa->ifa_flags & IFF_LOOPBACK) != 0;
-      adapter.up = (ifa->ifa_flags & IFF_UP) != 0;
+      adapter.setLoopback(ifa->ifa_flags & IFF_LOOPBACK);
+      adapter.setUp(ifa->ifa_flags & IFF_UP);
 
-      // TODO: The error is not expected here.
-      if (!fillAddress(*ifa->ifa_addr, adapter.address)) {
-        continue;
-      }
-      if (adapter.address.isUnspecified()) {
-        continue;
-      }
-      if (!fillAddress(*ifa->ifa_netmask, adapter.mask)) {
+      if (!fillAddress(ifa->ifa_addr, adapter.address)) {
         continue;
       }
 
-      if (ifa->ifa_flags & IFF_BROADCAST) {
-        if (!fillAddress(*ifa->ifa_ifu.ifu_broadaddr, adapter.broadcastAddress)) {
-          continue;
+      if (!fillAddress(ifa->ifa_netmask, adapter.mask)) {
+        continue;
+      }
+
+      if ((ifa->ifa_flags & IFF_BROADCAST) && ifa->ifa_broadaddr) {
+        if (!fillAddress(ifa->ifa_broadaddr, adapter.broadcastAddress)) {
+          // It is ok not to have proper broadcast address.
         }
       }
-      // TODO: Probably read additional flags, like DHCP or whatever.
+
+      if ( (ifa->ifa_flags & IFF_MULTICAST)) {
+
+      }
       adapters.push_back(adapter);
     }
   }

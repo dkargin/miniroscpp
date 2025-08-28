@@ -138,9 +138,6 @@ public:
   void addASyncConnection(const ASyncXMLRPCConnectionPtr& conn);
   void removeASyncConnection(const ASyncXMLRPCConnectionPtr& conn);
 
-  void setMaster();
-  bool isMaster() const;
-
   /// Get access to HTTP server.
   /// This pointer lifetime is tied to this instance of RPCManager.
   http::HttpServer* getHttpServer();
