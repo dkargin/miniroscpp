@@ -244,7 +244,7 @@ std::pair<std::shared_ptr<NetSocket>, Error> NetSocket::accept()
 
   std::shared_ptr<NetSocket> sock(new NetSocket(fd, internal_->type, true));
   NetAddress address;
-  fillAddress(addr, address);
+  fillAddress(&addr, address);
   sock->internal_->peer_address = address;
   return {sock, Error::Ok};
 }
@@ -370,7 +370,7 @@ std::pair<size_t, Error> NetSocket::recv(WriteBuf& s, NetAddress* address)
       s.append(readBuf, n);
       received += n;
       if (address) {
-        fillAddress(peerAddress, *address);
+        fillAddress(&peerAddress, *address);
       }
       // Receive only one packet with datagram socket.
       if (isDatagram())
@@ -412,7 +412,7 @@ std::pair<size_t, Error> NetSocket::send(const void* rawData, size_t size, const
         return {0, Error::InvalidAddress};
       }
       size_t rawAddrSize = address->rawAddressSize();
-      n = ::sendto(internal_->fd, sp, static_cast<socklen_t>(size), flags, rawAddr, rawAddrSize);
+      n = ::sendto(internal_->fd, sp, static_cast<socklen_t>(size), flags, rawAddr, static_cast<socklen_t>(rawAddrSize));
     } else {
       n = ::send(internal_->fd, sp, static_cast<socklen_t>(size - written), flags);
     }

@@ -22,7 +22,7 @@ TEST(Address, ip4)
   EXPECT_EQ(address1.port(), 10);
   const sockaddr* addr = static_cast<const sockaddr*>(address1.rawAddress());
   NetAddress address2;
-  ASSERT_EQ(fillAddress(*addr, address2), Error::Ok);
+  ASSERT_EQ(fillAddress(addr, address2), Error::Ok);
 
   ASSERT_EQ(address1, address2);
 
@@ -40,7 +40,7 @@ TEST(Address, ip6)
   EXPECT_EQ(address1.port(), 10);
   const sockaddr* addr = static_cast<const sockaddr*>(address1.rawAddress());
   NetAddress address2;
-  ASSERT_EQ(fillAddress(*addr, address2), Error::Ok);
+  ASSERT_EQ(fillAddress(addr, address2), Error::Ok);
 
   ASSERT_EQ(address1, address2);
 

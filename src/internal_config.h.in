@@ -9,6 +9,10 @@
 #cmakedefine MINIROS_USE_LIBSYSTEMD
 #cmakedefine HAVE_LIBSYSTEMD
 
+#cmakedefine MINIROS_VERSION_MAJOR @miniros_VERSION_MAJOR@
+#cmakedefine MINIROS_VERSION_MINOR @miniros_VERSION_MINOR@
+#cmakedefine MINIROS_VERSION_BUILD @miniros_VERSION_BUILD@
+
 /// Additional guard against including internal headers.
 /// This header should not be be included into any user code.
 #ifndef MINIROS_INTERNAL_HEADER

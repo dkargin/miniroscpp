@@ -23,13 +23,13 @@ bool startsWith(const std::string_view& str, const std::string_view& prefix)
   return strncmp(str.data(), prefix.data(), prefix.size()) == 0;
 }
 
-template <int N>
+template <unsigned int N>
 bool tokenCmp(const char* a, const HttpFrame::Token& ta, const char b[N])
 {
   if (ta.empty()) {
     return N == 0;
   }
-  const int size = std::min<int>(ta.size(), N);
+  const size_t size = std::min<size_t>(ta.size(), N);
   return strncasecmp(a + ta.start,b, size) == 0;
 }
 
@@ -139,7 +139,7 @@ int HttpFrame::bodyLength() const
   if (m_bodyPosition <= 0 || m_contentLength < 0)
     return 0;
 
-  size_t leftOver = data.length() - m_bodyPosition;
+  int leftOver = static_cast<int>(data.length()) - m_bodyPosition;
   if (leftOver < m_contentLength) {
     return leftOver;
   }

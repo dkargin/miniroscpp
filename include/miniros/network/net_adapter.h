@@ -5,6 +5,7 @@
 #ifndef MINIROS_NET_ADAPTER_H
 #define MINIROS_NET_ADAPTER_H
 
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -19,19 +20,21 @@ struct HostInfo;
 struct NetAdapter {
   /// Name of the adapter.
   std::string name;
-  /// Address on the adapter.
-  network::NetAddress address;
-  /// IPv4 netmask.
-  network::NetAddress mask;
 
-  bool loopback = false;
-  bool up = false;
+  /// Address on the adapter.
+  NetAddress address;
+  /// IPv4 netmask.
+  NetAddress mask;
 
   /// Address for broadcasts.
-  network::NetAddress broadcastAddress;
+  NetAddress broadcastAddress;
 
   /// Check it is localhost/loopback interface.
   bool isLoopback() const;
+  void setLoopback(bool loopback);
+
+  bool isUp() const;
+  void setUp(bool up);
 
   /// Check if there is valid network address.
   bool isValid() const;
@@ -43,10 +46,24 @@ struct NetAdapter {
   bool isIPv6() const;
 
   /// Check if specified address belongs to this address range and mask.
-  bool matchNetAddress(const network::NetAddress& address) const;
+  bool matchNetAddress(const NetAddress& address) const;
 
   /// Check if this adapter can be used to access specified host.
   bool hasAccessTo(const HostInfo& host) const;
+
+protected:
+
+  /// Packed collection of flags.
+  union {
+    struct {
+      /// Interface is properly configured and running.
+      unsigned int up: 1;
+
+      /// Interface is a loopback device.
+      unsigned int loop: 1;
+    }f;
+    uint16_t raw = 0;
+  } flags_;
 };
 
 NODISCARD Error scanAdapters(std::vector<NetAdapter>& adapters);

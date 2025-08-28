@@ -51,6 +51,9 @@ struct Master::Internal {
   /// Timer for periodic broadcasts.
   SteadyTimer timerBroadcasts;
 
+  /// Some unique UUID of this instance.
+  UUID uuid;
+
   Internal(const std::shared_ptr<RPCManager>& manager);
   ~Internal();
 
