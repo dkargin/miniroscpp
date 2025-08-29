@@ -109,18 +109,21 @@ NetAddress NetAddress::fromString(Type type, const std::string& address, int por
     if (!inet_pton(AF_INET, address.c_str(), &addr.sin_addr)) {
       return result;
     }
+    addr.sin_port = htons(port);
     result.assignRawAddress(type, &addr, sizeof(addr));
-    result.setPort(port);
   } else if (type == NetAddress::AddressIPv6) {
     sockaddr_in6 addr{};
     addr.sin6_family = AF_INET6;
+    addr.sin6_port = htons(port);
     if (!inet_pton(AF_INET6, address.c_str(), &addr.sin6_addr)) {
       return result;
     }
     result.assignRawAddress(type, &addr, sizeof(addr));
-    result.setPort(port);
+  } else {
+    return {};
   }
 
+  result.address = address;
   return result;
 }
 
@@ -172,14 +175,12 @@ Error fillAddress(const sockaddr* sysAddr, NetAddress& address)
   const void* addrPtr = nullptr;
 
   if (sysAddr->sa_family == AF_INET) {
-    const sockaddr_in* addr4 = reinterpret_cast<const sockaddr_in*>(&sysAddr);
+    const sockaddr_in* addr4 = reinterpret_cast<const sockaddr_in*>(sysAddr);
     address.assignRawAddress(NetAddress::AddressIPv4, sysAddr, getAddressSize(NetAddress::Type::AddressIPv4));
-    address.setPort(ntohs(addr4->sin_port));
     addrPtr = &addr4->sin_addr;
   } else if (sysAddr->sa_family == AF_INET6) {
     const sockaddr_in6* addr6 = reinterpret_cast<const sockaddr_in6*>(sysAddr);
     address.assignRawAddress(NetAddress::AddressIPv6, sysAddr, getAddressSize(NetAddress::Type::AddressIPv6));
-    address.setPort(ntohs(addr6->sin6_port));
     addrPtr = &addr6->sin6_addr;
   } else {
     return Error::InvalidValue;
