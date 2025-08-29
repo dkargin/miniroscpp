@@ -18,13 +18,14 @@ TEST(Address, ip4)
   NetAddress address1 = NetAddress::fromIp4String("192.168.1.10", 10);
   ASSERT_TRUE(address1.valid());
   EXPECT_GT(address1.rawAddressSize(), 0);
-
   EXPECT_EQ(address1.port(), 10);
+
   const sockaddr* addr = static_cast<const sockaddr*>(address1.rawAddress());
   NetAddress address2;
   ASSERT_EQ(fillAddress(addr, address2), Error::Ok);
 
-  ASSERT_EQ(address1, address2);
+  EXPECT_EQ(address2.port(), 10);
+  EXPECT_EQ(address1, address2);
 
   NetAddress address3 = NetAddress::fromIp4String("very wrong address", 10);
   ASSERT_FALSE(address3.valid());
@@ -36,13 +37,15 @@ TEST(Address, ip6)
   NetAddress address1 = NetAddress::fromIp6String("fe80::1ff:fe23:4567:890a", 10);
   ASSERT_TRUE(address1.valid());
   EXPECT_GT(address1.rawAddressSize(), 0);
-
   EXPECT_EQ(address1.port(), 10);
+
   const sockaddr* addr = static_cast<const sockaddr*>(address1.rawAddress());
   NetAddress address2;
   ASSERT_EQ(fillAddress(addr, address2), Error::Ok);
 
-  ASSERT_EQ(address1, address2);
+  EXPECT_EQ(address2.port(), 10);
+  EXPECT_EQ(address1, address2);
+
 
   NetAddress address3 = NetAddress::fromIp6String("very wrong address", 10);
   ASSERT_FALSE(address3.valid());
