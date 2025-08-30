@@ -150,7 +150,7 @@ public:
 private:
   ServiceCallbackHelperPtr helper_;
   std::shared_ptr<uint8_t[]> buffer_;
-  uint32_t num_bytes_;
+  uint64_t num_bytes_;
   ServiceClientLinkPtr link_;
   bool has_tracked_object_;
   VoidConstWPtr tracked_object_;

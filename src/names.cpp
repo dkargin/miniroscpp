@@ -314,9 +314,12 @@ size_t Path::size() const
 }
 
 /// Return string element.
-std::string Path::str(int i) const
+std::string Path::str(size_t i) const
 {
   auto v = this->view(i);
+  if (v.empty()) {
+    return {};
+  }
   return std::string(v.data(), v.size());
 }
 
@@ -327,7 +330,7 @@ std::string Path::right(int i) const
   if (i == 0)
     return "";
 
-  int pos = size() - i;
+  size_t pos = size() - i;
   auto v = view(pos);
 
   const auto* end = &m_fullPath[0] + m_fullPath.size();
@@ -357,7 +360,7 @@ bool Path::isAbsolute() const
 
 
 /// Return string view element.
-std::string_view Path::view(int i) const
+std::string_view Path::view(size_t i) const
 {
   if (i == m_ns.size())
     return m_lastName;

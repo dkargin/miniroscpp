@@ -102,16 +102,41 @@ void NodeRef::writeJson(std::ostream& os, miniros::JsonState& state, const minir
   // TODO: Implement
 }
 
-void NodeRef::updateHost(const std::shared_ptr<HostInfo>& hostInfo)
+void NodeRef::updateHost(const std::shared_ptr<network::HostInfo>& hostInfo)
 {
   std::unique_lock lock(m_guard);
   m_hostInfo = hostInfo;
 }
 
-std::weak_ptr<const HostInfo> NodeRef::hostInfo() const
+std::weak_ptr<const network::HostInfo> NodeRef::hostInfo() const
 {
   std::unique_lock lock(m_guard);
   return m_hostInfo;
+}
+
+void NodeRef::lock() const
+{
+  m_guard.lock();
+}
+
+void NodeRef::unlock() const
+{
+  m_guard.unlock();
+}
+
+const std::set<std::string>& NodeRef::getSubscriptionsUnsafe() const
+{
+  return m_topicSubscriptions;
+}
+
+const std::set<std::string>& NodeRef::getPublicationsUnsafe() const
+{
+  return m_topicPublications;
+}
+
+const std::set<std::string>& NodeRef::getServicesUnsafe() const
+{
+  return m_services;
 }
 
 } // namespace master

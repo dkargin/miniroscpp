@@ -124,50 +124,31 @@ public:
   class MINIROS_DECL PendingConnection : public ASyncXMLRPCConnection
   {
     public:
-      PendingConnection(XmlRpc::XmlRpcClient* client, TransportUDPPtr udp_transport, const SubscriptionWPtr& parent, const std::string& remote_uri)
-      : client_(client)
-      , udp_transport_(udp_transport)
-      , parent_(parent)
-      , remote_uri_(remote_uri)
-      {}
+      PendingConnection(XmlRpc::XmlRpcClient* client, TransportUDPPtr udp_transport, const SubscriptionWPtr& parent, const std::string& remote_uri);
 
-      ~PendingConnection()
-      {
-        delete client_;
-      }
+      ~PendingConnection() override;
 
-      XmlRpc::XmlRpcClient* getClient() const { return client_; }
-      TransportUDPPtr getUDPTransport() const { return udp_transport_; }
+      XmlRpc::XmlRpcClient* getClient() const;
+      TransportUDPPtr getUDPTransport() const;
 
-      virtual void addToDispatch(XmlRpc::XmlRpcDispatch* disp)
+      void addToDispatch(PollSet* pollSet) override;
+
+      void removeFromDispatch(PollSet* pollSet) override;
+
+    /*
+      void addToDispatch(XmlRpc::XmlRpcDispatch* disp) override
       {
         disp->addSource(client_, XmlRpc::XmlRpcDispatch::WritableEvent | XmlRpc::XmlRpcDispatch::Exception);
       }
 
-      virtual void removeFromDispatch(XmlRpc::XmlRpcDispatch* disp)
+      void removeFromDispatch(XmlRpc::XmlRpcDispatch* disp) override
       {
         disp->removeSource(client_);
-      }
+      }*/
 
-      virtual bool check()
-      {
-        SubscriptionPtr parent = parent_.lock();
-        if (!parent)
-        {
-          return true;
-        }
+      bool check() override;
 
-        XmlRpc::XmlRpcValue result;
-        if (client_->executeCheckDone(result))
-        {
-          parent->pendingConnectionDone(std::dynamic_pointer_cast<PendingConnection>(shared_from_this()), result);
-          return true;
-        }
-
-        return false;
-      }
-
-      const std::string& getRemoteURI() { return remote_uri_; }
+      const std::string& getRemoteURI();
 
     private:
       XmlRpc::XmlRpcClient* client_;
@@ -175,6 +156,7 @@ public:
       SubscriptionWPtr parent_;
       std::string remote_uri_;
   };
+
   typedef std::shared_ptr<PendingConnection> PendingConnectionPtr;
 
   void pendingConnectionDone(const PendingConnectionPtr& pending_conn, XmlRpc::XmlRpcValue& result);

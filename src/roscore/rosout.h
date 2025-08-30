@@ -38,12 +38,13 @@ public:
   size_t current_file_size_;
   size_t max_backup_index_;
   size_t current_backup_index_;
-  NodeHandle node_;
+
+  NodeHandle& node_;
   Subscriber rosout_sub_;
   Publisher agg_pub_;
   bool omit_topics_;
 
-  Rosout();
+  Rosout(NodeHandle& nh);
 
   void init();
   void rosoutCallback(const rosgraph_msgs::Log::ConstPtr& msg);

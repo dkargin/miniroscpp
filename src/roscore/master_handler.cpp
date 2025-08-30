@@ -13,19 +13,18 @@
 #endif
 #include "master_handler.h"
 
-#include "miniros/transport/network.h"
-#include "miniros/transport/rpc_manager.h"
+#include "../../include/miniros/network/network.h"
 #include "miniros/internal/at_exit.h"
+#include "miniros/transport/rpc_manager.h"
 
 #include <xmlrpcpp/XmlRpcServerConnection.h>
 
 namespace miniros {
 namespace master {
 
-MasterHandler::MasterHandler(RPCManagerPtr rpcManager, RegistrationManager* regManager)
-  :m_rpcManager(rpcManager), m_regManager(regManager)
+MasterHandler::MasterHandler(RPCManagerPtr rpcManager, RegistrationManager* regManager, AddressResolver* resolver)
+  :m_rpcManager(rpcManager), m_regManager(regManager), m_resolver(resolver)
 {
-  m_resolver.scanAdapters();
 }
 
 Error MasterHandler::enqueueNodeCommand(const std::shared_ptr<NodeRef>& nr, const char* method, const RpcValue& arg1, const RpcValue& arg2)
@@ -93,11 +92,6 @@ Error MasterHandler::sendToNode(const std::shared_ptr<NodeRef>& nr, const char* 
   return Error::Ok;
 }
 
-std::string MasterHandler::getUri(const std::string& caller_id) const
-{
-  return uri;
-}
-
 void MasterHandler::notifyTopicSubscribers(const std::string& topic, const std::vector<std::shared_ptr<NodeRef>>& subscribers)
 {
   if (subscribers.empty())
@@ -111,7 +105,7 @@ void MasterHandler::notifyTopicSubscribers(const std::string& topic, const std::
       int j = 0;
       for (int i = 0; i < publishers.size(); i++) {
         if (publishers[i]) {
-          network::URL url = m_resolver.resolveAddressFor(publishers[i], sub);
+          network::URL url = m_resolver->resolveAddressFor(publishers[i], sub);
           l[j++] = url.str();
         }
       }
@@ -130,7 +124,7 @@ ReturnStruct MasterHandler::registerService(const RequesterInfo& requesterInfo, 
   if (!ref)
     return ReturnStruct(0, "Internal error");
 
-  if (auto hostInfo = m_resolver.updateHost(requesterInfo))
+  if (auto hostInfo = m_resolver->updateHost(requesterInfo))
     ref->updateHost(hostInfo);
 
   return ReturnStruct(1, "Registered [" + requesterInfo.callerId + "] as provider of [" + service + "]", RpcValue(1));
@@ -142,7 +136,7 @@ std::string MasterHandler::lookupService(const RequesterInfo& requesterInfo, con
   std::string service_api = m_regManager->services.get_service_api(service);
   std::shared_ptr<NodeRef> node = m_regManager->getNodeByAPI(service_api);
   if (node && requesterInfo.clientAddress.valid()) {
-    network::URL url = m_resolver.resolveAddressFor(node, requesterInfo.clientAddress, requesterInfo.localAddress);
+    network::URL url = m_resolver->resolveAddressFor(node, requesterInfo.clientAddress, requesterInfo.localAddress);
     return url.str();
   }
   return service_api;
@@ -167,7 +161,7 @@ ReturnStruct MasterHandler::registerSubscriber(const RequesterInfo& requesterInf
   MINIROS_INFO_NAMED("handler", "registerSubscriber(\"%s\") caller_id=%s caller_api=%s, type=%s",
     topic.c_str(), requesterInfo.callerId.c_str(), requesterInfo.callerApi.c_str(), topic_type.c_str());
 
-  if (auto hostInfo = m_resolver.updateHost(requesterInfo))
+  if (auto hostInfo = m_resolver->updateHost(requesterInfo))
     ref->updateHost(hostInfo);
 
   std::vector<std::shared_ptr<NodeRef>> publishers = m_regManager->getTopicPublishers(topic);
@@ -179,11 +173,11 @@ ReturnStruct MasterHandler::registerSubscriber(const RequesterInfo& requesterInf
   rtn.statusCode = 1;
 
   rtn.value = RpcValue::Array(publishers.size());
-  for (int i = 0; i < publishers.size(); i++) {
+  for (size_t i = 0; i < publishers.size(); i++) {
     if (publishers[i]) {
       std::string strUrl;
       if (publishers[i] != ref) {
-        network::URL url = m_resolver.resolveAddressFor(publishers[i], requesterInfo.clientAddress, requesterInfo.localAddress);
+        network::URL url = m_resolver->resolveAddressFor(publishers[i], requesterInfo.clientAddress, requesterInfo.localAddress);
         strUrl = url.str();
       } else {
         // The publisher is the same as the subscriber. Do not resolve IP address in this case.
@@ -219,7 +213,7 @@ ReturnStruct MasterHandler::registerPublisher(const RequesterInfo& requesterInfo
     return ReturnStruct(0, "Internal error");
   }
 
-  if (auto hostInfo = m_resolver.updateHost(requesterInfo))
+  if (auto hostInfo = m_resolver->updateHost(requesterInfo))
     ref->updateHost(hostInfo);
 
   std::vector<std::shared_ptr<NodeRef>> subscribers = m_regManager->getTopicSubscribers(topic);
@@ -230,10 +224,10 @@ ReturnStruct MasterHandler::registerPublisher(const RequesterInfo& requesterInfo
   rtn.statusMessage = ss.str();
   rtn.statusCode = 1;
   rtn.value = RpcValue::Array(subscribers.size());
-  for (int i = 0; i < subscribers.size(); i++) {
+  for (size_t i = 0; i < subscribers.size(); i++) {
     if (!subscribers[i])
       continue;
-    network::URL url = m_resolver.resolveAddressFor(subscribers[i], requesterInfo.clientAddress, requesterInfo.localAddress);
+    network::URL url = m_resolver->resolveAddressFor(subscribers[i], requesterInfo.clientAddress, requesterInfo.localAddress);
     std::string strUrl = url.str();
     MINIROS_INFO_NAMED("handler", "registerPublisher(\"%s\") - sub=%s", topic.c_str(), strUrl.c_str());
     rtn.value[i] = strUrl;
@@ -265,7 +259,7 @@ std::string MasterHandler::lookupNode(const RequesterInfo& requesterInfo, const 
   std::shared_ptr<NodeRef> node = m_regManager->getNodeByName(node_name);
   if (!node)
     return "";
-  network::URL url = m_resolver.resolveAddressFor(node, requesterInfo.clientAddress, requesterInfo.localAddress);
+  network::URL url = m_resolver->resolveAddressFor(node, requesterInfo.clientAddress, requesterInfo.localAddress);
   return url.str();
 }
 
@@ -294,11 +288,6 @@ MasterHandler::SystemState MasterHandler::getSystemState(const RequesterInfo& re
   result.subscribers = m_regManager->subscribers.getState();
   result.services = m_regManager->services.getState();
   return result;
-}
-
-void MasterHandler::setResolveNodeIP(bool resolve)
-{
-  m_resolver.setResolveIp(resolve);
 }
 
 void MasterHandler::update()

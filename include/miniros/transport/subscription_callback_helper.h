@@ -45,7 +45,7 @@ namespace miniros
 struct SubscriptionCallbackHelperDeserializeParams
 {
   uint8_t* buffer;
-  uint32_t length;
+  uint64_t length;
   std::shared_ptr<M_string> connection_header;
 };
 

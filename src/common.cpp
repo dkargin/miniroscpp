@@ -221,35 +221,67 @@ Error notifyNodeExiting()
 static std::random_device              rd;
 static std::mt19937                    gen(rd());
 static std::uniform_int_distribution<> dis(0, 15);
-static std::uniform_int_distribution<> dis2(8, 11);
 
-/// code is taken from https://stackoverflow.com/questions/24365331/how-can-i-generate-uuid-in-c-without-using-boost-library
-std::string generatePseudoUuid() {
-  std::stringstream ss;
-  int i;
-  ss << std::hex;
-  for (i = 0; i < 8; i++) {
-    ss << dis(gen);
+constexpr unsigned int UUID_Version = 0x40;
+constexpr unsigned int UUID_Variant = 0x80;
+
+void UUID::generate()
+{
+  for (int i = 0; i < 16; i++) {
+    bytes[i] = dis(gen);
   }
-  ss << "-";
-  for (i = 0; i < 4; i++) {
-    ss << dis(gen);
-  }
-  ss << "-4";
-  for (i = 0; i < 3; i++) {
-    ss << dis(gen);
-  }
-  ss << "-";
-  ss << dis2(gen);
-  for (i = 0; i < 3; i++) {
-    ss << dis(gen);
-  }
-  ss << "-";
-  for (i = 0; i < 12; i++) {
-    ss << dis(gen);
-  };
-  return ss.str();
+  constexpr unsigned int mask4 = 0xf;
+  constexpr unsigned int mask3 = 0x3f;
+  // Force version bits.
+
+  bytes[6] = (bytes[6] & mask4) | UUID_Version;
+  bytes[8] = (bytes[8] & mask3) | UUID_Variant;
 }
+
+void UUID::reset()
+{
+  for (int i = 0; i < 16; i++) {
+    bytes[i] = 0;
+  }
+}
+
+bool UUID::valid() const
+{
+  // Check if mandatory bytes are set.
+  if (!(bytes[6] & UUID_Version))
+    return false;
+  if (!(bytes[8] & UUID_Variant))
+    return false;
+
+  // Check if there is any byte with non-zero value.
+  for (int i = 0; i < 16; i++) {
+    if (bytes[i] != 0)
+      return true;
+  }
+  return false;
+}
+
+/// Most lazy method to return string form of UUID.
+std::string UUID::toString() const
+{
+  std::stringstream ss;
+  ss << std::hex;
+  int i = 0;
+  for (;i < 4; i++)
+    ss << bytes[i];
+  ss << "-";
+  for (; i < 6; i++)
+    ss << bytes[i];
+  ss << "-";
+  for (; i < 8; i++)
+    ss << bytes[i];
+  for (; i < 12; i++)
+    ss << bytes[i];
+  ss << "-";
+  for (; i < 16; i++)
+    ss << bytes[i];
+  return ss.str();
+};
 
 Error makeDirectory(const std::string& path)
 {
