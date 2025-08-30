@@ -31,10 +31,6 @@ Master::Internal::Internal(const std::shared_ptr<RPCManager>& manager)
 
   resolver.scanAdapters();
 
-  // Forcing global master link to use local RPC manager.
-  auto masterLink = getMasterLink();
-  masterLink->setLocalMaster(true);
-
   // TODO: Read environment.
   // split the URI (if it's valid) into host and port
   // if (!network.splitURI(ROS.ROS_MASTER_URI, ref _host, ref _port))

@@ -153,7 +153,8 @@ int main(int argc, const char ** argv) {
     remappings["__rpc_server_port"] = std::to_string(port);
   }
 
-  init(remappings, "miniroscore", init_options::NoRosout | init_options::NoSigintHandler);
+  constexpr int options = init_options::LocalMaster | init_options::NoRosout | init_options::NoSigintHandler;
+  init(remappings, "miniroscore", options);
 
   master.setResolveNodeIP(resolve);
   master.setDumpParameters(dumpParameters);
