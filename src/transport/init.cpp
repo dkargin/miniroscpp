@@ -507,6 +507,8 @@ void init(const M_string& remappings, const std::string& name, uint32_t options)
     auto rpcManager = RPCManager::instance();
     g_master_link.reset(new MasterLink());
     g_master_link->initLink(remappings, rpcManager);
+    if (options & init_options::LocalMaster)
+      g_master_link->setLocalMaster(true);
     // names:: namespace is initialized by this_node
     this_node::init(name, remappings, options);
     file_log::init(remappings);
