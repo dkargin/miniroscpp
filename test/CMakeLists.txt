@@ -5,6 +5,12 @@ include(CTest)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+add_executable(manage-master manage-master.cpp)
+target_link_libraries(manage-master miniros::roscxx)
+add_dependencies(manage-master miniroscore)
+
+set(TESTS_WITH_MASTER "" CACHE INTERNAL "Tests with rosmaster")
+
 function(miniros_add_test TARGET_NAME)
 	# These options are mapped to boolean flags
 	set(bool_options WITH_MASTER DISABLED)
@@ -17,10 +23,12 @@ function(miniros_add_test TARGET_NAME)
 	if (NOT ${CMAKE_CURRENT_FUNCTION}_DISABLED)
 		# Test is disabled. It is either not ported properly from rostest or does not suite CTest environment
 		add_test(NAME ${TARGET_NAME} COMMAND ${TARGET_NAME})
-		if (${CMAKE_CURRENT_FUNCTION}_MASTER)
+		if (${CMAKE_CURRENT_FUNCTION}_WITH_MASTER)
 			# Test needs master to operate
 			# Fixtures are still not working
-			# set_tests_properties(${TARGET_NAME} PROPERTIES FIXTURES_REQUIRED miniroscore)
+			set_tests_properties(start-master PROPERTIES FIXTURES_SETUP ${TARGET_NAME})
+			set_tests_properties(stop-master PROPERTIES FIXTURES_CLEANUP ${TARGET_NAME})
+			message(STATUS "Test ${TARGET_NAME} will require rosmaster")
 		endif()
 	endif()
 	set_target_properties (${TARGET_NAME} PROPERTIES FOLDER "Tests")

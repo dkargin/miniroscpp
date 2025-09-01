@@ -73,6 +73,7 @@
   #include <netdb.h>       // getnameinfo in network.cpp
   #include <netinet/in.h>  // sockaddr_in in network.cpp
   #include <netinet/tcp.h> // TCP_NODELAY in transport/transport_tcp.cpp
+  #include <sys/wait.h> // for wait_pid
 #endif
 
 /*****************************************************************************

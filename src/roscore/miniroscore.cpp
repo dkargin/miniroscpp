@@ -15,6 +15,7 @@
 #include "miniros/xmlrpcpp/XmlRpcUtil.h"
 
 #include "miniros/common.h"
+#include "miniros/transport/io.h"
 
 /// This define is injected in replacements/CMakeLists.txt
 #ifdef USE_LOCAL_PROGRAM_OPTIONS

@@ -4,11 +4,40 @@ include_directories(${MINIROS_GENERATED_INCLUDE_DIRS})
 
 link_directories(${GTEST_LIBRARY_DIRS})
 
+add_test(NAME start-master COMMAND manage-master start)
+#add_test(NAME stop-master COMMAND manage-master stop)
+
+function(miniros_advanced_test TARGET_NAME)
+  # These options are mapped to boolean flags
+  set(bool_options WITH_MASTER DISABLED)
+  set(single_value_options)
+  cmake_parse_arguments(${CMAKE_CURRENT_FUNCTION} "${bool_options}" "${single_value_options}" "SOURCES;LIBRARIES" ${ARGN})
+  add_executable(${TARGET_NAME} ${${CMAKE_CURRENT_FUNCTION}_SOURCES})
+  set(optional_libs gtest_main)
+  target_link_libraries(${TARGET_NAME} roscxx ${GTEST_LIBRARIES})
+
+  if (NOT ${CMAKE_CURRENT_FUNCTION}_DISABLED)
+    # Test is disabled. It is either not ported properly from rostest or does not suite CTest environment
+    add_test(NAME ${TARGET_NAME} COMMAND ${TARGET_NAME})
+    if (${CMAKE_CURRENT_FUNCTION}_WITH_MASTER)
+      # Test needs master to operate
+      # Fixtures are still not working
+      #set_tests_properties(start-master PROPERTIES FIXTURES_SETUP ${TARGET_NAME})
+      #set_tests_properties(stop-master PROPERTIES FIXTURES_CLEANUP ${TARGET_NAME})
+      #message(STATUS "Test ${TARGET_NAME} will require rosmaster")
+      list(APPEND TESTS_WITH_MASTER ${TARGET_NAME})
+      set(TESTS_WITH_MASTER ${TESTS_WITH_MASTER} PARENT_SCOPE)
+    endif()
+  endif()
+  set_target_properties (${TARGET_NAME} PROPERTIES FOLDER "Tests")
+endfunction()
+
+
 set(TEST_GROUP advanced)
 
-miniros_add_test(${TEST_GROUP}-handles SOURCES handles.cpp WITH_MASTER DISABLED)
+miniros_advanced_test(${TEST_GROUP}-handles SOURCES handles.cpp WITH_MASTER)
 
-miniros_add_test(${TEST_GROUP}-timer_callbacks SOURCES timer_callbacks.cpp WITH_MASTER DISABLED)
+miniros_advanced_test(${TEST_GROUP}-timer_callbacks SOURCES timer_callbacks.cpp WITH_MASTER)
 
 miniros_add_test(${TEST_GROUP}-latching_publisher SOURCES latching_publisher.cpp WITH_MASTER DISABLED)
 
@@ -74,7 +103,7 @@ miniros_add_test(${TEST_GROUP}-multiple_init_fini SOURCES multiple_init_fini.cpp
 miniros_add_test(${TEST_GROUP}-missing_call_to_shutdown SOURCES missing_call_to_shutdown.cpp WITH_MASTER DISABLED)
 
 # Test node inspection functionality
-miniros_add_test(${TEST_GROUP}-inspection SOURCES inspection.cpp WITH_MASTER DISABLED)
+miniros_advanced_test(${TEST_GROUP}-inspection SOURCES inspection.cpp WITH_MASTER)
 
 # Test that advertising a service multiple times fails
 miniros_add_test(${TEST_GROUP}-service_adv_multiple SOURCES service_adv_multiple.cpp WITH_MASTER DISABLED)
@@ -99,13 +128,13 @@ miniros_add_test(${TEST_GROUP}-name_remapping_with_ns SOURCES name_remapping_wit
 miniros_add_test(${TEST_GROUP}-namespaces SOURCES namespaces.cpp WITH_MASTER DISABLED)
 
 # Test params
-miniros_add_test(${TEST_GROUP}-params SOURCES params.cpp WITH_MASTER DISABLED)
+miniros_advanced_test(${TEST_GROUP}-params SOURCES params.cpp WITH_MASTER)
 
 # Test spinners
 miniros_add_test(${TEST_GROUP}-spinners SOURCES spinners.cpp WITH_MASTER DISABLED)
 
 # Test getting information from the master
-miniros_add_test(${TEST_GROUP}-get_master_information SOURCES get_master_information.cpp WITH_MASTER DISABLED)
+miniros_advanced_test(${TEST_GROUP}-get_master_information SOURCES get_master_information.cpp WITH_MASTER DISABLED)
 
 # Test multiple subscriptions
 miniros_add_test(${TEST_GROUP}-multiple_subscriptions SOURCES multiple_subscriptions.cpp WITH_MASTER DISABLED)
@@ -116,14 +145,13 @@ miniros_add_test(${TEST_GROUP}-wait_for_message SOURCES wait_for_message.cpp WIT
 
 miniros_add_test(${TEST_GROUP}-loads_of_publishers SOURCES loads_of_publishers.cpp WITH_MASTER DISABLED)
 
-miniros_add_test(${TEST_GROUP}-incrementing_sequence SOURCES incrementing_sequence.cpp WITH_MASTER DISABLED)
+miniros_advanced_test(${TEST_GROUP}-incrementing_sequence SOURCES incrementing_sequence.cpp WITH_MASTER)
 
-miniros_add_test(${TEST_GROUP}-subscription_callback_types SOURCES subscription_callback_types.cpp WITH_MASTER DISABLED)
-#add_dependencies(${TEST_GROUP}-subscription_callback_types ${std_msgs_EXPORTED_TARGETS})
+miniros_advanced_test(${TEST_GROUP}-subscription_callback_types SOURCES subscription_callback_types.cpp WITH_MASTER)
 
-miniros_add_test(${TEST_GROUP}-service_callback_types SOURCES service_callback_types.cpp WITH_MASTER DISABLED)
+miniros_advanced_test(${TEST_GROUP}-service_callback_types SOURCES service_callback_types.cpp WITH_MASTER)
 
-miniros_add_test(${TEST_GROUP}-intraprocess_subscriptions SOURCES intraprocess_subscriptions.cpp WITH_MASTER DISABLED)
+miniros_advanced_test(${TEST_GROUP}-intraprocess_subscriptions SOURCES intraprocess_subscriptions.cpp WITH_MASTER)
 
 miniros_add_test(${TEST_GROUP}-nonconst_subscriptions SOURCES nonconst_subscriptions.cpp WITH_MASTER DISABLED)
 
@@ -176,3 +204,8 @@ miniros_add_test(${TEST_GROUP}-publisher_rate SOURCES publisher_rate.cpp WITH_MA
 miniros_add_test(${TEST_GROUP}-subscriber SOURCES subscriber.cpp WITH_MASTER DISABLED)
 #add_dependencies(${TEST_GROUP}-subscriber ${std_msgs_EXPORTED_TARGETS})
 
+
+set_tests_properties(start-master PROPERTIES FIXTURES_REQUIRED "stop-master ${TESTS_WITH_MASTER}")
+#set_tests_properties(stop-master PROPERTIES FIXTURES_CLEANUP "${TESTS_WITH_MASTER}")
+
+message(STATUS "Advanced tests with master: ${TESTS_WITH_MASTER}")
