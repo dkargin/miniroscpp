@@ -16,12 +16,13 @@
 namespace miniros {
 
 /// Launcher helps to starting applications and tracking its return status.
+/// TODO: Make proper implementation for Win32. Right now it is just a placeholder code.
 class MINIROS_DECL Launcher {
 public:
   /// Create empty launcher. It can be start later.
   Launcher();
   /// Create launcher for specific PID.
-  explicit Launcher(int pid);
+  explicit Launcher(int64_t pid);
 
   ~Launcher();
 
@@ -41,10 +42,12 @@ public:
   int waitExit();
 
   /// Get PID of a process.
-  int pid() const;
+  int64_t pid() const;
 
   /// Check if app is running.
   bool valid() const;
+
+  static int64_t myPid();
 
 protected:
   struct Internal;
