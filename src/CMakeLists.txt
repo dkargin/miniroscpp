@@ -50,6 +50,7 @@ set(cpp_common_SRC
     common.cpp
     console_print.cpp
     file_log.cpp
+    launcher.cpp
     names.cpp
     serialization.cpp)
 

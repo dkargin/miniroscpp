@@ -1,4 +1,0 @@
-<launch>
-  <test test-name="incrementing_sequence" pkg="miniros" type="advanced-incrementing_sequence"/>
-</launch>
-

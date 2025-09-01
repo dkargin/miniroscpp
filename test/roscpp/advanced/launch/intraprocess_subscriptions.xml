@@ -1,3 +1,0 @@
-<launch>
-  <test test-name="intraprocess_subscriptions" pkg="miniros" type="advanced-intraprocess_subscriptions"/>
-</launch>
