@@ -1,3 +1,0 @@
-<launch>
-  <test test-name="get_master_information" pkg="miniros" type="advanced-get_master_information"/>
-</launch>
