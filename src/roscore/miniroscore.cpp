@@ -6,6 +6,7 @@
 #include <csignal>
 #include <atomic>
 #include <filesystem>
+#include <fstream>
 
 #include "master.h"
 #include "rosout.h"
@@ -33,6 +34,43 @@ void systemSignalHandler(int signal) {
   }
 }
 
+/// PidFile creates file with a PID of current process.
+/// The file is removed in the destructor.
+class PidFile {
+public:
+  PidFile() {}
+
+  ~PidFile()
+  {
+    remove();
+  }
+
+  /// Create PID file.
+  bool create(const char* file)
+  {
+    std::ofstream out(file);
+    if (!out.is_open()) {
+      std::cerr << "Failed to open PID file \"" << file << "\"" << std::endl;
+    }
+    out << getpid();
+    out.close();
+    path_ = std::filesystem::path(file);
+    return true;
+  }
+
+  /// Remove PID file and clear internal state.
+  void remove()
+  {
+    if (!path_.empty() && std::filesystem::is_regular_file(path_)) {
+      std::filesystem::remove(path_);
+    }
+    path_.clear();
+  }
+
+protected:
+  std::filesystem::path path_;
+};
+
 int main(int argc, const char ** argv) {
   std::signal(SIGINT, systemSignalHandler);
 
@@ -48,6 +86,7 @@ int main(int argc, const char ** argv) {
     // Unify rosmaster RPC manager and rosout RPC manager.
     // rosout creates its own RPC manager by default.
     ("unified_rpc", po::value<bool>()->default_value(false), "Resolve node IP address")
+    ("pidfile", po::value<std::string>(), "Path to a PID file")
     ;
 
   po::variables_map vm;
@@ -113,6 +152,11 @@ int main(int argc, const char ** argv) {
 
   master.setResolveNodeIP(resolve);
   master.setDumpParameters(dumpParameters);
+
+  PidFile pidFile;
+  if (vm.count("pidfile")) {
+    pidFile.create(vm["pidfile"].as<std::string>().c_str());
+  }
 
   MINIROS_INFO("Starting Master thread");
   master.start();
