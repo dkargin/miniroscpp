@@ -187,7 +187,10 @@ unsigned XmlRpcServer::acceptConnection()
   if (s < 0)
   {
     //this->close();
-    XmlRpcUtil::error("XmlRpcServer::acceptConnection: Could not accept connection (%s).", XmlRpcSocket::getErrorMsg().c_str());
+    int err = errno;
+    if (err != EAGAIN) {
+      XmlRpcUtil::error("XmlRpcServer::acceptConnection: Could not accept connection (%s).", XmlRpcSocket::getErrorMsg().c_str());
+    }
 
     // Note that there was an accept error; retry in 1 second
     _accept_error = true;
