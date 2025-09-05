@@ -104,6 +104,12 @@ bool Master::start(PollSet* poll_set)
     return false;
 
   MINIROS_DEBUG("Starting discovery module");
+  internal_->discovery.setDiscoveryCallback(
+    // This is invoked at poll queue thread.
+    [](const DiscoveryEvent& event) {
+
+      });
+
   if (!internal_->discovery.start(poll_set, internal_->uuid, internal_->port)) {
     stop();
     return false;
@@ -169,9 +175,9 @@ void Master::setupBindings()
     server->registerEndpoint(std::make_unique<http::SimpleFilter>(http::HttpMethod::Get, "/favicon.ico"),
       std::make_shared<MasterFaviconEndpoint>());
 
+    // This endpoint is only for testing purposes. Clients could create endpoints by themselves if needed.
     auto fsEndpoint = std::make_shared<http::FilesystemEndpoint>("/files/", ".");
-    server->registerEndpoint(std::make_unique<http::SimpleFilter>(http::HttpMethod::Get, "/files/", http::SimpleFilter::CheckType::Prefix),
-      fsEndpoint);
+    server->registerEndpoint(std::make_unique<http::SimpleFilter>(http::HttpMethod::Get, "/files/", http::SimpleFilter::CheckType::Prefix), fsEndpoint);
   }
 }
 
@@ -244,7 +250,7 @@ Master::RpcValue Master::unregisterService(const std::string& caller_id, const s
   return res;
 }
 
-Master::RpcValue Master::getTopicTypes(const std::string& topic, const ClientInfo&)
+Master::RpcValue Master::getTopicTypes(const std::string& /*caller_id*/, const ClientInfo&)
 {
   std::unique_lock<const RegistrationManager> lock(internal_->regManager);
 
