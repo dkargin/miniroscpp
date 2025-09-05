@@ -242,7 +242,7 @@ Error Discovery::doBroadcast()
 
   }
 
-  MINIROS_INFO("Broadcasted discovery packets to %d interfaces", interfaces);
+  MINIROS_DEBUG_NAMED("Discovery", "Broadcasted discovery packets to %d interfaces", interfaces);
   return Error::Ok;
 }
 
