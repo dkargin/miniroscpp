@@ -4,38 +4,13 @@
 
 #include "master_endpoints.h"
 #include "miniros_favicon.h"
+
 #include "http/http_server.h"
+#include "http/http_filters.h"
 
 
 namespace miniros {
 namespace master {
-
-/// Get final name from path: "/node/ws1/node1" returns "/ws1/node1"
-std::string_view getNameFromUrlPath(const std::string_view& path)
-{
-  size_t pos = path.find_first_of("/\\");
-  if(pos != std::string_view::npos) {
-    return path.substr(pos);
-  }
-  return path;
-}
-
-/// Get final name from path: "/node/ws1/node1" returns "/ws1/node1"
-std::string_view getNameFromUrlPath(const std::string_view& path, const std::string_view& prefix)
-{
-  // Even if path == prefix, it is still invalid input, because output name will be empty.
-  if (path.size() <= prefix.size()) {
-    return {};
-  }
-
-  for (size_t i = 0; i < prefix.size(); i++) {
-    if (path[i] != prefix[i]) {
-      return {};
-    }
-  }
-  // Ensure trailing slash is added.
-  return path.substr(prefix.size() - 1);
-}
 
 Error MasterRootEndpoint::handle(const http::HttpFrame& frame, const network::ClientInfo& clientInfo,
   http::HttpResponseHeader& responseHeader, std::string& body)
@@ -68,7 +43,7 @@ Error MasterFaviconEndpoint::handle(const http::HttpFrame& frame, const network:
 Error NodeInfoEndpoint::handle(const http::HttpFrame& frame, const network::ClientInfo& clientInfo,
   http::HttpResponseHeader& responseHeader, std::string& body)
 {
-  std::string_view name = getNameFromUrlPath(frame.getPath(), "/node/");
+  std::string_view name = http::getNameFromUrlPath(frame.getPath(), "/node/", true);
 
   responseHeader.contentType = "text/html";
   body = "<!doctype html><html><title>Mini ROS master</title><body>";
@@ -87,7 +62,7 @@ Error NodeInfoEndpoint::handle(const http::HttpFrame& frame, const network::Clie
 Error TopicInfoEndpoint::handle(const http::HttpFrame& frame, const network::ClientInfo& clientInfo,
   http::HttpResponseHeader& responseHeader, std::string& body)
 {
-  std::string_view name = getNameFromUrlPath(frame.getPath(), "/topic/");
+  std::string_view name = http::getNameFromUrlPath(frame.getPath(), "/topic/", true);
 
   responseHeader.contentType = "text/html";
   body = "<!doctype html><html><title>Mini ROS master</title><body>";

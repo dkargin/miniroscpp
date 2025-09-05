@@ -96,7 +96,7 @@ int HttpServerConnection::handleEvents(int evtFlags)
       MINIROS_DEBUG("Handling HTTP request to %s", endpoint.c_str());
       Error err = handler->handle(http_frame_, clientInfo, response_header_, response_body_);
       if (!err) {
-        MINIROS_ERROR("Failed to handle HTTP request to %s", err.toString());
+        MINIROS_ERROR("Failed to handle HTTP request to \"%s\"", err.toString());
         prepareFaultResponse(err, response_header_, response_body_);
       }
     }

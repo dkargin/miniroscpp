@@ -15,9 +15,11 @@
 
 #include "miniros/transport/rpc_manager.h"
 
-#include "http/http_server.h"
+#include "miniros/http/http_server.h"
+
 
 #include "miniros/http/http_filters.h"
+#include "miniros/http/endpoints/filesystem.h"
 
 #include <xmlrpcpp/XmlRpcServerConnection.h>
 
@@ -166,6 +168,10 @@ void Master::setupBindings()
       internal_->httpTopicInfoEndpoint);
     server->registerEndpoint(std::make_unique<http::SimpleFilter>(http::HttpMethod::Get, "/favicon.ico"),
       std::make_shared<MasterFaviconEndpoint>());
+
+    auto fsEndpoint = std::make_shared<http::FilesystemEndpoint>("/files/", ".");
+    server->registerEndpoint(std::make_unique<http::SimpleFilter>(http::HttpMethod::Get, "/files/", http::SimpleFilter::CheckType::Prefix),
+      fsEndpoint);
   }
 }
 

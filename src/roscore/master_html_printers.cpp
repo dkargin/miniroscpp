@@ -5,49 +5,12 @@
 #include "master_internal.h"
 
 #include "miniros/network/host_info.h"
+#include "miniros/http/http_printers.h"
 
 namespace miniros {
 namespace master {
 
-namespace print {
-struct Url {
-  Url(const std::string_view& link, const std::string_view& text)
-    :link_(link), text_(text)
-  {}
-
-  friend std::ostream& operator << (std::ostream& out, const Url& url)
-  {
-    out << "<a href=\"" << url.link_ << "\">" << url.text_ << "</a>";
-    return out;
-  }
-  std::string_view link_, text_;
-};
-
-struct PrefixUrl {
-  PrefixUrl(const std::string_view& prefix, const std::string_view& link, const std::string_view& text)
-    :prefix_(prefix), link_(link), text_(text)
-  {}
-
-  friend std::ostream& operator << (std::ostream& out, const PrefixUrl& url)
-  {
-    out << "<a href=\"" << url.prefix_ << url.link_ << "\">" << url.text_ << "</a>";
-    return out;
-  }
-
-  std::string_view prefix_, link_, text_;
-};
-
-struct HB {
-  HB(const std::string_view& text) : text_(text) {}
-
-  friend std::ostream& operator << (std::ostream& out, const HB& hb)
-  {
-    out << "<h><b>" << hb.text_ << "</b></h>";
-    return out;
-  }
-  std::string_view text_;
-};
-}
+using namespace http;
 
 void Master::Internal::renderMasterStatus(std::string& output) const
 {

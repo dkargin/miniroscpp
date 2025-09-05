@@ -5,6 +5,8 @@
 #ifndef MINIROS_HTTP_FS_ENDPOINT_H
 #define MINIROS_HTTP_FS_ENDPOINT_H
 
+#include <filesystem>
+
 #include "../http_endpoint.h"
 #include "../http_tools.h"
 
@@ -24,7 +26,10 @@ public:
 protected:
   std::string prefix_path_;
   /// Path to a shared folder.
-  std::string root_path_;
+  std::filesystem::path root_path_;
+
+  /// Show hidden files.
+  bool show_hidden_ = false;
 };
 
 }
