@@ -65,19 +65,19 @@ std::shared_ptr<NodeRef> RegistrationManager::getNodeByAPIUnsafe(const std::stri
 std::shared_ptr<NodeRef> RegistrationManager::_register(Registrations& r, const std::string& key, const std::string& caller_id, const std::string& caller_api,
   const std::string& service_api)
 {
-  auto [node_ref, oldNode] = registerNodeApi(caller_id, caller_api);
-  if (!node_ref) {
+  RegistrationReport report = registerNodeApi(caller_id, caller_api);
+  if (!report.node) {
     MINIROS_ERROR("Failed to register NodeRef(node=%s api=%s)", caller_id.c_str(), caller_api.c_str());
     return {};
   }
 
-  node_ref->add(r.type(), key);
+  report.node->add(r.type(), key);
 
-  if (oldNode) {
-    dropRegistrations(oldNode);
+  if (report.previous) {
+    dropRegistrations(report.previous);
   }
   r.registerObj(key, caller_id, caller_api, service_api);
-  return node_ref;
+  return report.node;
 }
 
 void RegistrationManager::dropRegistrations(const std::shared_ptr<NodeRef>& node)
@@ -193,29 +193,37 @@ ReturnStruct RegistrationManager::unregister_param_subscriber(const std::string&
   return unregisterObject(param_subscribers, param, caller_id, caller_api);
 }
 
-std::pair<NodeRefPtr, NodeRefPtr> RegistrationManager::registerNodeApi(const std::string& caller_id, const std::string& caller_api)
+RegistrationManager::RegistrationReport
+RegistrationManager::registerNodeApi(const std::string& nodeName, const std::string& nodeApi, int flags)
 {
   std::scoped_lock<std::mutex> lock(m_guard);
 
-  std::shared_ptr<NodeRef> node_ref;
-  if (m_nodes.count(caller_id))
-    node_ref = m_nodes[caller_id];
+  RegistrationReport report;
 
-  NodeRefPtr prevNode;
-  if (node_ref) {
-    if (node_ref->getApi() == caller_api) {
-      return {node_ref, prevNode};
+  if (m_nodes.count(nodeName))
+    report.node = m_nodes[nodeName];
+
+  if (report.node) {
+    if (report.node->getApi() == nodeApi) {
+      return report;
     }
     // TODO: Need to check PID of the new node and verify that it has changed.
-    prevNode = node_ref;
-    MINIROS_WARN_NAMED("reg", "New node registered with name=\"%s\" api=%s", caller_id.c_str(), caller_api.c_str());
-    m_nodesToShutdown.insert(node_ref);
+    NodeRefPtr prevNode;
+
+    report.previous = report.node;
+    MINIROS_WARN_NAMED("reg", "New node registered with name=\"%s\" api=%s", nodeName.c_str(), nodeApi.c_str());
+    m_nodesToShutdown.insert(report.node);
   }
 
-  node_ref.reset(new NodeRef(caller_id, caller_api));
-  m_nodes[caller_id] = node_ref;
+  report.node.reset(new NodeRef(nodeName, nodeApi));
+  report.created = true;
 
-  return {node_ref, prevNode};
+  m_nodes[nodeName] = report.node;
+
+  if (flags & REG_MASTER) {
+    report.node->setMaster();
+  }
+  return report;
 }
 
 std::set<std::shared_ptr<NodeRef>> RegistrationManager::pullShutdownNodes()

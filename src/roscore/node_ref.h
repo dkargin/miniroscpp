@@ -92,6 +92,10 @@ public:
     /// It is thread-unsafe method and should be done inside external lock.
     const std::set<std::string>& getServicesUnsafe() const;
 
+    /// Mark this node as master.
+    void setMaster();
+    bool isMaster() const;
+
 protected:
     std::set<std::string> m_paramSubscriptions;
     std::set<std::string> m_topicSubscriptions;

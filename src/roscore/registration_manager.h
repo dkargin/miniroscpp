@@ -31,9 +31,6 @@ public:
   Registrations subscribers;
   Registrations services;
 
-  /// Get a list of URIs for specified topic and caller.
-  std::vector<std::string> getTopicSubscribersUri(const std::string& topic, const std::string& caller_api);
-
   /// Get nodes which publish specified topic.
   std::vector<std::shared_ptr<NodeRef>> getTopicPublishers(const std::string& topic) const;
 
@@ -60,9 +57,19 @@ public:
   /// @returns reference to a node or nullptr if no node is found.
   std::shared_ptr<NodeRef> getNodeByAPI(const std::string& nodeApi) const;
 
+  enum NodeRegFlags {
+    REG_MASTER = 1<<1
+  };
+
+  struct RegistrationReport {
+    NodeRefPtr node;
+    NodeRefPtr previous;
+    bool created = false;
+  };
+
   /// Register or update node API.
-  /// @returns a pair with {newNode, replacedNode}
-  std::pair<NodeRefPtr, NodeRefPtr> registerNodeApi(const std::string& caller_id, const std::string& caller_api);
+  /// @returns a pair with {newNode, replacedNode}. Second part is present only if there were an existing node with the same name.
+  RegistrationReport registerNodeApi(const std::string& nodeName, const std::string& nodeApi, int flags = 0);
 
   /// Internal method for registering an object.
   /// It can allocate new NodeRef for an object, or update an existing one.

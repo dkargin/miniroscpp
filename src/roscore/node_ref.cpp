@@ -139,5 +139,17 @@ const std::set<std::string>& NodeRef::getServicesUnsafe() const
   return m_services;
 }
 
+void NodeRef::setMaster()
+{
+  std::unique_lock lock(m_guard);
+  m_isMaster = true;
+}
+
+bool NodeRef::isMaster() const
+{
+  std::unique_lock lock(m_guard);
+  return m_isMaster;
+}
+
 } // namespace master
 } // namespace miniros
