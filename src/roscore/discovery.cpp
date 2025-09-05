@@ -21,6 +21,28 @@ constexpr int DNS_UDP_PORT = 53;
 constexpr int MDNS_UDP_PORT = 5353;
 constexpr int NTP_UDP_PORT = 123;
 
+#pragma pack(push, 1)
+struct DiscoveryPacket {
+  /// Operation
+  int16_t op = 0;
+
+  /// Additional flags.
+  int16_t flags = 0;
+
+  /// Size of packet.
+  int16_t size = 0;
+
+  /// Master RPC port.
+  int16_t masterPort = 0;
+
+  /// Sender address.
+  sockaddr addr{};
+
+  /// UUID of master instance.
+  UUID uuid;
+};
+#pragma pack(pop)
+
 struct Discovery::Internal {
   PollSet* pollSet = nullptr;
 
@@ -28,6 +50,8 @@ struct Discovery::Internal {
 
   /// Port for discovery broadcast.
   int broadcastPort = 0;
+
+  int rpcPort = 0;
 
   /// UUID to be broadcasted.
   UUID uuid;
@@ -38,84 +62,17 @@ struct Discovery::Internal {
   /// A collection of adapter-related sockets.
   std::multimap<std::string, network::NetSocket> discoverySockets;
 
+  DiscoveryEventCallback callback;
+
   Internal(AddressResolver* resolver)
     : resolver(resolver)
   {
     assert(resolver);
   }
 
-  NODISCARD Error initSockets(int port)
-  {
-    Error error = Error::Ok;
-    error = socket.initUDP(false);
-    if (!error) {
-      return error;
-    }
+  NODISCARD Error initSockets(int port);
 
-    error = socket.setBroadcast(true);
-    if (!error) {
-      detachSockets();
-      return error;
-    }
-
-    error = socket.setReuseAddr(true);
-    if (!error) {
-      detachSockets();
-      return error;
-    }
-
-    error = socket.setReusePort(true);
-    if (!error) {
-      detachSockets();
-      return error;
-    }
-
-    error = socket.bind(port);
-    if (!error) {
-      detachSockets();
-      return error;
-    }
-
-    error = socket.setBroadcast(true);
-    if (!error) {
-      detachSockets();
-      return error;
-    }
-
-    broadcastPort = port;
-
-    int fd = socket.fd();
-
-    bool added = pollSet->addSocket(fd,
-      [this](int flags)
-      {
-        if (flags & POLLIN) {
-          onSocketEvent(socket, 0, flags);
-        } else {
-          MINIROS_WARN("Discovery socket: unexpected event %d", flags);
-        }
-      });
-
-    if (!added)
-    {
-      MINIROS_ERROR("Failed to register listening socket");
-      return Error::InternalError;
-    }
-
-    if (!pollSet->addEvents(fd, POLLIN)) {
-      MINIROS_ERROR("Failed to add events");
-      return Error::InternalError;
-    }
-
-    return Error::Ok;
-  }
-
-  void onSocketEvent(network::NetSocket& s, int role, int event)
-  {
-    std::string rawData;
-    network::NetAddress address;;
-    auto [numBytes, error] = s.recv(rawData, &address);
-  }
+  void onSocketEvent(network::NetSocket& s, int role, int event);
 
   void detachSocket(network::NetSocket& s)
   {
@@ -138,6 +95,108 @@ struct Discovery::Internal {
   }
 };
 
+Error Discovery::Internal::initSockets(int port)
+{
+  Error error = Error::Ok;
+  error = socket.initUDP(false);
+  if (!error) {
+    return error;
+  }
+
+  error = socket.setBroadcast(true);
+  if (!error) {
+    detachSockets();
+    return error;
+  }
+
+  error = socket.setReuseAddr(true);
+  if (!error) {
+    detachSockets();
+    return error;
+  }
+
+  error = socket.setReusePort(true);
+  if (!error) {
+    detachSockets();
+    return error;
+  }
+
+  error = socket.bind(port);
+  if (!error) {
+    detachSockets();
+    return error;
+  }
+  broadcastPort = port;
+
+  error = socket.setBroadcast(true);
+  if (!error) {
+    detachSockets();
+    return error;
+  }
+
+  int fd = socket.fd();
+
+  bool added = pollSet->addSocket(fd,
+    [this](int flags)
+    {
+      if (flags & POLLIN) {
+        onSocketEvent(socket, 0, flags);
+      } else {
+        MINIROS_WARN("Discovery socket: unexpected event %d", flags);
+      }
+    });
+
+  if (!added)
+  {
+    MINIROS_ERROR("Failed to register listening socket");
+    return Error::InternalError;
+  }
+
+  if (!pollSet->addEvents(fd, POLLIN)) {
+    MINIROS_ERROR("Failed to add events");
+    return Error::InternalError;
+  }
+
+  return Error::Ok;
+}
+
+void Discovery::Internal::onSocketEvent(network::NetSocket& s, int role, int event)
+{
+  std::string rawData;
+  DiscoveryEvent discoveryEvent;
+  auto [numBytes, error] = s.recv(rawData, &discoveryEvent.senderAddress);
+  if (error != Error::Ok) {
+    MINIROS_ERROR("Discovery socket: recv error %s", error.toString());
+    return;
+  }
+  if (numBytes < sizeof(DiscoveryPacket)) {
+    MINIROS_ERROR("Unexpected size of incoming discovery packet: %zu", numBytes);
+    return;
+  }
+
+  if (!discoveryEvent.senderAddress.valid()) {
+    MINIROS_ERROR("Discovery socket: address invalid");
+    return;
+  }
+
+  DiscoveryPacket packet{};
+  memcpy(&packet, rawData.data(), sizeof(packet));
+
+  error = network::fillAddress(&packet.addr, discoveryEvent.masterAddress);
+  if (!error) {
+    MINIROS_WARN("Faled to extract address from discovery packet: %s", error.toString());
+    return;
+  }
+
+  discoveryEvent.uuid = packet.uuid;
+  discoveryEvent.masterAddress.setPort(packet.masterPort);
+
+  if (callback) {
+    callback(discoveryEvent);
+  }
+}
+
+
 Discovery::Discovery(AddressResolver* resolver)
 {
   internal_.reset(new Internal(resolver));
@@ -148,7 +207,7 @@ Discovery::~Discovery()
   internal_->detachSockets();
 }
 
-Error Discovery::start(PollSet* pollSet, const UUID& uuid, int port)
+Error Discovery::start(PollSet* pollSet, const UUID& uuid, int rpcPort, int broadcastPort)
 {
   if (!internal_) {
     return Error::InternalError;
@@ -157,14 +216,17 @@ Error Discovery::start(PollSet* pollSet, const UUID& uuid, int port)
   if (!uuid.valid())
     return Error::InvalidValue;
 
+  if (broadcastPort == 0)
+    broadcastPort = rpcPort;
+
   internal_->uuid = uuid;
   internal_->pollSet = pollSet;
+  internal_->rpcPort = rpcPort;
 
-  if (Error err = internal_->initSockets(port); err != Error::Ok) {
-    MINIROS_ERROR("Failed to initialize discovery sockets for port %d: %s", port, err.toString());
+  if (Error err = internal_->initSockets(broadcastPort); err != Error::Ok) {
+    MINIROS_ERROR("Failed to initialize discovery sockets for port %d: %s", broadcastPort, err.toString());
     return err;
   }
-
 
   return Error::Ok;
 }
@@ -173,25 +235,6 @@ void Discovery::stop()
 {
 
 }
-
-#pragma pack(push, 1)
-struct DiscoveryPacket {
-  /// Operation
-  int16_t op = 0;
-
-  /// Additional flags.
-  int16_t flags = 0;
-
-  /// Size of packet.
-  int16_t size = 0;
-
-  /// Sender address.
-  sockaddr addr{};
-
-  /// UUID of master instance.
-  UUID uuid;
-};
-#pragma pack(pop)
 
 Error Discovery::doBroadcast()
 {
@@ -207,7 +250,9 @@ Error Discovery::doBroadcast()
 
   DiscoveryPacket packet;
   packet.op = 0;
-  packet.size = 0;
+  packet.size = sizeof(packet);
+  packet.uuid = internal_->uuid;
+  packet.masterPort = internal_->rpcPort;
 
   int interfaces = 0;
   int skipped = 0;
@@ -219,7 +264,6 @@ Error Discovery::doBroadcast()
       if (!adapter->isValid())
         return;
       if (adapter->isIPv4() && adapter->broadcastAddress.valid()) {
-
         const sockaddr* localAddr = static_cast<const sockaddr*>(adapter->address.rawAddress());
         size_t addrSize = adapter->address.rawAddressSize();
         memcpy(&packet.addr, localAddr, addrSize);
@@ -245,6 +289,14 @@ Error Discovery::doBroadcast()
   MINIROS_DEBUG_NAMED("Discovery", "Broadcasted discovery packets to %d interfaces", interfaces);
   return Error::Ok;
 }
+
+void Discovery::setDiscoveryCallback(DiscoveryEventCallback callback)
+{
+  if (!internal_)
+    return;
+  internal_->callback = callback;
+}
+
 
 }
 
