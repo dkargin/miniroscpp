@@ -67,7 +67,12 @@ struct Master::Internal {
   Error renderNodeInfo(const std::string_view& name, std::string& output) const;
 
   /// Callback for broadcasting timer.
+  /// It is called from main thread.
   void onBroadcast(const SteadyTimerEvent& evt);
+
+  /// Callback for discovery event.
+  /// It is called from PollSet thread.
+  void onDiscovery(const DiscoveryEvent& evt);
 };
 
 }
