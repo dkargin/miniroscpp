@@ -52,6 +52,7 @@ MINIROS_DECL Error notifyNodeExiting();
 /// xxxxxxxx-xxxx-Mxxx-Nxxx-xxxxxxxxxxxx
 /// M and N encode type of UUID. They correspond to character 6 and 8.
 struct MINIROS_DECL UUID {
+  enum {Dim = 16};
   uint8_t bytes[16] = {};
 
   void generate();
@@ -64,6 +65,8 @@ struct MINIROS_DECL UUID {
 
   std::string toString() const;
 };
+
+MINIROS_DECL bool operator == (const UUID& a, const UUID& b);
 
 MINIROS_DECL Error makeDirectory(const std::string& path);
 
