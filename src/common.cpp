@@ -268,20 +268,26 @@ std::string UUID::toString() const
   ss << std::hex;
   int i = 0;
   for (;i < 4; i++)
-    ss << bytes[i];
+    ss << static_cast<int>(bytes[i]);
   ss << "-";
   for (; i < 6; i++)
-    ss << bytes[i];
+    ss << static_cast<int>(bytes[i]);
   ss << "-";
   for (; i < 8; i++)
-    ss << bytes[i];
+    ss << static_cast<int>(bytes[i]);
   for (; i < 12; i++)
-    ss << bytes[i];
+    ss << static_cast<int>(bytes[i]);
   ss << "-";
   for (; i < 16; i++)
-    ss << bytes[i];
+    ss << static_cast<int>(bytes[i]);
   return ss.str();
-};
+}
+
+bool operator == (const UUID& a, const UUID& b)
+{
+  return memcmp(a.bytes, b.bytes, UUID::Dim) == 0;
+}
+
 
 Error makeDirectory(const std::string& path)
 {
