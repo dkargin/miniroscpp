@@ -60,6 +60,25 @@ void Master::Internal::onBroadcast(const SteadyTimerEvent& evt)
   discovery.doBroadcast();
 }
 
+void Master::Internal::onDiscovery(const DiscoveryEvent& evt)
+{
+  if (uuid == evt.uuid)
+    return;
+  std::string name = evt.uuid.toString();
+  std::string URI = evt.masterAddress.str();
+  auto report = regManager.registerNodeApi(name, URI);
+  if (report.created) {
+    MINIROS_INFO("Registered new master=%s at %s", name.c_str(), URI.c_str());
+  }
+  RequesterInfo reqInfo;
+  reqInfo.callerId = name;
+  reqInfo.callerApi = URI;
+  reqInfo.clientAddress = evt.masterAddress;
+  auto hostInfo = resolver.updateHost(reqInfo);
+  report.node->updateHost(hostInfo);
+}
+
+
 Master::Master(std::shared_ptr<RPCManager> manager)
 {
   internal_ = std::make_unique<Internal>(manager);
@@ -105,9 +124,9 @@ bool Master::start(PollSet* poll_set)
 
   MINIROS_DEBUG("Starting discovery module");
   internal_->discovery.setDiscoveryCallback(
-    // This is invoked at poll queue thread.
-    [](const DiscoveryEvent& event) {
-
+      // This is invoked at poll queue thread.
+    [this](const DiscoveryEvent& event) {
+        internal_->onDiscovery(event);
       });
 
   if (!internal_->discovery.start(poll_set, internal_->uuid, internal_->port)) {

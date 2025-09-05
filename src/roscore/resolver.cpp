@@ -201,7 +201,7 @@ void AddressResolver::setResolveIp(bool resolve)
   m_resolveIp = resolve;
 }
 
-std::shared_ptr<network::HostInfo> AddressResolver::updateHost(const  RequesterInfo& requesterInfo)
+std::shared_ptr<network::HostInfo> AddressResolver::updateHost(const RequesterInfo& requesterInfo)
 {
   if (requesterInfo.callerApi.empty())
     return {};
