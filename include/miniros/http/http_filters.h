@@ -44,6 +44,15 @@ protected:
   HttpMethod method_;
 };
 
+/// Get final name from path:
+/// @param path path from http request
+/// @param prefix to be removed from path.
+/// @param trailingSlash - should add trailing slash to output path.
+///  "/node/ws1/node1" returns "/ws1/node1".
+///  "/node" returns an empty string.
+std::string_view getNameFromUrlPath(const std::string_view& path,
+  const std::string_view& prefix, bool trailingSlash);
+
 }
 }
 
