@@ -205,11 +205,11 @@ std::pair<NodeRefPtr, NodeRefPtr> RegistrationManager::registerNodeApi(const std
   if (node_ref) {
     if (node_ref->getApi() == caller_api) {
       return {node_ref, prevNode};
-    } else {
-      prevNode = node_ref;
-      MINIROS_WARN_NAMED("reg", "New node registered with name=\"%s\" api=%s", caller_id.c_str(), caller_api.c_str());
-      m_nodesToShutdown.insert(node_ref);
     }
+    // TODO: Need to check PID of the new node and verify that it has changed.
+    prevNode = node_ref;
+    MINIROS_WARN_NAMED("reg", "New node registered with name=\"%s\" api=%s", caller_id.c_str(), caller_api.c_str());
+    m_nodesToShutdown.insert(node_ref);
   }
 
   node_ref.reset(new NodeRef(caller_id, caller_api));

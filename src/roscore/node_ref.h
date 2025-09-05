@@ -98,15 +98,25 @@ protected:
     std::set<std::string> m_topicPublications;
     std::set<std::string> m_services;
 
+    /// Name of a node.
     std::string m_id;
+    /// API path.
+    /// TODO: maybe it should be removed.
     std::string m_api;
 
+    /// Should be the same as m_api.
     network::URL m_apiUrl;
 
     /// Resolved IP of a node.
     std::string m_resolvedIp;
 
     std::weak_ptr<network::HostInfo> m_hostInfo;
+
+    /// PID of a node. Checked by separate request to a node.
+    int m_pid = 0;
+
+    /// Checked if this node is also master node.
+    bool m_isMaster = false;
 
     mutable std::mutex m_guard;
 };
