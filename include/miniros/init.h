@@ -67,7 +67,13 @@ enum InitOption
    * Don't create the /clock subscriber.
    */
   NoSimTime = 1 << 3,
+
+  /**
+   * Local RPC manager is also rosmaster. MasterLink will run only local requests.
+   */
+  LocalMaster = 1 << 16,
 };
+
 }
 typedef init_options::InitOption InitOption;
 
@@ -213,6 +219,7 @@ MINIROS_DECL void removeROSArgs(int argc, const char* const* argv, V_string& arg
 
 /**
  * \brief Get pointer to MasterLink
+ * It is created only after miniros::init is invoked.
  */
 MINIROS_DECL MasterLinkPtr getMasterLink();
 
