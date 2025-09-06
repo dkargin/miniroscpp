@@ -82,6 +82,10 @@ public:
   /// Get current peer address.
   NetAddress peerAddress() const;
 
+  /// Join to multicast group on any interface.
+  /// Only IP address is taken from `group`. Port value is ignored.
+  Error joinMulticastGroup(const NetAddress& group);
+
   int fd() const;
 
   /// Get current port number.

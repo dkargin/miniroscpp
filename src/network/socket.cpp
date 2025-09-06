@@ -338,6 +338,38 @@ Error NetSocket::setReusePort(bool reuse)
   return Error::Ok;
 }
 
+Error NetSocket::joinMulticastGroup(const NetAddress& group)
+{
+  if (!internal_)
+    return Error::InternalError;
+  if (internal_->fd < 0)
+    return Error::InvalidHandle;
+
+
+  if (group.type() == NetAddress::AddressIPv4) {
+    if (!isDatagram() || !isIpv4()) {
+      return Error::NotSupported;
+    }
+
+
+    struct ip_mreq mreq;
+    memset(&mreq, 0, sizeof(mreq));
+
+    const sockaddr_in* addr = static_cast<const sockaddr_in*>(group.rawAddress());
+    mreq.imr_multiaddr.s_addr = addr->sin_addr.s_addr;
+    mreq.imr_interface.s_addr = htonl(INADDR_ANY);
+    int fd = internal_->fd;
+    if (setsockopt(fd, IPPROTO_IP, IP_ADD_MEMBERSHIP, (char*) &mreq, sizeof(mreq)) < 0) {
+      const char* err = last_socket_error_string();
+      MINIROS_ERROR("NetSocket failed to join multicast group \"%s\": %s", group.str().c_str(), err);
+    }
+  } else {
+    return Error::NotImplemented;
+  }
+  return Error::Ok;
+}
+
+
 bool expectingBlock(int err)
 {
   return err == EINPROGRESS || err == EAGAIN || err == EWOULDBLOCK || err == EINTR;
