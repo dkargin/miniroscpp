@@ -64,7 +64,7 @@ void Master::Internal::onDiscovery(const DiscoveryEvent& evt)
 {
   if (uuid == evt.uuid)
     return;
-  std::string name = evt.uuid.toString();
+  std::string name = std::string("/") + evt.uuid.toString();
   std::string URI = evt.masterAddress.str();
   auto report = regManager.registerNodeApi(name, URI);
   if (report.created) {
