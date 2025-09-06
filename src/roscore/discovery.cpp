@@ -48,6 +48,8 @@ struct Discovery::Internal {
 
   AddressResolver* resolver = nullptr;
 
+  network::NetAddress multicastGroup;
+
   /// Port for discovery broadcast.
   int broadcastPort = 0;
 
@@ -58,6 +60,8 @@ struct Discovery::Internal {
 
   /// Regular IPv4 socket for sending broadcasts.
   network::NetSocket socket;
+
+  bool multicastEnabled = false;
 
   /// A collection of adapter-related sockets.
   std::multimap<std::string, network::NetSocket> discoverySockets;
@@ -97,15 +101,11 @@ struct Discovery::Internal {
 
 Error Discovery::Internal::initSockets(int port)
 {
+  multicastGroup = network::NetAddress::fromIp4String("239.1.1.234", port);
+
   Error error = Error::Ok;
   error = socket.initUDP(false);
   if (!error) {
-    return error;
-  }
-
-  error = socket.setBroadcast(true);
-  if (!error) {
-    detachSockets();
     return error;
   }
 
@@ -121,18 +121,27 @@ Error Discovery::Internal::initSockets(int port)
     return error;
   }
 
+  error = socket.setBroadcast(true);
+  if (!error) {
+    detachSockets();
+    return error;
+  }
+
+  error = socket.joinMulticastGroup(multicastGroup);
+  if (!error) {
+    MINIROS_WARN("Discovery has failed to join multicast group \"%s\"", multicastGroup.str().c_str());
+    multicastEnabled = false;
+  } else {
+    multicastEnabled = true;
+  }
+
+
   error = socket.bind(port);
   if (!error) {
     detachSockets();
     return error;
   }
   broadcastPort = port;
-
-  error = socket.setBroadcast(true);
-  if (!error) {
-    detachSockets();
-    return error;
-  }
 
   int fd = socket.fd();
 
@@ -152,7 +161,7 @@ Error Discovery::Internal::initSockets(int port)
     return Error::InternalError;
   }
 
-  if (!pollSet->addEvents(fd, POLLIN)) {
+  if (!pollSet->addEvents(fd, POLLIN | POLLERR)) {
     MINIROS_ERROR("Failed to add events");
     return Error::InternalError;
   }
@@ -286,6 +295,12 @@ Error Discovery::doBroadcast()
 
   }
 
+  if (internal_->multicastEnabled) {
+    auto [written, error] = internal_->socket.send(&packet, sizeof(packet), &internal_->multicastGroup);
+    if (error != Error::Ok) {
+      MINIROS_WARN("Failed to multicast");
+    }
+  }
   MINIROS_DEBUG_NAMED("Discovery", "Broadcasted discovery packets to %d interfaces", interfaces);
   return Error::Ok;
 }
