@@ -145,7 +145,7 @@ Error Discovery::Internal::initSockets(int port)
 
   int fd = socket.fd();
 
-  bool added = pollSet->addSocket(fd,
+  if (!pollSet->addSocket(fd, POLLIN | POLLERR,
     [this](int flags)
     {
       if (flags & POLLIN) {
@@ -153,9 +153,7 @@ Error Discovery::Internal::initSockets(int port)
       } else {
         MINIROS_WARN("Discovery socket: unexpected event %d", flags);
       }
-    });
-
-  if (!added)
+    }))
   {
     MINIROS_ERROR("Failed to register listening socket");
     return Error::InternalError;

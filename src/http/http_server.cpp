@@ -80,7 +80,7 @@ Error HttpServer::start(int port)
   }
 
   int fd = internal_->socket_v4.fd();
-  bool added = internal_->pollSet->addSocket(fd,
+  bool added = internal_->pollSet->addSocket(fd, POLLIN,
     [this](int flags)
     {
       if (flags & POLLIN) {
@@ -93,11 +93,6 @@ Error HttpServer::start(int port)
   if (!added)
   {
     MINIROS_ERROR("Failed to register listening socket");
-    return Error::InternalError;
-  }
-
-  if (!internal_->pollSet->addEvents(fd, POLLIN)) {
-    MINIROS_ERROR("Failed to add events");
     return Error::InternalError;
   }
 
@@ -151,7 +146,7 @@ void HttpServer::acceptClient(network::NetSocket* sock)
 
   std::shared_ptr<HttpServerConnection> connection(new HttpServerConnection(this, client));
   internal_->connections[fd] = connection;
-  internal_->pollSet->addSocket(fd, [this, connection, fd](int flags) {
+  internal_->pollSet->addSocket(fd, POLLIN, [this, connection, fd](int flags) {
     int newFlags = connection->handleEvents(flags);
     if (!newFlags) {
       closeConnection(fd, "EOF");
@@ -159,8 +154,6 @@ void HttpServer::acceptClient(network::NetSocket* sock)
       internal_->pollSet->setEvents(fd, newFlags);
     }
   }, connection);
-
-  internal_->pollSet->addEvents(fd, POLLIN);
 }
 
 Error HttpServer::registerEndpoint(std::unique_ptr<EndpointFilter>&& filter, const std::shared_ptr<EndpointHandler>& handler)
