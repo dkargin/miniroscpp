@@ -37,6 +37,8 @@
 #include <algorithm>
 #include <vector>
 #include <map>
+#include <mutex>
+#include <optional>
 
 #include "miniros/transport/poll_set.h"
 #include "miniros/transport/io.h"
@@ -54,7 +56,7 @@ namespace miniros
 struct PollSet::Internal {
   struct SocketInfo
   {
-    TransportPtr transport_;
+    TrackedObject object_;
     SocketUpdateFunc func_;
     int fd_;
     int events_;
@@ -84,15 +86,15 @@ struct PollSet::Internal {
 
   }
 
-  const SocketInfo* findSocketInfo(int fd) const
+  /// It returns a copy of SocketInfo to make sure that shared pointer to tracked object having additional reference.
+  std::optional<SocketInfo> findSocketInfo(int fd) const
   {
     std::scoped_lock<std::mutex> lock(socket_info_mutex_);
     auto it = socket_info_.find(fd);
     // the socket has been entirely deleted
     if (it == socket_info_.end())
-      return nullptr;
-
-    return &it->second;
+      return {};
+    return {it->second};
   }
 };
 
@@ -104,8 +106,7 @@ PollSet::PollSet()
     MINIROS_FATAL("create_signal_pair() failed");
     MINIROS_BREAK();
   }
-  addSocket(internal_->signal_pipe_[0], [this](int events){this->onLocalPipeEvents(events);});
-  addEvents(internal_->signal_pipe_[0], POLLIN);
+  addSocket(internal_->signal_pipe_[0], POLLIN, [this](int events){this->onLocalPipeEvents(events);});
 }
 
 PollSet::~PollSet()
@@ -115,12 +116,15 @@ PollSet::~PollSet()
   internal_.reset();
 }
 
-bool PollSet::addSocket(int fd, const SocketUpdateFunc& update_func, const TransportPtr& transport)
+bool PollSet::addSocket(int fd, int events, const SocketUpdateFunc& update_func, const TrackedObject& object)
 {
+  if (fd < 0)
+    return false;
+
   Internal::SocketInfo info;
   info.fd_ = fd;
-  info.events_ = 0;
-  info.transport_ = transport;
+  info.events_ = events;
+  info.object_ = object;
   info.func_ = update_func;
 
   {
@@ -133,7 +137,7 @@ bool PollSet::addSocket(int fd, const SocketUpdateFunc& update_func, const Trans
       return false;
     }
 
-    add_socket_to_watcher(internal_->epfd_, fd);
+    add_socket_to_watcher(internal_->epfd_, fd, events);
 
     internal_->sockets_changed_ = true;
   }
@@ -263,7 +267,8 @@ void PollSet::update(int poll_timeout)
 {
   createNativePollset();
 
-  Error err = poll_sockets(internal_->epfd_, &internal_->ufds_.front(), internal_->ufds_.size(), poll_timeout, internal_->ofds_);
+  const nfds_t numFd = static_cast<nfds_t>(internal_->ufds_.size());
+  Error err = poll_sockets(internal_->epfd_, &internal_->ufds_.front(), numFd, poll_timeout, internal_->ofds_);
   if (!err)
   {
     MINIROS_ERROR("poll failed with error %s", err.toString());
@@ -278,14 +283,14 @@ void PollSet::update(int poll_timeout)
       if (revents == 0)
         continue;
 
-      const auto* info = internal_->findSocketInfo(fd);
+      auto info = internal_->findSocketInfo(fd);
       if (!info)
         continue;
 
       // Store off the function and transport in case the socket is deleted from another thread
       SocketUpdateFunc func = info->func_;
       // This pointer helps keeping transport alive until we exit this block.
-      TransportPtr transport = info->transport_;
+      TrackedObject object = info->object_;
       const int events = info->events_;
 
       bool hasEvents = events & revents

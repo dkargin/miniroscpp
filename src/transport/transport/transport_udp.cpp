@@ -299,7 +299,7 @@ bool TransportUDP::initializeSocket()
   if (poll_set_)
   {
     auto thisptr = std::static_pointer_cast<TransportUDP>(shared_from_this());
-    poll_set_->addSocket(sock_, [thisptr](int val){thisptr->socketUpdate(val);});
+    poll_set_->addSocket(sock_, 0, [thisptr](int val){thisptr->socketUpdate(val);});
   }
 
   return true;

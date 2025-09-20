@@ -125,13 +125,13 @@ void close_socket_watcher(int fd)
     ::close(fd);
 }
 
-void add_socket_to_watcher(int epfd, int fd)
+void add_socket_to_watcher(int epfd, int fd, int events)
 {
 #if defined(HAVE_EPOLL)
   struct epoll_event ev;
   bzero(&ev, sizeof(ev));
 
-  ev.events = 0;
+  ev.events = events;
   ev.data.fd = fd;
 
   if (::epoll_ctl(epfd, EPOLL_CTL_ADD, fd, &ev)) {

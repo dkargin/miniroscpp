@@ -36,15 +36,11 @@
 #define MINIROS_POLL_SET_H
 
 #include <functional>
-#include <mutex>
 
 #include "miniros/common.h"
 
 namespace miniros
 {
-
-class Transport;
-typedef std::shared_ptr<Transport> TransportPtr;
 
 /**
  * \brief Manages a set of sockets being polled through the poll() function call.
@@ -58,17 +54,21 @@ public:
   PollSet();
   ~PollSet();
 
+  /// Object to be kept back during active callback.
+  typedef std::shared_ptr<void> TrackedObject;
+
   typedef std::function<void(int)> SocketUpdateFunc;
   /**
    * \brief Add a socket.
    *
    * addSocket() may be called from any thread.
    * \param sock The socket to add
+   * \param events selected events.
    * \param update_func The function to call when a socket has events
-   * \param transport The (optional) transport associated with this socket. Mainly
+   * \param object The (optional) object associated with this socket. Mainly
    * used to prevent the transport from being deleted while we're calling the update function
    */
-  bool addSocket(int sock, const SocketUpdateFunc& update_func, const TransportPtr& transport = TransportPtr());
+  bool addSocket(int sock, int events, const SocketUpdateFunc& update_func, const TrackedObject& object = TrackedObject());
   /**
    * \brief Delete a socket
    *
