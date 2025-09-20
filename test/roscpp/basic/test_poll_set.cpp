@@ -267,7 +267,7 @@ public:
 TEST_F(Poller, read)
 {
   SocketHelper sh(sockets_[0]);
-  ASSERT_TRUE(poll_set_.addSocket(sh.socket_, [&sh](int events){sh.processEvents(events);}));
+  ASSERT_TRUE(poll_set_.addSocket(sh.socket_, 0, [&sh](int events){sh.processEvents(events);}));
 
   char b = 0;
 
@@ -304,7 +304,7 @@ TEST_F(Poller, read)
 TEST_F(Poller, write)
 {
   SocketHelper sh(sockets_[0]);
-  ASSERT_TRUE(poll_set_.addSocket(sh.socket_, [&sh](int events){sh.processEvents(events);}));
+  ASSERT_TRUE(poll_set_.addSocket(sh.socket_, 0, [&sh](int events){sh.processEvents(events);}));
   ASSERT_TRUE(poll_set_.addEvents(sh.socket_, POLLOUT));
 
   poll_set_.update(1);
@@ -322,8 +322,8 @@ TEST_F(Poller, readAndWrite)
 {
   SocketHelper sh1(sockets_[0]);
   SocketHelper sh2(sockets_[1]);
-  ASSERT_TRUE(poll_set_.addSocket(sh1.socket_, [&sh1](int events){sh1.processEvents(events);}));
-  ASSERT_TRUE(poll_set_.addSocket(sh2.socket_, [&sh2](int events){sh2.processEvents(events);}));
+  ASSERT_TRUE(poll_set_.addSocket(sh1.socket_, 0, [&sh1](int events){sh1.processEvents(events);}));
+  ASSERT_TRUE(poll_set_.addSocket(sh2.socket_, 0, [&sh2](int events){sh2.processEvents(events);}));
 
   ASSERT_TRUE(poll_set_.addEvents(sh1.socket_, POLLIN));
   ASSERT_TRUE(poll_set_.addEvents(sh2.socket_, POLLIN));
@@ -359,8 +359,8 @@ TEST_F(Poller, readAndWrite)
 TEST_F(Poller, multiAddDel)
 {
   SocketHelper sh(sockets_[0]);
-  ASSERT_TRUE(poll_set_.addSocket(sh.socket_, [&sh](int events){sh.processEvents(events);}));
-  ASSERT_FALSE(poll_set_.addSocket(sh.socket_, [&sh](int events){sh.processEvents(events);}));
+  ASSERT_TRUE(poll_set_.addSocket(sh.socket_, 0, [&sh](int events){sh.processEvents(events);}));
+  ASSERT_FALSE(poll_set_.addSocket(sh.socket_, 0, [&sh](int events){sh.processEvents(events);}));
 
   ASSERT_TRUE(poll_set_.addEvents(sh.socket_, 0));
   ASSERT_FALSE(poll_set_.addEvents(sh.socket_ + 1, 0));
@@ -376,7 +376,7 @@ void addThread(PollSet* ps, SocketHelper* sh, Barrier* barrier)
 {
   barrier->wait();
 
-  ps->addSocket(sh->socket_, [sh](int events){sh->processEvents(events);});
+  ps->addSocket(sh->socket_, 0, [sh](int events){sh->processEvents(events);});
   ps->addEvents(sh->socket_, POLLIN);
   ps->addEvents(sh->socket_, POLLOUT);
 }
@@ -469,11 +469,11 @@ void addDelManyTimesThread(PollSet* ps, SocketHelper* sh1, SocketHelper* sh2, Ba
 
   for (int i = 0; i < count; ++i)
   {
-    ps->addSocket(sh1->socket_, [sh1](int events){sh1->processEvents(events);});
+    ps->addSocket(sh1->socket_, 0, [sh1](int events){sh1->processEvents(events);});
     ps->addEvents(sh1->socket_, POLLIN);
     ps->addEvents(sh1->socket_, POLLOUT);
 
-    ps->addSocket(sh2->socket_, [sh2](int events){sh2->processEvents(events);});
+    ps->addSocket(sh2->socket_, 0, [sh2](int events){sh2->processEvents(events);});
     ps->addEvents(sh2->socket_, POLLIN);
     ps->addEvents(sh2->socket_, POLLOUT);
 

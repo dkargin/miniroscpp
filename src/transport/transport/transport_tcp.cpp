@@ -142,11 +142,13 @@ bool TransportTCP::initializeSocket()
   {
     MINIROS_DEBUG("Adding tcp socket [%d] to pollset", sock_);
     auto thisptr = std::static_pointer_cast<TransportTCP>(shared_from_this());
-    poll_set_->addSocket(sock_, [thisptr](int val){thisptr->socketUpdate(val);});
+    int events = 0;
 #if defined(POLLRDHUP) // POLLRDHUP is not part of POSIX!
     // This is needed to detect dead connections. #1704
-    poll_set_->addEvents(sock_, POLLRDHUP);
+    events = POLLRDHUP;
 #endif
+
+    poll_set_->addSocket(sock_, events, [thisptr](int val){thisptr->socketUpdate(val);});
   }
 
   if (!(flags_ & SYNCHRONOUS))

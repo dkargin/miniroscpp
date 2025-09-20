@@ -179,7 +179,7 @@ MINIROS_DECL int create_signal_pair(signal_fd_t signal_pair[2]);
 
 MINIROS_DECL int create_socket_watcher();
 MINIROS_DECL void close_socket_watcher(int fd);
-MINIROS_DECL void add_socket_to_watcher(int epfd, int fd);
+MINIROS_DECL void add_socket_to_watcher(int epfd, int fd, int events);
 MINIROS_DECL void del_socket_from_watcher(int epfd, int fd);
 MINIROS_DECL void set_events_on_socket(int epfd, int fd, int events);
 
