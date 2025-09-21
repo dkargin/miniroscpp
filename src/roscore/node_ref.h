@@ -10,17 +10,19 @@
 #include <set>
 #include <string>
 
-#include <miniros/macros.h>
-#include <miniros/transport/url.h>
+#include "miniros/network/url.h"
+#include "miniros/macros.h"
 
 #include "registrations.h"
 
 
 namespace miniros {
 
-namespace master {
-
+namespace network {
 struct HostInfo;
+}
+
+namespace master {
 
 /// NodeRef contains specific data about a node: publishers, subscribers, services, etc.
 /// It also stores information about ip addresses of the node.
@@ -65,12 +67,34 @@ public:
     /// Hostname is often determined by API URL. In some cases hostname is a direct IP address.
     std::string getHost() const;
 
-    void updateHost(const std::shared_ptr<HostInfo>& hostInfo);
+    void updateHost(const std::shared_ptr<network::HostInfo>& hostInfo);
 
-    std::weak_ptr<const HostInfo> hostInfo() const;
+    std::weak_ptr<const network::HostInfo> hostInfo() const;
 
     /// Save state in a json form.
     void writeJson(std::ostream& os, miniros::JsonState& state, const miniros::JsonSettings& settings);
+
+    /// Lock internal mutex.
+    void lock() const;
+
+    /// Unlock internal mutex.
+    void unlock() const;
+
+    /// Get access to a subscription set.
+    /// It is thread-unsafe method and should be done inside external lock.
+    const std::set<std::string>& getSubscriptionsUnsafe() const;
+
+    /// Get access to a publication set.
+    /// It is thread-unsafe method and should be done inside external lock.
+    const std::set<std::string>& getPublicationsUnsafe() const;
+
+    /// Get access to a serive set.
+    /// It is thread-unsafe method and should be done inside external lock.
+    const std::set<std::string>& getServicesUnsafe() const;
+
+    /// Mark this node as master.
+    void setMaster();
+    bool isMaster() const;
 
 protected:
     std::set<std::string> m_paramSubscriptions;
@@ -78,15 +102,25 @@ protected:
     std::set<std::string> m_topicPublications;
     std::set<std::string> m_services;
 
+    /// Name of a node.
     std::string m_id;
+    /// API path.
+    /// TODO: maybe it should be removed.
     std::string m_api;
 
+    /// Should be the same as m_api.
     network::URL m_apiUrl;
 
     /// Resolved IP of a node.
     std::string m_resolvedIp;
 
-    std::weak_ptr<HostInfo> m_hostInfo;
+    std::weak_ptr<network::HostInfo> m_hostInfo;
+
+    /// PID of a node. Checked by separate request to a node.
+    int m_pid = 0;
+
+    /// Checked if this node is also master node.
+    bool m_isMaster = false;
 
     mutable std::mutex m_guard;
 };
