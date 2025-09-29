@@ -89,9 +89,6 @@ int main(int argc, const char ** argv) {
     ("dir", po::value<std::string>(), "Path to working directory")
     ("resolve", po::value<bool>()->default_value(false), "Resolve node IP address")
     ("dump_parameters", po::value<bool>()->default_value(false), "Dump all ROSParam values on every update")
-    // Unify rosmaster RPC manager and rosout RPC manager.
-    // rosout creates its own RPC manager by default.
-    ("unified_rpc", po::value<bool>()->default_value(false), "Resolve node IP address")
     ("pidfile", po::value<std::string>(), "Path to a PID file")
     ;
 
