@@ -266,7 +266,7 @@ public:
   /// Unbind all callbacks, associated with specific object.
   size_t unbind(const void* object);
 
-  NODISCARD bool start(PollSet* poll_set, int port = 0);
+  NODISCARD Error start(PollSet* poll_set, int port = 0);
   void shutdown();
 
   bool isShuttingDown() const;

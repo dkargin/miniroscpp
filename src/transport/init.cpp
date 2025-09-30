@@ -354,9 +354,9 @@ Error start()
 
   PollSet& pollSet = pm->getPollSet();
   int rpcPort = network::getRPCPort();
-  if (!rpcm->start(&pollSet, rpcPort)) {
+  if (Error err = rpcm->start(&pollSet, rpcPort); !err) {
     // We can arrive here only if we are completely unable to host TCP/http server.
-    MINIROS_ERROR("Failed to start RPCManager. Something is very wrong with TCP network");
+    MINIROS_ERROR("Failed to start RPCManager at port %d: %s", rpcPort, err.toString());
     shutdown();
     return Error::SystemError;
   }
