@@ -41,7 +41,6 @@ class MINIROS_DECL Discovery {
 public:
   /// Constructor
   /// @param resolver - address resolver.
-  /// @param callbackQueue - callback queue to put discovery events.
   Discovery(AddressResolver* resolver);
   ~Discovery();
 
@@ -60,12 +59,19 @@ public:
 
   using DiscoveryEventCallback = std::function<void (const DiscoveryEvent& event)>;
 
+  /// Set multicast group for discovery broadcasts.
+  Error setMulticast(const std::string& group);
+
+  /// Enable/disable
+  void setAdapterBroadcasts(bool flag);
+
   void setDiscoveryCallback(DiscoveryEventCallback callback);
 
 protected:
   struct Internal;
   std::unique_ptr<Internal> internal_;
 };
+
 }
 }
 #endif // MINIROS_DISCOVERY_H

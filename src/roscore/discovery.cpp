@@ -48,10 +48,15 @@ struct Discovery::Internal {
 
   AddressResolver* resolver = nullptr;
 
+  /// Multicast group for discovery packets.
   network::NetAddress multicastGroup;
+  bool multicastEnabled = false;
 
   /// Port for discovery broadcast.
   int broadcastPort = 0;
+
+  /// Adapter-based broadcasts.
+  bool adapterBroadcasts = false;
 
   int rpcPort = 0;
 
@@ -60,8 +65,6 @@ struct Discovery::Internal {
 
   /// Regular IPv4 socket for sending broadcasts.
   network::NetSocket socket;
-
-  bool multicastEnabled = false;
 
   /// A collection of adapter-related sockets.
   std::multimap<std::string, network::NetSocket> discoverySockets;
@@ -101,8 +104,6 @@ struct Discovery::Internal {
 
 Error Discovery::Internal::initSockets(int port)
 {
-  multicastGroup = network::NetAddress::fromIp4String("239.1.1.234", port);
-
   Error error = Error::Ok;
   error = socket.initUDP(false);
   if (!error) {
@@ -127,21 +128,25 @@ Error Discovery::Internal::initSockets(int port)
     return error;
   }
 
-  error = socket.joinMulticastGroup(multicastGroup);
-  if (!error) {
-    MINIROS_WARN("Discovery has failed to join multicast group \"%s\"", multicastGroup.str().c_str());
-    multicastEnabled = false;
-  } else {
-    multicastEnabled = true;
-  }
-
-
   error = socket.bind(port);
   if (!error) {
     detachSockets();
     return error;
   }
-  broadcastPort = port;
+
+  // Actual port can change during bind.
+  broadcastPort = port == 0 ? socket.port() : port;
+
+  if (multicastGroup.valid()) {
+    multicastGroup.setPort(broadcastPort);
+    error = socket.joinMulticastGroup(multicastGroup);
+    if (!error) {
+      MINIROS_WARN("Discovery has failed to join multicast group \"%s\"", multicastGroup.str().c_str());
+      multicastEnabled = false;
+    } else {
+      multicastEnabled = true;
+    }
+  }
 
   int fd = socket.fd();
 
@@ -211,7 +216,8 @@ Discovery::Discovery(AddressResolver* resolver)
 
 Discovery::~Discovery()
 {
-  internal_->detachSockets();
+  if (internal_)
+    internal_->detachSockets();
 }
 
 Error Discovery::start(PollSet* pollSet, const UUID& uuid, int rpcPort, int broadcastPort)
@@ -240,7 +246,9 @@ Error Discovery::start(PollSet* pollSet, const UUID& uuid, int rpcPort, int broa
 
 void Discovery::stop()
 {
-
+  if (!internal_)
+    return;
+  internal_->detachSockets();
 }
 
 Error Discovery::doBroadcast()
@@ -263,34 +271,37 @@ Error Discovery::doBroadcast()
 
   int interfaces = 0;
   int skipped = 0;
-  internal_->resolver->iterateAdapters(
-    [&interfaces, &skipped, &packet, this](const network::NetAdapter* adapter)
-    {
-      if (adapter->isLoopback())
-        return;
-      if (!adapter->isValid())
-        return;
-      if (adapter->isIPv4() && adapter->broadcastAddress.valid()) {
-        const sockaddr* localAddr = static_cast<const sockaddr*>(adapter->address.rawAddress());
-        size_t addrSize = adapter->address.rawAddressSize();
-        memcpy(&packet.addr, localAddr, addrSize);
+  if (internal_->adapterBroadcasts) {
+    internal_->resolver->iterateAdapters(
+      [&interfaces, &skipped, &packet, this](const network::NetAdapter* adapter)
+      {
+        if (adapter->isLoopback())
+          return;
+        if (!adapter->isValid())
+          return;
+        if (adapter->isIPv4() && adapter->broadcastAddress.valid()) {
+          const sockaddr* localAddr = static_cast<const sockaddr*>(adapter->address.rawAddress());
+          size_t addrSize = adapter->address.rawAddressSize();
+          memcpy(&packet.addr, localAddr, addrSize);
 
-        network::NetAddress brAddr = adapter->broadcastAddress;
-        Error err = brAddr.setPort(internal_->broadcastPort);
-        assert(err);
+          network::NetAddress brAddr = adapter->broadcastAddress;
+          Error err = brAddr.setPort(internal_->broadcastPort);
+          assert(err);
 
-        auto [written, error] = internal_->socket.send(&packet, sizeof(packet), &brAddr);
-        if (error != Error::Ok) {
-          MINIROS_WARN("Failed to broadcast to adapter \"%s\" addr=%s", adapter->name.c_str(), brAddr.str().c_str());
+          auto [written, error] = internal_->socket.send(&packet, sizeof(packet), &brAddr);
+          if (error != Error::Ok) {
+            MINIROS_WARN("Failed to broadcast to adapter \"%s\" addr=%s", adapter->name.c_str(), brAddr.str().c_str());
+          }
+          interfaces++;
+        } else {
+          skipped++;
         }
-        interfaces++;
-      } else {
-        skipped++;
-      }
-    });
-
-  if (interfaces == 0) {
-
+      });
+    if (interfaces == 0 && skipped > 0) {
+      MINIROS_DEBUG("No interface has valid broadcast address, skipped=%d", skipped);
+    } else {
+      MINIROS_DEBUG("Broadcasted to %d interfaces", interfaces);
+    }
   }
 
   if (internal_->multicastEnabled) {
@@ -310,6 +321,25 @@ void Discovery::setDiscoveryCallback(DiscoveryEventCallback callback)
   internal_->callback = callback;
 }
 
+Error Discovery::setMulticast(const std::string& group)
+{
+  if (!internal_)
+    return Error::InternalError;
+
+  if (internal_->multicastEnabled) {
+    // TODO: implement resubscription to multicast group.
+    return Error::NotImplemented;
+  }
+  internal_->multicastGroup = network::NetAddress::fromIp4String(group, 0);
+  return Error::Ok;
+}
+
+void Discovery::setAdapterBroadcasts(bool flag)
+{
+  if (!internal_)
+    return;
+  internal_->adapterBroadcasts = flag;
+}
 
 }
 

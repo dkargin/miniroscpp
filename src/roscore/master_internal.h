@@ -46,7 +46,7 @@ struct Master::Internal {
   std::shared_ptr<TopicInfoEndpoint> httpTopicInfoEndpoint;
 
   /// Discovery service for companion masters.
-  Discovery discovery;
+  std::unique_ptr<Discovery> discovery;
 
   /// Timer for periodic broadcasts.
   SteadyTimer timerBroadcasts;

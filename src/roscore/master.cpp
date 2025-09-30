@@ -27,7 +27,7 @@ namespace miniros {
 namespace master {
 
 Master::Internal::Internal(const std::shared_ptr<RPCManager>& manager)
-    : handler(manager, &regManager, &resolver), parameterStorage(&regManager), discovery(&resolver)
+    : handler(manager, &regManager, &resolver), parameterStorage(&regManager)
 {
   rpcManager = manager;
 
@@ -57,7 +57,9 @@ Master::Internal::~Internal()
 
 void Master::Internal::onBroadcast(const SteadyTimerEvent& evt)
 {
-  discovery.doBroadcast();
+  if (!discovery)
+    return;
+  discovery->doBroadcast();
 }
 
 void Master::Internal::onDiscovery(const DiscoveryEvent& evt)
@@ -122,16 +124,20 @@ bool Master::start(PollSet* poll_set)
   if (!internal_->rpcManager->start(poll_set, internal_->port))
     return false;
 
-  MINIROS_DEBUG("Starting discovery module");
-  internal_->discovery.setDiscoveryCallback(
-      // This is invoked at poll queue thread.
-    [this](const DiscoveryEvent& event) {
-        internal_->onDiscovery(event);
-      });
+  if (internal_->discovery) {
+    MINIROS_DEBUG("Starting discovery module");
+    internal_->discovery->setDiscoveryCallback(
+        // This is invoked at poll queue thread.
+      [this](const DiscoveryEvent& event) {
+          internal_->onDiscovery(event);
+        });
 
-  if (!internal_->discovery.start(poll_set, internal_->uuid, internal_->port)) {
-    stop();
-    return false;
+    if (!internal_->discovery->start(poll_set, internal_->uuid, internal_->port)) {
+      stop();
+      return false;
+    }
+  } else {
+    MINIROS_DEBUG("Starting without discovery module");
   }
 
   MINIROS_DEBUG("Master startup is complete.");
@@ -558,6 +564,35 @@ void Master::initEvents(NodeHandle& nh)
   WallDuration period(0.5);
   internal_->timerBroadcasts = nh.createSteadyTimer(period, &Internal::onBroadcast, internal_.get());
 }
+
+void enableDiscoveryBroadcasts(bool flag);
+
+void Master::enableDiscoveryBroadcasts(bool flag)
+{
+  if (!internal_)
+    return;
+
+  if (flag && !internal_->discovery) {
+    internal_->discovery.reset(new Discovery(&internal_->resolver));
+    internal_->discovery->setAdapterBroadcasts(flag);
+  }
+  else if (!flag && internal_->discovery) {
+    internal_->discovery.reset();
+  }
+}
+
+Error Master::setDiscoveryGroup(const std::string& group)
+{
+  if (!internal_)
+    return Error::InternalError;
+
+  if (!internal_->discovery) {
+    internal_->discovery.reset(new Discovery(&internal_->resolver));
+  }
+
+  return internal_->discovery->setMulticast(group);
+}
+
 
 } // namespace master
 } // namespace miniros
