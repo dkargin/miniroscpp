@@ -182,14 +182,14 @@ RPCManager::~RPCManager()
   shutdown();
 }
 
-bool RPCManager::start(PollSet* poll_set, int port)
+Error RPCManager::start(PollSet* poll_set, int port)
 {
   if (!internal_)
-    return false;
+    return Error::InternalError;
 
   if (internal_->server_thread_.joinable()) {
     MINIROS_INFO("Manager is already running at port %d", internal_->port_);
-    return true;
+    return Error::Ok;
   }
 
   MINIROS_INFO("Starting manager at port %d", port);
@@ -211,8 +211,7 @@ bool RPCManager::start(PollSet* poll_set, int port)
   internal_->http_server_->registerEndpoint(std::make_unique<http::SimpleFilter>(http::HttpMethod::Post, "/RPC2"), xmlrpc_enpoint);
 
   if (Error err = internal_->http_server_->start(port); !err) {
-    MINIROS_FATAL("Failed to start HTTP server at port %d", port);
-    return false;
+    return err;
   }
 
   internal_->port_ = internal_->http_server_->getPortIp4();
@@ -225,7 +224,7 @@ bool RPCManager::start(PollSet* poll_set, int port)
   internal_->uri_ = ss.str();
 
   internal_->server_thread_ = std::thread(&RPCManager::serverThreadFunc, this);
-  return true;
+  return Error::Ok;
 }
 
 void RPCManager::shutdown()

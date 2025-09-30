@@ -15,7 +15,8 @@ namespace network {
 
 struct NetAdapter;
 
-/// Owner of a  network socket.
+/// Owner of a network socket.
+/// Most of this class is not thread safe.
 class MINIROS_DECL NetSocket {
 public:
 

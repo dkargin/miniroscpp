@@ -89,6 +89,10 @@ Error NetSocket::bind(int port)
   assert(internal_);
   if (!internal_)
     return Error::InternalError;
+
+  if (!internal_->fd) {
+    return Error::InvalidHandle;
+  }
   sockaddr_storage ss;
   socklen_t ss_len = 0;
   memset(&ss, 0, sizeof(ss));
@@ -115,7 +119,33 @@ Error NetSocket::bind(int port)
   }
 
   if (int ret = ::bind(internal_->fd, reinterpret_cast<sockaddr*>(&ss), ss_len); ret != 0) {
-    MINIROS_WARN("Failed to bind fd=%d to port=%d : %s", internal_->fd, port, strerror(errno));
+    /* Errors according to `man bind`
+       EACCES The address is protected, and the user is not the superuser.
+       EADDRINUSE The given address is already in use.
+       EADDRINUSE
+              (Internet  domain  sockets)  The port number was specified as zero in the socket address structure, but, upon attempting to bind to an ephemeral port, it was determined that all port numbers in the ephemeral port range are cur‐
+              rently in use.  See the discussion of /proc/sys/net/ipv4/ip_local_port_range ip(7).
+       EBADF  sockfd is not a valid file descriptor.
+       EINVAL The socket is already bound to an address.
+       EINVAL addrlen is wrong, or addr is not a valid address for this socket's domain.
+       ENOTSOCK The file descriptor sockfd does not refer to a socket.
+     */
+    switch (errno) {
+      case EADDRINUSE:
+        return Error::AddressInUse;
+      case ENOTSOCK:
+        return Error::InvalidHandle;
+      case EBADF:
+        // Should not be here since we've checked handle previously.
+        return Error::InvalidHandle;
+      case EACCES:
+        break;
+      case EINVAL:
+        break;
+      default:
+        break;
+    }
+    MINIROS_WARN("Unexpected error while binding socket fd=%d to port=%d : %s", internal_->fd, port, strerror(errno));
     return Error::SystemError;
   }
 
@@ -171,7 +201,6 @@ Error NetSocket::tcpListen(int port, NetAddress::Type type, int maxQueuedClients
   }
 
   if (Error err = bind(port); !err) {
-    MINIROS_ERROR("Error while binding socket to port %d: %s", port, err.toString());
     return err;
   }
   if (Error err = listen(maxQueuedClients); !err) {
