@@ -9,6 +9,7 @@
 #include <memory>
 
 #include "miniros/macros.h"
+#include "miniros/errors.h"
 
 /*
 More info at:
@@ -67,6 +68,13 @@ public:
   int getPort() const;
 
   void setResolveNodeIP(bool resolv);
+
+  /// Enable automatic discovery of other masters.
+  void enableDiscoveryBroadcasts(bool flag);
+
+  /// Set multicast address for service discovery.
+  /// Can return an error if multicast address is invalid.
+  Error setDiscoveryGroup(const std::string& group);
 
   /// Update queued tasks.
   void update();

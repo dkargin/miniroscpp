@@ -90,6 +90,8 @@ int main(int argc, const char ** argv) {
     ("resolve", po::value<bool>()->default_value(false), "Resolve node IP address")
     ("dump_parameters", po::value<bool>()->default_value(false), "Dump all ROSParam values on every update")
     ("pidfile", po::value<std::string>(), "Path to a PID file")
+    ("discoveryBroadcasts", po::value<bool>()->default_value(false), "Enable master discovery broadcasts")
+    ("discoveryGroup", po::value<std::string>(), "Multicast address for master discovery")
     ;
 
   po::variables_map vm;
@@ -159,6 +161,19 @@ int main(int argc, const char ** argv) {
   PidFile pidFile;
   if (vm.count("pidfile")) {
     pidFile.create(vm["pidfile"].as<std::string>().c_str());
+  }
+
+  if (vm.count("discoveryBroadcasts")) {
+    bool useDiscovery = vm["discoveryBroadcasts"].as<bool>();
+    master.enableDiscoveryBroadcasts(useDiscovery);
+  }
+
+  if (vm.count("discoveryGroup")) {
+    std::string discoveryGroup = vm["discoveryGroup"].as<std::string>();
+    Error err = master.setDiscoveryGroup(discoveryGroup);
+    if (err != Error::Ok) {
+      MINIROS_ERROR("Failed to set up address for discovery multicasts: %s", err.toString());
+    }
   }
 
   MINIROS_INFO("Starting Master thread");
