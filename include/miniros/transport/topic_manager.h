@@ -28,6 +28,8 @@
 #ifndef MINIROS_TOPIC_MANAGER_H
 #define MINIROS_TOPIC_MANAGER_H
 
+#include "../network/network.h"
+
 #include <list>
 
 #include "miniros/internal/forwards.h"
@@ -47,6 +49,10 @@ namespace miniros
 class Message;
 struct SubscribeOptions;
 struct AdvertiseOptions;
+
+namespace network {
+struct ClientInfo;
+}
 
 class TopicManager;
 typedef std::shared_ptr<TopicManager> TopicManagerPtr;
@@ -155,12 +161,12 @@ private:
    * @param caller
    * @param topic The topic of interest.
    * @param protos List of transport protocols, in preference order
-   * @param ret Return value
+   * @param conn Contains informaton about requesting client
    *
    * @return true on success, false otherwise
    *
    */
-  RpcValue requestTopic(const std::string& caller, const std::string &topic, const RpcValue &protos, XmlRpc::XmlRpcServerConnection* conn);
+  RpcValue requestTopic(const std::string& caller, const std::string &topic, const RpcValue &protos, const network::ClientInfo& conn);
 
   // Must lock the advertised topics mutex before calling this function
   bool isTopicAdvertised(const std::string& topic);
