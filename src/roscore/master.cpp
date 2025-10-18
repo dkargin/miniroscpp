@@ -201,8 +201,8 @@ void Master::setupBindings()
       std::make_shared<MasterFaviconEndpoint>());
 
     // This endpoint is only for testing purposes. Clients could create endpoints by themselves if needed.
-    auto fsEndpoint = std::make_shared<http::FilesystemEndpoint>("/files/", ".");
-    server->registerEndpoint(std::make_unique<http::SimpleFilter>(http::HttpMethod::Get, "/files/", http::SimpleFilter::CheckType::Prefix), fsEndpoint);
+    //auto fsEndpoint = std::make_shared<http::FilesystemEndpoint>("/files/", ".");
+    //server->registerEndpoint(std::make_unique<http::SimpleFilter>(http::HttpMethod::Get, "/files/", http::SimpleFilter::CheckType::Prefix), fsEndpoint);
   }
 }
 
