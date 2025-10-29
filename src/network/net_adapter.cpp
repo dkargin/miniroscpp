@@ -83,7 +83,7 @@ bool NetAdapter::matchNetAddress(const network::NetAddress& other) const
 
 bool NetAdapter::hasAccessTo(const HostInfo& host) const
 {
-  for (const auto& addr: host.addresses) {
+  for (const auto& addr: host.addresses()) {
     if (addr.isLoopback() || addr.isUnspecified())
       continue;
     if (matchNetAddress(addr))
