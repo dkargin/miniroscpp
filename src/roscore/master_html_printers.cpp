@@ -41,14 +41,15 @@ void Master::Internal::renderMasterStatus(std::string& output) const
   for (const std::shared_ptr<network::HostInfo> host : resolver.getHosts()) {
     ss << "<li><div><dl>";
     ss << "<dt>" << host->hostname << "</dt>";
-    for (const network::NetAddress& address: host->addresses) {
+    host->iterate([&ss](const network::NetAddress& address) {
       // Skip boring addresses.
-      if (address.isLoopback())
-        continue;
-      if (address.isUnspecified())
-        continue;
-      ss << "<dd>" << address.str() << "</dd>" << std::endl;
-    }
+            if (address.isLoopback())
+              return;
+            if (address.isUnspecified())
+              return;
+            ss << "<dd>" << address.str() << "</dd>" << std::endl;
+    });
+
     ss << "</dl></div></li>";
   }
   ss << "</ul>\n";

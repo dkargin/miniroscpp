@@ -160,6 +160,7 @@ set(transport_SRC
     http/http_server_connection.cpp
     http/http_tools.cpp
 
+    network/host_info.cpp
     network/network.cpp
     network/net_adapter.cpp
     network/net_address.cpp

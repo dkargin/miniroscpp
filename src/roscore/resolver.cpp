@@ -56,7 +56,7 @@ Error AddressResolver::scanAdapters()
     assert(it != m_hosts.end());
     if (it != m_hosts.end()) {
       for (const auto& adapter: m_adapters) {
-        it->second->addresses.insert(adapter.address);
+        it->second->addAddress(adapter.address);
       }
     }
   }
@@ -96,9 +96,9 @@ network::URL AddressResolver::resolveAddressFor(const std::shared_ptr<NodeRef>& 
   }
 
   // Here both node and requester are located on different machines and node is not located on a local host.
-  if (!nodeHost->addresses.empty()) {
+  if (nodeHost->hasAnyAddress()) {
     // Find first usable address.
-    for (const auto& addr: nodeHost->addresses) {
+    for (const auto& addr: nodeHost->addresses()) {
       if (!addr.isLoopback()) {
         url.host = addr.str();
         break;
@@ -152,7 +152,7 @@ network::URL AddressResolver::resolveAddressFor(const std::shared_ptr<NodeRef>& 
     MINIROS_WARN_NAMED("resolver", "resolveAddressFor(%s) - no adapter matched for %s", node->id().c_str(), requester->id().c_str());
   } else {
     // Just return any address. That will fork for simple networks.
-    for (const auto& addr: nodeHost->addresses) {
+    for (const auto& addr: nodeHost->addresses()) {
       if (!addr.isLoopback()) {
         url.host = addr.str();
         return url;
@@ -171,7 +171,7 @@ std::shared_ptr<network::HostInfo> AddressResolver::findHost(const network::NetA
     if (!hostPtr) {
       continue;
     }
-    if (hostPtr->addresses.find(address) != hostPtr->addresses.end()) {
+    if (hostPtr->hasAddress(address)) {
       return hostPtr;
     }
   }
@@ -240,7 +240,7 @@ std::shared_ptr<network::HostInfo> AddressResolver::updateHost(const RequesterIn
   }
 
   if (!isSameMachine)
-    it->second->addresses.insert((requesterInfo.clientAddress));
+    it->second->addAddress(requesterInfo.clientAddress);
   else
     it->second->local = true;
 

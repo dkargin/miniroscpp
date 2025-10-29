@@ -105,7 +105,7 @@ protected:
 };
 
 /// Address comparator which checks for IP address only, without comparing the port.
-struct AddressCompare {
+struct AddressCompareNoPort {
   bool operator()(const NetAddress& a, const NetAddress& b) const;
 };
 
