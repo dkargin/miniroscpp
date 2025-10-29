@@ -17,6 +17,11 @@ FilesystemEndpoint::FilesystemEndpoint(const std::string& uriRoot, const std::st
   :prefix_path_(uriRoot),  root_path_(fsPath)
 {}
 
+bool isSubpath(const std::filesystem::path& path, const std::filesystem::path& base) {
+  const auto mismatch_pair = std::mismatch(path.begin(), path.end(), base.begin(), base.end());
+  return mismatch_pair.second == base.end();
+}
+
 Error FilesystemEndpoint::handle(const HttpFrame& frame, const network::ClientInfo& clientInfo,
   HttpResponseHeader& responseHeader, std::string& body)
 {
@@ -30,8 +35,15 @@ Error FilesystemEndpoint::handle(const HttpFrame& frame, const network::ClientIn
     return Error::InvalidAddress;
   }*/
 
-  std::filesystem::path fsPath = root_path_ / path;
+  std::filesystem::path fsPath = std::filesystem::absolute(root_path_ / path);
   if (!std::filesystem::exists(fsPath)) {
+    return Error::FileNotFound;
+  }
+
+  std::filesystem::path fullRootPath = std::filesystem::absolute(root_path_);
+  /// Check if we are still within `root_path_`
+  if (!isSubpath(fsPath, fullRootPath)) {
+    MINIROS_WARN("Client tried to access path \"%s\" out of prefix path", fsPath.c_str());
     return Error::FileNotFound;
   }
 
