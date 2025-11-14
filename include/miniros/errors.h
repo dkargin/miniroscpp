@@ -53,6 +53,8 @@ struct MINIROS_DECL Error {
     NotConnected,
     /// Handle or file descriptor is invalid.
     InvalidHandle,
+    /// Timed out during operation.
+    Timeout,
   };
 
   Error() :code(Ok)

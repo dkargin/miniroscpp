@@ -14,21 +14,32 @@
 namespace miniros {
 namespace http {
 
-enum class HttpMethod {
-  Invalid, //< Invalid method type.
-  Get,
-  Head,
-  Options,
-  Trace,
-  Put,
-  Delete,
-  Post,
-  Patch,
-  Connect
+struct HttpMethod {
+  enum Value_t {
+    Invalid, //< Invalid method type.
+    Get,
+    Head,
+    Options,
+    Trace,
+    Put,
+    Delete,
+    Post,
+    Patch,
+    Connect
+  }value;
+
+  HttpMethod(Value_t val) : value(val) {}
+
+  operator Value_t() const
+  {
+    return value;
+  }
+
+  const char* toString() const;
 };
 
 /// Intermediate storage for HTTP data.
-struct MINIROS_DECL HttpFrame {
+struct MINIROS_DECL HttpParserFrame {
   enum ParserState {
     /// Parser is in invalid state.
     ParseInvalid,
@@ -52,11 +63,7 @@ struct MINIROS_DECL HttpFrame {
     /// Position of the next symbol after last
     int end = -1;
 
-    void assign(int start_, int end_)
-    {
-      start = start_;
-      end = end_;
-    }
+    void assign(int start_, int end_);
 
     void reset()
     {
@@ -98,6 +105,7 @@ struct MINIROS_DECL HttpFrame {
   /// Current length of request body.
   int bodyLength() const;
 
+  /// GET, POST, ...
   Token requestMethodToken;
 
   /// Response code: 200, ...
@@ -106,14 +114,18 @@ struct MINIROS_DECL HttpFrame {
 
   /// Response status: OK, ...
   Token responseStatus;
+
   /// Request method: {GET, POST, PUT, ...}
   HttpMethod requestMethod = HttpMethod::Invalid;
 
   /// Requested path
   Token requestPath;
 
-  /// HTTP Version.
-  Token requestHttpVersion;
+  /// Protocol name. Expect string like:
+  ///   HTTP/1.1
+  ///   RTSP/1.0,
+  ///   ...
+  Token protocol;
 
   /// HTTP Field.
   struct Field {
@@ -121,13 +133,26 @@ struct MINIROS_DECL HttpFrame {
     std::string value;
   };
 
-  /// Parsed fields.
+  /// Content type of request or response.
+  Token contentType;
+
+  /// Contains all unspecialized request fields.
   std::vector<Field> fields;
 
   /// Get a pointer to HTTP version part.
-  std::string_view getHttpVersion() const
+  std::string_view getProtocolName() const
   {
-    return getTokenView(data, requestHttpVersion);
+    return getTokenView(data, protocol);
+  }
+
+  std::string_view getResponseStatus() const
+  {
+    return getTokenView(data, responseCodeToken);
+  }
+
+  std::string_view getContentType() const
+  {
+    return getTokenView(data, contentType);
   }
 
   std::string_view getPath() const
@@ -198,7 +223,7 @@ protected:
   Token m_fieldName;
 
   /// Current state of a parser.
-  ParserState m_state = HttpFrame::ParseInvalid;
+  ParserState m_state = HttpParserFrame::ParseInvalid;
 };
 
 /// Header of HTTP response.
@@ -206,6 +231,8 @@ protected:
 struct HttpResponseHeader {
   /// Internal error.
   Error error = Error::Ok;
+
+  std::string protocol = "HTTP/1.1";
 
   /// Status code.
   int statusCode = 200;

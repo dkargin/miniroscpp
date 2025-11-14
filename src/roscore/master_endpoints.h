@@ -15,7 +15,7 @@ class MasterRootEndpoint : public http::EndpointHandler {
 public:
   MasterRootEndpoint(Master::Internal* internal) : internal(internal) {}
 
-  Error handle(const http::HttpFrame& frame, const network::ClientInfo& clientInfo,
+  Error handle(const http::HttpParserFrame& frame, const network::ClientInfo& clientInfo,
     http::HttpResponseHeader& responseHeader, std::string& body);
 
   Master::Internal* internal = nullptr;
@@ -25,7 +25,7 @@ class NodeInfoEndpoint : public http::EndpointHandler {
 public:
   NodeInfoEndpoint(Master::Internal* internal) : internal(internal) {}
 
-  Error handle(const http::HttpFrame& frame, const network::ClientInfo& clientInfo,
+  Error handle(const http::HttpParserFrame& frame, const network::ClientInfo& clientInfo,
     http::HttpResponseHeader& responseHeader, std::string& body);
 
   Master::Internal* internal = nullptr;
@@ -35,7 +35,7 @@ class TopicInfoEndpoint : public http::EndpointHandler {
 public:
   TopicInfoEndpoint(Master::Internal* internal) : internal(internal) {}
 
-  Error handle(const http::HttpFrame& frame, const network::ClientInfo& clientInfo,
+  Error handle(const http::HttpParserFrame& frame, const network::ClientInfo& clientInfo,
     http::HttpResponseHeader& responseHeader, std::string& body);
 
   Master::Internal* internal = nullptr;
@@ -45,7 +45,7 @@ class PublishedTopicsEndpoint : public http::EndpointHandler {
 public:
   PublishedTopicsEndpoint(Master::Internal* internal) : internal(internal) {}
 
-  Error handle(const http::HttpFrame& frame, const network::ClientInfo& clientInfo,
+  Error handle(const http::HttpParserFrame& frame, const network::ClientInfo& clientInfo,
     http::HttpResponseHeader& responseHeader, std::string& body);
 
   Master::Internal* internal = nullptr;
@@ -55,7 +55,7 @@ class TopicTypesEndpoint : public http::EndpointHandler {
 public:
   TopicTypesEndpoint(Master::Internal* internal) : internal(internal) {}
 
-  Error handle(const http::HttpFrame& frame, const network::ClientInfo& clientInfo,
+  Error handle(const http::HttpParserFrame& frame, const network::ClientInfo& clientInfo,
     http::HttpResponseHeader& responseHeader, std::string& body);
 
   Master::Internal* internal = nullptr;
@@ -63,7 +63,7 @@ public:
 
 /// Handles GET /favicon.ico.
 class MasterFaviconEndpoint : public http::EndpointHandler {
-  Error handle(const http::HttpFrame& frame, const network::ClientInfo& clientInfo,
+  Error handle(const http::HttpParserFrame& frame, const network::ClientInfo& clientInfo,
     http::HttpResponseHeader& responseHeader, std::string& body);
 };
 

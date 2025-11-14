@@ -741,7 +741,7 @@ TEST_F(MockSocketTest, readHeader_only) {
 
   // Check that state machine is in the correct state after getting the header.
   EXPECT_EQ(XmlRpcClientForTest::READ_RESPONSE, a._connectionState);
-  EXPECT_EQ(a._httpFrame.state(), miniros::http::HttpFrame::ParseBody);
+  EXPECT_EQ(a._httpFrame.state(), miniros::http::HttpParserFrame::ParseBody);
   // Check that the remaining response is stored in _response
   EXPECT_EQ(114, a._httpFrame.contentLength()); // Check decoded content length
 

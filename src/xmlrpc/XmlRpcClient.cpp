@@ -137,7 +137,7 @@ XmlRpcClient::execute(const char* method, XmlRpcValue const& params, XmlRpcValue
   double msTime = -1.0;   // Process until exit is called
   _disp.work(msTime);
 
-  if (_connectionState != IDLE  || _httpFrame.state() != miniros::http::HttpFrame::ParseComplete)
+  if (_connectionState != IDLE  || _httpFrame.state() != miniros::http::HttpParserFrame::ParseComplete)
     return false;
 
   {
@@ -153,12 +153,7 @@ XmlRpcClient::execute(const char* method, XmlRpcValue const& params, XmlRpcValue
   return true;
 }
 
-// Execute the named procedure on the remote server, non-blocking.
-// Params should be an array of the arguments for the method.
-// Returns true if the request was sent and a result received (although the result
-// might be a fault).
-bool
-XmlRpcClient::executeNonBlock(const char* method, XmlRpcValue const& params)
+bool XmlRpcClient::executeNonBlock(const char* method, XmlRpcValue const& params)
 {
   XmlRpcUtil::log(1, "XmlRpcClient(%s)::executeNonBlock: method %s (_connectionState %s).", name().c_str(),
     method, connectionStateStr(_connectionState));
@@ -429,7 +424,7 @@ bool XmlRpcClient::readResponse()
 
   XmlRpcUtil::log(4, "XmlRpcClient(%s)::readHeader client read content length: %d", name().c_str(), _httpFrame.contentLength());
 
-  if (_httpFrame.state() == miniros::http::HttpFrame::ParseComplete) {
+  if (_httpFrame.state() == miniros::http::HttpParserFrame::ParseComplete) {
     if (_httpFrame.contentLength() <= 0) {
       XmlRpcUtil::error("Error in XmlRpcClient(%s)::readHeader: Invalid Content-length specified (%d).", name().c_str(), _httpFrame.contentLength());
       // Close the socket because we can't make further use of it.

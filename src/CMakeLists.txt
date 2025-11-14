@@ -186,8 +186,12 @@ set(transport_SRC
     shape_shifter.cpp
     observer.cpp
 
+    http/http_client.cpp
+    http/http_request.cpp
+
     http/endpoints/xmlrpc.cpp
     http/endpoints/filesystem.cpp
+
     http/http_filters.cpp
     http/http_server.cpp
     http/http_server_connection.cpp

@@ -16,6 +16,7 @@
 namespace miniros {
 
 class PollSet;
+template <class T> struct Lifetime;
 
 namespace network {
 class NetSocket;
@@ -39,7 +40,7 @@ public:
   Error stop();
 
   /// Get port for IPv4
-  int getPortIp4() const;
+  int getPort() const;
 
   /// Get port for IPv4
   int getPortIp6() const;
@@ -54,17 +55,13 @@ public:
   Error registerEndpoint(std::unique_ptr<EndpointFilter>&& filter, const std::shared_ptr<EndpointHandler>& handler);
 
   /// Find endpoint for request.
-  EndpointHandler* findEndpoint(const HttpFrame& frame);
+  EndpointHandler* findEndpoint(const HttpParserFrame& frame);
 
 protected:
   /// Accept client and add it to event processing.
   /// For internal usage only.
   /// @param sock - listening socket.
-  void acceptClient(network::NetSocket* sock);
-
-  /// Closes and unregisters a connection.
-  /// For internal usage only.
-  void closeConnection(int fd, const char* reason);
+  void acceptClient(const std::shared_ptr<Lifetime<HttpServer>>& lifetime, network::NetSocket* sock);
 
 protected:
   struct Internal;

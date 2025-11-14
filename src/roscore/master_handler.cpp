@@ -302,6 +302,7 @@ void MasterHandler::update()
   }
 
   for (const auto& command: commands) {
+    // Ignore all commands to nodes which are queued for shutdown.
     if (shutdownNodes.count(command.node)) {
       continue;
     }

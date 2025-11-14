@@ -69,8 +69,8 @@ private:
 
   PollSet poll_set_;
 
-  std::atomic_bool shutting_down_{false};
-  std::atomic_bool running_{false};
+  std::atomic_bool shutting_down_;
+  std::atomic_bool running_;
 
   /// Signal raised when this connection is dropped.
   using PollWatchers = observer::Target<PollWatcher>;

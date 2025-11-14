@@ -16,14 +16,14 @@ namespace network {
 }
 namespace http {
 
-struct HttpFrame;
+struct HttpParserFrame;
 struct HttpResponseHeader;
 
 /// Base class for endpoint filters.
 class EndpointFilter {
 public:
   virtual ~EndpointFilter() {}
-  virtual bool check(const HttpFrame& frame) const = 0;
+  virtual bool check(const HttpParserFrame& frame) const = 0;
 };
 
 class EndpointHandler {
@@ -36,7 +36,7 @@ public:
   /// @param clientInfo - connection information.
   /// @param responseHeader - header of response.
   /// @param body - buffer for serialized body.
-  virtual Error handle(const HttpFrame& frame, const network::ClientInfo& clientInfo,
+  virtual Error handle(const HttpParserFrame& frame, const network::ClientInfo& clientInfo,
     HttpResponseHeader& responseHeader, std::string& body) = 0;
 };
 

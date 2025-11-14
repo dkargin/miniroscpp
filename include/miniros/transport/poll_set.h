@@ -39,6 +39,9 @@
 
 #include "miniros/common.h"
 
+/// Add this evt flag to update event flags by return value from SocketUpdateFunc.
+static constexpr int EVT_UPDATE = (1 << 30);
+
 namespace miniros
 {
 
@@ -57,7 +60,9 @@ public:
   /// Object to be kept back during active callback.
   typedef std::shared_ptr<void> TrackedObject;
 
-  typedef std::function<void(int)> SocketUpdateFunc;
+  typedef std::function<int (int)> SocketUpdateFunc;
+
+  typedef std::function<void (int)> SocketUpdateVoidFunc;
   /**
    * \brief Add a socket.
    *
@@ -69,6 +74,7 @@ public:
    * used to prevent the transport from being deleted while we're calling the update function
    */
   bool addSocket(int sock, int events, const SocketUpdateFunc& update_func, const TrackedObject& object = TrackedObject());
+
   /**
    * \brief Delete a socket
    *
@@ -133,7 +139,7 @@ private:
   /**
    * \brief Called when events have been triggered on our signal pipe
    */
-  void onLocalPipeEvents(int events);
+  int onLocalPipeEvents(int events);
 
   struct Internal;
   std::unique_ptr<Internal> internal_;

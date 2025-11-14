@@ -22,7 +22,7 @@ bool isSubpath(const std::filesystem::path& path, const std::filesystem::path& b
   return mismatch_pair.second == base.end();
 }
 
-Error FilesystemEndpoint::handle(const HttpFrame& frame, const network::ClientInfo& clientInfo,
+Error FilesystemEndpoint::handle(const HttpParserFrame& frame, const network::ClientInfo& clientInfo,
   HttpResponseHeader& responseHeader, std::string& body)
 {
   // 1. Read path.

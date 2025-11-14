@@ -20,7 +20,7 @@ public:
   /// @param fsPath - path to root folder at filesystem.
   FilesystemEndpoint(const std::string& uriRoot, const std::string& fsPath);
 
-  Error handle(const HttpFrame& frame, const network::ClientInfo& clientInfo,
+  Error handle(const HttpParserFrame& frame, const network::ClientInfo& clientInfo,
     HttpResponseHeader& responseHeader, std::string& body) override;
 
 protected:

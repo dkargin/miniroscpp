@@ -82,7 +82,11 @@ struct MINIROS_DECL NetAddress {
   /// Assign new raw address value.
   void assignRawAddress(Type type, const void* addr, size_t size);
 
-  /// Create network address from a string.
+  /// Create network address from some IP address and port.
+  /// @param type - address family.
+  /// @param address - IP (or similar) address.
+  /// @param port - numeric port.
+  /// Note: this function does not resolve DNS addresses.
   NODISCARD static NetAddress fromString(Type type, const std::string& address, int port);
 
   NODISCARD static NetAddress fromIp4String(const std::string& address, int port)

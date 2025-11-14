@@ -60,7 +60,7 @@ void generateFaultResponseBody(std::string const& errorMsg, int errorCode, std::
 }
 
 // Parse the method name and the argument values from the request.
-std::string parseRequest(const HttpFrame& httpFrame, XmlRpc::XmlRpcValue& params)
+std::string parseRequest(const HttpParserFrame& httpFrame, XmlRpc::XmlRpcValue& params)
 {
   int offset = 0;   // Number of chars parsed from the request
 
@@ -81,7 +81,7 @@ std::string parseRequest(const HttpFrame& httpFrame, XmlRpc::XmlRpcValue& params
   return methodName;
 }
 
-Error XmlRpcHandler::handle(const HttpFrame& frame, const ClientInfo& clientInfo,
+Error XmlRpcHandler::handle(const HttpParserFrame& frame, const ClientInfo& clientInfo,
   HttpResponseHeader& responseHeader, std::string& body)
 {
   RpcValue params, resultValue;

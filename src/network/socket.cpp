@@ -29,6 +29,11 @@ struct NetSocket::Internal {
   /// Socket is listening for connections.
   bool listening = false;
 
+  /// Checked if socket is in non-blocking mode.
+  bool nonblock = false;
+
+  bool connecting = true;
+
   /// Address of connected endpoint.
   NetAddress peer_address;
 
@@ -36,11 +41,13 @@ struct NetSocket::Internal {
   void close()
   {
     if (own && fd != MINIROS_INVALID_SOCKET) {
+      MINIROS_INFO("NetSocket::close(%d)", fd);
       close_socket(fd);
-      fd = MINIROS_INVALID_SOCKET;
     }
     own = false;
     listening = false;
+    connecting = false;
+    fd = MINIROS_INVALID_SOCKET;
     peer_address.reset();
   }
 };
@@ -181,8 +188,6 @@ Error NetSocket::tcpListen(int port, NetAddress::Type type, int maxQueuedClients
   else {
     return Error::InvalidValue;
   }
-  if (!addrType)
-    return Error::InvalidValue;
   int fd = socket(addrType, SOCK_STREAM, IPPROTO_TCP);
   if (fd < 0) {
     const char* err = last_socket_error_string();
@@ -190,6 +195,7 @@ Error NetSocket::tcpListen(int port, NetAddress::Type type, int maxQueuedClients
     return Error::SystemError;
   }
   internal_->fd = fd;
+  internal_->own = true;
 
   if (type == NetAddress::AddressIPv4)
     internal_->type = Type::TCP;
@@ -209,6 +215,77 @@ Error NetSocket::tcpListen(int port, NetAddress::Type type, int maxQueuedClients
   }
   return Error::Ok;
 }
+
+Error NetSocket::tcpConnect(const NetAddress& address, bool nonblock)
+{
+  if (!address.valid()) {
+    return Error::InvalidAddress;
+  }
+
+  if (valid()) {
+    close();
+  }
+
+  // Determine address family based on address type
+  int domain = 0;
+  Type socketType = Type::Invalid;
+  if (address.type() == NetAddress::AddressIPv6) {
+    domain = AF_INET6;
+    socketType = Type::TCPv6;
+  } else if (address.type() == NetAddress::AddressIPv4) {
+    domain = AF_INET;
+    socketType = Type::TCP;
+  } else {
+    return Error::InvalidValue;
+  }
+
+  // Create TCP socket
+  int fd = socket(domain, SOCK_STREAM, IPPROTO_TCP);
+  if (fd < 0) {
+    const char* err = last_socket_error_string();
+    MINIROS_ERROR("Error while trying to create TCP socket: %s", err);
+    return Error::SystemError;
+  }
+
+  internal_->fd = fd;
+  internal_->type = socketType;
+  internal_->own = true;
+
+  // Connect to peer address
+  const sockaddr* rawAddr = static_cast<const sockaddr*>(address.rawAddress());
+  socklen_t addrLen = static_cast<socklen_t>(address.rawAddressSize());
+
+  if (nonblock) {
+    setNonBlock();
+  }
+
+  if (::connect(internal_->fd, rawAddr, addrLen) != 0) {
+    int err = last_socket_error();
+
+    if (err == EINPROGRESS && internal_->nonblock) {
+      internal_->connecting = true;
+      return Error::WouldBlock;
+    }
+    // Close socket on error
+    close();
+
+    // Map timeout error if applicable
+    if (err == ETIMEDOUT) {
+      return Error::Timeout;
+    }
+
+    const char* errStr = last_socket_error_string();
+    MINIROS_ERROR("Error while connecting TCP socket to %s: %s", address.str().c_str(), errStr);
+
+    return Error::SystemError;
+  }
+
+  // Store peer address
+  internal_->peer_address = address;
+
+  return Error::Ok;
+}
+
 
 Error NetSocket::initUDP(bool ipv6)
 {
@@ -250,6 +327,7 @@ Error NetSocket::initUDP(bool ipv6)
   }
   internal_->fd = fd;
   internal_->type = ipv6 ? Type::UDPv6 : Type::UDP;
+  internal_->own = true;
   return Error::Ok;
 }
 
@@ -295,6 +373,7 @@ Error NetSocket::setNonBlock()
     MINIROS_ERROR("setting socket [%d] as non_blocking failed with error [%d]", internal_->fd, result);
     return Error::SystemError;
   }
+  internal_->nonblock = true;
   return Error::Ok;
 }
 
@@ -607,6 +686,63 @@ bool NetSocket::isIpv6() const
   const Type t = internal_->type;
   return t == Type::TCPv6 || t == Type::UDPv6;
 }
+
+int NetSocket::getSysError() const
+{
+  if (!internal_)
+    return 0;
+  int err = 0;
+  socklen_t len = 0;
+  getsockopt(internal_->fd, SOL_SOCKET, SO_ERROR, &err, &len);
+  return err;
+}
+
+Error NetSocket::checkConnected()
+{
+  if (!internal_ || !valid()) {
+    return Error::InternalError;
+  }
+
+  if (!internal_->connecting)
+    return Error::Ok;
+
+  int err = 0;
+  socklen_t error_code_len = sizeof(err);
+  if (getsockopt(internal_->fd, SOL_SOCKET, SO_ERROR, &err, &error_code_len) == 0) {
+    if (err == 0) {
+      // Connection successful
+      internal_->connecting = false;
+      return Error::Ok;
+    }
+
+    if (err == ETIMEDOUT) {
+      // Still connecting
+      return Error::Timeout;
+    }
+
+    if (err == ECONNREFUSED) {
+      return Error::NotConnected;
+    }
+    // Connection failed with error_code
+    const char* msg = strerror(err);
+    MINIROS_WARN("NetSocket::checkConnected - unhandled error %s", msg);
+    return Error::SystemError;
+  }
+  // Error retrieving SO_ERROR
+  const char* msg = strerror(errno);
+  MINIROS_WARN("NetSocket::checkConnected - unhandled error %s", msg);
+  return Error::SystemError;
+}
+
+bool NetSocket::isConnecting() const
+{
+  if (internal_)
+    return internal_->connecting;
+  return false;
+}
+
+
+
 
 }
 }
