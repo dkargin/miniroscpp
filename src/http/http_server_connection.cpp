@@ -19,11 +19,15 @@ HttpServerConnection::HttpServerConnection(HttpServer* server, std::shared_ptr<n
 }
 
 HttpServerConnection::~HttpServerConnection()
-{}
+{
+  MINIROS_INFO("HttpServerConnection::~HttpServerConnection()");
+  std::unique_lock<std::mutex> lock(guard_);
+
+}
 
 Error HttpServerConnection::readRequest()
 {
-  if (http_frame_.state() == HttpFrame::ParseRequestHeader) {
+  if (http_frame_.state() == HttpParserFrame::ParseRequestHeader) {
     request_start_ = SteadyTime::now();
   }
   auto [transferred, readErr] = socket_->recv(http_frame_.data, nullptr);
@@ -35,7 +39,7 @@ Error HttpServerConnection::readRequest()
   MINIROS_DEBUG("HttpServerConnection(%d)::readHeader: ContentLength=%d, parsed=%d t=%fms", fd, http_frame_.contentLength(), parsed, dur);
 
   // If we haven't gotten the entire request yet, return (keep reading)
-  if (http_frame_.state() != HttpFrame::ParseComplete) {
+  if (http_frame_.state() != HttpParserFrame::ParseComplete) {
     if (readErr == Error::EndOfFile) {
       MINIROS_DEBUG("HttpServerConnection(%d)::readRequest: EOF while reading request", fd);
       http_frame_.finishRequest();
@@ -46,8 +50,7 @@ Error HttpServerConnection::readRequest()
     return Error::Ok;
   }
 
-  assert(http_frame_.state() == HttpFrame::ParseComplete);
-  auto body = http_frame_.body();
+  assert(http_frame_.state() == HttpParserFrame::ParseComplete);
   // Otherwise, parse and dispatch the request
   MINIROS_DEBUG("HttpServerConnection(%d)::readRequest read %d/%d bytes.", fd, http_frame_.bodyLength(), http_frame_.contentLength());
   state_ = State::ProcessRequest;
@@ -56,6 +59,7 @@ Error HttpServerConnection::readRequest()
 
 int HttpServerConnection::handleEvents(int evtFlags)
 {
+  std::unique_lock<std::mutex> lock(guard_);
   bool stateFallback = false;
   if (state_ == State::ReadRequest) {
     if (evtFlags & POLLIN) {
@@ -84,7 +88,7 @@ int HttpServerConnection::handleEvents(int evtFlags)
   if (state_ == State::ProcessRequest) {
     resetResponse();
     // Execute request:
-    auto* handler = server_->findEndpoint(http_frame_);
+    EndpointHandler* handler = server_ ? server_->findEndpoint(http_frame_) : nullptr;
     std::string endpoint{http_frame_.getPath()};
     if (!handler) {
       MINIROS_ERROR("No handler for endpoint \"%s\"", endpoint.c_str());
@@ -103,6 +107,10 @@ int HttpServerConnection::handleEvents(int evtFlags)
     response_header_.writeHeader(response_header_buffer_, response_body_.size());
     state_ = State::WriteResponse;
     stateFallback = true;
+
+    if (!server_) {
+      close();
+    }
   }
 
   if (state_ == State::WriteResponse) {
@@ -206,6 +214,13 @@ void HttpServerConnection::prepareFaultResponse(Error error, HttpResponseHeader&
       break;
   }
 }
+
+void HttpServerConnection::detach()
+{
+  std::unique_lock<std::mutex> lock(guard_);
+  server_ = nullptr;
+}
+
 
 }
 }

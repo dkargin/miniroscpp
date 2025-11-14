@@ -127,7 +127,7 @@ bool XmlRpcServerConnection::readHeader()
 bool XmlRpcServerConnection::readRequest()
 {
   // If we don't have the entire request yet, read available data
-  if (_httpFrame.state() == miniros::http::HttpFrame::ParseBody) {
+  if (_httpFrame.state() == miniros::http::HttpParserFrame::ParseBody) {
     bool eof;
     if ( ! XmlRpcSocket::nbRead(this->getfd(), _httpFrame.data, &eof)) {
       XmlRpcUtil::error("XmlRpcServerConnection(%d)::readRequest: read error (%s).", _fd, XmlRpcSocket::getErrorMsg().c_str());
@@ -137,7 +137,7 @@ bool XmlRpcServerConnection::readRequest()
     _httpFrame.incrementalParse();
 
     // If we haven't gotten the entire request yet, return (keep reading)
-    if (_httpFrame.state() == miniros::http::HttpFrame::ParseBody) {
+    if (_httpFrame.state() == miniros::http::HttpParserFrame::ParseBody) {
       if (eof) {
         XmlRpcUtil::error("XmlRpcServerConnection(%d)::readRequest: EOF while reading request", _fd);
         _httpFrame.finishRequest();
@@ -148,7 +148,7 @@ bool XmlRpcServerConnection::readRequest()
     }
   }
 
-  assert(_httpFrame.state() == miniros::http::HttpFrame::ParseComplete);
+  assert(_httpFrame.state() == miniros::http::HttpParserFrame::ParseComplete);
   auto body = _httpFrame.body();
   // Otherwise, parse and dispatch the request
   XmlRpcUtil::log(3, "XmlRpcServerConnection(%d)::readRequest read %d/%d bytes.", _fd, _httpFrame.bodyLength(), _httpFrame.contentLength());

@@ -13,7 +13,7 @@ SimpleFilter::SimpleFilter(HttpMethod method, const std::string& path, CheckType
   :path_(path), method_(method), checkType_(checkType)
 {}
 
-bool SimpleFilter::check(const HttpFrame& frame) const
+bool SimpleFilter::check(const HttpParserFrame& frame) const
 {
   if (frame.requestMethod != method_)
     return false;
@@ -28,7 +28,7 @@ RegexFilter::RegexFilter(const std::regex& regex, HttpMethod method)
   :regex_(regex), method_(method)
 {}
 
-bool RegexFilter::check(const HttpFrame& frame) const
+bool RegexFilter::check(const HttpParserFrame& frame) const
 {
   if (frame.requestMethod == method_)
     return false;

@@ -121,12 +121,11 @@ void Subscription::PendingConnection::addToDispatch(PollSet* pollSet)
   assert(pollSet);
 
   int fd = client_->getfd();
-  pollSet->addSocket(fd, POLLOUT | POLLERR, [this, pollSet](int flags) {
+  pollSet->addSocket(fd, POLLOUT | POLLERR | EVT_UPDATE, [this, pollSet](int flags) {
     int oflags = convertEventsToXmlRpc(flags);
     int newEvents = client_->handleEvent(oflags);
-    pollSet->setEvents(client_->getfd(), convertEventsToPollSet(newEvents));
+    return convertEventsToPollSet(newEvents);
   });
-  //disp->addSource(client_, XmlRpc::XmlRpcDispatch::WritableEvent | XmlRpc::XmlRpcDispatch::Exception);
 }
 
 void Subscription::PendingConnection::removeFromDispatch(PollSet* pollSet)

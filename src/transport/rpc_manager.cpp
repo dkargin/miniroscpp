@@ -214,7 +214,7 @@ Error RPCManager::start(PollSet* poll_set, int port)
     return err;
   }
 
-  internal_->port_ = internal_->http_server_->getPortIp4();
+  internal_->port_ = internal_->http_server_->getPort();
   MINIROS_ASSERT(internal_->port_ != 0);
 
   std::string host = network::getHost();

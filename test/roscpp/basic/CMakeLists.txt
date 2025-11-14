@@ -17,6 +17,7 @@ miniros_add_test(${TEST_GROUP}-test_callback_queue SOURCES test_callback_queue.c
 miniros_add_test(${TEST_GROUP}-test_names SOURCES  test_names.cpp)
 miniros_add_test(${TEST_GROUP}-test_args SOURCES test_args.cpp)
 miniros_add_test(${TEST_GROUP}-test_observer SOURCES test_observer.cpp)
+miniros_add_test(${TEST_GROUP}-test_http_parser SOURCES test_http_parser.cpp)
 miniros_add_test(${TEST_GROUP}-test_http SOURCES test_http.cpp)
 miniros_add_test(${TEST_GROUP}-test_net SOURCES test_net.cpp)
 

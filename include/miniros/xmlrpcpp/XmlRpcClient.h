@@ -63,7 +63,12 @@ namespace XmlRpc {
     //! to determine whether the result is a fault response.
     bool execute(const char* method, XmlRpcValue const& params, XmlRpcValue& result);
 
+    /// Execute the named procedure on the remote server, non-blocking.
+    /// Params should be an array of the arguments for the method.
+    /// Returns true if the request was sent and a result received (although the result
+    /// might be a fault).
     bool executeNonBlock(const char* method, XmlRpcValue const& params);
+
     bool executeCheckDone(XmlRpcValue& result);
 
     //! Returns true if the result of the last execute() was a fault response.
@@ -157,7 +162,7 @@ namespace XmlRpc {
     std::string _name;
 
     /// Data + parser state of HTTP response.
-    miniros::http::HttpFrame _httpFrame;
+    miniros::http::HttpParserFrame _httpFrame;
 
     /// Guards data inside incoming buffers like _httpFrame.
     std::mutex _dataGuard;

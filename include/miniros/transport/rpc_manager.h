@@ -70,7 +70,7 @@ public:
   virtual void addToDispatch(PollSet* disp) = 0;
   virtual void removeFromDispatch(PollSet* disp) = 0;
 
-  // Check if connection can be removed.
+  /// Check if request is complete.
   virtual bool check() = 0;
 };
 typedef std::shared_ptr<ASyncXMLRPCConnection> ASyncXMLRPCConnectionPtr;

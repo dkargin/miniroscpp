@@ -11,6 +11,8 @@
 
 #include "miniros/steady_timer.h"
 
+#include <mutex>
+
 namespace miniros {
 
 namespace http {
@@ -33,6 +35,7 @@ public:
     ReadRequest,
     ProcessRequest,
     WriteResponse,
+    Exit,
   };
 
   /// Incremental reading of request.
@@ -46,12 +49,16 @@ public:
   /// Fill in fault response.
   void prepareFaultResponse(Error error, HttpResponseHeader& header, std::string& body) const;
 
+  /// Detach from server.
+  /// Breaks link with Http server.
+  void detach();
+
 protected:
   State state_ = State::ReadRequest;
 
   HttpServer* server_;
 
-  HttpFrame http_frame_;
+  HttpParserFrame http_frame_;
 
   HttpResponseHeader response_header_;
   /// Intermediate storage for response header.
@@ -63,6 +70,8 @@ protected:
 
   SteadyTime request_start_;
   std::shared_ptr<network::NetSocket> socket_;
+
+  std::mutex guard_;
 };
 
 }

@@ -24,7 +24,7 @@ public:
 
   SimpleFilter(HttpMethod method, const std::string& path, CheckType checkType = CheckType::Exact);
 
-  bool check(const HttpFrame& frame) const override;
+  bool check(const HttpParserFrame& frame) const override;
 
 protected:
   std::string path_;
@@ -37,7 +37,7 @@ class RegexFilter : public EndpointFilter {
 public:
   RegexFilter(const std::regex& regex, HttpMethod method);
 
-  bool check(const HttpFrame& frame) const override;
+  bool check(const HttpParserFrame& frame) const override;
 
 protected:
   std::regex regex_;

@@ -72,9 +72,15 @@ public:
   /// Allocate tcp port and start listening.
   Error tcpListen(int port, NetAddress::Type type, int maxQueuedClients=100);
 
+  /// Connect to specified TCP address.
+  /// @param address - destination address
+  /// @param nonblock - connect in nonblock mode. Actual state should be processed by PollSet.
+  Error tcpConnect(const NetAddress& address, bool nonblock);
+
   /// Enter listening mode.
   /// Socket must be already created.
   Error listen(int maxQueuedClients);
+
 
   /// Initialize UDP ipv4 socket.
   /// @param ip6 - should create ipv6 socket.
@@ -110,6 +116,16 @@ public:
   /// Check if socket is using ip v6.
   bool isIpv6() const;
 
+  /// Check if socket is connecting to remote host.
+  bool isConnecting() const;
+
+  /// Check if connection is complete and clear connecting flag.
+  /// @returns:
+  ///   Error::Ok - connection is complete
+  ///   Error::Timeout - still connecting.
+  ///   Any other error - failed to connect.
+  Error checkConnected();
+
   /// Bind socket to a specific network adapter.
   Error bind(const NetAddress& adapter);
 
@@ -138,6 +154,10 @@ public:
   std::pair<size_t, Error> write2(const char* header, size_t headerSize,
     const char* body, size_t bodySize,
     size_t written = 0);
+
+  /// Get system error from socket.
+  /// It can be used to extract error when poll/epoll returned POLLERR event.
+  int getSysError() const;
 
 protected:
   struct Internal;

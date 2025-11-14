@@ -16,7 +16,7 @@
 namespace miniros {
 namespace master {
 
-Error MasterRootEndpoint::handle(const http::HttpFrame& frame, const network::ClientInfo& clientInfo,
+Error MasterRootEndpoint::handle(const http::HttpParserFrame& frame, const network::ClientInfo& clientInfo,
   http::HttpResponseHeader& responseHeader, std::string& body)
 {
   if (!internal)
@@ -31,7 +31,7 @@ Error MasterRootEndpoint::handle(const http::HttpFrame& frame, const network::Cl
   return Error::Ok;
 }
 
-Error MasterFaviconEndpoint::handle(const http::HttpFrame& frame, const network::ClientInfo& clientInfo,
+Error MasterFaviconEndpoint::handle(const http::HttpParserFrame& frame, const network::ClientInfo& clientInfo,
     http::HttpResponseHeader& responseHeader, std::string& body)
 {
   responseHeader.statusCode = 200;
@@ -44,7 +44,7 @@ Error MasterFaviconEndpoint::handle(const http::HttpFrame& frame, const network:
   return Error::Ok;
 }
 
-Error NodeInfoEndpoint::handle(const http::HttpFrame& frame, const network::ClientInfo& clientInfo,
+Error NodeInfoEndpoint::handle(const http::HttpParserFrame& frame, const network::ClientInfo& clientInfo,
   http::HttpResponseHeader& responseHeader, std::string& body)
 {
   std::string_view name = http::getNameFromUrlPath(frame.getPath(), "/node/", true);
@@ -63,7 +63,7 @@ Error NodeInfoEndpoint::handle(const http::HttpFrame& frame, const network::Clie
   return Error::Ok;
 }
 
-Error TopicInfoEndpoint::handle(const http::HttpFrame& frame, const network::ClientInfo& clientInfo,
+Error TopicInfoEndpoint::handle(const http::HttpParserFrame& frame, const network::ClientInfo& clientInfo,
   http::HttpResponseHeader& responseHeader, std::string& body)
 {
   std::string_view name = http::getNameFromUrlPath(frame.getPath(), "/topic/", true);
@@ -82,7 +82,7 @@ Error TopicInfoEndpoint::handle(const http::HttpFrame& frame, const network::Cli
   return Error::Ok;
 }
 
-Error PublishedTopicsEndpoint::handle(const http::HttpFrame& frame, const network::ClientInfo& clientInfo,
+Error PublishedTopicsEndpoint::handle(const http::HttpParserFrame& frame, const network::ClientInfo& clientInfo,
   http::HttpResponseHeader& responseHeader, std::string& body)
 {
   if (!internal)
@@ -115,7 +115,7 @@ Error PublishedTopicsEndpoint::handle(const http::HttpFrame& frame, const networ
   return Error::Ok;
 }
 
-Error TopicTypesEndpoint::handle(const http::HttpFrame& frame, const network::ClientInfo& clientInfo,
+Error TopicTypesEndpoint::handle(const http::HttpParserFrame& frame, const network::ClientInfo& clientInfo,
   http::HttpResponseHeader& responseHeader, std::string& body)
 {
   if (!internal)

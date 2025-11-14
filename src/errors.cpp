@@ -47,6 +47,8 @@ const char* Error::toString() const {
       return "Not connected";
     case Error::InvalidHandle:
       return "Invalid handle";
+    case Error::Timeout:
+      return "Timeout";
   }
   return "Unknown error";
 }

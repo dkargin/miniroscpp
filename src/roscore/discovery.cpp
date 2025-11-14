@@ -158,6 +158,7 @@ Error Discovery::Internal::initSockets(int port)
       } else {
         MINIROS_WARN("Discovery socket: unexpected event %d", flags);
       }
+      return 0;
     }))
   {
     MINIROS_ERROR("Failed to register listening socket");

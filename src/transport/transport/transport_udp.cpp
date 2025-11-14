@@ -106,7 +106,6 @@ void TransportUDP::socketUpdate(int events)
 {
   {
     std::scoped_lock<std::mutex> lock(close_mutex_);
-
     if (closed_)
     {
       return;
@@ -138,7 +137,6 @@ void TransportUDP::socketUpdate(int events)
       }
     }
   }
-
 }
 
 std::string TransportUDP::getTransportInfo()
@@ -299,7 +297,10 @@ bool TransportUDP::initializeSocket()
   if (poll_set_)
   {
     auto thisptr = std::static_pointer_cast<TransportUDP>(shared_from_this());
-    poll_set_->addSocket(sock_, 0, [thisptr](int val){thisptr->socketUpdate(val);});
+    poll_set_->addSocket(sock_, 0, [thisptr](int val) {
+      thisptr->socketUpdate(val);
+      return 0;
+    });
   }
 
   return true;

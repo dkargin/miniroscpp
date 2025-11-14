@@ -148,7 +148,10 @@ bool TransportTCP::initializeSocket()
     events = POLLRDHUP;
 #endif
 
-    poll_set_->addSocket(sock_, events, [thisptr](int val){thisptr->socketUpdate(val);});
+    poll_set_->addSocket(sock_, events, [thisptr](int val) {
+      thisptr->socketUpdate(val);
+      return 0;
+    });
   }
 
   if (!(flags_ & SYNCHRONOUS))

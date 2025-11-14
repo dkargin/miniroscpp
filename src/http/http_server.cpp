@@ -5,8 +5,9 @@
 #include <cassert>
 #include <mutex>
 
-#include "../../include/miniros/network/socket.h"
+#include "miniros/network/socket.h"
 #include "miniros/transport/poll_set.h"
+#include "miniros/internal/lifetime.h"
 
 #include "miniros/transport/io.h"
 
@@ -24,7 +25,6 @@ struct Binding {
 };
 
 struct HttpServer::Internal {
-
   /// A collection of endpoints.
   std::vector<Binding> endpoints;
   /// A mutex for endpoints.
@@ -43,26 +43,57 @@ struct HttpServer::Internal {
   PollSet* pollSet;
 
   /// Global mutex.
-  std::mutex mutex;
+  std::shared_ptr<Lifetime<HttpServer>> lifetime = std::make_shared<Lifetime<HttpServer>>();
 
   Internal(PollSet* ps) : pollSet(ps)
-  {}
+  {
+    assert(pollSet);
+  }
+
+  ~Internal()
+  {
+    MINIROS_INFO_NAMED("destructor", "HttpServer::~Internal()");
+  }
+
+  void closeConnection(int fd, const char* reason);
 };
+
+void HttpServer::Internal::closeConnection(int fd, const char* reason)
+{
+  MINIROS_DEBUG_NAMED("HttpServer", "closeConnection(%d): %s", fd, reason);
+  std::shared_ptr<HttpServerConnection> connection;
+  auto it = connections.find(fd);
+  if (it != connections.end()) {
+    if (pollSet) {
+      pollSet->delSocket(fd);
+    }
+    connection = it->second;
+    connection->detach();
+    connections.erase(fd);
+    connection->close();
+  }
+}
 
 HttpServer::HttpServer(PollSet* pollSet)
 {
+  assert(pollSet);
   internal_ = std::make_unique<Internal>(pollSet);
 }
 
 HttpServer::~HttpServer()
 {
   if (internal_) {
+    auto lifetime = internal_->lifetime;
+
     // 1. Close all connections.
     // 2. Detach all endpoints.
-    std::unique_lock lock(internal_->mutex);
     stop();
+    std::unique_lock lock(*lifetime);
+    internal_->lifetime->alive = false;
     internal_->pollSet = nullptr;
+    internal_.reset();
   }
+  MINIROS_INFO("HttpServer::~HttpServer()");
 }
 
 Error HttpServer::start(int port)
@@ -70,7 +101,7 @@ Error HttpServer::start(int port)
   if (!internal_)
     return Error::InternalError;
 
-  std::unique_lock lock(internal_->mutex);
+  std::unique_lock lock(*internal_->lifetime);
   if (Error err = internal_->socket_v4.tcpListen(port, network::NetAddress::AddressIPv4, 100); !err) {
     return err;
   }
@@ -80,15 +111,18 @@ Error HttpServer::start(int port)
   }
 
   int fd = internal_->socket_v4.fd();
+  auto lifetime = internal_->lifetime;
+
   bool added = internal_->pollSet->addSocket(fd, POLLIN,
-    [this](int flags)
+    [this, lifetime](int flags)
     {
       if (flags & POLLIN) {
-        this->acceptClient(&internal_->socket_v4);
+        this->acceptClient(lifetime, &internal_->socket_v4);
       } else {
         MINIROS_WARN("HttpServer socket: unexpected event %d", flags);
       }
-    });
+      return 0;
+    }, lifetime);
 
   if (!added)
   {
@@ -103,18 +137,26 @@ Error HttpServer::start(int port)
 
 Error HttpServer::stop()
 {
-  if (!internal_->pollSet->delSocket(internal_->socket_v4.fd())) {
+  if (!internal_)
     return Error::InternalError;
+
+  std::unique_lock lock(*internal_->lifetime);
+
+  if (internal_->pollSet && internal_->socket_v4.valid()) {
+    if (!internal_->pollSet->delSocket(internal_->socket_v4.fd())) {
+      return Error::InternalError;
+    }
   }
+
   internal_->socket_v4.close();
   while (!internal_->connections.empty()) {
     auto it = internal_->connections.begin();
-    closeConnection(it->first, "HttpServer::stop()");
+    internal_->closeConnection(it->first, "HttpServer::stop()");
   }
   return Error::Ok;
 }
 
-int HttpServer::getPortIp4() const
+int HttpServer::getPort() const
 {
   return internal_->socket_v4.port();
 }
@@ -129,8 +171,18 @@ PollSet* HttpServer::getPollSet() const
   return internal_ ? internal_->pollSet : nullptr;
 }
 
-void HttpServer::acceptClient(network::NetSocket* sock)
+void HttpServer::acceptClient(const std::shared_ptr<Lifetime<HttpServer>>& lifetime, network::NetSocket* sock)
 {
+  // This callback is called from PollSet thread.
+  std::unique_lock lock(*lifetime);
+  if (!lifetime->alive)
+    return;
+
+  if (!internal_)
+    return;
+  if (!sock)
+    return;
+
   auto [client, err] = sock->accept();
 
   if (!client) {
@@ -144,16 +196,22 @@ void HttpServer::acceptClient(network::NetSocket* sock)
   client->setNonBlock();
   client->setNoDelay(true);
 
+  assert(internal_->pollSet);
+
   std::shared_ptr<HttpServerConnection> connection(new HttpServerConnection(this, client));
   internal_->connections[fd] = connection;
-  internal_->pollSet->addSocket(fd, POLLIN, [this, connection, fd](int flags) {
+  auto internalCopy = internal_->lifetime;
+  internal_->pollSet->addSocket(fd, POLLIN | EVT_UPDATE, [this, connection, fd, internalCopy](int flags) {
     int newFlags = connection->handleEvents(flags);
+    // HttpServerConnection can probably be destroyed here.
+    std::unique_lock lock(*internalCopy);
+    if (!internalCopy->alive)
+      return 0;
     if (!newFlags) {
-      closeConnection(fd, "EOF");
-    } else {
-      internal_->pollSet->setEvents(fd, newFlags);
+      internal_->closeConnection(fd, "EOF");
     }
-  }, connection);
+    return newFlags;
+  }, internalCopy);
 }
 
 Error HttpServer::registerEndpoint(std::unique_ptr<EndpointFilter>&& filter, const std::shared_ptr<EndpointHandler>& handler)
@@ -168,7 +226,7 @@ Error HttpServer::registerEndpoint(std::unique_ptr<EndpointFilter>&& filter, con
   return Error::Ok;
 }
 
-EndpointHandler* HttpServer::findEndpoint(const HttpFrame& frame)
+EndpointHandler* HttpServer::findEndpoint(const HttpParserFrame& frame)
 {
   std::unique_lock<std::mutex> lock(internal_->endpointsGuard);
 
@@ -179,22 +237,6 @@ EndpointHandler* HttpServer::findEndpoint(const HttpFrame& frame)
   }
 
   return nullptr;
-}
-
-void HttpServer::closeConnection(int fd, const char* reason)
-{
-  if (!internal_)
-    return;
-  MINIROS_DEBUG("HttpServer::closeConnection(%d): %s", fd, reason);
-  std::shared_ptr<HttpServerConnection> connection;
-  std::unique_lock<std::mutex> lock(internal_->mutex);
-  auto it = internal_->connections.find(fd);
-  if (it != internal_->connections.end()) {
-    internal_->pollSet->delSocket(fd);
-    connection = it->second;
-    internal_->connections.erase(fd);
-    connection->close();
-  }
 }
 
 }

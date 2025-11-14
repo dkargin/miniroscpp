@@ -60,6 +60,7 @@ struct PollSet::Internal {
     SocketUpdateFunc func_;
     int fd_;
     int events_;
+    bool updateEvents_;
   };
 
   std::map<int, SocketInfo> socket_info_;
@@ -106,7 +107,7 @@ PollSet::PollSet()
     MINIROS_FATAL("create_signal_pair() failed");
     MINIROS_BREAK();
   }
-  addSocket(internal_->signal_pipe_[0], POLLIN, [this](int events){this->onLocalPipeEvents(events);});
+  addSocket(internal_->signal_pipe_[0], POLLIN, [this](int events){return onLocalPipeEvents(events);});
 }
 
 PollSet::~PollSet()
@@ -123,6 +124,12 @@ bool PollSet::addSocket(int fd, int events, const SocketUpdateFunc& update_func,
 
   Internal::SocketInfo info;
   info.fd_ = fd;
+  if (events & EVT_UPDATE) {
+    info.updateEvents_ = true;
+    events &= ~EVT_UPDATE;
+  } else {
+    info.updateEvents_ = false;
+  }
   info.events_ = events;
   info.object_ = object;
   info.func_ = update_func;
@@ -238,7 +245,6 @@ bool PollSet::setEvents(int sock, int events)
 
   if (it->second.events_ != events) {
     it->second.events_ = events;
-
     set_events_on_socket(internal_->epfd_, sock, it->second.events_);
 
     internal_->sockets_changed_ = true;
@@ -315,8 +321,17 @@ void PollSet::update(int poll_timeout)
             skip = true;
         }
 
-        if (!skip)
-          func(revents & (events|POLLERR|POLLHUP|POLLNVAL));
+        if (!skip) {
+          int ret = func(revents & (events|POLLERR|POLLHUP|POLLNVAL));
+          if (info->updateEvents_ && ret != info->events_) {
+            std::scoped_lock<std::mutex> lock(internal_->socket_info_mutex_);
+            auto it = internal_->socket_info_.find(fd);
+            if (it != internal_->socket_info_.end() && it->second.events_ != events) {
+              it->second.events_ = events;
+              set_events_on_socket(internal_->epfd_, fd, it->second.events_);
+            }
+          }
+        }
       }
     }
   }
@@ -349,7 +364,7 @@ void PollSet::createNativePollset()
   internal_->sockets_changed_ = false;
 }
 
-void PollSet::onLocalPipeEvents(int events)
+int PollSet::onLocalPipeEvents(int events)
 {
   if(events & POLLIN)
   {
@@ -359,6 +374,7 @@ void PollSet::onLocalPipeEvents(int events)
       //do nothing keep draining
     };
   }
+  return 0;
 }
 
 }
