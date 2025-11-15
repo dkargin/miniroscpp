@@ -7,6 +7,10 @@
 
 #include "http/http_server.h"
 #include "http/http_filters.h"
+#include "requester_info.h"
+#include "miniros/internal/json_tools.h"
+#include "miniros/xmlrpcpp/XmlRpcValue.h"
+
 
 
 namespace miniros {
@@ -75,6 +79,40 @@ Error TopicInfoEndpoint::handle(const http::HttpFrame& frame, const network::Cli
     responseHeader.status = "OK";
   }
   body += "</body></html>";
+  return Error::Ok;
+}
+
+Error PublishedTopicsEndpoint::handle(const http::HttpFrame& frame, const network::ClientInfo& clientInfo,
+  http::HttpResponseHeader& responseHeader, std::string& body)
+{
+  if (!internal)
+    return Error::InternalError;
+
+  // Create RequesterInfo for the HTTP client
+  RequesterInfo requesterInfo;
+  requesterInfo.assign("http_client", clientInfo);
+
+  // Get published topics
+  auto topics = internal->handler.getPublishedTopics(requesterInfo, "");
+
+  // Build JSON structure as a simple object: {"/topic1": "std_msgs/String", ...}
+  using RpcValue = XmlRpc::XmlRpcValue;
+  RpcValue jsonResponse;
+  for (size_t i = 0; i < topics.size(); i++) {
+    jsonResponse[topics[i][0]] = topics[i][1];  // topic name -> topic type
+  }
+
+  // Serialize to JSON
+  std::ostringstream oss;
+  miniros::JsonState state;
+  miniros::JsonSettings settings;
+  jsonResponse.writeJson(oss, state, settings);
+  body = oss.str();
+
+  responseHeader.statusCode = 200;
+  responseHeader.status = "OK";
+  responseHeader.contentType = "application/json";
+
   return Error::Ok;
 }
 
