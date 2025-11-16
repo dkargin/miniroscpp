@@ -191,6 +191,7 @@ void Master::setupBindings()
     internal_->httpNodeInfoEndpoint.reset(new NodeInfoEndpoint(internal_.get()));
     internal_->httpTopicInfoEndpoint.reset(new TopicInfoEndpoint(internal_.get()));
     internal_->httpPublishedTopicsEndpoint.reset(new PublishedTopicsEndpoint(internal_.get()));
+    internal_->httpTopicTypesEndpoint.reset(new TopicTypesEndpoint(internal_.get()));
 
     server->registerEndpoint(std::make_unique<http::SimpleFilter>(http::HttpMethod::Get, "/"), internal_->httpRootEndpoint);
     server->registerEndpoint(
@@ -200,6 +201,8 @@ void Master::setupBindings()
       internal_->httpTopicInfoEndpoint);
     server->registerEndpoint(std::make_unique<http::SimpleFilter>(http::HttpMethod::Get, "/api2/published_topics"),
       internal_->httpPublishedTopicsEndpoint);
+    server->registerEndpoint(std::make_unique<http::SimpleFilter>(http::HttpMethod::Get, "/api2/topic_types"),
+      internal_->httpTopicTypesEndpoint);
     server->registerEndpoint(std::make_unique<http::SimpleFilter>(http::HttpMethod::Get, "/favicon.ico"),
       std::make_shared<MasterFaviconEndpoint>());
 

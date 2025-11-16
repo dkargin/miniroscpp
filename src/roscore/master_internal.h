@@ -23,6 +23,7 @@ class MasterRootEndpoint;
 class NodeInfoEndpoint;
 class TopicInfoEndpoint;
 class PublishedTopicsEndpoint;
+class TopicTypesEndpoint;
 
 struct Master::Internal {
   int port = -1;
@@ -48,6 +49,9 @@ struct Master::Internal {
 
   /// Endpoint for accessing /api2/published_topics
   std::shared_ptr<PublishedTopicsEndpoint> httpPublishedTopicsEndpoint;
+
+  /// Endpoint for accessing /api2/topic_types
+  std::shared_ptr<TopicTypesEndpoint> httpTopicTypesEndpoint;
 
   /// Discovery service for companion masters.
   std::unique_ptr<Discovery> discovery;

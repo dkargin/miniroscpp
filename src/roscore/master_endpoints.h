@@ -51,6 +51,16 @@ public:
   Master::Internal* internal = nullptr;
 };
 
+class TopicTypesEndpoint : public http::EndpointHandler {
+public:
+  TopicTypesEndpoint(Master::Internal* internal) : internal(internal) {}
+
+  Error handle(const http::HttpFrame& frame, const network::ClientInfo& clientInfo,
+    http::HttpResponseHeader& responseHeader, std::string& body);
+
+  Master::Internal* internal = nullptr;
+};
+
 /// Handles GET /favicon.ico.
 class MasterFaviconEndpoint : public http::EndpointHandler {
   Error handle(const http::HttpFrame& frame, const network::ClientInfo& clientInfo,

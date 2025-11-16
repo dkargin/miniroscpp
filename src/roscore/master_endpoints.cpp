@@ -105,8 +105,36 @@ Error PublishedTopicsEndpoint::handle(const http::HttpFrame& frame, const networ
   // Serialize to JSON
   std::ostringstream oss;
   miniros::JsonState state;
-  miniros::JsonSettings settings;
-  jsonResponse.writeJson(oss, state, settings);
+  jsonResponse.writeJson(oss, state, {});
+  body = oss.str();
+
+  responseHeader.statusCode = 200;
+  responseHeader.status = "OK";
+  responseHeader.contentType = "application/json";
+
+  return Error::Ok;
+}
+
+Error TopicTypesEndpoint::handle(const http::HttpFrame& frame, const network::ClientInfo& clientInfo,
+  http::HttpResponseHeader& responseHeader, std::string& body)
+{
+  if (!internal)
+    return Error::InternalError;
+
+  // Get all topic types
+  auto topicTypes = internal->regManager.getTopicTypes("http_client");
+
+  // Build JSON structure as a simple object: {"/topic1": "std_msgs/String", ...}
+  using RpcValue = XmlRpc::XmlRpcValue;
+  RpcValue jsonResponse;
+  for (const auto& [topicName, topicType] : topicTypes) {
+    jsonResponse[topicName] = topicType;
+  }
+
+  // Serialize to JSON
+  std::ostringstream oss;
+  miniros::JsonState state;
+  jsonResponse.writeJson(oss, state, {});
   body = oss.str();
 
   responseHeader.statusCode = 200;
