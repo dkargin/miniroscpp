@@ -30,6 +30,9 @@ option(MINIROS_BUILD_SHARED_LIBS "Build shared version of miniros" ON)
 option(MINIROS_ROSBAG_USE_GPGME_ENCRYPTION "Use GPGME encryption support" OFF)
 option(MINIROS_ROSBAG_USE_OPENSSL_ENCRYPTION "Use openssl encryption for rosbag" OFF)
 option(MINIROS_PATCH_RPATH "Patch RPATH" OFF)
+option(MINIROS_SANITIZE_MEMORY "Use ASan to find memory errors" OFF)
+option(MINIROS_SANITIZE_THREADS "Use TSan to find potential data races" OFF)
+
 
 if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
   option(MINIROS_USE_LIBSYSTEMD "Signal systemd when node has actually started" ON)

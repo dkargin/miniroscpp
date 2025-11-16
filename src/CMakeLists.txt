@@ -37,6 +37,39 @@ configure_file("${CMAKE_CURRENT_SOURCE_DIR}/internal_config.h.in" internal_confi
 
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
+if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+  list(APPEND MINIROS_COMPIE_OPTIONS "-Wall" "-Wextra" "-Werror=switch-enum" "-Werror=format" "-Werror=format-extra-args")
+elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+  list(APPEND MINIROS_COMPIE_OPTIONS "-Wall" "-Wextra" "-Werror=switch-enum" "-Werror=format" "-Werror=format-extra-args")
+elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
+  # TODO
+elseif (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+  # TODO
+endif()
+
+if (MINIROS_SANITIZE_MEMORY)
+  if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    list(APPEND MINIROS_COMPIE_OPTIONS "-fsanitize=address")
+    list(APPEND MINIROS_LINK_OPTIONS "-fsanitize=address" "-fsanitize=undefined")
+  elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    list(APPEND MINIROS_COMPIE_OPTIONS "-fsanitize=address")
+    list(APPEND MINIROS_LINK_OPTIONS "-fsanitize=address" "-fsanitize=undefined")
+  endif()
+endif ()
+
+if (MINIROS_SANITIZE_THREADS)
+  if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    list(APPEND MINIROS_COMPIE_OPTIONS "-fsanitize=thread")
+    list(APPEND MINIROS_LINK_OPTIONS "-fsanitize=thread")
+  elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    list(APPEND MINIROS_COMPIE_OPTIONS "-fsanitize=thread")
+    list(APPEND MINIROS_LINK_OPTIONS "-fsanitize=thread")
+  endif()
+endif()
+
+
+#-fsanitize=thread
+
 SET(rostime_SRC
     rostime/duration.cpp
     rostime/rate.cpp
@@ -248,6 +281,9 @@ if (MINIROS_BUILD_SHARED_LIBS)
 else()
   add_library(roscxx ${cpp_common_SRC} ${transport_SRC} ${master_SRC} ${rostime_SRC} ${XMLRPC_SRC})
 endif()
+
+target_compile_options(roscxx PRIVATE ${MINIROS_COMPILE_OPTIONS})
+target_link_options(roscxx PRIVATE ${MINIROS_LINK_OPTIONS})
 
 set_property(TARGET roscxx PROPERTY CXX_STANDARD 17)
 
