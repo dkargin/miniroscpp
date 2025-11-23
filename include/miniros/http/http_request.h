@@ -118,6 +118,9 @@ public:
   /// It is not thread safe until state == HasResponse.
   const HttpResponseHeader& responseHeader() const;
 
+  /// Wait until status changes to Status::HasResponse.
+  Error waitForResponse(const WallDuration& duration) const;
+
 protected:
   Status status_ = Status::Idle;
   /// Timestamp when request was sent.
@@ -142,7 +145,7 @@ protected:
   std::string response_body_;
 
   mutable std::mutex mutex_;
-  std::condition_variable cv_;
+  mutable std::condition_variable cv_;
 };
 
 } // namespace http

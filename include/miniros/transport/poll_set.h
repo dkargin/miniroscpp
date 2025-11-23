@@ -39,9 +39,6 @@
 
 #include "miniros/common.h"
 
-/// Add this evt flag to update event flags by return value from SocketUpdateFunc.
-static constexpr int EVT_UPDATE = (1 << 30);
-
 namespace miniros
 {
 
@@ -57,6 +54,15 @@ public:
   PollSet();
   ~PollSet();
 
+  /// Add this evt flag to update event flags by return value from SocketUpdateFunc.
+  static const int EventUpdate;
+  /// Use this flag to subscribe to "input" events. They are equal to POLLIN.
+  static const int EventIn;
+  /// Use this flag to get notified when output is possible. It is equal to POLLOUT.
+  static const int EventOut;
+  /// Equal to POLLERR.
+  static const int EventError;
+
   /// Object to be kept back during active callback.
   typedef std::shared_ptr<void> TrackedObject;
 
@@ -68,7 +74,8 @@ public:
    *
    * addSocket() may be called from any thread.
    * \param sock The socket to add
-   * \param events selected events.
+   * \param events selected events. They are equal to events in poll/epoll, except PollSet::EventUpdate, which
+   *      allows to update events by returning new event flags from SocketUpdateFunc call.
    * \param update_func The function to call when a socket has events
    * \param object The (optional) object associated with this socket. Mainly
    * used to prevent the transport from being deleted while we're calling the update function

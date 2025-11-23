@@ -7,7 +7,7 @@
 #include "miniros/http/http_server.h"
 #include "miniros/http/http_server_connection.h"
 
-#include "miniros/transport/io.h"
+#include "miniros/transport/poll_set.h"
 
 namespace miniros {
 namespace http {
@@ -62,14 +62,14 @@ int HttpServerConnection::handleEvents(int evtFlags)
   std::unique_lock<std::mutex> lock(guard_);
   bool stateFallback = false;
   if (state_ == State::ReadRequest) {
-    if (evtFlags & POLLIN) {
+    if (evtFlags & PollSet::EventIn) {
       Error err = readRequest();
       // What to do with EOF?
 
       if (err == Error::Ok) {
         // Request is not finished. Need to wait for another packet.
         if (state_ == State::ReadRequest) {
-          return POLLIN;
+          return PollSet::EventIn;
         }
       }
       else if (err == Error::EndOfFile) {
@@ -114,7 +114,7 @@ int HttpServerConnection::handleEvents(int evtFlags)
   }
 
   if (state_ == State::WriteResponse) {
-    if (evtFlags & POLLOUT || stateFallback) {
+    if (evtFlags & PollSet::EventOut || stateFallback) {
       std::pair<size_t, Error> r;
 
       if (response_body_.size() > 0) {
@@ -139,19 +139,19 @@ int HttpServerConnection::handleEvents(int evtFlags)
       }
 
       if (err == Error::WouldBlock)
-        return POLLOUT;
+        return PollSet::EventOut;
 
       if (err == Error::Ok) {
         if (data_sent_ < totalSize) {
           // Failed to write all data, so we need to yield to spinner.
-          return POLLOUT;
+          return PollSet::EventOut;
         }
         data_sent_ = 0;
         state_ = State::ReadRequest;
         http_frame_.finishRequest();
         auto dur = SteadyTime::now() - request_start_;
         MINIROS_DEBUG("Served HTTP response in %fms", dur.toSec()*1000);
-        return POLLIN;
+        return PollSet::EventIn;
       } else {
         MINIROS_ERROR("HttpServerConnection writeResponse error: %s", err.toString());
         return 0;

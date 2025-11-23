@@ -9,8 +9,6 @@
 #include "miniros/transport/poll_set.h"
 #include "miniros/internal/lifetime.h"
 
-#include "miniros/transport/io.h"
-
 #include "miniros/http/http_server.h"
 #include "miniros/http/http_server_connection.h"
 
@@ -113,10 +111,10 @@ Error HttpServer::start(int port)
   int fd = internal_->socket_v4.fd();
   auto lifetime = internal_->lifetime;
 
-  bool added = internal_->pollSet->addSocket(fd, POLLIN,
+  bool added = internal_->pollSet->addSocket(fd, PollSet::EventIn,
     [this, lifetime](int flags)
     {
-      if (flags & POLLIN) {
+      if (flags & PollSet::EventIn) {
         this->acceptClient(lifetime, &internal_->socket_v4);
       } else {
         MINIROS_WARN("HttpServer socket: unexpected event %d", flags);
@@ -201,7 +199,7 @@ void HttpServer::acceptClient(const std::shared_ptr<Lifetime<HttpServer>>& lifet
   std::shared_ptr<HttpServerConnection> connection(new HttpServerConnection(this, client));
   internal_->connections[fd] = connection;
   auto internalCopy = internal_->lifetime;
-  internal_->pollSet->addSocket(fd, POLLIN | EVT_UPDATE, [this, connection, fd, internalCopy](int flags) {
+  internal_->pollSet->addSocket(fd, PollSet::EventIn | PollSet::EventUpdate, [this, connection, fd, internalCopy](int flags) {
     int newFlags = connection->handleEvents(flags);
     // HttpServerConnection can probably be destroyed here.
     std::unique_lock lock(*internalCopy);

@@ -49,7 +49,6 @@
 #include "miniros/transport/connection_manager.h"
 #include "miniros/transport/intraprocess_publisher_link.h"
 #include "miniros/transport/intraprocess_subscriber_link.h"
-#include "miniros/transport/io.h"
 #include "miniros/transport/message_deserializer.h"
 #include "miniros/transport/poll_manager.h"
 #include "miniros/transport/publication.h"
@@ -121,7 +120,7 @@ void Subscription::PendingConnection::addToDispatch(PollSet* pollSet)
   assert(pollSet);
 
   int fd = client_->getfd();
-  pollSet->addSocket(fd, POLLOUT | POLLERR | EVT_UPDATE, [this, pollSet](int flags) {
+  pollSet->addSocket(fd, PollSet::EventIn | PollSet::EventError | PollSet::EventUpdate, [this, pollSet](int flags) {
     int oflags = convertEventsToXmlRpc(flags);
     int newEvents = client_->handleEvent(oflags);
     return convertEventsToPollSet(newEvents);

@@ -5,7 +5,6 @@
 #include <cassert>
 #include <chrono>
 
-#include "miniros/transport/io.h"
 #include "miniros/network/socket.h"
 #include "miniros/http/http_client.h"
 
@@ -50,7 +49,10 @@ struct HttpClient::Internal {
   /// Condition variable for state change.
   std::condition_variable cv;
 
-  Internal(PollSet* ps) : poll_set(ps) {}
+  Internal(PollSet* ps) : poll_set(ps)
+  {
+    assert(ps);
+  }
 
   ~Internal()
   {
@@ -108,7 +110,7 @@ int HttpClient::Internal::pullNewTaskUnsafe()
 
   state = State::WriteRequest;
 
-  return POLLIN;
+  return PollSet::EventIn;
 }
 
 
@@ -153,7 +155,7 @@ int HttpClient::Internal::handleEvents(int evtFlags)
   if (state == State::Connecting) {
     // Assume socket is in "connecting" state
     assert(socket->isConnecting());
-    if (evtFlags | POLLOUT) {
+    if (evtFlags | PollSet::EventOut) {
       Error err = socket->checkConnected();
       if (err == Error::Ok) {
         MINIROS_DEBUG_NAMED("HttpClient", "handleEvents(state=Connecting) - connected");
@@ -169,13 +171,13 @@ int HttpClient::Internal::handleEvents(int evtFlags)
         return 0;
       }
     }
-    if (evtFlags | POLLERR) {
+    if (evtFlags | PollSet::EventError) {
       // TODO: Process error.
     }
   }
 
   if (state == State::WriteRequest) {
-    if (evtFlags & POLLOUT) {
+    if (evtFlags & PollSet::EventOut) {
       std::pair<size_t, Error> r;
 
       if (request_body.size() > 0) {
@@ -202,7 +204,7 @@ int HttpClient::Internal::handleEvents(int evtFlags)
 
       if (err == Error::WouldBlock) {
         // Failed to write all data. Retry later.
-        return POLLOUT;
+        return PollSet::EventOut;
       }
 
       if (err != Error::Ok) {
@@ -213,7 +215,7 @@ int HttpClient::Internal::handleEvents(int evtFlags)
 
       if (data_sent < totalSize) {
         // Failed to write all data, so we need to yield to spinner.
-        return POLLOUT;
+        return PollSet::EventOut;
       }
 
       data_sent = 0;
@@ -224,9 +226,9 @@ int HttpClient::Internal::handleEvents(int evtFlags)
       http_frame.resetParseState(false); // false = response mode
       auto dur = SteadyTime::now() - active_request->getRequestStart();
       MINIROS_DEBUG("HttpClient sent request in %fms, waiting for response", dur.toSec()*1000);
-      return POLLIN;
+      return PollSet::EventIn;
     }
-    if (evtFlags & POLLERR) {
+    if (evtFlags & PollSet::EventError) {
       int err = socket->getSysError();
       // Here we can have some disconnect problem or some generic network problem.
       MINIROS_WARN("HttpClient::handleEvents socket error in WriteRequest: %i", err);
@@ -239,14 +241,14 @@ int HttpClient::Internal::handleEvents(int evtFlags)
   }
 
   if (state == State::ReadResponse) {
-    if (evtFlags & POLLIN) {
+    if (evtFlags & PollSet::EventIn) {
       Error err = readResponse();
       // What to do with EOF?
 
       if (err == Error::Ok) {
         // Request is not finished. Need to wait for another packet.
         if (state == State::ReadResponse) {
-          return POLLIN;
+          return PollSet::EventIn;
         }
       }
       else if (err == Error::EndOfFile) {
@@ -286,7 +288,7 @@ int HttpClient::Internal::handleEvents(int evtFlags)
     return pullNewTaskUnsafe();
   }
 
-  if (state == State::Idle && evtFlags & POLLOUT) {
+  if (state == State::Idle && evtFlags & PollSet::EventOut) {
     // Nothing to do here.
   } else {
     MINIROS_WARN("HttpClient unhandled events: %o in state %d", evtFlags, (int)state);
@@ -338,7 +340,7 @@ Error HttpClient::attach(std::shared_ptr<NetSocket> sock)
   }
   auto copy = internal_;
 
-  if (!internal_->poll_set->addSocket(sock->fd(), POLLIN | POLLOUT,
+  if (!internal_->poll_set->addSocket(sock->fd(), PollSet::EventIn | PollSet::EventOut,
     [copy](int evtFlags) {
       return copy->handleEvents(evtFlags);
     }, copy))
@@ -418,7 +420,7 @@ Error HttpClient::connect(const std::string& host, int port)
   internal_->port_ = port;
 
   auto copy = internal_;
-  internal_->poll_set->addSocket(internal_->socket->fd(), POLLIN | POLLOUT | EVT_UPDATE,
+  internal_->poll_set->addSocket(internal_->socket->fd(), PollSet::EventIn | PollSet::EventOut | PollSet::EventUpdate,
     [copy](int event)
     {
       return copy->handleEvents(event);
