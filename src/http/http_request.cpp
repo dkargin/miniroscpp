@@ -245,6 +245,20 @@ const HttpResponseHeader& HttpRequest::responseHeader() const
   return response_header_;
 }
 
+Error HttpRequest::waitForResponse(const WallDuration& duration) const
+{
+  std::unique_lock lock(mutex_);
+  if (status_ == Status::HasResponse)
+    return Error::Ok;
+  std::chrono::duration<double> d(duration.toSec());
+  if (!cv_.wait_for(lock, d, [this]() {
+    return status_ == Status::HasResponse;
+  })) {
+    return Error::Timeout;
+  }
+  return Error::Ok;
+}
+
 
 } // namespace http
 } // namespace miniros

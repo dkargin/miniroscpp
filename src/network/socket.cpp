@@ -693,7 +693,7 @@ int NetSocket::getSysError() const
     return 0;
   int err = 0;
   socklen_t len = 0;
-  getsockopt(internal_->fd, SOL_SOCKET, SO_ERROR, &err, &len);
+  getsockopt(internal_->fd, SOL_SOCKET, SO_ERROR, (char*)&err, &len);
   return err;
 }
 
@@ -708,7 +708,7 @@ Error NetSocket::checkConnected()
 
   int err = 0;
   socklen_t error_code_len = sizeof(err);
-  if (getsockopt(internal_->fd, SOL_SOCKET, SO_ERROR, &err, &error_code_len) == 0) {
+  if (getsockopt(internal_->fd, SOL_SOCKET, SO_ERROR, (char*)&err, &error_code_len) == 0) {
     if (err == 0) {
       // Connection successful
       internal_->connecting = false;

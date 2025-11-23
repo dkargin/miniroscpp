@@ -53,6 +53,16 @@
 namespace miniros
 {
 
+const int PollSet::EventUpdate = 1<<30;
+
+/// Use this flag to subscribe to "input" events. They are equal to POLLIN.
+const int PollSet::EventIn = POLLIN;
+
+/// Use this flag to get notified when output is possible. It is equal to POLLOUT.
+const int PollSet::EventOut = POLLOUT;
+
+const int PollSet::EventError = POLLERR;
+
 struct PollSet::Internal {
   struct SocketInfo
   {
@@ -124,9 +134,9 @@ bool PollSet::addSocket(int fd, int events, const SocketUpdateFunc& update_func,
 
   Internal::SocketInfo info;
   info.fd_ = fd;
-  if (events & EVT_UPDATE) {
+  if (events & EventUpdate) {
     info.updateEvents_ = true;
-    events &= ~EVT_UPDATE;
+    events &= ~EventUpdate;
   } else {
     info.updateEvents_ = false;
   }

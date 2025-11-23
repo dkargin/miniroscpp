@@ -2,6 +2,8 @@
 // Created by dkargin on 8/24/25.
 //
 
+#include <cassert>
+
 #include "discovery.h"
 
 #include "miniros/network/net_adapter.h"
@@ -10,7 +12,6 @@
 #include "miniros/transport/poll_set.h"
 
 #include "resolver.h"
-#include "transport/poll_manager.h"
 
 namespace miniros {
 
@@ -150,10 +151,10 @@ Error Discovery::Internal::initSockets(int port)
 
   int fd = socket.fd();
 
-  if (!pollSet->addSocket(fd, POLLIN | POLLERR,
+  if (!pollSet->addSocket(fd, PollSet::EventIn | PollSet::EventError,
     [this](int flags)
     {
-      if (flags & POLLIN) {
+      if (flags & PollSet::EventIn) {
         onSocketEvent(socket, 0, flags);
       } else {
         MINIROS_WARN("Discovery socket: unexpected event %d", flags);
@@ -162,11 +163,6 @@ Error Discovery::Internal::initSockets(int port)
     }))
   {
     MINIROS_ERROR("Failed to register listening socket");
-    return Error::InternalError;
-  }
-
-  if (!pollSet->addEvents(fd, POLLIN | POLLERR)) {
-    MINIROS_ERROR("Failed to add events");
     return Error::InternalError;
   }
 
