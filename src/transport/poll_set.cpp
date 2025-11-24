@@ -41,6 +41,8 @@
 #include <optional>
 
 #include "miniros/transport/poll_set.h"
+
+#include "internal/at_exit.h"
 #include "miniros/transport/io.h"
 
 #include "miniros/file_log.h"
@@ -54,6 +56,8 @@ namespace miniros
 {
 
 const int PollSet::EventUpdate = 1<<30;
+
+const int PollSet::EventTimer = 1<<29;
 
 /// Use this flag to subscribe to "input" events. They are equal to POLLIN.
 const int PollSet::EventIn = POLLIN;
@@ -71,9 +75,11 @@ struct PollSet::Internal {
     int fd_;
     int events_;
     bool updateEvents_;
+    int timeLeftMs_ = -1;
   };
 
   std::map<int, SocketInfo> socket_info_;
+  std::map<int, SteadyTime> socket_timers_;
   mutable std::mutex socket_info_mutex_;
   bool sockets_changed_ = false;
 
@@ -184,6 +190,10 @@ bool PollSet::delSocket(int fd)
 
     del_socket_from_watcher(internal_->epfd_, fd);
 
+    auto it2 = internal_->socket_timers_.find(fd);
+    if (it2 != internal_->socket_timers_.end())
+      internal_->socket_timers_.erase(it2);
+
     internal_->sockets_changed_ = true;
     signal();
 
@@ -256,7 +266,6 @@ bool PollSet::setEvents(int sock, int events)
   if (it->second.events_ != events) {
     it->second.events_ = events;
     set_events_on_socket(internal_->epfd_, sock, it->second.events_);
-
     internal_->sockets_changed_ = true;
     signal();
   }
@@ -264,6 +273,20 @@ bool PollSet::setEvents(int sock, int events)
   return true;
 }
 
+bool PollSet::setTimerEvent(int sock, int timeoutMs)
+{
+  std::scoped_lock<std::mutex> lock(internal_->socket_info_mutex_);
+  auto it = internal_->socket_info_.find(sock);
+
+  if (it == internal_->socket_info_.end())
+  {
+    MINIROS_DEBUG("PollSet: Tried to set timer fd [%d] which does not exist in this pollset", sock);
+    return false;
+  }
+  internal_->socket_timers_[sock] = SteadyTime::now() + WallDuration(timeoutMs*0.001);
+  signal();
+  return true;
+}
 
 void PollSet::signal()
 {
@@ -283,72 +306,106 @@ void PollSet::update(int poll_timeout)
 {
   createNativePollset();
 
+  AtExit ae([this]() {
+    std::scoped_lock<std::mutex> lock(internal_->just_deleted_mutex_);
+    internal_->just_deleted_.clear();
+  });
+
+  // This function does not lock socket info for most of the time.
+  // So it should be expected that configuration of sockets and events can change.
+  // delSocket also can be called during poll and its processing.
+
   const nfds_t numFd = static_cast<nfds_t>(internal_->ufds_.size());
   Error err = poll_sockets(internal_->epfd_, &internal_->ufds_.front(), numFd, poll_timeout, internal_->ofds_);
   if (!err)
   {
     MINIROS_ERROR("poll failed with error %s", err.toString());
+    return;
   }
-  else
+
+  for (const socket_pollfd& spfd: internal_->ofds_)
   {
-    for (const socket_pollfd& spfd: internal_->ofds_)
+    int fd = spfd.fd;
+    int revents = spfd.revents;
+
+    if (revents == 0)
+      continue;
+
+    auto info = internal_->findSocketInfo(fd);
+    if (!info)
+      continue;
+
+    // Store off the function and transport in case the socket is deleted from another thread
+    SocketUpdateFunc func = info->func_;
+    // This pointer helps keeping transport alive until we exit this block.
+    TrackedObject object = info->object_;
+    const int events = info->events_;
+
+    bool hasEvents = events & revents
+            || revents & POLLERR
+            || revents & POLLHUP
+            || revents & POLLNVAL;
+    if (!func || !hasEvents)
+      continue;
+    // If these are registered events for this socket, OR the events are ERR/HUP/NVAL,
+    // call through to the registered function
+    bool skip = false;
+    if (revents & (POLLNVAL|POLLERR|POLLHUP))
     {
-      int fd = spfd.fd;
-      int revents = spfd.revents;
+      // If a socket was just closed and then the file descriptor immediately reused, we can
+      // get in here with what we think is a valid socket (since it was just re-added to our set)
+      // but which is actually referring to the previous fd with the same #.  If this is the case,
+      // we ignore the first instance of one of these errors.  If it's a real error we'll
+      // hit it again next time through.
+      std::scoped_lock<std::mutex> lock(internal_->just_deleted_mutex_);
+      auto it = std::find(internal_->just_deleted_.begin(), internal_->just_deleted_.end(), fd);
+      if (it != internal_->just_deleted_.end())
+        skip = true;
+    }
+    if (skip)
+      continue;
 
-      if (revents == 0)
-        continue;
-
-      auto info = internal_->findSocketInfo(fd);
-      if (!info)
-        continue;
-
-      // Store off the function and transport in case the socket is deleted from another thread
-      SocketUpdateFunc func = info->func_;
-      // This pointer helps keeping transport alive until we exit this block.
-      TrackedObject object = info->object_;
-      const int events = info->events_;
-
-      bool hasEvents = events & revents
-              || revents & POLLERR
-              || revents & POLLHUP
-              || revents & POLLNVAL;
-      // If these are registered events for this socket, OR the events are ERR/HUP/NVAL,
-      // call through to the registered function
-      if (func && hasEvents)
-      {
-        bool skip = false;
-        if (revents & (POLLNVAL|POLLERR|POLLHUP))
-        {
-          // If a socket was just closed and then the file descriptor immediately reused, we can
-          // get in here with what we think is a valid socket (since it was just re-added to our set)
-          // but which is actually referring to the previous fd with the same #.  If this is the case,
-          // we ignore the first instance of one of these errors.  If it's a real error we'll
-          // hit it again next time through.
-          std::scoped_lock<std::mutex> lock(internal_->just_deleted_mutex_);
-          auto it = std::find(internal_->just_deleted_.begin(), internal_->just_deleted_.end(), fd);
-          if (it != internal_->just_deleted_.end())
-            skip = true;
-        }
-
-        if (!skip) {
-          int ret = func(revents & (events|POLLERR|POLLHUP|POLLNVAL));
-          if (info->updateEvents_ && ret != info->events_) {
-            std::scoped_lock<std::mutex> lock(internal_->socket_info_mutex_);
-            auto it = internal_->socket_info_.find(fd);
-            if (it != internal_->socket_info_.end() && it->second.events_ != events) {
-              it->second.events_ = events;
-              set_events_on_socket(internal_->epfd_, fd, it->second.events_);
-            }
-          }
-        }
+    int ret = func(revents & (events|POLLERR|POLLHUP|POLLNVAL));
+    if (info->updateEvents_ && ret != info->events_) {
+      std::scoped_lock<std::mutex> lock(internal_->socket_info_mutex_);
+      auto it = internal_->socket_info_.find(fd);
+      if (it != internal_->socket_info_.end() && it->second.events_ != events) {
+        it->second.events_ = events;
+        set_events_on_socket(internal_->epfd_, fd, it->second.events_);
       }
+    }
+  } // for socket event
+
+  processTimers();
+}
+
+void PollSet::processTimers()
+{
+  // Fire timer events.
+  SteadyTime now = SteadyTime::now();
+  std::vector<int> expiredTimers;
+
+  {
+    std::scoped_lock<std::mutex> lock(internal_->socket_info_mutex_);
+    // Gather all timer events that fired.
+    for (auto [fd, stamp]: internal_->socket_timers_) {
+      if (stamp <= now) {
+        expiredTimers.push_back(fd);
+      }
+    }
+    for (auto fd: expiredTimers) {
+      internal_->socket_timers_.erase(fd);
     }
   }
 
-  std::scoped_lock<std::mutex> lock(internal_->just_deleted_mutex_);
-  internal_->just_deleted_.clear();
+  for (auto fd: expiredTimers) {
+    auto info = internal_->findSocketInfo(fd);
+    if (!info || !info->func_)
+      continue;
+    (void)info->func_(EventTimer);
+  }
 }
+
 
 void PollSet::createNativePollset()
 {

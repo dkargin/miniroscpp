@@ -62,6 +62,8 @@ public:
   static const int EventOut;
   /// Equal to POLLERR.
   static const int EventError;
+  /// Low precision timer event.
+  static const int EventTimer;
 
   /// Object to be kept back during active callback.
   typedef std::shared_ptr<void> TrackedObject;
@@ -118,6 +120,13 @@ public:
   bool setEvents(int sock, int events);
 
   /**
+   * \brief Enable oneshot timer event for a socket.
+   * @param sock The socket to run event.
+   * @param timeoutMs time for event to happen.
+   */
+  bool setTimerEvent(int sock, int timeoutMs);
+
+  /**
    * \brief Process all socket events
    *
    * This function will actually call poll() on the available sockets, and allow
@@ -149,6 +158,8 @@ private:
    * \brief Called when events have been triggered on our signal pipe
    */
   int onLocalPipeEvents(int events);
+
+  void processTimers();
 
   struct Internal;
   std::unique_ptr<Internal> internal_;
