@@ -85,7 +85,11 @@ set(cpp_common_SRC
     file_log.cpp
     launcher.cpp
     names.cpp
-    serialization.cpp)
+    serialization.cpp
+    internal/xml_tools.cpp
+    b64/b64decode.cpp
+    b64/b64encode.cpp
+)
 
 set(rosbag_SRC "")
 set(rosbag_LIBS "")
@@ -178,8 +182,6 @@ set(XMLRPC_SRC
     xmlrpc/XmlRpcSource.cpp
     xmlrpc/XmlRpcUtil.cpp
     xmlrpc/XmlRpcValue.cpp
-    xmlrpc/b64decode.cpp
-    xmlrpc/b64encode.cpp
 )
 
 set(transport_SRC

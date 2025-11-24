@@ -59,7 +59,7 @@ struct HttpClient::Internal {
     if (socket) {
       poll_set->delSocket(socket->fd());
     }
-    MINIROS_INFO_NAMED("destructor", "HttpClient::~Internal()");
+    MINIROS_DEBUG_NAMED("destructor", "HttpClient::~Internal()");
   }
 
   void resetResponse();
@@ -88,8 +88,10 @@ void HttpClient::Internal::resetResponse()
 
 int HttpClient::Internal::pullNewTaskUnsafe()
 {
-  if (requests.empty())
+  if (requests.empty()) {
+    active_request = {};
     return 0;
+  }
 
   active_request = requests.front();
   requests.pop_front();
@@ -268,8 +270,6 @@ int HttpClient::Internal::handleEvents(int evtFlags)
   if (state == State::ProcessResponse) {
     // Response received and parsed - store it in HttpRequest
     if (active_request) {
-      active_request->updateStatus(HttpRequest::Status::HasResponse);
-
       active_request->setResponseHeader(http_frame);
       
       // Store response body
@@ -278,6 +278,8 @@ int HttpClient::Internal::handleEvents(int evtFlags)
         active_request->setResponseBody(body.data(), body.size());
       }
       
+      // Status should be updated last to prevent possible racing with access to response body.
+      active_request->updateStatus(HttpRequest::Status::HasResponse);
       auto dur = active_request->getRequestFinish() - active_request->getRequestStart();
       MINIROS_DEBUG("HttpClient received response in %fms", dur.toSec()*1000);
     }
@@ -309,7 +311,7 @@ HttpClient::~HttpClient()
     std::swap(internal_, copy);
     copy->close();
   }
-  MINIROS_INFO("HttpClient::~HttpClient()");
+  MINIROS_DEBUG_NAMED("destructor", "HttpClient::~HttpClient()");
 }
 
 void HttpClient::close()

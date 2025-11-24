@@ -33,6 +33,7 @@ public:
   MasterHandler(RPCManagerPtr rpcManager, RegistrationManager* regManager, AddressResolver* resolver);
 
   /// Sends immediate command/update to a node.
+  /// This is blocking call. It will wait until response is obtained.
   Error sendToNode(const std::shared_ptr<NodeRef>& nr, const char* method,
     const RpcValue& arg1, const RpcValue& arg2 = {});
 

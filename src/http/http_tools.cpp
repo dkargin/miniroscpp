@@ -6,6 +6,7 @@
 #include <cstring>
 
 #include "miniros/http/http_tools.h"
+#include "miniros/xmlrpcpp/XmlRpcValue.h"
 
 #if defined(_MSC_VER)
 # define strncasecmp	_strnicmp
@@ -359,5 +360,5 @@ void HttpResponseHeader::writeHeader(std::string& output, size_t bodySize) const
   output += "\r\n";
 }
 
-} // namespace network
+} // namespace http
 } // namespace miniros
