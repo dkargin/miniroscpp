@@ -25,11 +25,14 @@ struct MINIROS_DECL XmlCodec {
   /// Replace characters by XML escape sequences.
   static std::string encode(const std::string_view& raw);
 
+  /// Parses XMLRPC request.
+  NODISCARD static bool parseXmlRpcRequest(const std::string_view& data, std::string_view& method, Value& params);
+
   /// XMLRPC decoding
   /// @param value - reference to value container.
   /// @param data - raw XMLRPC data.
   /// @param offset - offset in XMLRPC data.
-  static bool parseXmlRpcValue(Value& value, const std::string_view& data, size_t& offset);
+  NODISCARD static bool parseXmlRpcValue(Value& value, const std::string_view& data, size_t& offset);
 
   static bool parseXmlRpcBool(Value& value, const std::string_view& data, size_t& offset);
   static bool parseXmlRpcInt(Value& value, const std::string_view& data, size_t& offset);

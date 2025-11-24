@@ -7,21 +7,17 @@
 #include "miniros/xmlrpcpp/XmlRpcException.h"
 #include "miniros/xmlrpcpp/XmlRpcServer.h"
 #include "miniros/xmlrpcpp/XmlRpcServerMethod.h"
-#include "miniros/xmlrpcpp/XmlRpcUtil.h"
 #include "miniros/xmlrpcpp/XmlRpcValue.h"
 
-const char METHODNAME_TAG[] = "<methodName>";
-const char PARAMS_TAG[] = "<params>";
-const char PARAMS_ETAG[] = "</params>";
-const char PARAM_TAG[] = "<param>";
-const char PARAM_ETAG[] = "</param>";
+#include "miniros/internal/xml_tools.h"
 
-const char SYSTEM_MULTICALL[] = "system.multicall";
-const char METHODNAME[] = "methodName";
-const char PARAMS[] = "params";
-
-const char FAULTCODE[] = "faultCode";
-const char FAULTSTRING[] = "faultString";
+namespace {
+constexpr char SYSTEM_MULTICALL[] = "system.multicall";
+constexpr char METHODNAME[] = "methodName";
+constexpr char PARAMS[] = "params";
+constexpr char FAULTCODE[] = "faultCode";
+constexpr char FAULTSTRING[] = "faultString";
+}
 
 namespace miniros {
 namespace http {
@@ -59,33 +55,19 @@ void generateFaultResponseBody(std::string const& errorMsg, int errorCode, std::
   outBuf += RESPONSE_2;
 }
 
-// Parse the method name and the argument values from the request.
-std::string parseRequest(const HttpParserFrame& httpFrame, XmlRpc::XmlRpcValue& params)
-{
-  int offset = 0;   // Number of chars parsed from the request
-
-  std::string request{httpFrame.body()};
-  std::string methodName = XmlRpcUtil::parseTag(METHODNAME_TAG, request, &offset);
-
-  if (methodName.size() > 0 && XmlRpcUtil::findTag(PARAMS_TAG, request, &offset))
-  {
-    int nArgs = 0;
-    while (XmlRpcUtil::nextTagIs(PARAM_TAG, request, &offset)) {
-      params[nArgs++] = XmlRpcValue(request, &offset);
-      (void) XmlRpcUtil::nextTagIs(PARAM_ETAG, request, &offset);
-    }
-
-    (void) XmlRpcUtil::nextTagIs(PARAMS_ETAG, request, &offset);
-  }
-
-  return methodName;
-}
-
 Error XmlRpcHandler::handle(const HttpParserFrame& frame, const ClientInfo& clientInfo,
   HttpResponseHeader& responseHeader, std::string& body)
 {
   RpcValue params, resultValue;
-  std::string methodName = parseRequest(frame, params);
+
+  std::string_view methodView;
+  if (!xml::XmlCodec::parseXmlRpcRequest(frame.body(), methodView, params) || methodView.empty()) {
+    const char* msg = "Failed to parse XMLRPC request";
+    MINIROS_ERROR("XmlRpcHandler(%d)::executeRequest: fault %s.", clientInfo.fd, msg);
+    generateFaultResponseBody(msg, 0, body);
+  }
+
+  std::string methodName(methodView);
   MINIROS_DEBUG("XmlRpcHandler(%d)::executeRequest: calling method '%s'", clientInfo.fd, methodName.c_str());
 
   try {
