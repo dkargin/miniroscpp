@@ -27,12 +27,23 @@
 #include <stdlib.h>
 #include <string>
 
+#include "miniros/internal/xml_tools.h"
 #include "xmlrpcpp/XmlRpcValue.h"
 #include "xmlrpcpp/XmlRpcException.h"
 
 #include <gtest/gtest.h>
 
 using namespace XmlRpc;
+
+XmlRpcValue parse(const std::string& xml)
+{
+  XmlRpcValue value;
+  miniros::xml::XmlCodec codec;
+
+  size_t offset = 0;
+  (void)codec.parseXmlRpcValue(value, xml, offset);
+  return value;
+}
 
 TEST(XmlRpc, Bool) {
   XmlRpcValue v(bool(false));
@@ -51,10 +62,8 @@ TEST(XmlRpc, Bool) {
 TEST(XmlRpc, testBoolean) {
   XmlRpcValue booleanFalse(false);
   XmlRpcValue booleanTrue(true);
-  int offset = 0;
-  XmlRpcValue booleanFalseXml("<value><boolean>0</boolean></value>", &offset);
-  offset = 0;
-  XmlRpcValue booleanTrueXml("<value><boolean>1</boolean></value>", &offset);
+  XmlRpcValue booleanFalseXml = parse("<value><boolean>0</boolean></value>");
+  XmlRpcValue booleanTrueXml = parse("<value><boolean>1</boolean></value>");
   EXPECT_NE(booleanFalse, booleanTrue);
   EXPECT_EQ(booleanFalse, booleanFalseXml);
   EXPECT_NE(booleanFalse, booleanTrueXml);
@@ -87,13 +96,11 @@ TEST(XmlRpc, testInt) {
   XmlRpcValue int_1(-1);
   ASSERT_EQ(XmlRpcValue::TypeInt, int_1.getType());
 
-  int offset = 0;
-  XmlRpcValue int0Xml("<value><int>0</int></value>", &offset);
+  XmlRpcValue int0Xml = parse("<value><int>0</int></value>");
   ASSERT_EQ(XmlRpcValue::TypeInt, int0Xml.getType());
   EXPECT_EQ(0, int(int0Xml));
 
-  offset = 0;
-  XmlRpcValue int9Xml("<value><i4>9</i4></value>", &offset);
+  XmlRpcValue int9Xml = parse("<value><i4>9</i4></value>");
   ASSERT_EQ(XmlRpcValue::TypeInt, int9Xml.getType());
   EXPECT_EQ(9, int(int9Xml));
 
@@ -115,8 +122,7 @@ TEST(XmlRpc, testDouble) {
   EXPECT_EQ("<value><double>43.700000000000003</double></value>", d.toXml());
   EXPECT_DOUBLE_EQ(43.7, double(d));
 
-  int offset = 0;
-  XmlRpcValue dXml("<value><double>56.3</double></value>", &offset);
+  XmlRpcValue dXml = parse("<value><double>56.3</double></value>");
   ASSERT_EQ(XmlRpcValue::TypeDouble, dXml.getType());
   EXPECT_DOUBLE_EQ(56.3, double(dXml));
 
@@ -138,28 +144,23 @@ TEST(XmlRpc, testString) {
   char csxml[] = "<value><string>Now is the time &lt;&amp;</string></value>";
   std::string ssxml = csxml;
 
-  int offset = 0;
-  XmlRpcValue vscXml(csxml, &offset);
+  XmlRpcValue vscXml = parse(csxml);
   EXPECT_EQ(s, vscXml);
 
-  offset = 0;
-  XmlRpcValue vssXml(ssxml, &offset);
+  XmlRpcValue vssXml = parse(ssxml);
   EXPECT_EQ(s, vssXml);
 
-  offset = 0;
-  XmlRpcValue fromXml(vssXml.toXml(), &offset);
+  XmlRpcValue fromXml = parse(vssXml.toXml());
   EXPECT_EQ(s, fromXml);
 
   // Empty or blank strings with no <string> tags
   std::string emptyStringXml("<value></value>");
-  offset = 0;
-  XmlRpcValue emptyStringVal1(emptyStringXml, &offset);
+  XmlRpcValue emptyStringVal1 = parse(emptyStringXml);
   XmlRpcValue emptyStringVal2("");
   EXPECT_EQ(emptyStringVal1, emptyStringVal2);
 
   emptyStringXml = "<value>  </value>";
-  offset = 0;
-  XmlRpcValue blankStringVal(emptyStringXml, &offset);
+  XmlRpcValue blankStringVal = parse(emptyStringXml);
   EXPECT_EQ(std::string(blankStringVal), "  ");
 
   // Implicitly initialized string.
@@ -176,11 +177,8 @@ TEST(XmlRpc, testString) {
 
 TEST(XmlRpc, testDateTime) {
   // DateTime
-  int offset = 0;
   // Construct from XML
-  XmlRpcValue dateTime(
-      "<value><dateTime.iso8601>19040503T03:12:35</dateTime.iso8601></value>",
-      &offset);
+  XmlRpcValue dateTime = parse("<value><dateTime.iso8601>19040503T03:12:35</dateTime.iso8601></value>");
   ASSERT_EQ(XmlRpcValue::TypeDateTime, dateTime.getType());
   struct tm t = dateTime;
   EXPECT_EQ(t.tm_year, 1904);
@@ -281,8 +279,7 @@ TEST(XmlRpc, testArray) {
                   "  </data>\n"
                   "</array></value>";
 
-  int offset = 0;
-  XmlRpcValue aXml(csaXml, &offset);
+  XmlRpcValue aXml = parse(csaXml);
   EXPECT_EQ(a, aXml);
 
   // Array copy works
@@ -344,8 +341,7 @@ TEST(XmlRpc, testStruct) {
                        "  </member>\n"
                        "</struct></value>";
 
-  int offset = 0;
-  XmlRpcValue structXml(csStructXml, &offset);
+  XmlRpcValue structXml = parse(csStructXml);
   EXPECT_EQ(struct1, structXml);
 
   for (XmlRpcValue::iterator itr = struct1.begin(); itr != struct1.end();
@@ -416,8 +412,7 @@ TEST(XmlRpc, base64) {
   EXPECT_EQ("AQI=\n", ss.str());
 
   // Constructor from XML
-  int offset = 0;
-  XmlRpcValue bin2("<value><base64>AQI=</base64></value>", &offset);
+  XmlRpcValue bin2 = parse("<value><base64>AQI=</base64></value>");
   EXPECT_EQ(XmlRpcValue::TypeBase64, bin2.getType());
   EXPECT_EQ(2, bin2.size());
 

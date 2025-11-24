@@ -26,12 +26,6 @@ class XmlRpcServerMethod;
 class XMLRPCPP_DECL XmlRpcServerConnection : public XmlRpcSource {
 public:
   // Static data
-  static const char METHODNAME_TAG[];
-  static const char PARAMS_TAG[];
-  static const char PARAMS_ETAG[];
-  static const char PARAM_TAG[];
-  static const char PARAM_ETAG[];
-
   static const char SYSTEM_MULTICALL[];
   static const char METHODNAME[];
   static const char PARAMS[];
@@ -64,9 +58,6 @@ protected:
 
   // Parses the request, runs the method, generates the response xml.
   virtual void executeRequest();
-
-  // Parse the methodName and parameters from the request.
-  std::string parseRequest(XmlRpcValue& params);
 
   // Execute a named method with the specified params.
   bool executeMethod(const std::string& methodName, XmlRpcValue& params, XmlRpcValue& result);

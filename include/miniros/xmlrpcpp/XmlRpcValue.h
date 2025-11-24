@@ -68,10 +68,6 @@ namespace XmlRpc {
       _value.asBinary = new BinaryData((char*)value, ((char*)value)+nBytes);
     }
 
-    //! Construct from xml, beginning at *offset chars into the string, updates offset
-    XmlRpcValue(std::string const& xml, int* offset) : _type(TypeInvalid)
-    { if ( ! fromXml(xml,offset)) _type = TypeInvalid; }
-
     //! Copy
     XmlRpcValue(XmlRpcValue const& rhs) : _type(TypeInvalid) { *this = rhs; }
 
@@ -175,9 +171,6 @@ namespace XmlRpc {
     //! Erase member of a struct.
     bool eraseMember(const std::string& key);
 
-    //! Decode xml. Destroys any existing value.
-    bool fromXml(std::string const& valueXml, int* offset);
-
     //! Encode the Value in xml
     std::string toXml() const;
 
@@ -197,16 +190,6 @@ namespace XmlRpc {
     void assertArray(size_t size);
     void assertStructConst() const;
     void assertStruct();
-
-    // XML decoding
-    bool boolFromXml(std::string const& valueXml, int* offset);
-    bool intFromXml(std::string const& valueXml, int* offset);
-    bool doubleFromXml(std::string const& valueXml, int* offset);
-    bool stringFromXml(std::string const& valueXml, int* offset);
-    bool timeFromXml(std::string const& valueXml, int* offset);
-    bool binaryFromXml(std::string const& valueXml, int* offset);
-    bool arrayFromXml(std::string const& valueXml, int* offset);
-    bool structFromXml(std::string const& valueXml, int* offset);
 
     // XML encoding
     std::string boolToXml() const;

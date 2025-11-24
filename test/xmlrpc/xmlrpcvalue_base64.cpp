@@ -1,9 +1,11 @@
 #include <gtest/gtest.h>
-#include "xmlrpcpp/XmlRpcValue.h"
 
 #include <algorithm>
 #include <string>
 #include <sstream>
+
+#include "xmlrpcpp/XmlRpcValue.h"
+#include "miniros/internal/xml_tools.h"
 
 int main(int argc, char **argv)
 {
@@ -21,8 +23,11 @@ namespace XmlRpc
 
   XmlRpcValue fromXml(std::string const & data)
   {
-    int offset = 0;
-    return XmlRpcValue(data, &offset);
+    XmlRpcValue value;
+    size_t offset = 0;
+    miniros::xml::XmlCodec codec;
+    (void)codec.parseXmlRpcValue(value, data, offset);
+    return value;
   }
 
   void removeNewlines(std::string & data)

@@ -8,6 +8,8 @@
 #include "xmlrpcpp/XmlRpcUtil.h"
 #include "xmlrpcpp/XmlRpcValue.h"
 
+#include "miniros/internal/xml_tools.h"
+
 using namespace XmlRpc;
 
 // Static data
@@ -463,13 +465,17 @@ bool XmlRpcClient::parseResponse(const std::string_view& responseView, XmlRpcVal
   }
 
   // Expect either <params><param>... or <fault>...
-  if ((XmlRpcUtil::nextTagIs(PARAMS_TAG, response,&offset) && XmlRpcUtil::nextTagIs(PARAM_TAG, response,&offset))
-       || (XmlRpcUtil::nextTagIs(FAULT_TAG, response,&offset) && (isFault = true))) //< _isFault assignment is intended behaviour
+  if ((XmlRpcUtil::nextTagIs(PARAMS_TAG, response, &offset) && XmlRpcUtil::nextTagIs(PARAM_TAG, response,&offset))
+       || (XmlRpcUtil::nextTagIs(FAULT_TAG, response, &offset) && (isFault = true))) //< _isFault assignment is intended behaviour
   {
-    if ( ! result.fromXml(response, &offset)) {
+    miniros::xml::XmlCodec codec;
+    size_t offsetCopy = offset;
+    if ( !codec.parseXmlRpcValue(result, responseView, offsetCopy))
+    {
       XmlRpcUtil::error("Error in XmlRpcClient(%s)::parseResponse: Invalid response value. Response:\n%s", name().c_str(), response.c_str());
       return false;
     }
+    offset = offsetCopy;
   } else {
     XmlRpcUtil::error("Error in XmlRpcClient(%s)::parseResponse: Invalid response - no param or fault tag. Response:\n%s", name().c_str(), response.c_str());
     return false;

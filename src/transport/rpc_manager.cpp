@@ -42,8 +42,6 @@
 #include "miniros/transport/io.h"
 #include "miniros/transport/rpc_manager.h"
 
-#include "minibag/structures.h"
-
 #include <miniros/rostime.h>
 
 #include "miniros/http/http_server.h"
@@ -51,6 +49,7 @@
 #include "miniros/http/http_filters.h"
 
 #include "miniros/xmlrpcpp/XmlRpcServerConnection.h"
+#include "miniros/internal/xml_tools.h"
 
 using namespace XmlRpc;
 
@@ -334,8 +333,9 @@ bool RPCManager::validateXmlrpcResponse(const std::string& method, XmlRpcValue &
   else
   {
     std::string empty_array = "<value><array><data></data></array></value>";
-    int offset = 0;
-    payload = XmlRpcValue(empty_array, &offset);
+    size_t offset = 0;
+    xml::XmlCodec codec;
+    codec.parseXmlRpcValue(payload, empty_array, offset);
   }
   return true;
 }

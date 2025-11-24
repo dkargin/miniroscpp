@@ -14,7 +14,6 @@ namespace xml {
 // Returns contents between <tag> and </tag>, updates offset to char after </tag>
 std::string_view parseXmlTag(const char* tag, std::string_view const& data, size_t& offset)
 {
-  assert(offset);
   if (offset >= data.length())
     return {};
   size_t istart = data.find(tag, offset);
@@ -36,7 +35,6 @@ std::string_view parseXmlTag(const char* tag, std::string_view const& data, size
 // Returns true if the tag is found and updates offset to the char after the tag
 bool findXmlTag(const char* tag, std::string_view const& data, size_t& offset)
 {
-  assert(offset);
   if (offset >= data.size())
     return false;
   size_t istart = data.find(tag, offset);
@@ -51,8 +49,6 @@ bool findXmlTag(const char* tag, std::string_view const& data, size_t& offset)
 // and updates offset to the char after the tag
 bool nextXmlTagIs(const char* tag, std::string_view const& data, size_t& offset)
 {
-  assert(offset);
-
   if (offset >= data.size())
     return false;
   const char* cp = &data[offset];
@@ -82,7 +78,9 @@ std::string_view getNextXmlTag(const std::string_view& xml, size_t& offset)
 
   size_t pos = offset;
   const char* cp = xml.data() + pos;
-  while (*cp && isspace(*cp)) {
+  const char* end = xml.data() + xml.size();
+
+  while (cp < end && *cp && isspace(*cp)) {
     ++cp;
     ++pos;
   }
@@ -90,21 +88,20 @@ std::string_view getNextXmlTag(const std::string_view& xml, size_t& offset)
   if (*cp != '<')
     return {};
 
-  std::string s;
+  size_t tagStart = pos;
   do {
-    s += *cp;
     ++pos;
-  } while (*cp++ != '>' && *cp != 0);
+  } while (cp < end && *cp++ != '>' && *cp != 0);
 
   offset = pos;
-  return s;
+  return std::string_view(&xml[tagStart], pos - tagStart);
 }
 
 namespace {
 // xml encodings (xml-encoded entities are preceded with '&')
 constexpr char  AMP = '&';
 constexpr char  rawEntity[] = { '<',   '>',   '&',    '\'',    '\"',    0 };
-constexpr char* xmlEntity[] = { "lt;", "gt;", "amp;", "apos;", "quot;", 0 };
+constexpr char* const xmlEntity[] = { "lt;", "gt;", "amp;", "apos;", "quot;", 0 };
 constexpr int   xmlEntLen[] = { 3,     3,     4,      5,       5 };
 }
 
@@ -169,6 +166,9 @@ std::string XmlCodec::encode(const std::string_view& raw)
 
 namespace {
 constexpr char METHODRESPONSE_TAG[] = "<methodResponse>";
+constexpr char METHODNAME_TAG[] = "<methodName>";
+constexpr char PARAMS_ETAG[] = "</params>";
+constexpr char PARAM_ETAG[] = "</param>";
 constexpr char PARAMS_TAG[] = "<params>";
 constexpr char PARAM_TAG[] = "<param>";
 constexpr char PARAMS[] = "params";
@@ -201,8 +201,36 @@ constexpr char NAME_TAG[]      = "<name>";
 constexpr char NAME_ETAG[]     = "</name>";
 constexpr char MEMBER_ETAG[]   = "</member>";
 constexpr char STRUCT_ETAG[]   = "</struct>";
+
 }
 
+// Parse the method name and the argument values from the request.
+bool XmlCodec::parseXmlRpcRequest(const std::string_view& request, std::string_view& method, Value& params)
+{
+  size_t offset = 0;   // Number of chars parsed from the request
+
+  method = parseXmlTag(METHODNAME_TAG, request, offset);
+  if (method.empty())
+    return false;
+
+  if (!findXmlTag(PARAMS_TAG, request, offset))
+    return false;
+    Value::ValueArray array;
+
+  int nArgs = 0;
+  while (nextXmlTagIs(PARAM_TAG, request, offset)) {
+    Value val;
+    if (!parseXmlRpcValue(val, request, offset)) {
+      return false;
+    }
+    params[nArgs++] = val;
+    (void) nextXmlTagIs(PARAM_ETAG, request, offset);
+  }
+
+  (void) nextXmlTagIs(PARAMS_ETAG, request, offset);
+  params.setArray(std::move(array));
+  return true;
+}
 
 // Set the value from xml. The chars at *offset into valueXml
 // should be the start of a <value> tag. Destroys any existing value.

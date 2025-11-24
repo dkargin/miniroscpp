@@ -2,7 +2,8 @@
 #include <cstring>
 #include <cstdlib>
 
-#include "../../include/miniros/network/net_address.h"
+#include "miniros/network/net_address.h"
+#include "miniros/internal/xml_tools.h"
 #include "xmlrpcpp/XmlRpcServerConnection.h"
 
 #include "xmlrpcpp/XmlRpc.h"
@@ -18,16 +19,9 @@
 using namespace XmlRpc;
 
 // Static data
-const char XmlRpcServerConnection::METHODNAME_TAG[] = "<methodName>";
-const char XmlRpcServerConnection::PARAMS_TAG[] = "<params>";
-const char XmlRpcServerConnection::PARAMS_ETAG[] = "</params>";
-const char XmlRpcServerConnection::PARAM_TAG[] = "<param>";
-const char XmlRpcServerConnection::PARAM_ETAG[] = "</param>";
-
 const char XmlRpcServerConnection::SYSTEM_MULTICALL[] = "system.multicall";
 const char XmlRpcServerConnection::METHODNAME[] = "methodName";
 const char XmlRpcServerConnection::PARAMS[] = "params";
-
 const char XmlRpcServerConnection::FAULTCODE[] = "faultCode";
 const char XmlRpcServerConnection::FAULTSTRING[] = "faultString";
 
@@ -192,7 +186,11 @@ bool XmlRpcServerConnection::writeResponse()
 void XmlRpcServerConnection::executeRequest()
 {
   XmlRpcValue params, resultValue;
-  std::string methodName = parseRequest(params);
+  miniros::xml::XmlCodec codec;
+
+  std::string_view methodView;
+  codec.parseXmlRpcRequest(_httpFrame.body(), methodView, params);
+  std::string methodName(methodView);
   XmlRpcUtil::log(2, "XmlRpcServerConnection(%d)::executeRequest: calling method '%s'", _fd,
                     methodName.c_str());
 
@@ -208,28 +206,6 @@ void XmlRpcServerConnection::executeRequest()
     generateFaultResponse(fault.getMessage(), fault.getCode());
   }
   XmlRpcUtil::log(2, "XmlRpcServerConnection(%d)::executeRequest: finished calling method '%s'", _fd, methodName.c_str());
-}
-
-// Parse the method name and the argument values from the request.
-std::string XmlRpcServerConnection::parseRequest(XmlRpcValue& params)
-{
-  int offset = 0;   // Number of chars parsed from the request
-
-  std::string request{_httpFrame.body()};
-  std::string methodName = XmlRpcUtil::parseTag(METHODNAME_TAG, request, &offset);
-
-  if (methodName.size() > 0 && XmlRpcUtil::findTag(PARAMS_TAG, request, &offset))
-  {
-    int nArgs = 0;
-    while (XmlRpcUtil::nextTagIs(PARAM_TAG, request, &offset)) {
-      params[nArgs++] = XmlRpcValue(request, &offset);
-      (void) XmlRpcUtil::nextTagIs(PARAM_ETAG, request, &offset);
-    }
-
-    (void) XmlRpcUtil::nextTagIs(PARAMS_ETAG, request, &offset);
-  }
-
-  return methodName;
 }
 
 // Execute a named method with the specified params.
