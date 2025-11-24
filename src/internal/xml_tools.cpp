@@ -215,15 +215,14 @@ bool XmlCodec::parseXmlRpcRequest(const std::string_view& request, std::string_v
 
   if (!findXmlTag(PARAMS_TAG, request, offset))
     return false;
-    Value::ValueArray array;
 
-  int nArgs = 0;
+  Value::ValueArray array;
   while (nextXmlTagIs(PARAM_TAG, request, offset)) {
     Value val;
     if (!parseXmlRpcValue(val, request, offset)) {
       return false;
     }
-    params[nArgs++] = val;
+    array.push_back(val);
     (void) nextXmlTagIs(PARAM_ETAG, request, offset);
   }
 

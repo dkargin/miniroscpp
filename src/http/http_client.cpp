@@ -2,8 +2,11 @@
 // Created by dkargin on 11/14/25.
 //
 
+#include "http/http_client.h"
+
 #include <cassert>
 #include <chrono>
+#include <cstring>
 
 #include "miniros/network/socket.h"
 #include "miniros/http/http_client.h"
@@ -13,6 +16,26 @@
 
 namespace miniros {
 namespace http {
+
+const char* toString(HttpClient::State state)
+{
+  switch (state) {
+    case HttpClient::State::Invalid:
+      return "Invalid";
+    case HttpClient::State::Connecting:
+      return "Connecting";
+    case HttpClient::State::Idle:
+      return "Idle";
+    case HttpClient::State::WriteRequest:
+      return "WriteRequest";
+    case HttpClient::State::ReadResponse:
+      return "ReadResponse";
+    case HttpClient::State::ProcessResponse:
+      return "ProcessResponse";
+    default:
+      return "Unknown";
+  }
+}
 
 struct HttpClient::Internal {
 
@@ -157,7 +180,15 @@ int HttpClient::Internal::handleEvents(int evtFlags)
   if (state == State::Connecting) {
     // Assume socket is in "connecting" state
     assert(socket->isConnecting());
-    if (evtFlags | PollSet::EventOut) {
+    if (evtFlags & PollSet::EventError) {
+      MINIROS_ERROR_NAMED("HttpClient", "handleEvents(state=Connecting) - failed to connect");
+      close();
+      state = State::Invalid;
+      socket.reset();
+      return 0;
+    }
+
+    if (evtFlags & PollSet::EventOut) {
       Error err = socket->checkConnected();
       if (err == Error::Ok) {
         MINIROS_DEBUG_NAMED("HttpClient", "handleEvents(state=Connecting) - connected");
@@ -169,12 +200,10 @@ int HttpClient::Internal::handleEvents(int evtFlags)
         // Still connecting.
       } else {
         MINIROS_ERROR_NAMED("HttpClient", "handleEvents(state=Connecting) - error: %s", err.toString());
-        // TODO: Disconnect.
+        state = State::Invalid;
+        cv.notify_all();
         return 0;
       }
-    }
-    if (evtFlags | PollSet::EventError) {
-      // TODO: Process error.
     }
   }
 
@@ -238,11 +267,15 @@ int HttpClient::Internal::handleEvents(int evtFlags)
       return 0;
     }
     // Some unhandled event.
-    MINIROS_WARN("HttpClient unhandled event in WriteRequest: %o", evtFlags);
+    std::string evt = PollSet::eventToString(evtFlags);
+    MINIROS_WARN("HttpClient unhandled event in WriteRequest: %s", evt.c_str());
     return 0;
   }
 
   if (state == State::ReadResponse) {
+    if (evtFlags & PollSet::EventError) {
+      // TODO: Implement.
+    }
     if (evtFlags & PollSet::EventIn) {
       Error err = readResponse();
       // What to do with EOF?
@@ -262,7 +295,8 @@ int HttpClient::Internal::handleEvents(int evtFlags)
         return 0;
       }
     } else {
-      MINIROS_WARN("HttpClient unhandled events in ReadResponse: %o", evtFlags);
+      std::string evt = PollSet::eventToString(evtFlags);
+      MINIROS_WARN("HttpClient unhandled events in ReadResponse: %s", evt.c_str());
       return 0;
     }
   }
@@ -293,7 +327,8 @@ int HttpClient::Internal::handleEvents(int evtFlags)
   if (state == State::Idle && evtFlags & PollSet::EventOut) {
     // Nothing to do here.
   } else {
-    MINIROS_WARN("HttpClient unhandled events: %o in state %d", evtFlags, (int)state);
+    std::string evt = PollSet::eventToString(evtFlags);
+    MINIROS_WARN("HttpClient unhandled events: %s in state %s", evt.c_str(), toString(state));
   }
   return 0;
 }
@@ -443,14 +478,18 @@ Error HttpClient::waitConnected(const WallDuration& duration)
     return Error::InternalError;
   if (!internal_->socket || !internal_->socket->valid())
     return Error::InvalidHandle;
+
   std::unique_lock<std::mutex> lock(internal_->guard);
   if (internal_->cv.wait_for(lock, std::chrono::duration<double>(duration.toSec()),
     [this]() {
-      if (internal_->state == State::Invalid || internal_->state == State::Connecting)
+      if (internal_->state == State::Connecting)
         return false;
       return true;
     })) {
-    return Error::Ok;
+    if (internal_->state == State::Idle)
+      return Error::Ok;
+
+    return Error::NotConnected;
   }
   return Error::Timeout;
 }

@@ -65,6 +65,7 @@ Error XmlRpcHandler::handle(const HttpParserFrame& frame, const ClientInfo& clie
     const char* msg = "Failed to parse XMLRPC request";
     MINIROS_ERROR("XmlRpcHandler(%d)::executeRequest: fault %s.", clientInfo.fd, msg);
     generateFaultResponseBody(msg, 0, body);
+    return Error::Ok;
   }
 
   std::string methodName(methodView);
