@@ -254,7 +254,7 @@ namespace XmlRpc {
     if ( ! XmlRpcUtil::nextTagIs(VALUE_TAG, valueXml, offset))
       return false;       // Not a value, offset not updated
 
-	int afterValueOffset = *offset;
+    int afterValueOffset = *offset;
     std::string typeTag = XmlRpcUtil::getNextTag(valueXml, offset);
     bool result = false;
     if (typeTag == BOOLEAN_TAG)
@@ -794,6 +794,121 @@ namespace XmlRpc {
     return os;
   }
 
+
+  void XmlRpcValue::setBool(bool value)
+  {
+    if (_type != TypeBoolean) {
+      invalidate();
+    }
+    _type = TypeBoolean;
+    _value.asBool = value;
+  }
+
+  void XmlRpcValue::setInt(int value)
+  {
+    if (_type != TypeInt) {
+      invalidate();
+    }
+    _type = TypeInt;
+    _value.asInt = value;
+  }
+
+  void XmlRpcValue::setDouble(double value)
+  {
+    if (_type != TypeDouble) {
+      invalidate();
+    }
+    _type = TypeDouble;
+    _value.asDouble = value;
+  }
+
+  void XmlRpcValue::setString(std::string&& value)
+  {
+    if (_type != TypeString) {
+      invalidate();
+      _type = TypeString;
+      _value.asString = new std::string(std::move(value));
+    } else {
+      *_value.asString = std::move(value);
+    }
+  }
+
+  void XmlRpcValue::setDateTime(const struct tm& value)
+  {
+    if (_type != TypeDateTime) {
+      invalidate();
+      _type = TypeDateTime;
+      _value.asTime = new tm(value);
+    } else {
+      *_value.asTime = value;
+    }
+  }
+
+  void XmlRpcValue::setArray(const ValueArray& value)
+  {
+    if (_type != TypeArray) {
+      invalidate();
+      _type = TypeArray;
+      _value.asArray = new ValueArray(value);
+    } else {
+      *_value.asArray = value;
+    }
+  }
+
+  void XmlRpcValue::setArray(ValueArray&& value)
+  {
+    if (_type != TypeArray) {
+      invalidate();
+      _type = TypeArray;
+      _value.asArray = new ValueArray(std::move(value));
+    } else {
+      *_value.asArray = std::move(value);
+    }
+  }
+
+  void XmlRpcValue::setStruct(const ValueStruct& value)
+  {
+    if (_type != TypeStruct) {
+      invalidate();
+      _type = TypeStruct;
+      _value.asStruct = new ValueStruct(value);
+    } else {
+      *_value.asStruct = value;
+    }
+  }
+
+  void XmlRpcValue::setStruct(ValueStruct&& value)
+  {
+    if (_type != TypeStruct) {
+      invalidate();
+      _type = TypeStruct;
+      _value.asStruct = new ValueStruct(std::move(value));
+    } else {
+      *_value.asStruct = std::move(value);
+    }
+  }
+
+  void XmlRpcValue::setBinary(const BinaryData& value)
+  {
+    if (_type != TypeBase64) {
+      invalidate();
+      _type = TypeBase64;
+      _value.asBinary = new BinaryData(value);
+    } else {
+      *_value.asBinary = value;
+    }
+  }
+
+  void XmlRpcValue::setBinary(BinaryData&& value)
+  {
+    if (_type != TypeBase64) {
+      invalidate();
+      _type = TypeBase64;
+      _value.asBinary = new BinaryData(std::move(value));
+    } else {
+      *_value.asBinary = std::move(value);
+    }
+  }
 } // namespace XmlRpc
 
 

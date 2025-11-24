@@ -33,7 +33,6 @@ public:
 
   void SetUp() override
   {
-    // TODO: Alter ROS logging levels to make tests easier to debug.
     poll_manager_.start();
     PollSet* ps = &poll_manager_.getPollSet();
     server_.reset(new http::HttpServer(ps));
@@ -48,11 +47,6 @@ public:
       server_.reset();
     }
     poll_manager_.shutdown();
-  }
-
-  void startServer()
-  {
-
   }
 };
 
@@ -226,6 +220,6 @@ int main(int argc, char** argv)
 {
   testing::InitGoogleTest(&argc, argv);
   miniros::handleCrashes();
-
+  miniros::console::set_logger_level("destructor", console::Level::Debug);
   return RUN_ALL_TESTS();
 }

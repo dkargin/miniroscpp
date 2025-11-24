@@ -28,7 +28,6 @@ namespace XmlRpc {
   class XMLRPCPP_DECL XmlRpcValue {
   public:
 
-
     enum Type {
       TypeInvalid,
       TypeBoolean,
@@ -96,6 +95,21 @@ namespace XmlRpc {
 
     //! Erase the current value
     void clear() { invalidate(); }
+
+    // Assign new value/type.
+    /// Assign boolean value.
+    void setBool(bool value);
+    /// Assign integer value.
+    void setInt(int value);
+    void setDouble(double value);
+    void setString(std::string&& value);
+    void setDateTime(const struct tm& value);
+    void setArray(const ValueArray& value);
+    void setArray(ValueArray&& value);
+    void setStruct(const ValueStruct& value);
+    void setStruct(ValueStruct&& value);
+    void setBinary(const BinaryData& data);
+    void setBinary(BinaryData&& data);
 
     // Operators
     XmlRpcValue& operator=(XmlRpcValue const& rhs);

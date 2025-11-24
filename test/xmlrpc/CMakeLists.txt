@@ -38,8 +38,8 @@ miniros_add_test(test_client SOURCES test_client.cpp
   ${XMLRPC_SRC_ROOT}/XmlRpcUtil.cpp
   ${XMLRPC_SRC_ROOT}/XmlRpcDispatch.cpp
   ${XMLRPC_SRC_ROOT}/XmlRpcSource.cpp
-  ${XMLRPC_SRC_ROOT}/b64decode.cpp
-  ${XMLRPC_SRC_ROOT}/b64encode.cpp)
+  ${XMLRPC_SRC_ROOT}/../b64/b64decode.cpp
+  ${XMLRPC_SRC_ROOT}/../b64/b64encode.cpp)
 
 target_link_libraries(test_client mock_socket)
 if(WIN32)
@@ -55,8 +55,8 @@ miniros_add_test(test_dispatch SOURCES test_dispatch.cpp
   ${XMLRPC_SRC_ROOT}/XmlRpcDispatch.cpp
   ${XMLRPC_SRC_ROOT}/XmlRpcSource.cpp
   ${XMLRPC_SRC_ROOT}/XmlRpcUtil.cpp
-  ${XMLRPC_SRC_ROOT}/b64decode.cpp
-  ${XMLRPC_SRC_ROOT}/b64encode.cpp)
+  ${XMLRPC_SRC_ROOT}/../b64/b64decode.cpp
+  ${XMLRPC_SRC_ROOT}/../b64/b64encode.cpp)
 
 if(WIN32)
   # build everything from source, undefine MINIROS_BUILD_SHARED_LIBS to eliminate the dllimport/dllexport attributes

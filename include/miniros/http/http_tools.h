@@ -147,7 +147,7 @@ struct MINIROS_DECL HttpParserFrame {
 
   std::string_view getResponseStatus() const
   {
-    return getTokenView(data, responseCodeToken);
+    return getTokenView(data, responseStatus);
   }
 
   std::string_view getContentType() const
@@ -253,9 +253,9 @@ struct HttpResponseHeader {
 };
 
 /// Checks if a string starts with a prefix.
-bool startsWith(const std::string_view& str, const std::string_view& prefix);
+MINIROS_DECL bool startsWith(const std::string_view& str, const std::string_view& prefix);
 
-} // namespace network
+} // namespace http
 
 } // namespace miniros
 #endif // MINIROS_HTTP_H

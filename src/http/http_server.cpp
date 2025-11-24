@@ -91,7 +91,7 @@ HttpServer::~HttpServer()
     internal_->pollSet = nullptr;
     internal_.reset();
   }
-  MINIROS_INFO("HttpServer::~HttpServer()");
+  MINIROS_DEBUG_NAMED("destructor", "HttpServer::~HttpServer()");
 }
 
 Error HttpServer::start(int port)

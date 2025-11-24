@@ -95,7 +95,6 @@ public:
 
   SteadyTime getRequestFinish() const;
 
-  /// Response body
   const std::string& responseBody() const
   {
     return response_body_;

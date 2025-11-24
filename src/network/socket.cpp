@@ -41,7 +41,7 @@ struct NetSocket::Internal {
   void close()
   {
     if (own && fd != MINIROS_INVALID_SOCKET) {
-      MINIROS_INFO("NetSocket::close(%d)", fd);
+      MINIROS_DEBUG_NAMED("socket", "NetSocket::close(%d)", fd);
       close_socket(fd);
     }
     own = false;
@@ -152,7 +152,7 @@ Error NetSocket::bind(int port)
       default:
         break;
     }
-    MINIROS_WARN("Unexpected error while binding socket fd=%d to port=%d : %s", internal_->fd, port, strerror(errno));
+    MINIROS_WARN_NAMED("socket", "Unexpected error while binding socket fd=%d to port=%d : %s", internal_->fd, port, strerror(errno));
     return Error::SystemError;
   }
 
@@ -191,7 +191,7 @@ Error NetSocket::tcpListen(int port, NetAddress::Type type, int maxQueuedClients
   int fd = socket(addrType, SOCK_STREAM, IPPROTO_TCP);
   if (fd < 0) {
     const char* err = last_socket_error_string();
-    MINIROS_ERROR("Error while trying to create listening socket: %s", err);
+    MINIROS_ERROR_NAMED("socket", "Error while trying to create listening socket: %s", err);
     return Error::SystemError;
   }
   internal_->fd = fd;
@@ -210,7 +210,7 @@ Error NetSocket::tcpListen(int port, NetAddress::Type type, int maxQueuedClients
     return err;
   }
   if (Error err = listen(maxQueuedClients); !err) {
-    MINIROS_ERROR("Error while entering listening mode: %s", err.toString());
+    MINIROS_ERROR_NAMED("socket", "Error while entering listening mode: %s", err.toString());
     return err;
   }
   return Error::Ok;
