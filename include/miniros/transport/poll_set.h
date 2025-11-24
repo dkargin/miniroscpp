@@ -137,6 +137,8 @@ public:
    */
   void signal();
 
+  static std::string eventToString(int event);
+
 private:
   /**
    * \brief Creates the native pollset for our sockets, if any have changed

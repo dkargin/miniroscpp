@@ -387,4 +387,31 @@ int PollSet::onLocalPipeEvents(int events)
   return 0;
 }
 
+std::string PollSet::eventToString(int event)
+{
+  std::string result;
+  if (event & POLLIN) {
+    result += "I";
+    event &= ~POLLIN;
+  }
+  if (event & POLLOUT) {
+    result += "O";
+    event &= ~POLLOUT;
+  }
+  if (event & POLLERR) {
+    result += "E";
+    event &= ~POLLERR;
+  }
+  if (event & POLLHUP) {
+    result += "H";
+    event &= ~POLLHUP;
+  }
+
+  if (event != 0) {
+    result += std::to_string(event);
+  }
+  return result;
+}
+
+
 }

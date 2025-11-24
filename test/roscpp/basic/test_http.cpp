@@ -68,6 +68,15 @@ public:
   int counter = 0;
 };
 
+TEST_F(HttpServerTest, ConnectNoServer)
+{
+  http::HttpClient client(&poll_manager_.getPollSet());
+
+  client.connect("127.0.0.1", 19999);
+  Error conErr = client.waitConnected(WallDuration(5));
+  EXPECT_EQ(conErr, Error::NotConnected);
+}
+
 TEST_F(HttpServerTest, SimpleGet)
 {
   // Test sends two GET requests using the same request object.
