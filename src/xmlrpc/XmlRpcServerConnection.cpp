@@ -189,7 +189,11 @@ void XmlRpcServerConnection::executeRequest()
   miniros::xml::XmlCodec codec;
 
   std::string_view methodView;
-  codec.parseXmlRpcRequest(_httpFrame.body(), methodView, params);
+  if (!codec.parseXmlRpcRequest(_httpFrame.body(), methodView, params)) {
+    const char* msg = "Failed to parse incoming request";
+    XmlRpcUtil::log(2, "XmlRpcServerConnection(%d)::executeRequest: fault %s.", _fd, msg);
+    generateFaultResponse(msg, -1);
+  }
   std::string methodName(methodView);
   XmlRpcUtil::log(2, "XmlRpcServerConnection(%d)::executeRequest: calling method '%s'", _fd,
                     methodName.c_str());

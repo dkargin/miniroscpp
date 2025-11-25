@@ -15,7 +15,8 @@ namespace network {
 
 /// Network address.
 /// Main goal of this structure is to hide system-dependent details from user code.
-struct MINIROS_DECL NetAddress {
+class MINIROS_DECL NetAddress {
+public:
   enum Type {
     AddressInvalid,
     AddressIPv4,

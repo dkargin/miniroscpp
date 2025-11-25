@@ -369,8 +369,8 @@ void PollSet::update(int poll_timeout)
     if (info->updateEvents_ && ret != info->events_) {
       std::scoped_lock<std::mutex> lock(internal_->socket_info_mutex_);
       auto it = internal_->socket_info_.find(fd);
-      if (it != internal_->socket_info_.end() && it->second.events_ != events) {
-        it->second.events_ = events;
+      if (it != internal_->socket_info_.end() && it->second.events_ != ret) {
+        it->second.events_ = ret;
         set_events_on_socket(internal_->epfd_, fd, it->second.events_);
       }
     }
