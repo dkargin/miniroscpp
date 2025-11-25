@@ -156,7 +156,7 @@ void del_socket_from_watcher(int epfd, int fd)
 #endif
 }
 
-void set_events_on_socket(int epfd, int fd, int events)
+bool set_events_on_socket(int epfd, int fd, int events)
 {
 #if defined(HAVE_EPOLL)
   struct epoll_event ev;
@@ -165,13 +165,15 @@ void set_events_on_socket(int epfd, int fd, int events)
   ev.events = events;
   ev.data.fd = fd;
   if (::epoll_ctl(epfd, EPOLL_CTL_MOD, fd, &ev)) {
-    MINIROS_ERROR("Unable to modify FD epoll: %s", strerror(errno));
+    MINIROS_ERROR("Unable to modify FD epoll for fd=%d: %s", fd, strerror(errno));
+    return false;
   }
 #else
   UNUSED(epfd);
   UNUSED(fd);
   UNUSED(events);
 #endif
+  return true;
 }
 
 /*****************************************************************************

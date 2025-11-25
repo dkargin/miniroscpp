@@ -526,7 +526,8 @@ std::pair<size_t, Error> NetSocket::recv(WriteBuf& s, NetAddress* address)
       }
     }
   }
-  return {received, Error::Ok};
+  // This function receives data until it gets WouldBlock in non-block mode or obtains full buffer.
+  return {received, wouldBlock ? Error::WouldBlock : Error::Ok};
 }
 
 std::pair<size_t, Error> NetSocket::send(const void* rawData, size_t size, const NetAddress* address)

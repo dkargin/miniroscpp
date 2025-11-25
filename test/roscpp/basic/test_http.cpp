@@ -97,7 +97,7 @@ TEST_F(HttpServerTest, SimpleGet)
   ASSERT_TRUE(conErr == Error::Ok || conErr == Error::Timeout);
   ASSERT_EQ(client.waitConnected(WallDuration(20)), Error::Ok);
 
-  MINIROS_INFO("Connected to local server");
+  MINIROS_INFO("Test connected to local server");
 
   // Create and configure GET request to /data
   auto request = std::make_shared<http::HttpRequest>(http::HttpMethod::Get, "/data");
