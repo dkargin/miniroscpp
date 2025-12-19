@@ -5,13 +5,14 @@
 #ifndef MINIROS_HTTP_SERVER_CONNECTION_H
 #define MINIROS_HTTP_SERVER_CONNECTION_H
 
-#include "miniros/network/socket.h"
+#include <mutex>
 
+#include "miniros/network/socket.h"
 #include "miniros/http/http_tools.h"
+#include "miniros/http/http_request.h"
 
 #include "miniros/steady_timer.h"
 
-#include <mutex>
 
 namespace miniros {
 
@@ -47,11 +48,14 @@ public:
   void close();
 
   /// Fill in fault response.
-  void prepareFaultResponse(Error error, HttpResponseHeader& header, std::string& body) const;
+  void prepareFaultResponse(Error error, http::HttpRequest& request) const;
 
   /// Detach from server.
   /// Breaks link with Http server.
   void detach();
+
+  /// Allocate new request object or reuse some existing object from the pool.
+  std::shared_ptr<HttpRequest> makeRequestObject();
 
 protected:
   State state_ = State::ReadRequest;
@@ -60,11 +64,11 @@ protected:
 
   HttpParserFrame http_frame_;
 
-  HttpResponseHeader response_header_;
-  /// Intermediate storage for response header.
+  std::shared_ptr<HttpRequest> active_request;
+
+  /// Intermediate storage for HttpResponseHeader.
   std::string response_header_buffer_;
-  /// Intermediate storage for response body.
-  std::string response_body_;
+
   /// Number of bytes sent from current part (header or body).
   size_t data_sent_ = 0;
 

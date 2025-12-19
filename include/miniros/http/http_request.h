@@ -12,7 +12,6 @@
 #include <condition_variable>
 
 #include "miniros/macros.h"
-#include "miniros/steady_timer.h"
 #include "miniros/http/http_tools.h"
 
 namespace miniros {
@@ -20,19 +19,32 @@ namespace http {
 
 /// Contains some HTTP request.
 /// This object can be reused for further requests once it has been finished.
+/// Role for HttpClient:
+///  - its instance is created when client sends request and when server handles response.
+/// Role for HttpServerConnection
+///  - its instance is created when server has received all parts of request.
 class MINIROS_DECL HttpRequest {
 public:
-  enum class Status {
+  /// Represents high-level state of Http request object.
+  enum class State {
     /// Waiting to be added to queue.
     Idle,
+
     /// Request is in queue and waiting to be sent.
-    Queued,
+    ClientQueued,
     /// Sending request. Large requests can be sent in several steps.
-    Sending,
+    ClientSending,
     /// Waiting for response from server.
-    WaitResponse,
+    ClientWaitResponse,
     /// Got HTTP response but waiting for client to process it.
-    HasResponse,
+    ClientHasResponse,
+
+    /// Receiving request.
+    ServerReceive,
+    /// Request is received and parsed, but not processed.
+    ServerHandleRequest,
+    /// Sending back response data,
+    ServerSendResponse,
   };
 
   HttpRequest();
@@ -71,11 +83,11 @@ public:
   std::string getHeader(const std::string& name) const;
 
   /// Set request body (for POST, PUT, etc.)
-  void setBody(const std::string& body);
+  void setRequestBody(const std::string& body);
 
-  void setBody(const char* data, size_t size);
+  void setRequestBody(const char* data, size_t size);
 
-  const std::string& body() const;
+  const std::string& requestBody() const;
 
   /// Build HTTP request header string
   /// @param host - host name for Host header (managed by HttpClient)
@@ -85,9 +97,9 @@ public:
   /// Reset request for reuse
   void reset();
 
-  void updateStatus(Status status);
+  void updateState(State status);
 
-  Status status() const;
+  State state() const;
 
   void setRequestStart(const SteadyTime& time);
 
@@ -95,23 +107,24 @@ public:
 
   SteadyTime getRequestFinish() const;
 
-  const std::string& responseBody() const
-  {
-    return response_body_;
-  }
+  /// Get reference to response body.
+  /// It is thread unsafe.
+  const std::string& responseBody() const;
 
-  void setResponseBody(const std::string& body)
-  {
-    response_body_ = body;
-  }
+  void setResponseBody(const std::string& body, const std::string& contentType);
 
-  void setResponseBody(const char* data, size_t size)
-  {
-    response_body_.assign(data, size);
-  }
+  void setResponseBody(const char* data, size_t size);
+
+  /// Set response status and code.
+  void setResponseStatus(int code, const char* status);
+
+  /// Set response status OK 200
+  void setResponseStatusOk();
 
   /// Set response header from HttpFrame parser state.
   void setResponseHeader(const HttpParserFrame& frame);
+
+  void setResponseHeader(const HttpResponseHeader& responseHeader);
 
   /// Get response header.
   /// It is not thread safe until state == HasResponse.
@@ -120,8 +133,11 @@ public:
   /// Wait until status changes to Status::HasResponse.
   Error waitForResponse(const WallDuration& duration) const;
 
+  /// Reset response-related data.
+  void resetResponse();
+
 protected:
-  Status status_ = Status::Idle;
+  State state_ = State::Idle;
   /// Timestamp when request was sent.
   SteadyTime request_start_;
   /// Stamp when response was received.
@@ -136,7 +152,7 @@ protected:
   /// HTTP headers
   std::map<std::string, std::string> headers_;
   /// Request body
-  std::string body_;
+  std::string request_body_;
 
   HttpResponseHeader response_header_;
 

@@ -5,6 +5,8 @@
 #include <thread>
 #include <chrono>
 
+#include <gtest/gtest.h>
+
 #include "miniros/http/http_client.h"
 #include "miniros/http/http_request.h"
 #include "miniros/http/http_server.h"
@@ -12,10 +14,7 @@
 #include "miniros/http/http_endpoint.h"
 #include "miniros/http/http_filters.h"
 
-#include <gtest/gtest.h>
-
 #include "miniros/transport/poll_manager.h"
-#include "miniros/transport/poll_set.h"
 
 using namespace miniros;
 
@@ -53,15 +52,13 @@ public:
 // Simple endpoint handler that returns JSON data
 class DataEndpointHandler : public http::EndpointHandler {
 public:
-  Error handle(const http::HttpParserFrame& frame, const network::ClientInfo& clientInfo,
-    http::HttpResponseHeader& responseHeader, std::string& body) override
+  Error handle(const network::ClientInfo& clientInfo, std::shared_ptr<http::HttpRequest> request) override
   {
     // Return example JSON data
-    body = std::string(R"({"name": "test_data", "counter": )") + std::to_string(counter)
+    std::string body = std::string(R"({"name": "test_data", "counter": )") + std::to_string(counter)
       + R"(, "items": ["item1", "item2", "item3"]})";
-    responseHeader.statusCode = 200;
-    responseHeader.status = "OK";
-    responseHeader.contentType = "application/json";
+    request->setResponseStatusOk();
+    request->setResponseBody(body, "application/json");
     counter++;
     return Error::Ok;
   }
@@ -110,7 +107,7 @@ TEST_F(HttpServerTest, SimpleGet)
   EXPECT_EQ(request->waitForResponse(WallDuration(5.0)), Error::Ok);
 
   // Verify we actually got a response
-  ASSERT_EQ(request->status(), http::HttpRequest::Status::HasResponse);
+  ASSERT_EQ(request->state(), http::HttpRequest::State::ClientHasResponse);
   {
     const auto& responseHeader = request->responseHeader();
     EXPECT_EQ(responseHeader.statusCode, 200);
@@ -128,7 +125,7 @@ TEST_F(HttpServerTest, SimpleGet)
 
   EXPECT_EQ(request->waitForResponse(WallDuration(5.0)), Error::Ok);
   // Verify we actually got a response
-  ASSERT_EQ(request->status(), http::HttpRequest::Status::HasResponse);
+  ASSERT_EQ(request->state(), http::HttpRequest::State::ClientHasResponse);
   {
     const auto& responseHeader = request->responseHeader();
     EXPECT_EQ(responseHeader.statusCode, 200);
@@ -145,21 +142,20 @@ TEST_F(HttpServerTest, SimpleGet)
 // POST endpoint handler that processes JSON request and returns JSON response
 class JsonPostEndpointHandler : public http::EndpointHandler {
 public:
-  Error handle(const http::HttpParserFrame& frame, const network::ClientInfo& clientInfo,
-    http::HttpResponseHeader& responseHeader, std::string& body) override
+  Error handle(const network::ClientInfo& clientInfo, std::shared_ptr<http::HttpRequest> request) override
   {
+
     // Read JSON from request body
-    std::string_view requestBody = frame.body();
+    std::string_view requestBody = request->requestBody();
     
     // Simple JSON processing: echo back the request with a processed field
     // In a real scenario, you would parse the JSON here
     // For this test, we'll create a simple response that includes the request data
-    body = R"({"status": "success", "received": )" + std::string(requestBody) + 
+    std::string body = R"({"status": "success", "received": )" + std::string(requestBody) +
            R"(, "processed": true, "message": "Request processed successfully"})";
-    
-    responseHeader.statusCode = 200;
-    responseHeader.status = "OK";
-    responseHeader.contentType = "application/json";
+
+    request->setResponseStatus(200, "OK");
+    request->setResponseBody(body, "application/json");
     return Error::Ok;
   }
 };
@@ -189,7 +185,7 @@ TEST_F(HttpServerTest, PostWithJson)
   
   // Set JSON body
   std::string jsonRequest = R"({"name": "test_user", "value": 42, "active": true})";
-  request->setBody(jsonRequest);
+  request->setRequestBody(jsonRequest);
   
   // Set Content-Type header
   request->setHeader("Content-Type", "application/json");
@@ -202,7 +198,7 @@ TEST_F(HttpServerTest, PostWithJson)
   EXPECT_EQ(request->waitForResponse(WallDuration(5.0)), Error::Ok);
 
   // Verify we actually got a response
-  ASSERT_EQ(request->status(), http::HttpRequest::Status::HasResponse);
+  ASSERT_EQ(request->state(), http::HttpRequest::State::ClientHasResponse);
   {
     const auto& responseHeader = request->responseHeader();
     EXPECT_EQ(responseHeader.statusCode, 200);

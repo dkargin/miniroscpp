@@ -4,6 +4,7 @@
 
 #include "../../../include/miniros/http/endpoints/xmlrpc.h"
 
+#include "http/http_request.h"
 #include "miniros/xmlrpcpp/XmlRpcException.h"
 #include "miniros/xmlrpcpp/XmlRpcServer.h"
 #include "miniros/xmlrpcpp/XmlRpcServerMethod.h"
@@ -55,16 +56,18 @@ void generateFaultResponseBody(std::string const& errorMsg, int errorCode, std::
   outBuf += RESPONSE_2;
 }
 
-Error XmlRpcHandler::handle(const HttpParserFrame& frame, const ClientInfo& clientInfo,
-  HttpResponseHeader& responseHeader, std::string& body)
+Error XmlRpcHandler::handle(const network::ClientInfo& clientInfo, std::shared_ptr<HttpRequest> request)
 {
   RpcValue params, resultValue;
 
   std::string_view methodView;
-  if (!xml::XmlCodec::parseXmlRpcRequest(frame.body(), methodView, params) || methodView.empty()) {
+  std::string body;
+  if (!xml::XmlCodec::parseXmlRpcRequest(request->requestBody(), methodView, params) || methodView.empty()) {
     const char* msg = "Failed to parse XMLRPC request";
     MINIROS_ERROR("XmlRpcHandler(%d)::executeRequest: fault %s.", clientInfo.fd, msg);
     generateFaultResponseBody(msg, 0, body);
+    request->setResponseStatus(200, "OK");
+    request->setResponseBody(body, "text/xml");
     return Error::Ok;
   }
 
@@ -75,13 +78,19 @@ Error XmlRpcHandler::handle(const HttpParserFrame& frame, const ClientInfo& clie
     if ( ! executeMethod(clientInfo, methodName, params, resultValue) &&
          ! executeMulticall(clientInfo, methodName, params, resultValue)) {
       generateFaultResponseBody(methodName + ": unknown method name", 200, body);
+      request->setResponseStatus(200, "OK");
+      request->setResponseBody(body, "text/xml");
     }
     else {
       generateResponseBody(resultValue.toXml(), body);
+      request->setResponseStatus(200, "OK");
+      request->setResponseBody(body, "text/xml");
     }
   } catch (const XmlRpcException& fault) {
     MINIROS_ERROR("XmlRpcHandler(%d)::executeRequest: fault %s.", clientInfo.fd, fault.getMessage().c_str());
     generateFaultResponseBody(fault.getMessage(), fault.getCode(), body);
+    request->setResponseStatus(200, "OK");
+    request->setResponseBody(body, "text/xml");
   }
   MINIROS_DEBUG("XmlRpcHandler(%d)::executeRequest: finished calling method '%s'", clientInfo.fd, methodName.c_str());
   return Error::Ok;

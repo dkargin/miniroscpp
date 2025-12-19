@@ -22,7 +22,6 @@ HttpServerConnection::~HttpServerConnection()
 {
   MINIROS_INFO("HttpServerConnection::~HttpServerConnection()");
   std::unique_lock<std::mutex> lock(guard_);
-
 }
 
 Error HttpServerConnection::readRequest()
@@ -57,6 +56,11 @@ Error HttpServerConnection::readRequest()
   return Error::Ok;
 }
 
+std::shared_ptr<HttpRequest> HttpServerConnection::makeRequestObject()
+{
+  return std::make_shared<HttpRequest>();
+}
+
 int HttpServerConnection::handleEvents(int evtFlags)
 {
   std::unique_lock<std::mutex> lock(guard_);
@@ -89,22 +93,33 @@ int HttpServerConnection::handleEvents(int evtFlags)
     resetResponse();
     // Execute request:
     EndpointHandler* handler = server_ ? server_->findEndpoint(http_frame_) : nullptr;
+    auto requestObject = makeRequestObject();
+    requestObject->updateState(HttpRequest::State::ServerHandleRequest);
+    requestObject->resetResponse();
+
     std::string endpoint{http_frame_.getPath()};
     if (!handler) {
       MINIROS_ERROR("No handler for endpoint \"%s\"", endpoint.c_str());
-      prepareFaultResponse(Error::FileNotFound, response_header_, response_body_);
+      prepareFaultResponse(Error::FileNotFound, *requestObject);
     } else {
       network::ClientInfo clientInfo;
       clientInfo.fd = socket_->fd();
       clientInfo.remoteAddress = socket_->peerAddress();
       MINIROS_DEBUG("Handling HTTP request to %s", endpoint.c_str());
-      Error err = handler->handle(http_frame_, clientInfo, response_header_, response_body_);
+
+      requestObject->setRequestBody(std::string{http_frame_.body()});
+
+      Error err = handler->handle(clientInfo, requestObject);
       if (!err) {
         MINIROS_ERROR("Failed to handle HTTP request to \"%s\"", err.toString());
-        prepareFaultResponse(err, response_header_, response_body_);
+        prepareFaultResponse(err, *requestObject);
       }
     }
-    response_header_.writeHeader(response_header_buffer_, response_body_.size());
+
+    const HttpResponseHeader& responseHeader = requestObject->responseHeader();
+    requestObject->updateState(HttpRequest::State::ServerSendResponse);
+    active_request = requestObject;
+    responseHeader.writeHeader(response_header_buffer_, requestObject->responseBody().size());
     state_ = State::WriteResponse;
     stateFallback = true;
 
@@ -117,10 +132,13 @@ int HttpServerConnection::handleEvents(int evtFlags)
     if (evtFlags & PollSet::EventOut || stateFallback) {
       std::pair<size_t, Error> r;
 
-      if (response_body_.size() > 0) {
+      const std::string& responseBody = active_request->responseBody();
+      size_t responseBodySize = responseBody.size();
+
+      if (responseBodySize > 0) {
         r = socket_->write2(
           response_header_buffer_.c_str(), response_header_buffer_.size(),
-          response_body_.c_str(), response_body_.size(), data_sent_);
+          responseBody.c_str(), responseBodySize, data_sent_);
 
       } else {
         const char* data = response_header_buffer_.c_str() + data_sent_;
@@ -128,7 +146,7 @@ int HttpServerConnection::handleEvents(int evtFlags)
         r = socket_->send(data, toSend, nullptr);
       }
 
-      const size_t totalSize = response_header_buffer_.size() + response_body_.size();
+      const size_t totalSize = response_header_buffer_.size() + responseBodySize;
       auto [written, err] = r;
 
       if (written > 0) {
@@ -174,43 +192,38 @@ void HttpServerConnection::close()
 
 void HttpServerConnection::resetResponse()
 {
-  response_body_.resize(0);
   response_header_buffer_.resize(0);
-  response_header_.reset();
+  active_request.reset();
   data_sent_ = 0;
 }
 
-void HttpServerConnection::prepareFaultResponse(Error error, HttpResponseHeader& responseHeader, std::string& body) const
+void HttpServerConnection::prepareFaultResponse(Error error, http::HttpRequest& request) const
 {
-  responseHeader.reset();
-  responseHeader.contentType = "text/html";
+  request.resetResponse();
   switch (error.code) {
     case Error::FileNotFound:
-      responseHeader.statusCode = 404;
-      responseHeader.status = "Not Found";
-      body = "<!doctype html>"
+      request.setResponseStatus(404, "Not Found");
+      request.setResponseBody("<!doctype html>"
       "<html>"
       "<title>404 Not Found</title>"
       "<body>404 Not Found</body>"
-      "</html>";
+      "</html>", "text/html");
       break;
     case Error::NotImplemented:
-      responseHeader.statusCode = 501;
-      responseHeader.status = "Not Implemented";
-      body = "<!doctype html>"
+      request.setResponseStatus(501, "Not Implemented)");
+      request.setResponseBody("<!doctype html>"
       "<html>"
       "<title>501 Not Implemented</title>"
       "<body>501 Not Implemented</body>"
-      "</html>";
+      "</html>", "text/html");
       break;
     default:
-      responseHeader.statusCode = 500;
-      responseHeader.status = "Internal Server Error";
-      body = "<!doctype html>"
+      request.setResponseStatus(500, "Internal Server Error");
+      request.setResponseBody("<!doctype html>"
       "<html>"
       "<title>500 Internal server error</title>"
       "<body>500 Internal server error</body>"
-      "</html>";
+      "</html>", "text/html");
       break;
   }
 }
