@@ -80,19 +80,19 @@ std::string HttpRequest::getHeader(const std::string& name) const
 }
 
 /// Set request body (for POST, PUT, etc.)
-void HttpRequest::setBody(const std::string& body)
+void HttpRequest::setRequestBody(const std::string& body)
 {
-  body_ = body;
+  request_body_ = body;
 }
 
-void HttpRequest::setBody(const char* data, size_t size)
+void HttpRequest::setRequestBody(const char* data, size_t size)
 {
-  body_.assign(data, size);
+  request_body_.assign(data, size);
 }
 
-const std::string& HttpRequest::body() const
+const std::string& HttpRequest::requestBody() const
 {
-  return body_;
+  return request_body_;
 }
 
 // URL encode a string (percent encoding)
@@ -159,9 +159,9 @@ std::string HttpRequest::buildHeader(const std::string& host, int port) const
   }
 
   // Content-Length header (if body is present)
-  if (!body_.empty()) {
+  if (!request_body_.empty()) {
     char buff[40];
-    std::snprintf(buff, sizeof(buff), "%zu", body_.size());
+    std::snprintf(buff, sizeof(buff), "%zu", request_body_.size());
     header << "Content-Length: " << buff << "\r\n";
   }
 
@@ -182,35 +182,35 @@ std::string HttpRequest::buildHeader(const std::string& host, int port) const
 /// Reset request for reuse
 void HttpRequest::reset()
 {
-  status_ = Status::Idle;
+  state_ = State::Idle;
   method_ = HttpMethod::Get;
   path_ = "/";
   url_parameters_.clear();
   headers_.clear();
-  body_.clear();
+  request_body_.clear();
   request_start_ = SteadyTime();
   request_finish_ = SteadyTime();
   response_header_.reset();
   response_body_.clear();
 }
 
-void HttpRequest::updateStatus(Status status)
+void HttpRequest::updateState(State status)
 {
   std::unique_lock lock(mutex_);
-  if (status_ == status)
+  if (state_ == status)
     return;
 
-  if (status == Status::HasResponse) {
+  if (status == State::ClientHasResponse) {
     request_finish_ = SteadyTime::now();
   }
-  status_ = status;
+  state_ = status;
   cv_.notify_all();
 }
 
-HttpRequest::Status HttpRequest::status() const
+HttpRequest::State HttpRequest::state() const
 {
   std::unique_lock lock(mutex_);
-  return status_;
+  return state_;
 }
 
 void HttpRequest::setRequestStart(const SteadyTime& time)
@@ -240,6 +240,51 @@ void HttpRequest::setResponseHeader(const HttpParserFrame& frame)
   response_header_.contentType = frame.getContentType();
 }
 
+const std::string& HttpRequest::responseBody() const
+{
+  return response_body_;
+}
+
+void HttpRequest::setResponseBody(const std::string& body, const std::string& contentType)
+{
+  std::unique_lock lock(mutex_);
+  response_body_ = body;
+  response_header_.contentType = contentType;
+}
+
+void HttpRequest::setResponseBody(const char* data, size_t size)
+{
+  std::unique_lock lock(mutex_);
+  response_body_.assign(data, size);
+}
+
+void HttpRequest::setResponseHeader(const HttpResponseHeader& responseHeader)
+{
+  std::unique_lock lock(mutex_);
+  response_header_ = responseHeader;
+}
+
+void HttpRequest::resetResponse()
+{
+  std::unique_lock lock(mutex_);
+  response_header_.reset();
+  response_body_.clear();
+}
+
+void HttpRequest::setResponseStatus(int code, const char* status)
+{
+  std::unique_lock lock(mutex_);
+  response_header_.statusCode = code;
+  response_header_.status = status;
+}
+
+void HttpRequest::setResponseStatusOk()
+{
+  std::unique_lock lock(mutex_);
+  response_header_.statusCode = 200;
+  response_header_.status = "OK";
+}
+
 const HttpResponseHeader& HttpRequest::responseHeader() const
 {
   return response_header_;
@@ -248,11 +293,11 @@ const HttpResponseHeader& HttpRequest::responseHeader() const
 Error HttpRequest::waitForResponse(const WallDuration& duration) const
 {
   std::unique_lock lock(mutex_);
-  if (status_ == Status::HasResponse)
+  if (state_ == State::ClientHasResponse)
     return Error::Ok;
   std::chrono::duration<double> d(duration.toSec());
   if (!cv_.wait_for(lock, d, [this]() {
-    return status_ == Status::HasResponse;
+    return state_ == State::ClientHasResponse;
   })) {
     return Error::Timeout;
   }

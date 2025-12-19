@@ -22,6 +22,13 @@ namespace network {
 struct HostInfo;
 }
 
+namespace http {
+class HttpClient;
+class HttpRequest;
+}
+
+class PollSet;
+
 namespace master {
 
 /// NodeRef contains specific data about a node: publishers, subscribers, services, etc.
@@ -36,8 +43,6 @@ namespace master {
 class MINIROS_DECL NodeRef
 {
 public:
-    NodeRef() = default;
-
     NodeRef(const std::string& _id, const std::string& _api);
     ~NodeRef();
 
@@ -88,13 +93,24 @@ public:
     /// It is thread-unsafe method and should be done inside external lock.
     const std::set<std::string>& getPublicationsUnsafe() const;
 
-    /// Get access to a serive set.
+    /// Get access to a service set.
     /// It is thread-unsafe method and should be done inside external lock.
     const std::set<std::string>& getServicesUnsafe() const;
 
     /// Mark this node as master.
     void setMaster();
     bool isMaster() const;
+
+    /// Enable connection to this node.
+    void activateConnection(PollSet* ps);
+
+    Error sendRequest(const std::shared_ptr<http::HttpRequest>& request);
+
+    /// Serialize state into intermediate value.
+    void saveState(XmlRpc::XmlRpcValue& storage);
+
+    /// Load state from intermediate value.
+    void loadState(const XmlRpc::XmlRpcValue& storage);
 
 protected:
     std::set<std::string> m_paramSubscriptions;
@@ -111,9 +127,6 @@ protected:
     /// Should be the same as m_api.
     network::URL m_apiUrl;
 
-    /// Resolved IP of a node.
-    std::string m_resolvedIp;
-
     std::weak_ptr<network::HostInfo> m_hostInfo;
 
     /// PID of a node. Checked by separate request to a node.
@@ -123,6 +136,8 @@ protected:
     bool m_isMaster = false;
 
     mutable std::mutex m_guard;
+
+    std::shared_ptr<http::HttpClient> m_client;
 };
 
 using NodeRefPtr = std::shared_ptr<NodeRef>;

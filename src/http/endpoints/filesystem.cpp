@@ -9,6 +9,7 @@
 #include "miniros/http/endpoints/filesystem.h"
 #include "miniros/http/http_filters.h"
 #include "miniros/http/http_printers.h"
+#include "miniros/http/http_request.h"
 
 namespace miniros {
 namespace http {
@@ -22,12 +23,11 @@ bool isSubpath(const std::filesystem::path& path, const std::filesystem::path& b
   return mismatch_pair.second == base.end();
 }
 
-Error FilesystemEndpoint::handle(const HttpParserFrame& frame, const network::ClientInfo& clientInfo,
-  HttpResponseHeader& responseHeader, std::string& body)
+Error FilesystemEndpoint::handle(const network::ClientInfo& clientInfo, std::shared_ptr<HttpRequest> request)
 {
   // 1. Read path.
 
-  std::string_view requestPath = frame.getPath();
+  std::string_view requestPath = request->path();
   std::string_view path = getNameFromUrlPath(requestPath, prefix_path_, false);
 
   /*
@@ -47,10 +47,9 @@ Error FilesystemEndpoint::handle(const HttpParserFrame& frame, const network::Cl
     return Error::FileNotFound;
   }
 
+  std::string body;
   if (std::filesystem::is_directory(fsPath)) {
-    responseHeader.contentType = "text/html";
-    responseHeader.statusCode = 200;
-    responseHeader.status = "OK";
+    request->setResponseStatusOk();
 
     std::vector<std::filesystem::path> directories;
     std::vector<std::filesystem::path> files;
@@ -106,6 +105,7 @@ Error FilesystemEndpoint::handle(const HttpParserFrame& frame, const network::Cl
     std::istreambuf_iterator<char> it{in}, end;
     body.assign(it, end);
   }
+  request->setResponseBody(body, "text/html");
   // 3. Deliver.
   return Error::Ok;
 }

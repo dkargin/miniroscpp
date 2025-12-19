@@ -28,8 +28,7 @@ public:
     :server_(server)
   {}
 
-  Error handle(const HttpParserFrame& frame, const ClientInfo& clientInfo,
-      HttpResponseHeader& responseHeader, std::string& body) override;
+  Error handle(const network::ClientInfo& clientInfo, std::shared_ptr<HttpRequest> request) override;
 
   // Execute a named method with the specified params.
   bool executeMethod(const ClientInfo& clientInfo, const std::string& methodName,

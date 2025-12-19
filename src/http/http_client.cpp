@@ -166,12 +166,12 @@ bool HttpClient::Internal::pullNewTaskUnsafe()
   }
 
   // Update request status
-  active_request->updateStatus(HttpRequest::Status::Sending);
+  active_request->updateState(HttpRequest::State::ClientSending);
   active_request->setRequestStart(SteadyTime::now());
 
   // Build request header from HttpRequest (host/port managed by HttpClient)
   request_header_buffer = active_request->buildHeader(address.address, address.port());
-  request_body = active_request->body();
+  request_body = active_request->requestBody();
   data_sent = 0;
 
   return true;
@@ -291,7 +291,7 @@ Error HttpClient::enqueueRequest(const std::shared_ptr<HttpRequest>& request)
   {
     std::unique_lock<std::mutex> lock(internal_->requests_guard);
     // Set request status to Queued
-    request->updateStatus(HttpRequest::Status::Queued);
+    request->updateState(HttpRequest::State::ClientQueued);
     internal_->requests.push_back(request);
   }
 
@@ -523,7 +523,7 @@ void HttpClient::handleWriteRequest(int evtFlags, bool fallThrough)
 
     internal_->data_sent = 0;
     // Request sent, now wait for response
-    internal_->active_request->updateStatus(HttpRequest::Status::WaitResponse);
+    internal_->active_request->updateState(HttpRequest::State::ClientWaitResponse);
     internal_->updateState(State::ReadResponse);
     internal_->http_frame.resetParseState(false); // false = response mode
     auto dur = SteadyTime::now() - internal_->active_request->getRequestStart();
@@ -580,7 +580,7 @@ void HttpClient::handleProcessResponse()
     }
 
     // Status should be updated last to prevent possible racing with access to response body.
-    internal_->active_request->updateStatus(HttpRequest::Status::HasResponse);
+    internal_->active_request->updateState(HttpRequest::State::ClientHasResponse);
     auto dur = internal_->active_request->getRequestFinish() - internal_->active_request->getRequestStart();
     MINIROS_DEBUG("HttpClient received response in %fms", dur.toSec()*1000);
   }
