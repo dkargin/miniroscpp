@@ -75,24 +75,24 @@ public:
   /// It can allocate new NodeRef for an object, or update an existing one.
   /// @param r - a container for registrations
   /// @param key - name of an object being registered
-  /// @param caller_id - name of a node
-  /// @param caller_api - API of a node
+  /// @param nodeName - name of a node
+  /// @param nodeApi - API of a node
   /// @param service_api - ?
   /// @returns reference to a node.
-  std::shared_ptr<NodeRef> _register(Registrations& r, const std::string& key, const std::string& caller_id, const std::string& caller_api,
+  std::shared_ptr<NodeRef> _register(Registrations& r, const std::string& key, const std::string& nodeName, const std::string& nodeApi,
     const std::string& service_api = "");
 
-  ReturnStruct unregisterObject(Registrations& r, const std::string& key, const std::string& caller_id,
-    const std::string& caller_api, const std::string& service_api = "");
+  ReturnStruct unregisterObject(Registrations& r, const std::string& key, const std::string& nodeName,
+    const std::string& nodeApi, const std::string& service_api = "");
 
-  std::shared_ptr<NodeRef> register_service(const std::string& service, const std::string& caller_id, const std::string& caller_api,
+  std::shared_ptr<NodeRef> register_service(const std::string& service, const std::string& caller_id, const std::string& nodeName,
     const std::string& service_api);
 
   std::shared_ptr<NodeRef> register_publisher(const std::string& topic, const std::string& topic_type,
     const std::string& caller_id, const std::string& caller_api);
 
   std::shared_ptr<NodeRef> register_subscriber(const std::string& topic, const std::string& topic_type,
-    const std::string& caller_id, const std::string& caller_api);
+    const std::string& nodeName, const std::string& nodeApi);
 
   std::shared_ptr<NodeRef> register_param_subscriber(const std::string& param, const std::string& caller_id, const std::string& caller_api);
 
@@ -110,7 +110,7 @@ public:
   std::ostream& writeJson(std::ostream& os, miniros::JsonState& state, const miniros::JsonSettings& settings) const;
 
   /// Drop all registrations for specified node.
-  void dropRegistrations(const std::shared_ptr<NodeRef>& node);
+  void dropRegistrations(const NodeRef& node);
 
   /// List all known nodes.
   std::vector<std::shared_ptr<NodeRef>> listAllNodes() const;
@@ -141,7 +141,7 @@ protected:
   std::shared_ptr<NodeRef> getNodeByAPIUnsafe(const std::string& nodeApi) const;
 
   /// Unregister node and all references to it.
-  void unregisterNode(const std::string& nodeApi);
+  void unregisterNode(const std::string& nodeName);
 
 protected:
   mutable std::mutex m_guard;

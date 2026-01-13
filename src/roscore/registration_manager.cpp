@@ -62,69 +62,65 @@ std::shared_ptr<NodeRef> RegistrationManager::getNodeByAPIUnsafe(const std::stri
   return {};
 }
 
-std::shared_ptr<NodeRef> RegistrationManager::_register(Registrations& r, const std::string& key, const std::string& caller_id, const std::string& caller_api,
+std::shared_ptr<NodeRef> RegistrationManager::_register(Registrations& r, const std::string& key, const std::string& nodeName, const std::string& nodeApi,
   const std::string& service_api)
 {
-  RegistrationReport report = registerNodeApi(caller_id, caller_api);
+  RegistrationReport report = registerNodeApi(nodeName, nodeApi);
   if (!report.node) {
-    MINIROS_ERROR("Failed to register NodeRef(node=%s api=%s)", caller_id.c_str(), caller_api.c_str());
+    MINIROS_ERROR("Failed to register NodeRef(node=%s api=%s)", nodeName.c_str(), nodeApi.c_str());
     return {};
   }
 
   report.node->add(r.type(), key);
 
   if (report.previous) {
-    dropRegistrations(report.previous);
+    dropRegistrations(*report.previous);
   }
-  r.registerObj(key, caller_id, caller_api, service_api);
+  r.registerObj(key, nodeName, nodeApi, service_api);
   return report.node;
 }
 
-void RegistrationManager::dropRegistrations(const std::shared_ptr<NodeRef>& node)
+void RegistrationManager::dropRegistrations(const NodeRef& node)
 {
-  if (!node)
-    return;
-  std::string name = node->id();
-  MINIROS_INFO("Unregistering everything from superseded node \"%s\" at %s", name.c_str(), node->getApi().c_str());
-  publishers.unregister_all(name);
-  subscribers.unregister_all(name);
-  services.unregister_all(name);
-  param_subscribers.unregister_all(name);
+  std::string name = node.id();
+  MINIROS_INFO("Unregistering everything from superseded node \"%s\" at %s", name.c_str(), node.getApi().c_str());
+  publishers.unregisterAll(name);
+  subscribers.unregisterAll(name);
+  services.unregisterAll(name);
+  param_subscribers.unregisterAll(name);
 }
 
 ReturnStruct RegistrationManager::unregisterObject(Registrations& r, const std::string& key,
-  const std::string& caller_id, const std::string& caller_api, const std::string& service_api)
+  const std::string& nodeName, const std::string& nodeApi, const std::string& service_api)
 {
   std::shared_ptr<NodeRef> node_ref;
   ReturnStruct ret;
 
   {
     std::scoped_lock<std::mutex> lock(m_guard);
-    if (m_nodes.count(caller_id)) {
-      node_ref = m_nodes[caller_id];
-      ret = r.unregisterObj(key, caller_id, caller_api, service_api);
+    if (m_nodes.count(nodeName)) {
+      node_ref = m_nodes[nodeName];
+      ret = r.unregisterObj(key, nodeName, nodeApi, service_api);
       if (ret.statusCode == 1) {
         node_ref->remove(r.type(), key);
       }
     } else {
       std::stringstream ss;
-      ss << "[" << caller_id << "] is not a registered node";
+      ss << "[" << nodeName << "] is not a registered node";
       ret = ReturnStruct(0, ss.str(), RpcValue(1));
     }
   }
 
-  if (node_ref) {
-    if (node_ref->is_empty()) {
-      unregisterNode(caller_id);
-    }
+  if (node_ref && node_ref->is_empty()) {
+    unregisterNode(nodeName);
   }
   return ret;
 }
 
-void RegistrationManager::unregisterNode(const std::string& nodeApi)
+void RegistrationManager::unregisterNode(const std::string& nodeName)
 {
   std::scoped_lock<std::mutex> lock(m_guard);
-  auto it = m_nodes.find(nodeApi);
+  auto it = m_nodes.find(nodeName);
   if (it == m_nodes.end())
     return;
   if (!it->second->is_empty())
@@ -135,9 +131,9 @@ void RegistrationManager::unregisterNode(const std::string& nodeApi)
 }
 
 std::shared_ptr<NodeRef> RegistrationManager::register_service(const std::string& service, const std::string& caller_id,
-  const std::string& caller_api, const std::string& service_api)
+  const std::string& nodeName, const std::string& service_api)
 {
-  return _register(services, service, caller_id, caller_api, service_api);
+  return _register(services, service, caller_id, nodeName, service_api);
 }
 
 std::shared_ptr<NodeRef> RegistrationManager::register_publisher(const std::string& topic, const std::string& topic_type,
@@ -152,14 +148,14 @@ std::shared_ptr<NodeRef> RegistrationManager::register_publisher(const std::stri
 }
 
 std::shared_ptr<NodeRef> RegistrationManager::register_subscriber(const std::string& topic, const std::string& topic_type,
-  const std::string& caller_id, const std::string& caller_api)
+  const std::string& nodeName, const std::string& nodeApi)
 {
   {
     std::scoped_lock<std::mutex> lock(m_guard);
     if (!m_topicTypes.count(topic))
       m_topicTypes[topic] = topic_type;
   }
-  return _register(subscribers, topic, caller_id, caller_api);
+  return _register(subscribers, topic, nodeName, nodeApi);
 }
 
 std::shared_ptr<NodeRef> RegistrationManager::register_param_subscriber(const std::string& param, const std::string& caller_id,
@@ -207,6 +203,7 @@ RegistrationManager::registerNodeApi(const std::string& nodeName, const std::str
     if (report.node->getApi() == nodeApi) {
       return report;
     }
+
     // TODO: Need to check PID of the new node and verify that it has changed.
     NodeRefPtr prevNode;
 

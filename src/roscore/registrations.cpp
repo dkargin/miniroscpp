@@ -54,19 +54,19 @@ std::map<std::string, std::vector<std::string>> Registrations::getState() const
   for (const auto& pair : map) {
     std::vector<std::string>& providers = result[pair.first];
     for (const Record& obj : pair.second) {
-      providers.push_back(obj.caller_id);
+      providers.push_back(obj.nodeName);
     }
   }
   return result;
 }
 
-Error Registrations::registerObj(const std::string& key, const std::string& caller_id,
-  const std::string& caller_api, const std::string& service_api)
+Error Registrations::registerObj(const std::string& key, const std::string& nodeName,
+  const std::string& nodeApi, const std::string& service_api)
 {
-  if (key.empty() || caller_id.empty() || caller_api.empty())
+  if (key.empty() || nodeName.empty() || nodeApi.empty())
     return Error::InvalidValue;
 
-  Record record{caller_id, caller_api};
+  Record record{nodeName, nodeApi};
 
   assert(!key.empty());
   auto providerIt = map.find(key);
@@ -90,54 +90,54 @@ Error Registrations::registerObj(const std::string& key, const std::string& call
   return Error::Ok;
 }
 
-ReturnStruct Registrations::unregisterObj(const std::string& key, const std::string& caller_id,
-  const std::string& caller_api, const std::string& service_api)
+ReturnStruct Registrations::unregisterObj(const std::string& key, const std::string& nodeName,
+  const std::string& nodeApi, const std::string& service_api)
 {
   std::stringstream ss;
   if (!service_api.empty()) {
     if (service_api_map.empty()) {
-      ss << "[" << caller_id << "] is not a provider of [" << key << "]";
+      ss << "[" << nodeName << "] is not a provider of [" << key << "]";
       return ReturnStruct(1, ss.str(), XmlRpcValue(0));
     }
 
-    Record tmplist = {caller_id, service_api};
+    Record tmplist = {nodeName, service_api};
 
     if (service_api_map[key] != tmplist) {
-      ss << "[" << caller_id << "] is no longer the current service api handle for [" << key << "]";
+      ss << "[" << nodeName << "] is no longer the current service api handle for [" << key << "]";
       return ReturnStruct(1, ss.str(), XmlRpcValue(0));
     } else {
       service_api_map.erase(key);
       map.erase(key);
     }
-    ss << "Unregistered [" << caller_id << "] as provider of [" << key << "]";
+    ss << "Unregistered [" << nodeName << "] as provider of [" << key << "]";
     return ReturnStruct(1, ss.str(), XmlRpcValue(1));
   } else if (m_type == Registrations::SERVICE) {
     throw std::runtime_error("service_api must be specified for Registrations.SERVICE");
     // RAISE THE ROOF
   } else {
     // providers = map[key];
-    Record tmplist{caller_id, caller_api};
+    Record tmplist{nodeName, nodeApi};
     auto& providers = map[key];
     for (auto it = providers.begin(); it != providers.end(); ++it) {
-      if (it->caller_id == caller_id) {
+      if (it->nodeName == nodeName) {
         providers.erase(it);
-        ss << "Unregistered [" << caller_id << "] as provider of [" << key << "]";
+        ss << "Unregistered [" << nodeName << "] as provider of [" << key << "]";
         return ReturnStruct(1, ss.str(), XmlRpcValue(1));
       }
     }
-    ss << "[" << caller_id << "] is not a known provider of [" << key << "]";
+    ss << "[" << nodeName << "] is not a known provider of [" << key << "]";
     return ReturnStruct(1, ss.str(), XmlRpcValue(0));
   }
 }
 
-void Registrations::unregister_all(const std::string& caller_id)
+void Registrations::unregisterAll(const std::string& nodeName)
 {
   std::vector<std::string> dead_keys;
 
   for (auto& [key, providers] : map) {
     auto newEnd = std::remove_if(providers.begin(), providers.end(),
       [&](const Record& r) {
-        return r.caller_id == caller_id;
+        return r.nodeName == nodeName;
       });
     providers.erase(newEnd, providers.end());
 
@@ -151,7 +151,7 @@ void Registrations::unregister_all(const std::string& caller_id)
     dead_keys.clear();
 
     for (const auto& [key, record] : service_api_map) {
-      if (record.caller_id == caller_id)
+      if (record.nodeName == nodeName)
         dead_keys.push_back(key);
     }
     for (const std::string& key : dead_keys)

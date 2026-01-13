@@ -46,15 +46,15 @@ public:
 
     /// Some registration record about network resource.
     struct Record {
-        std::string caller_id;
+        std::string nodeName;
         std::string api;
 
         friend bool operator == (const Record& lhs, const Record& rhs) {
-            return lhs.caller_id == rhs.caller_id && lhs.api == rhs.api;
+            return lhs.nodeName == rhs.nodeName && lhs.api == rhs.api;
         }
 
         friend bool operator != (const Record& lhs, const Record& rhs) {
-            return lhs.caller_id != rhs.caller_id || lhs.api != rhs.api;
+            return lhs.nodeName != rhs.nodeName || lhs.api != rhs.api;
         }
     };
 
@@ -93,13 +93,23 @@ public:
     /// Returns a map: resourceName -> array of URIs who provide/need this resource (subscription, publication, service, ...)
     std::map<std::string, std::vector<std::string>> getState() const;
 
-    Error registerObj(const std::string& key, const std::string& caller_id,
-      const std::string& caller_api, const std::string& service_api="");
+    /// Register new object.
+    /// @param key - name of topic or service
+    /// @param nodeName - full name of providing node
+    /// @param nodeApi - API link of providing node
+    /// @param service_api - API link of service.
+    Error registerObj(const std::string& key, const std::string& nodeName,
+      const std::string& nodeApi, const std::string& service_api="");
 
-    ReturnStruct unregisterObj(const std::string& key, const std::string& caller_id,
-        const std::string& caller_api, const std::string& service_api);
+    /// Remove registration.
+    /// @param key - name of topic or service
+    /// @param nodeName - full name of providing node
+    /// @param nodeApi - API link of providing node
+    /// @param service_api - API link of service.
+    ReturnStruct unregisterObj(const std::string& key, const std::string& nodeName,
+        const std::string& nodeApi, const std::string& service_api);
 
-    void unregister_all(const std::string& caller_id);
+    void unregisterAll(const std::string& nodeName);
 
     Type type() const
     {
