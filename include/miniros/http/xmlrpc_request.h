@@ -7,8 +7,6 @@
 
 #include "miniros/http/http_request.h"
 #include "miniros/xmlrpcpp/XmlRpcValue.h"
-#include "miniros/xmlrpcpp/XmlRpcUtil.h"
-#include "miniros/xmlrpcpp/XmlRpcDecl.h"
 
 #include <string>
 #include <string_view>
@@ -21,6 +19,8 @@ namespace http {
   //! and decoding following the XML-RPC protocol specification.
   class MINIROS_DECL XmlRpcRequest : public HttpRequest {
   public:
+    using RpcValue = XmlRpc::XmlRpcValue;
+
     //! Construct an empty XML-RPC request
     XmlRpcRequest();
 
@@ -37,40 +37,41 @@ namespace http {
 
     //! Set the parameters for the XML-RPC call
     //! @param params The parameters as an XmlRpcValue (can be an array or a single value)
-    void setParams(const XmlRpc::XmlRpcValue& params);
+    void setParamArray(const RpcValue& params);
+
+    void setParams(const RpcValue& param0, const RpcValue& param1, const RpcValue& param2);
+
+    void setParams(const RpcValue& param0, const RpcValue& param1);
+
+    void setParams(const RpcValue& param0);
 
     //! Get the parameters
-    const XmlRpc::XmlRpcValue& params() const;
+    const RpcValue& params() const;
 
     //! Generate the XML-RPC request body and set it as the HTTP request body.
     //! This should be called before sending the request via HttpClient.
     //! The method automatically sets the Content-Type header to "text/xml".
     void generateRequestBody();
 
-    //! Parse the XML-RPC response from the HTTP response body.
-    //! @param result The result value to be populated
-    //! @param isFault Output parameter indicating if the response is a fault
-    //! @return true if parsing was successful, false otherwise
-    bool parseResponse(XmlRpc::XmlRpcValue& result, bool& isFault) const;
-
-    //! Parse the XML-RPC response from the HTTP response body.
-    //! This version uses the response body stored in the HttpRequest.
-    //! @param result The result value to be populated
-    //! @return true if parsing was successful, false otherwise
-    bool parseResponse(XmlRpc::XmlRpcValue& result) const;
+    /// Parse ROS-specific XMLRPC response.
+    std::tuple<int, XmlRpc::XmlRpcValue, std::string> parseResponse() const;
 
     //! Reset the request for reuse
     void reset() override;
+
+    Error processResponse() override;
+
+    std::function<void (int code, const XmlRpc::XmlRpcValue& data, const std::string msg)> onComplete;
 
   private:
     //! Generate the XML-RPC request body following the encoding scheme from XmlRpcClient
     std::string generateRequestXml() const;
 
     //! Internal implementation of parseResponse that takes a string_view
-    bool parseResponseImpl(const std::string_view& responseView, XmlRpc::XmlRpcValue& result, bool& isFault) const;
+    static bool parseResponseImpl(const std::string_view& responseView, XmlRpc::XmlRpcValue& result, bool& isFault);
 
     std::string method_name_;
-    XmlRpc::XmlRpcValue params_;
+    RpcValue params_ = RpcValue::Array(0);
   };
 
 } // namespace http

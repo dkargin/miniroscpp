@@ -96,9 +96,12 @@ Error TopicManager::start(PollManagerPtr pm, MasterLinkPtr master_link, Connecti
   connection_manager_ = cm;
   rpc_manager_ = rpcm;
 
+  rpc_manager_->bindEx3("publisherUpdate", this, &TopicManager::pubUpdateCallback);
+
+  /*
   rpc_manager_->bind("publisherUpdate", [this](const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result) {
     this->pubUpdateCallback(params, result);
-  });
+  });*/
 
   rpc_manager_->bindEx3("requestTopic", this, &TopicManager::requestTopic);
 
@@ -392,7 +395,7 @@ bool TopicManager::advertise(const AdvertiseOptions& ops, const SubscriberCallba
   }
 
   if (found) {
-    sub->addLocalConnection(pub);
+    sub->addLocalConnection(rpc_manager_, pub);
   }
 
   XmlRpcValue args, result, payload;
@@ -485,13 +488,20 @@ bool TopicManager::registerSubscriber(const SubscriptionPtr& s, const std::strin
     return false;
   }
 
+  std::stringstream ss;
+  ss << "publishers = [";
   std::vector<std::string> pub_uris;
   for (int i = 0; i < payload.size(); i++) {
     std::string pubUri = payload[i];
+    if (i != 0)
+      ss << ", ";
+    ss << pubUri;
     if (pubUri != rpc_manager_->getServerURI()) {
       pub_uris.push_back(pubUri);
     }
   }
+  ss << "]";
+  MINIROS_INFO("TopicManager::registerSubscriber(%s) %s", s->getName().c_str(), ss.str().c_str());
 
   bool self_subscribed = false;
   PublicationPtr pub;
@@ -519,9 +529,9 @@ bool TopicManager::registerSubscriber(const SubscriptionPtr& s, const std::strin
     }
   }
 
-  s->pubUpdate(pub_uris);
+  s->pubUpdate(rpc_manager_, pub_uris);
   if (self_subscribed) {
-    s->addLocalConnection(pub);
+    s->addLocalConnection(rpc_manager_, pub);
   }
 
   return true;
@@ -561,7 +571,7 @@ bool TopicManager::pubUpdate(const std::string& topic, const std::vector<std::st
   }
 
   if (sub) {
-    return sub->pubUpdate(pubs);
+    return sub->pubUpdate(rpc_manager_, pubs);
   } else {
     MINIROS_DEBUG("got a request for updating publishers of topic %s, but I "
                   "don't have any subscribers to that topic.",
@@ -944,19 +954,22 @@ void TopicManager::getPublications(XmlRpcValue& pubs)
   }
 }
 
-Error TopicManager::pubUpdateCallback(const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result)
+//Error TopicManager::pubUpdateCallback(const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result)
+TopicManager::RpcValue TopicManager::pubUpdateCallback(
+  const std::string& callerId, const std::string& topic, const RpcValue& publishers, const network::ClientInfo& ci)
 {
   std::stringstream ss;
+  /*
   if (params.size() < 3)
     return Error::InvalidValue;
   if (params[1].getType() != XmlRpc::XmlRpcValue::TypeString)
     return Error::InvalidValue;
   if (params[2].getType() != XmlRpc::XmlRpcValue::TypeArray)
     return Error::InvalidValue;
-  std::string topic = params[1];
+  std::string topic = params[1];*/
   std::vector<std::string> pubs;
-  for (int idx = 0; idx < params[2].size(); idx++) {
-    std::string pub = params[2][idx];
+  for (int idx = 0; idx < publishers.size(); idx++) {
+    std::string pub = publishers[idx];
     pubs.push_back(pub);
     if (idx != 0)
       ss << ",";
@@ -966,11 +979,9 @@ Error TopicManager::pubUpdateCallback(const XmlRpc::XmlRpcValue& params, XmlRpc:
   MINIROS_DEBUG("pubUpdateCallback(%s) publishers={%s}", topic.c_str(), ss.str().c_str());
 
   if (pubUpdate(topic, pubs)) {
-    result = xmlrpc::responseInt(1, "", 0);
-  } else {
-    result = xmlrpc::responseInt(0, console::g_last_error_message, 0);
+    return xmlrpc::responseInt(1, "", 0);
   }
-  return Error::Ok;
+  return xmlrpc::responseInt(0, console::g_last_error_message, 0);
 }
 
 void TopicManager::getBusStatsCallback(const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result)

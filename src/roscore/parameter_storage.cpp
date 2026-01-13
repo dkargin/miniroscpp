@@ -189,7 +189,7 @@ Error ParameterStorage::checkParamUpdates(const std::string& fullKey, const RpcV
   if (m_dumpParameters)
     dumpParamStateUnsafe("params.json");
 
-  if (m_parameterListeners.empty() || !paramUpdateFn)
+  if (m_parameterListeners.empty())
     return Error::Ok;
   names::Path path;
   if (auto err = path.fromString(fullKey); err != Error::Ok)
@@ -206,7 +206,7 @@ Error ParameterStorage::checkParamUpdates(const std::string& fullKey, const RpcV
     for (const auto& [subPath, nodes]: m_parameterListeners) {
       if (subPath.startsWith(path) || path.startsWith(subPath)) {
         for (auto& node: nodes)
-          paramUpdateFn(node, subPath.fullPath(), ptr);
+          node->sendParameterUpdate("/master", subPath.fullPath(), ptr);
       }
     }
   }
@@ -215,7 +215,7 @@ Error ParameterStorage::checkParamUpdates(const std::string& fullKey, const RpcV
     for (const auto& [subPath, nodes]: m_parameterListeners) {
       if (subPath.startsWith(path) || path.startsWith(subPath)) {
         for (auto& node: nodes)
-          paramUpdateFn(node, subPath.fullPath(), ptr);
+          node->sendParameterUpdate("/master", subPath.fullPath(), ptr);
       }
     }
   }

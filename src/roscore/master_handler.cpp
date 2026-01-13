@@ -27,15 +27,10 @@ MasterHandler::MasterHandler(RPCManagerPtr rpcManager, RegistrationManager* regM
 {
 }
 
-Error MasterHandler::enqueueNodeCommand(const std::shared_ptr<NodeRef>& nr, const char* method, const RpcValue& arg1, const RpcValue& arg2)
-{
-  if (!nr)
-    return Error::InvalidValue;
-
-  std::scoped_lock<std::mutex> lock(m_guard);
-  m_asyncCommands.emplace_back(AsyncCommand{nr, std::string(method), arg1, arg2});
-  return Error::Ok;
-}
+/// Relevant requests:
+///  - paramUpdate
+///  - shutdown from MasterHandler::update
+///  - publisherUpdate through MasterHandler::enqueueNodeCommand(sub, "publisherUpdate", topic, l);
 
 Error MasterHandler::sendToNode(const std::shared_ptr<NodeRef>& nr, const char* method,
   const RpcValue& arg1, const RpcValue& arg2)
@@ -109,9 +104,9 @@ void MasterHandler::notifyTopicSubscribers(const std::string& topic, const std::
           l[j++] = url.str();
         }
       }
-      Error err = this->enqueueNodeCommand(sub, "publisherUpdate", topic, l);
-      if (err != Error::Ok) {
-        MINIROS_WARN("Failed send publisherUpdate(%s) to node \"%s\"", topic.c_str(), sub->id().c_str());
+
+      if (Error err = sub->sendPublisherUpdate("/master", topic, l); err != Error::Ok) {
+        MINIROS_ERROR("Failed send publisherUpdate(%s) to node \"%s\"", topic.c_str(), sub->id().c_str());
       }
     }
   }
@@ -294,19 +289,15 @@ void MasterHandler::update()
 {
   auto shutdownNodes = m_regManager->pullShutdownNodes();
 
-  std::vector<AsyncCommand> commands;
+  auto newNodes = m_regManager->pullNewNodes();
 
-  {
-    std::unique_lock<std::mutex> lock(m_guard);
-    std::swap(commands, m_asyncCommands);
-  }
-
-  for (const auto& command: commands) {
-    // Ignore all commands to nodes which are queued for shutdown.
-    if (shutdownNodes.count(command.node)) {
-      continue;
+  auto* ps = m_rpcManager->getPollSet();
+  for (std::shared_ptr<NodeRef> nr: newNodes) {
+    assert(nr);
+    Error err = nr->activateConnection(ps);
+    if (!err) {
+      MINIROS_WARN("Failed to initialize client at NodeRef(%s)", nr->id().c_str());
     }
-    sendToNode(command.node, command.command.c_str(), command.arg1, command.arg2);
   }
 
   for (std::shared_ptr<NodeRef> nr: shutdownNodes) {
@@ -314,7 +305,7 @@ void MasterHandler::update()
     std::stringstream ss;
     ss << "[" << nr->id() << "] Reason: new node registered with same name";
     msg = ss.str();
-    sendToNode(nr, "shutdown", msg);
+    nr->sendShutdown(msg);
   }
 }
 

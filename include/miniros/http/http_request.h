@@ -51,6 +51,8 @@ public:
 
   HttpRequest(HttpMethod method, const char* path);
 
+  virtual ~HttpRequest();
+
   /// Set HTTP method (GET, POST, etc.)
   void setMethod(HttpMethod method);
 
@@ -95,7 +97,7 @@ public:
   std::string buildHeader(const std::string& host, int port = -1) const;
 
   /// Reset request for reuse
-  void reset();
+  virtual void reset();
 
   void updateState(State status);
 
@@ -135,6 +137,9 @@ public:
 
   /// Reset response-related data.
   void resetResponse();
+
+  /// Process response.
+  virtual Error processResponse() { return Error::Ok; }
 
 protected:
   State state_ = State::Idle;

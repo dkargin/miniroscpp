@@ -223,8 +223,8 @@ private:
    */
   bool pubUpdate(const std::string &topic, const std::vector<std::string> &pubs);
 
-  Error pubUpdateCallback(const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result);
-  void requestTopicCallback(const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result);
+  RpcValue pubUpdateCallback(const std::string& callerId, const std::string& topic, const RpcValue& publishers, const network::ClientInfo& ci);
+
   void getBusStatsCallback(const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result);
   void getBusInfoCallback(const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result);
   void getSubscriptionsCallback(const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result);

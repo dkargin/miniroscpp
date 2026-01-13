@@ -82,6 +82,9 @@ public:
   /// Init periodic events.
   void initEvents(NodeHandle& nh);
 
+  /// Register NodeRef related to itself.
+  void registerSelfRef();
+
 public: /// Request handlers
   RpcValue lookupService(const std::string& caller_id, const std::string& service, const ClientInfo& ci);
 

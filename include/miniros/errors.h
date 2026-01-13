@@ -55,8 +55,8 @@ struct MINIROS_DECL Error {
     InvalidHandle,
     /// Timed out during operation.
     Timeout,
-    /// Response was postponed.
-    Postponed,
+    /// Sending of request or response was postponed.
+    ResponsePostponed,
   };
 
   Error() :code(Ok)

@@ -294,7 +294,8 @@ bool isStarted()
   return g_started;
 }
 
-/// Start is issued by a first NodeHandle::construct.
+/// Start is issued by the first NodeHandle::construct.
+/// This function is expected to be called after miniros::init.
 Error start()
 {
   SteadyTime time_start = SteadyTime::now();
@@ -476,6 +477,22 @@ void check_ipv6_environment() {
 #endif
 }
 
+void initDefaultLogLevels(const M_string& remappings)
+{
+  // Setting up default log levels to some practical values.
+  auto it = remappings.find("__miniros.debug");
+  if (it != remappings.end() && it->second == "1") {
+    console::set_logger_level("miniros.http", console::Level::Debug);
+    console::set_logger_level("miniros.net", console::Level::Debug);
+    console::set_logger_level("miniros.http.client", console::Level::Info);
+  } else {
+    console::set_logger_level("miniros.http", console::Level::Error);
+    console::set_logger_level("miniros.http.client", console::Level::Error);
+    console::set_logger_level("miniros.net", console::Level::Fatal);
+  }
+  console::set_logger_level("miniros.poll_set", miniros::console::Level::Error);
+}
+
 void init(const M_string& remappings, const std::string& name, uint32_t options)
 {
   if (!g_atexit_registered)
@@ -516,6 +533,8 @@ void init(const M_string& remappings, const std::string& name, uint32_t options)
 
     g_initialized = true;
   }
+
+  initDefaultLogLevels(remappings);
 }
 
 M_string extractRemappings(int& argc, char** argv, const std::string& name, uint32_t options)

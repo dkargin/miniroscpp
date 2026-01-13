@@ -49,8 +49,8 @@ const char* Error::toString() const {
       return "Invalid handle";
     case Error::Timeout:
       return "Timeout";
-    case Error::Postponed:
-      return "Postponed";
+    case Error::ResponsePostponed:
+      return "ResponsePostponed";
   }
   return "Unknown error";
 }

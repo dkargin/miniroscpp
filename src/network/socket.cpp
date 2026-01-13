@@ -5,17 +5,17 @@
 #include <cassert>
 #include <cstring>
 
-#include "../../include/miniros/network/socket.h"
+#include "miniros/network/socket.h"
 #include "miniros/transport/io.h"
 
 #include "transport/transport_tcp.h"
-#include "xmlrpcpp/XmlRpcSocket.h"
 
 #ifndef WIN32
 #include <sys/uio.h>
 #endif
 
-#define MINIROS_PACKAGE_NAME "net_socket"
+// ROS log will be written to "miniros.net[.socket]"
+#define MINIROS_PACKAGE_NAME "net"
 
 namespace miniros {
 namespace network {
@@ -63,6 +63,9 @@ NetSocket::NetSocket(int fd, Type type, bool own)
   internal_->fd = fd;
   internal_->own = own;
   internal_->type = type;
+  if (fd) {
+    MINIROS_DEBUG_NAMED("socket", "NetSocket(%d)", fd);
+  }
 }
 
 NetSocket::~NetSocket()
@@ -191,7 +194,7 @@ Error NetSocket::tcpListen(int port, NetAddress::Type type, int maxQueuedClients
   int fd = socket(addrType, SOCK_STREAM, IPPROTO_TCP);
   if (fd < 0) {
     const char* err = last_socket_error_string();
-    MINIROS_ERROR_NAMED("socket", "Error while trying to create listening socket: %s", err);
+    MINIROS_ERROR_NAMED("socket", "NetSocket::tcpListen() - error while trying to create listening socket: %s", err);
     return Error::SystemError;
   }
   internal_->fd = fd;
@@ -203,14 +206,18 @@ Error NetSocket::tcpListen(int port, NetAddress::Type type, int maxQueuedClients
     internal_->type = Type::TCPv6;
 
   if (Error err = setReuseAddr(); !err) {
+    close();
     return err;
   }
 
   if (Error err = bind(port); !err) {
+    MINIROS_ERROR_NAMED("socket", "NetSocket[%d]::tcpListen() - error binding to port %d: %s", fd, port, err.toString());
+    close();
     return err;
   }
   if (Error err = listen(maxQueuedClients); !err) {
-    MINIROS_ERROR_NAMED("socket", "Error while entering listening mode: %s", err.toString());
+    MINIROS_ERROR_NAMED("socket", "NetSocket[%d]::tcpListen() - error while entering listening mode: %s", fd, err.toString());
+    close();
     return err;
   }
   return Error::Ok;
@@ -243,7 +250,7 @@ Error NetSocket::tcpConnect(const NetAddress& address, bool nonblock)
   int fd = socket(domain, SOCK_STREAM, IPPROTO_TCP);
   if (fd < 0) {
     const char* err = last_socket_error_string();
-    MINIROS_ERROR("Error while trying to create TCP socket: %s", err);
+    MINIROS_ERROR_NAMED("socket", "NetSocket::tcpConnect(%s) Error while trying to create TCP socket: %s", address.str().c_str(), err);
     return Error::SystemError;
   }
 
@@ -263,6 +270,8 @@ Error NetSocket::tcpConnect(const NetAddress& address, bool nonblock)
     int err = last_socket_error();
 
     if (err == EINPROGRESS && internal_->nonblock) {
+      // This is expected error and connection attempt will be retried later.
+      // This socket should be added to PollSet to get notification when connection is ready.
       internal_->connecting = true;
       return Error::WouldBlock;
     }
@@ -275,7 +284,7 @@ Error NetSocket::tcpConnect(const NetAddress& address, bool nonblock)
     }
 
     const char* errStr = last_socket_error_string();
-    MINIROS_ERROR("Error while connecting TCP socket to %s: %s", address.str().c_str(), errStr);
+    MINIROS_ERROR_NAMED("socket", "NetSocket[%d]::tcpConnect() error while connecting TCP socket to %s: %s", internal_->fd, address.str().c_str(), errStr);
 
     return Error::SystemError;
   }
@@ -370,7 +379,7 @@ Error NetSocket::setNonBlock()
 
   int result = set_non_blocking(internal_->fd);
   if ( result != 0 ) {
-    MINIROS_ERROR("setting socket [%d] as non_blocking failed with error [%d]", internal_->fd, result);
+    MINIROS_ERROR_NAMED("socket", "NetSocket[%d]::setNonBlock() failed with error [%d]", internal_->fd, result);
     return Error::SystemError;
   }
   internal_->nonblock = true;
@@ -388,7 +397,7 @@ Error NetSocket::setNoDelay(bool noDelay)
   int result = setsockopt(internal_->fd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int));
   if (result < 0)
   {
-    MINIROS_ERROR("setsockopt failed to set TCP_NODELAY on socket [%d]: %s", internal_->fd, last_socket_error_string());
+    MINIROS_ERROR_NAMED("socket", "NetSocket[%d]::setNoDelay() failed: %s", internal_->fd, last_socket_error_string());
     return Error::SystemError;
   }
   return Error::Ok;
@@ -404,7 +413,7 @@ Error NetSocket::setBroadcast(bool broadcast)
   int flag = broadcast ? 1 : 0;
   if (setsockopt(internal_->fd, SOL_SOCKET, SO_BROADCAST, reinterpret_cast<const char*>(&flag), sizeof(flag)) < 0)
   {
-    MINIROS_ERROR("NetSocket::setBroadcast failed to set SO_BROADCAST on socket [%d]: %s", internal_->fd, last_socket_error_string());
+    MINIROS_ERROR_NAMED("socket", "NetSocket[%d]::setBroadcast() failed on socket %s", internal_->fd, last_socket_error_string());
     return Error::SystemError;
   }
   return Error::Ok;
@@ -421,7 +430,7 @@ Error NetSocket::setReuseAddr(bool reuse)
   int flag = reuse ? 1 : 0;
   if (setsockopt(internal_->fd, SOL_SOCKET, SO_REUSEADDR, reinterpret_cast<const char*>(&flag), sizeof(flag)) != 0) {
     const char* err = last_socket_error_string();
-    MINIROS_ERROR("NetSocket::setReuseAddr() setting socket [%d] as reuse_addr failed with error: %s", internal_->fd, err);
+    MINIROS_ERROR_NAMED("socket", "NetSocket[%d]::setReuseAddr() failed with error: %s", internal_->fd, err);
     return Error::SystemError;
   }
   return Error::Ok;
@@ -439,7 +448,7 @@ Error NetSocket::setReusePort(bool reuse)
   int flag = reuse ? 1 : 0;
   if (setsockopt(internal_->fd, SOL_SOCKET, SO_REUSEPORT, &flag, sizeof(flag)) != 0) {
     const char* err = last_socket_error_string();
-    MINIROS_ERROR("NetSocket::setReusePort() socket [%d] as reuse_addr failed with error: %s", internal_->fd, err);
+    MINIROS_ERROR_NAMED("socket", "NetSocket[%d]::setReusePort() failed with error: %s", internal_->fd, err);
     return Error::SystemError;
   }
 #endif
@@ -469,7 +478,7 @@ Error NetSocket::joinMulticastGroup(const NetAddress& group)
     int fd = internal_->fd;
     if (setsockopt(fd, IPPROTO_IP, IP_ADD_MEMBERSHIP, (char*) &mreq, sizeof(mreq)) < 0) {
       const char* err = last_socket_error_string();
-      MINIROS_ERROR("NetSocket failed to join multicast group \"%s\": %s", group.str().c_str(), err);
+      MINIROS_ERROR_NAMED("socket", "NetSocket[%d]::joinMulticastGroup() failed to join multicast group \"%s\": %s", fd, group.str().c_str(), err);
     }
   } else {
     return Error::NotImplemented;
@@ -557,7 +566,7 @@ std::pair<size_t, Error> NetSocket::send(const void* rawData, size_t size, const
     } else {
       n = ::send(internal_->fd, sp, static_cast<socklen_t>(size - written), flags);
     }
-    MINIROS_DEBUG("NetSocket::send returned %d.", n);
+    MINIROS_DEBUG("NetSocket(%d)::send returned %d.", internal_->fd, n);
     if (n > 0) {
       if (isDatagram()) {
         break;
@@ -741,9 +750,6 @@ bool NetSocket::isConnecting() const
     return internal_->connecting;
   return false;
 }
-
-
-
 
 }
 }

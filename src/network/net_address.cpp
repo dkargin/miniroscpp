@@ -103,27 +103,126 @@ NetAddress NetAddress::fromString(Type type, const std::string& address, int por
 {
   NetAddress result;
 
+  // First, try to parse as IP address directly
   if (type == NetAddress::AddressIPv4) {
     sockaddr_in addr{};
     addr.sin_family = AF_INET;
-    if (!inet_pton(AF_INET, address.c_str(), &addr.sin_addr)) {
+    if (inet_pton(AF_INET, address.c_str(), &addr.sin_addr) == 1) {
+      addr.sin_port = htons(port);
+      result.assignRawAddress(type, &addr, sizeof(addr));
+      result.address = address;
       return result;
     }
-    addr.sin_port = htons(port);
-    result.assignRawAddress(type, &addr, sizeof(addr));
   } else if (type == NetAddress::AddressIPv6) {
     sockaddr_in6 addr{};
     addr.sin6_family = AF_INET6;
     addr.sin6_port = htons(port);
-    if (!inet_pton(AF_INET6, address.c_str(), &addr.sin6_addr)) {
+    if (inet_pton(AF_INET6, address.c_str(), &addr.sin6_addr) == 1) {
+      result.assignRawAddress(type, &addr, sizeof(addr));
+      result.address = address;
       return result;
     }
-    result.assignRawAddress(type, &addr, sizeof(addr));
+  } else if (type == NetAddress::AddressUnspecified) {
+    // Try IPv6 first, then IPv4
+    sockaddr_in6 addr6{};
+    addr6.sin6_family = AF_INET6;
+    addr6.sin6_port = htons(port);
+    if (inet_pton(AF_INET6, address.c_str(), &addr6.sin6_addr) == 1) {
+      result.assignRawAddress(AddressIPv6, &addr6, sizeof(addr6));
+      result.address = address;
+      return result;
+    }
+    sockaddr_in addr4{};
+    addr4.sin_family = AF_INET;
+    if (inet_pton(AF_INET, address.c_str(), &addr4.sin_addr) == 1) {
+      addr4.sin_port = htons(port);
+      result.assignRawAddress(AddressIPv4, &addr4, sizeof(addr4));
+      result.address = address;
+      return result;
+    }
   } else {
-    return {};
+    // Invalid type
+    return result;
   }
 
-  result.address = address;
+  // If IP parsing failed, try DNS resolution
+  struct addrinfo hints{};
+  struct addrinfo* res = nullptr;
+  
+  // Set up hints based on type preference
+  if (type == NetAddress::AddressIPv4) {
+    hints.ai_family = AF_INET;
+  } else if (type == NetAddress::AddressIPv6) {
+    hints.ai_family = AF_INET6;
+  } else {
+    // AddressUnspecified: prefer IPv6 but allow IPv4 fallback
+    hints.ai_family = AF_UNSPEC;
+  }
+  hints.ai_socktype = SOCK_STREAM;
+  hints.ai_flags = AI_ADDRCONFIG;
+
+  // Convert port to string for getaddrinfo
+  std::string portStr = std::to_string(port);
+  
+  int err = getaddrinfo(address.c_str(), portStr.c_str(), &hints, &res);
+  if (err != 0) {
+    // DNS resolution failed
+    return result;
+  }
+
+  // Try to find a matching address
+  // For AddressUnspecified, prefer IPv6 first, then IPv4
+  if (type == NetAddress::AddressUnspecified) {
+    // First pass: look for IPv6 addresses
+    for (struct addrinfo* rp = res; rp != nullptr; rp = rp->ai_next) {
+      if (rp->ai_family == AF_INET6) {
+        const sockaddr_in6* addr6 = reinterpret_cast<const sockaddr_in6*>(rp->ai_addr);
+        result.assignRawAddress(AddressIPv6, rp->ai_addr, rp->ai_addrlen);
+        char ipBuffer[INET6_ADDRSTRLEN];
+        if (inet_ntop(AF_INET6, &addr6->sin6_addr, ipBuffer, sizeof(ipBuffer))) {
+          result.address = ipBuffer;
+        }
+        freeaddrinfo(res);
+        return result;
+      }
+    }
+    // Second pass: look for IPv4 addresses if no IPv6 found
+    for (struct addrinfo* rp = res; rp != nullptr; rp = rp->ai_next) {
+      if (rp->ai_family == AF_INET) {
+        const sockaddr_in* addr4 = reinterpret_cast<const sockaddr_in*>(rp->ai_addr);
+        result.assignRawAddress(AddressIPv4, rp->ai_addr, rp->ai_addrlen);
+        char ipBuffer[INET_ADDRSTRLEN];
+        if (inet_ntop(AF_INET, &addr4->sin_addr, ipBuffer, sizeof(ipBuffer))) {
+          result.address = ipBuffer;
+        }
+        break;
+      }
+    }
+  } else {
+    // For specific types, find matching address family
+    for (struct addrinfo* rp = res; rp != nullptr; rp = rp->ai_next) {
+      if (rp->ai_family == AF_INET && type == NetAddress::AddressIPv4) {
+        const sockaddr_in* addr4 = reinterpret_cast<const sockaddr_in*>(rp->ai_addr);
+        result.assignRawAddress(AddressIPv4, rp->ai_addr, rp->ai_addrlen);
+        char ipBuffer[INET_ADDRSTRLEN];
+        if (inet_ntop(AF_INET, &addr4->sin_addr, ipBuffer, sizeof(ipBuffer))) {
+          result.address = ipBuffer;
+        }
+        break;
+      } else if (rp->ai_family == AF_INET6 && type == NetAddress::AddressIPv6) {
+        const sockaddr_in6* addr6 = reinterpret_cast<const sockaddr_in6*>(rp->ai_addr);
+        result.assignRawAddress(AddressIPv6, rp->ai_addr, rp->ai_addrlen);
+        char ipBuffer[INET6_ADDRSTRLEN];
+        if (inet_ntop(AF_INET6, &addr6->sin6_addr, ipBuffer, sizeof(ipBuffer))) {
+          result.address = ipBuffer;
+        }
+        break;
+      }
+    }
+  }
+
+  // Free the addrinfo structure
+  freeaddrinfo(res);
   return result;
 }
 

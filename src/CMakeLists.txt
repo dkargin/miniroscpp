@@ -190,6 +190,7 @@ set(transport_SRC
 
     http/http_client.cpp
     http/http_request.cpp
+    http/xmlrpc_request.cpp
 
     http/endpoints/xmlrpc.cpp
     http/endpoints/filesystem.cpp

@@ -36,9 +36,6 @@ public:
   /// @returns error code
   Error checkParamUpdates(const std::string& fullPath, const RpcValue* ptr);
 
-  /// Callback is invoked when parameter is updated.
-  std::function<void (const std::shared_ptr<NodeRef>& nr, const std::string& fullPath, const RpcValue* value)> paramUpdateFn;
-
   /// Searches for parameter.
   std::string searchParam(const std::string& ns, const std::string& key);
 

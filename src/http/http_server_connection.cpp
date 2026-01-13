@@ -9,6 +9,9 @@
 
 #include "miniros/transport/poll_set.h"
 
+// ROS log will write to the channel "miniros.http[.server]"
+#define MINIROS_PACKAGE_NAME "http"
+
 namespace miniros {
 namespace http {
 
@@ -20,7 +23,7 @@ HttpServerConnection::HttpServerConnection(HttpServer* server, std::shared_ptr<n
 
 HttpServerConnection::~HttpServerConnection()
 {
-  MINIROS_INFO("HttpServerConnection::~HttpServerConnection()");
+  MINIROS_DEBUG("~HttpServerConnection()");
   std::unique_lock<std::mutex> lock(guard_);
 }
 
@@ -34,24 +37,25 @@ Error HttpServerConnection::readRequest()
   const int fd = socket_->fd();
   const int parsed = http_frame_.incrementalParse();
 
+  std::string peer = socket_->peerAddress().str();
   double dur = (SteadyTime::now() - request_start_).toSec() * 1000;
-  MINIROS_DEBUG("HttpServerConnection(%d)::readHeader: ContentLength=%d, parsed=%d t=%fms", fd, http_frame_.contentLength(), parsed, dur);
+  MINIROS_DEBUG("HttpServerConnection(peer=%s fd=%d)::readHeader: ContentLength=%d, parsed=%d t=%fms", peer.c_str(), fd, http_frame_.contentLength(), parsed, dur);
 
   // If we haven't gotten the entire request yet, return (keep reading)
   if (http_frame_.state() != HttpParserFrame::ParseComplete) {
     if (readErr == Error::EndOfFile) {
-      MINIROS_DEBUG("HttpServerConnection(%d)::readRequest: EOF while reading request", fd);
+      MINIROS_DEBUG("HttpServerConnection(peer=%s fd=%d)::readRequest: EOF while reading request", peer.c_str(), fd);
       http_frame_.finishRequest();
       return Error::EndOfFile;
       // Either way we close the connection
     }
-    MINIROS_DEBUG("HttpServerConnection(%d)::readRequest got only %d/%d bytes.", fd, http_frame_.bodyLength(), http_frame_.contentLength());
+    MINIROS_DEBUG("HttpServerConnection(peer=%s fd=%d)::readRequest got only %d/%d bytes.", peer.c_str(), fd, http_frame_.bodyLength(), http_frame_.contentLength());
     return Error::Ok;
   }
 
   assert(http_frame_.state() == HttpParserFrame::ParseComplete);
   // Otherwise, parse and dispatch the request
-  MINIROS_DEBUG("HttpServerConnection(%d)::readRequest read %d/%d bytes.", fd, http_frame_.bodyLength(), http_frame_.contentLength());
+  MINIROS_DEBUG("HttpServerConnection(peer=%s fd=%d)::readRequest read %d/%d bytes.", peer.c_str(), fd, http_frame_.bodyLength(), http_frame_.contentLength());
   state_ = State::ProcessRequest;
   return Error::Ok;
 }
@@ -105,7 +109,7 @@ int HttpServerConnection::handleEvents(int evtFlags)
       network::ClientInfo clientInfo;
       clientInfo.fd = socket_->fd();
       clientInfo.remoteAddress = socket_->peerAddress();
-      MINIROS_DEBUG("Handling HTTP request to %s", endpoint.c_str());
+      MINIROS_DEBUG("Handling HTTP request to path=\"%s\"", endpoint.c_str());
 
       requestObject->setRequestBody(std::string{http_frame_.body()});
 

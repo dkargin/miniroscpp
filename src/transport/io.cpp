@@ -126,7 +126,7 @@ void close_socket_watcher(int fd)
     ::close(fd);
 }
 
-void add_socket_to_watcher(int epfd, int fd, int events)
+bool add_socket_to_watcher(int epfd, int fd, int events)
 {
 #if defined(HAVE_EPOLL)
   struct epoll_event ev;
@@ -137,11 +137,13 @@ void add_socket_to_watcher(int epfd, int fd, int events)
 
   if (::epoll_ctl(epfd, EPOLL_CTL_ADD, fd, &ev)) {
     MINIROS_ERROR("Unable to add FD to epoll: %s", strerror(errno));
+    return false;
   }
 #else
   UNUSED(epfd);
   UNUSED(fd);
 #endif
+  return true;
 }
 
 void del_socket_from_watcher(int epfd, int fd)

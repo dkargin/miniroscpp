@@ -37,9 +37,6 @@ public:
   Error sendToNode(const std::shared_ptr<NodeRef>& nr, const char* method,
     const RpcValue& arg1, const RpcValue& arg2 = {});
 
-  /// Enqueues command to a node. It will be executed later in `update()` method.
-  Error enqueueNodeCommand(const std::shared_ptr<NodeRef>& nr, const char* method, const RpcValue& arg1, const RpcValue& arg2 = {});
-
   void notifyTopicSubscribers(const std::string& topic, const std::vector<std::shared_ptr<NodeRef>>& subscribers);
 
   ReturnStruct registerService(const RequesterInfo& requesterInfo, const std::string& service, const std::string& service_api);
@@ -75,25 +72,11 @@ public:
   /// It is called from the main thread, out of any RPC handlers.
   void update();
 
-  struct AsyncCommand {
-    std::shared_ptr<NodeRef> node;
-
-    /// Name of XMLRPC command.
-    std::string command;
-    /// First argument.
-    RpcValue arg1;
-    /// Second argument.
-    RpcValue arg2;
-  };
-
 protected:
   AddressResolver* m_resolver;
   RegistrationManager* m_regManager;
 
   RPCManagerPtr m_rpcManager;
-
-  /// A  list of commands to be sent later.
-  std::vector<AsyncCommand> m_asyncCommands;
 
   /// Internal guard for m_topicTypes.
   mutable std::mutex m_guard;

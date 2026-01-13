@@ -21,6 +21,8 @@ public:
     AddressInvalid,
     AddressIPv4,
     AddressIPv6,
+    /// Unspecified address type. Used for creating NetAddress address from arbitrary hostname.
+    AddressUnspecified,
   };
 
   /// String representation of network address.
@@ -83,18 +85,21 @@ public:
   /// Assign new raw address value.
   void assignRawAddress(Type type, const void* addr, size_t size);
 
-  /// Create network address from some IP address and port.
+  /// Create network address from some IP address or hostname and port.
   /// @param type - address family.
-  /// @param address - IP (or similar) address.
+  /// @param address - hostname or IP (or similar) address.
   /// @param port - numeric port.
-  /// Note: this function does not resolve DNS addresses.
   NODISCARD static NetAddress fromString(Type type, const std::string& address, int port);
 
+  /// Create network address from string representation of IP4 address.
+  /// This function will not resolve DNS names.
   NODISCARD static NetAddress fromIp4String(const std::string& address, int port)
   {
     return fromString(Type::AddressIPv4, address, port);
   }
 
+  /// Create network address from string representation of IPv6 address.
+  /// This function will not resolve DNS names.
   NODISCARD static NetAddress fromIp6String(const std::string& address, int port)
   {
     return fromString(Type::AddressIPv6, address, port);

@@ -79,14 +79,15 @@ public:
    * \brief Handle a publisher update list received from the master. Creates/drops PublisherLinks based on
    * the list.  Never handles new self-subscriptions
    */
-  bool pubUpdate(const std::vector<std::string> &pubs);
+  bool pubUpdate(const RPCManagerPtr& rpcManager, const std::vector<std::string> &pubs);
   /**
    * \brief Negotiates a connection with a publisher
-   * \param xmlrpc_uri The XMLRPC URI to connect to to negotiate the connection
+   * \param rpcManager - RPC manager.
+   * \param xmlrpc_uri The XMLRPC URI to connect to negotiate the connection
    */
-  bool negotiateConnection(const std::string& xmlrpc_uri);
+  bool negotiateConnection(const RPCManagerPtr& rpcManager, const std::string& xmlrpc_uri);
 
-  void addLocalConnection(const PublicationPtr& pub);
+  void addLocalConnection(const RPCManagerPtr& rpcManager, const PublicationPtr& pub);
 
   /**
    * \brief Returns whether this Subscription has been dropped or not

@@ -12,7 +12,8 @@
 #include "miniros/http/http_server.h"
 #include "miniros/http/http_server_connection.h"
 
-#define MINIROS_PACKAGE_NAME "http_server"
+// ROS log will write to the channel "miniros.http[.server]"
+#define MINIROS_PACKAGE_NAME "http"
 
 namespace miniros {
 namespace http {
@@ -50,7 +51,7 @@ struct HttpServer::Internal {
 
   ~Internal()
   {
-    MINIROS_INFO_NAMED("destructor", "HttpServer::~Internal()");
+    MINIROS_DEBUG("HttpServer::~Internal()");
   }
 
   void closeConnection(int fd, const char* reason);
@@ -58,7 +59,7 @@ struct HttpServer::Internal {
 
 void HttpServer::Internal::closeConnection(int fd, const char* reason)
 {
-  MINIROS_DEBUG_NAMED("HttpServer", "closeConnection(%d): %s", fd, reason);
+  MINIROS_DEBUG("HttpServer[%d]::closeConnection(): %s", fd, reason);
   std::shared_ptr<HttpServerConnection> connection;
   auto it = connections.find(fd);
   if (it != connections.end()) {
@@ -91,7 +92,7 @@ HttpServer::~HttpServer()
     internal_->pollSet = nullptr;
     internal_.reset();
   }
-  MINIROS_DEBUG_NAMED("destructor", "HttpServer::~HttpServer()");
+  MINIROS_DEBUG("HttpServer::~HttpServer()");
 }
 
 Error HttpServer::start(int port)
@@ -128,7 +129,7 @@ Error HttpServer::start(int port)
     return Error::InternalError;
   }
 
-  MINIROS_INFO("Created HTTP ipv4 server fd=%d", fd);
+  MINIROS_INFO("HttpServer::start() created HTTP ipv4 server, fd=%d", fd);
   // TODO: ipv6 listener.
   return Error::Ok;
 }
@@ -151,6 +152,7 @@ Error HttpServer::stop()
     auto it = internal_->connections.begin();
     internal_->closeConnection(it->first, "HttpServer::stop()");
   }
+  MINIROS_DEBUG("HttpServer::stop() finished");
   return Error::Ok;
 }
 
@@ -184,12 +186,12 @@ void HttpServer::acceptClient(const std::shared_ptr<Lifetime<HttpServer>>& lifet
   auto [client, err] = sock->accept();
 
   if (!client) {
-    MINIROS_ERROR("Failed to accept HTTP client: %s", err.toString());
+    MINIROS_ERROR("HttpServer::accept() - failed to accept client: %s", err.toString());
     return;
   }
 
   int fd = client->fd();
-  MINIROS_DEBUG("Accepting new HTTP client fd=%d", client->fd());
+  MINIROS_DEBUG("HttpServer::accept() - accepting new client fd=%d", client->fd());
 
   client->setNonBlock();
   client->setNoDelay(true);

@@ -7,7 +7,6 @@
 #include "miniros/console.h"
 #include "miniros/names.h"
 
-
 namespace miniros {
 namespace master {
 
@@ -68,6 +67,12 @@ std::shared_ptr<NodeRef> RegistrationManager::_register(Registrations& r, const 
   RegistrationReport report = registerNodeApi(nodeName, nodeApi);
   if (!report.node) {
     MINIROS_ERROR("Failed to register NodeRef(node=%s api=%s)", nodeName.c_str(), nodeApi.c_str());
+    return {};
+  }
+
+  std::string nameError;
+  if (!names::validate(key, nameError)) {
+    MINIROS_ERROR("_register(node=%s,  key=%s) - invalid key: \"%s\"", nodeName.c_str(), key.c_str(), nameError.c_str());
     return {};
   }
 
@@ -196,15 +201,15 @@ RegistrationManager::registerNodeApi(const std::string& nodeName, const std::str
 
   RegistrationReport report;
 
-  if (m_nodes.count(nodeName))
-    report.node = m_nodes[nodeName];
-
-  if (report.node) {
+  auto it = m_nodes.find(nodeName);
+  if (it != m_nodes.end()) {
+    report.node = it->second;
     if (report.node->getApi() == nodeApi) {
       return report;
     }
 
     // TODO: Need to check PID of the new node and verify that it has changed.
+    // TODO: Need to check some alternative IP addresses to verify this node is really new.
     NodeRefPtr prevNode;
 
     report.previous = report.node;
@@ -216,10 +221,12 @@ RegistrationManager::registerNodeApi(const std::string& nodeName, const std::str
   report.created = true;
 
   m_nodes[nodeName] = report.node;
+  m_newNodes.insert(report.node);
 
+  /*
   if (flags & REG_MASTER) {
-    report.node->setMaster();
-  }
+    report.node->setLocal();
+  }*/
   return report;
 }
 
@@ -228,6 +235,14 @@ std::set<std::shared_ptr<NodeRef>> RegistrationManager::pullShutdownNodes()
   std::set<std::shared_ptr<NodeRef>> result;
   std::scoped_lock<std::mutex> lock(m_guard);
   std::swap(result, m_nodesToShutdown);
+  return result;
+}
+
+std::set<std::shared_ptr<NodeRef>> RegistrationManager::pullNewNodes()
+{
+  std::set<std::shared_ptr<NodeRef>> result;
+  std::scoped_lock<std::mutex> lock(m_guard);
+  std::swap(result, m_newNodes);
   return result;
 }
 

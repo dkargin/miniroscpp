@@ -73,12 +73,22 @@ public:
   ///   Error::NotConnected - connection refused.
   Error waitConnected(const WallDuration& timeout);
 
+  /// Get number of queued requests, including active one.
+  size_t getQueuedRequests() const;
+
   struct DisconnectResponse {
     bool reconnect = false;
     size_t reconnectTimeout = 0;
   };
 
+  /// Called when TCP connection is broken.
   std::function<DisconnectResponse (std::shared_ptr<NetSocket> socket)> onDisconnect;
+
+  /// Called when client has successfully established TCP connection.
+  std::function<bool (std::shared_ptr<NetSocket> socket)> onConnect;
+
+  /// Called when response is parsed.
+  std::function<void (const std::shared_ptr<HttpRequest>& req)> onResponse;
 
 protected:
   /// Get socket events for specified state.
