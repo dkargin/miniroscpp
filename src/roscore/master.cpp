@@ -41,12 +41,6 @@ Master::Internal::Internal(const std::shared_ptr<RPCManager>& manager)
     port = 11311;
     MINIROS_WARN("Invalid XMLRPC uri. Using ROS_MASTER_URI=http://%s:%d", host.c_str(), port);
   }
-
-  parameterStorage.paramUpdateFn =
-    [this](const std::shared_ptr<NodeRef>& nr, const std::string& fullPath, const RpcValue* value)
-    {
-      this->handler.sendToNode(nr, "paramUpdate", fullPath, value ? *value : RpcValue::Dict());
-    };
 }
 
 Master::Internal::~Internal()
@@ -569,6 +563,14 @@ void Master::initEvents(NodeHandle& nh)
     return;
   WallDuration period(0.5);
   internal_->timerBroadcasts = nh.createSteadyTimer(period, &Internal::onBroadcast, internal_.get());
+}
+
+void Master::registerSelfRef()
+{
+  internal_->regManager.registerNodeApi("/miniroscore", internal_->rpcManager->getServerURI(), RegistrationManager::REG_MASTER);
+  // Need to run update to initialize connection of new local NodeRef to rpcManager.
+  //
+  internal_->handler.update();
 }
 
 void enableDiscoveryBroadcasts(bool flag);

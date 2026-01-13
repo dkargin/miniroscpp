@@ -2,7 +2,7 @@
 // Created by dkargin on 7/22/25.
 //
 
-#include "../../../include/miniros/http/endpoints/xmlrpc.h"
+#include "miniros/http/endpoints/xmlrpc.h"
 
 #include "http/http_request.h"
 #include "miniros/xmlrpcpp/XmlRpcException.h"
@@ -11,6 +11,8 @@
 #include "miniros/xmlrpcpp/XmlRpcValue.h"
 
 #include "miniros/internal/xml_tools.h"
+
+#define MINIROS_PACKAGE_NAME "http"
 
 namespace {
 constexpr char SYSTEM_MULTICALL[] = "system.multicall";
@@ -72,7 +74,7 @@ Error XmlRpcHandler::handle(const network::ClientInfo& clientInfo, std::shared_p
   }
 
   std::string methodName(methodView);
-  MINIROS_DEBUG("XmlRpcHandler(%d)::executeRequest: calling method '%s'", clientInfo.fd, methodName.c_str());
+  MINIROS_INFO("XmlRpcHandler(%d)::executeRequest method '%s'", clientInfo.fd, methodName.c_str());
 
   try {
     if ( ! executeMethod(clientInfo, methodName, params, resultValue) &&

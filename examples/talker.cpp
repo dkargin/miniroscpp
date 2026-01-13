@@ -55,7 +55,7 @@ int main(int argc, char **argv)
   auto delta = std::chrono::duration_cast<std::chrono::milliseconds>(timeEnd - timeStart);
   MINIROS_INFO("Node initialized in %dms", (int)delta.count());
 
-  miniros::Rate loop_rate(10);
+  miniros::Rate loop_rate(2);
 
   /**
    * A count of how many messages we have sent. This is used to create

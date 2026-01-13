@@ -191,7 +191,6 @@ Error RPCManager::start(PollSet* poll_set, int port)
     return Error::Ok;
   }
 
-  MINIROS_INFO("Starting manager at port %d", port);
   internal_->shutting_down_ = false;
   bind("getPid", getPid);
 
@@ -203,7 +202,7 @@ Error RPCManager::start(PollSet* poll_set, int port)
 
   auto xmlrpc_enpoint = std::make_shared<http::XmlRpcHandler>(&internal_->server_);
 
-  // miniros endpoints tend to go here.
+  // miniroscore endpoints tend to go here.
   internal_->http_server_->registerEndpoint(std::make_unique<http::SimpleFilter>(http::HttpMethod::Post, "/"), xmlrpc_enpoint);
 
   // Common endpoint for regular ROS endpoints.
@@ -214,6 +213,12 @@ Error RPCManager::start(PollSet* poll_set, int port)
   }
 
   internal_->port_ = internal_->http_server_->getPort();
+  if (port == 0) {
+    MINIROS_INFO("Started RPC manager at free port %d", internal_->port_);
+  } else {
+    MINIROS_INFO("Started RPC manager at port %d", internal_->port_);
+  }
+
   MINIROS_ASSERT(internal_->port_ != 0);
 
   std::string host = network::getHost();
@@ -335,7 +340,7 @@ bool RPCManager::validateXmlrpcResponse(const std::string& method, XmlRpcValue &
     std::string empty_array = "<value><array><data></data></array></value>";
     size_t offset = 0;
     xml::XmlCodec codec;
-    codec.parseXmlRpcValue(payload, empty_array, offset);
+    return codec.parseXmlRpcValue(payload, empty_array, offset);
   }
   return true;
 }

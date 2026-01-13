@@ -50,9 +50,46 @@ const std::string& XmlRpcRequest::methodName() const
   return method_name_;
 }
 
-void XmlRpcRequest::setParams(const XmlRpc::XmlRpcValue& params)
+void XmlRpcRequest::setParamArray(const XmlRpc::XmlRpcValue& params)
 {
   params_ = params;
+  generateRequestBody();
+}
+
+void XmlRpcRequest::setParams(const XmlRpc::XmlRpcValue& param0)
+{
+  if (params_.getType() != RpcValue::TypeArray) {
+    params_ = RpcValue::Array(1);
+  } else if (params_.size() != 1) {
+    params_.setSize(1);
+  }
+  params_[0] = param0;
+  generateRequestBody();
+}
+
+void XmlRpcRequest::setParams(const RpcValue& param0, const RpcValue& param1)
+{
+  if (params_.getType() != RpcValue::TypeArray) {
+    params_ = RpcValue::Array(2);
+  } else if (params_.size() != 2) {
+    params_.setSize(2);
+  }
+  params_[0] = param0;
+  params_[1] = param1;
+  generateRequestBody();
+}
+
+void XmlRpcRequest::setParams(const RpcValue& param0, const RpcValue& param1, const RpcValue& param2)
+{
+  if (params_.getType() != RpcValue::TypeArray) {
+    params_ = RpcValue::Array(3);
+  } else if (params_.size() != 3) {
+    params_.setSize(3);
+  }
+  params_[0] = param0;
+  params_[1] = param1;
+  params_[2] = param2;
+  generateRequestBody();
 }
 
 const XmlRpc::XmlRpcValue& XmlRpcRequest::params() const
@@ -84,8 +121,8 @@ std::string XmlRpcRequest::generateRequestXml() const
   body += REQUEST_END_METHODNAME;
 
   // If params is an array, each element is a separate parameter
+  body += PARAMS_TAG;
   if (params_.valid()) {
-    body += PARAMS_TAG;
     if (params_.getType() == XmlRpc::XmlRpcValue::TypeArray)
     {
       for (int i=0; i<params_.size(); ++i) {
@@ -100,29 +137,61 @@ std::string XmlRpcRequest::generateRequestXml() const
       body += params_.toXml();
       body += PARAM_ETAG;
     }
-      
-    body += PARAMS_ETAG;
   }
+  body += PARAMS_ETAG;
   body += REQUEST_END;
   
   return body;
 }
 
-bool XmlRpcRequest::parseResponse(XmlRpc::XmlRpcValue& result, bool& isFault) const
+Error XmlRpcRequest::processResponse()
 {
-  const std::string& body = responseBody();
-  std::string_view responseView(body);
-  
-  return parseResponseImpl(responseView, result, isFault);
+  if (onComplete) {
+    auto [code, data, msg] = parseResponse();
+    onComplete(code, data, msg);
+  }
+  return Error::Ok;
 }
 
-bool XmlRpcRequest::parseResponse(XmlRpc::XmlRpcValue& result) const
+std::tuple<int, XmlRpc::XmlRpcValue, std::string> XmlRpcRequest::parseResponse() const
 {
-  bool isFault = false;
-  return parseResponse(result, isFault);
+  XmlRpc::XmlRpcValue value;
+  using Type = XmlRpc::XmlRpcValue::Type;
+  bool ok = false;
+
+  std::string_view responseView = response_body_;
+  if (!parseResponseImpl(responseView, value, ok)) {
+    return {0, {}, "failed to parse response"};
+  }
+
+  if (value.getType() != Type::TypeArray) {
+    return {0, {}, "invalid response: not an array"};
+  }
+
+  if (value.size() < 2 && value[0].getType() != Type::TypeInt) {
+    return {0, {}, "invalid response: unexpected value"};
+  }
+
+  int res = 0;
+  XmlRpc::XmlRpcValue data;
+  std::string msg;
+
+  if (value.size() > 0) {
+    res = value[0].as<int>();
+  }
+
+  if (value.size() > 1) {
+    data = value[1];
+  }
+
+  if (value.size() > 2 && value[2].getType() == Type::TypeString) {
+    msg = value[2].as<std::string>();
+  }
+
+  return {res, data, msg};
 }
 
-bool XmlRpcRequest::parseResponseImpl(const std::string_view& responseView, XmlRpc::XmlRpcValue& result, bool& isFault) const
+bool XmlRpcRequest::parseResponseImpl(const std::string_view& responseView, XmlRpc::XmlRpcValue& result, bool& isFault)
 {
   std::string response(responseView);
 
@@ -164,7 +233,7 @@ void XmlRpcRequest::reset()
   
   // Reset to POST method and default URI
   setMethod(HttpMethod::Post);
-  setPath(std::string("/RPC2"));
+  setPath("/RPC2");
   
   // Set default headers
   setHeader("Content-Type", "text/xml");

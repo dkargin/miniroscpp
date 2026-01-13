@@ -111,6 +111,8 @@ int convertEventsToPollSet(int flags)
     oflags |= POLLOUT;
   if (flags & XmlRpc::XmlRpcDispatch::Exception)
     oflags |= POLLERR;
+  if (oflags == 0)
+    return PollSet::ResultDropFD;
   return oflags;
 }
 
@@ -119,8 +121,9 @@ void Subscription::PendingConnection::addToDispatch(PollSet* pollSet)
   assert(client_);
   assert(pollSet);
 
+  /// XMLRPC connection from client has not sent any data, so we need PollSet::EventOut.
   int fd = client_->getfd();
-  pollSet->addSocket(fd, PollSet::EventIn | PollSet::EventError | PollSet::EventUpdate, [this, pollSet](int flags) {
+  pollSet->addSocket(fd, PollSet::EventOut | PollSet::EventError | PollSet::EventUpdate, [this, pollSet](int flags) {
     int oflags = convertEventsToXmlRpc(flags);
     int newEvents = client_->handleEvent(oflags);
     return convertEventsToPollSet(newEvents);
@@ -279,7 +282,7 @@ void Subscription::dropAllConnections()
   }
 }
 
-void Subscription::addLocalConnection(const PublicationPtr& pub)
+void Subscription::addLocalConnection(const RPCManagerPtr& rpcManager, const PublicationPtr& pub)
 {
   std::scoped_lock<std::mutex> lock(publisher_links_mutex_);
   if (dropped_)
@@ -289,7 +292,7 @@ void Subscription::addLocalConnection(const PublicationPtr& pub)
 
   MINIROS_DEBUG("Creating intraprocess link for topic [%s]", name_.c_str());
 
-  IntraProcessPublisherLinkPtr pub_link(std::make_shared<IntraProcessPublisherLink>(shared_from_this(), RPCManager::instance()->getServerURI(), transport_hints_));
+  IntraProcessPublisherLinkPtr pub_link(std::make_shared<IntraProcessPublisherLink>(shared_from_this(), rpcManager->getServerURI(), transport_hints_));
   IntraProcessSubscriberLinkPtr sub_link(std::make_shared<IntraProcessSubscriberLink>(pub));
   pub_link->setPublisher(sub_link);
   sub_link->setSubscriber(pub_link);
@@ -307,7 +310,7 @@ bool urisEqual(const std::string& uri1, const std::string& uri2)
   return port1 == port2 && host1 == host2;
 }
 
-bool Subscription::pubUpdate(const V_string& new_pubs)
+bool Subscription::pubUpdate(const RPCManagerPtr& rpcManager, const V_string& new_pubs)
 {
   std::scoped_lock<std::mutex> slock(shutdown_mutex_);
 
@@ -318,7 +321,7 @@ bool Subscription::pubUpdate(const V_string& new_pubs)
 
   bool retval = true;
 
-  const std::string ownURI = RPCManager::instance()->getServerURI();
+  const std::string ownURI = rpcManager->getServerURI();
   {
     std::stringstream ss;
 
@@ -421,7 +424,7 @@ bool Subscription::pubUpdate(const V_string& new_pubs)
     // this function should never negotiate a self-subscription
     if (ownURI != uri)
     {
-      retval &= negotiateConnection(uri);
+      retval &= negotiateConnection(rpcManager, uri);
     }
     else
     {
@@ -432,7 +435,7 @@ bool Subscription::pubUpdate(const V_string& new_pubs)
   return retval;
 }
 
-bool Subscription::negotiateConnection(const std::string& xmlrpc_uri)
+bool Subscription::negotiateConnection(const RPCManagerPtr& rpcManager, const std::string& xmlrpc_uri)
 {
   XmlRpcValue tcpros_array, protos_array, params;
   XmlRpcValue udpros_array;
@@ -449,7 +452,9 @@ bool Subscription::negotiateConnection(const std::string& xmlrpc_uri)
     if (transport == "UDP")
     {
       int max_datagram_size = transport_hints_.getMaxDatagramSize();
-      udp_transport = std::make_shared<TransportUDP>(&PollManager::instance()->getPollSet());
+      PollSet* ps = rpcManager->getPollSet();
+      assert(ps);
+      udp_transport = std::make_shared<TransportUDP>(ps);
       if (!max_datagram_size)
         max_datagram_size = udp_transport->getMaxDatagramSize();
       udp_transport->createIncoming(0, false);
@@ -491,14 +496,13 @@ bool Subscription::negotiateConnection(const std::string& xmlrpc_uri)
     return false;
   }
 
-  XmlRpc::XmlRpcClient* c = new XmlRpc::XmlRpcClient(peer_host.c_str(),
-                                                     peer_port, "/");
+  XmlRpc::XmlRpcClient* c = new XmlRpc::XmlRpcClient(peer_host.c_str(), peer_port, "/");
  // if (!c.execute("requestTopic", params, result) || !g_node->validateXmlrpcResponse("requestTopic", result, proto))
 
   // Initiate the negotiation.  We'll come back and check on it later.
   if (!c->executeNonBlock("requestTopic", params))
   {
-    MINIROS_DEBUG("Failed to contact publisher [%s:%d] for topic [%s]",
+    MINIROS_ERROR("Failed to contact publisher [%s:%d] for topic [%s]",
               peer_host.c_str(), peer_port, name_.c_str());
     delete c;
     if (udp_transport)
@@ -509,13 +513,13 @@ bool Subscription::negotiateConnection(const std::string& xmlrpc_uri)
     return false;
   }
 
-  MINIROS_DEBUG("Began asynchronous xmlrpc connection to [%s:%d]", peer_host.c_str(), peer_port);
+  MINIROS_INFO("Began asynchronous xmlrpc connection to [%s:%d] fd=%d", peer_host.c_str(), peer_port, c->getfd());
 
   // The PendingConnectionPtr takes ownership of c, and will delete it on
   // destruction.
   PendingConnectionPtr conn(std::make_shared<PendingConnection>(c, udp_transport, shared_from_this(), xmlrpc_uri));
 
-  RPCManager::instance()->addASyncConnection(conn);
+  rpcManager->addASyncConnection(conn);
   // Put this connection on the list that we'll look at later.
   {
     std::scoped_lock<std::mutex> pending_connections_lock(pending_connections_mutex_);

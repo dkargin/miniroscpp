@@ -107,6 +107,9 @@ public:
   /// Take collection of nodes for shutdown.
   std::set<std::shared_ptr<NodeRef>> pullShutdownNodes();
 
+  /// Take collection of new nodes.
+  std::set<std::shared_ptr<NodeRef>> pullNewNodes();
+
   std::ostream& writeJson(std::ostream& os, miniros::JsonState& state, const miniros::JsonSettings& settings) const;
 
   /// Drop all registrations for specified node.
@@ -151,6 +154,9 @@ protected:
 
   /// A collection of nodes queued for shutdown.
   std::set<std::shared_ptr<NodeRef>> m_nodesToShutdown;
+
+  /// A collection of new nodes.
+  std::set<std::shared_ptr<NodeRef>> m_newNodes;
 
   Registrations param_subscribers;
 

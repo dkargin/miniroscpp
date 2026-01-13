@@ -54,16 +54,22 @@ public:
   PollSet();
   ~PollSet();
 
-  /// Add this evt flag to update event flags by return value from SocketUpdateFunc.
-  static const int EventUpdate;
+
   /// Use this flag to subscribe to "input" events. They are equal to POLLIN.
   static const int EventIn;
   /// Use this flag to get notified when output is possible. It is equal to POLLOUT.
   static const int EventOut;
   /// Equal to POLLERR.
   static const int EventError;
+
   /// Low precision timer event.
-  static const int EventTimer;
+  static constexpr int EventTimer = 1<<29;
+  /// Add this evt flag to update event flags by return value from SocketUpdateFunc.
+  static constexpr int EventUpdate = 1 << 30;
+
+  /// Drop FD from poll set.
+  /// It can be returned by event handler.
+  static const int ResultDropFD = 1 << 24;
 
   /// Object to be kept back during active callback.
   typedef std::shared_ptr<void> TrackedObject;

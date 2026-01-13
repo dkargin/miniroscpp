@@ -17,6 +17,10 @@ HttpRequest::HttpRequest() : method_(HttpMethod::Get), path_("/")
 HttpRequest::HttpRequest(HttpMethod method, const char* path) : method_(method), path_(path)
 {}
 
+HttpRequest::~HttpRequest()
+{}
+
+
 void HttpRequest::setMethod(HttpMethod method)
 {
   method_ = method;
@@ -163,6 +167,8 @@ std::string HttpRequest::buildHeader(const std::string& host, int port) const
     char buff[40];
     std::snprintf(buff, sizeof(buff), "%zu", request_body_.size());
     header << "Content-Length: " << buff << "\r\n";
+  } else {
+    MINIROS_WARN("Unexpected empty request");
   }
 
   // Other custom headers

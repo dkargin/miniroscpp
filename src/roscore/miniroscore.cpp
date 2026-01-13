@@ -143,6 +143,9 @@ int main(int argc, const char ** argv) {
 
   std::shared_ptr<RPCManager> masterRpcManager = RPCManager::instance();
 
+  miniros::console::set_logger_level("*", console::Level::Debug);
+  miniros_console_bridge::setLogLevel(miniros_console_bridge::CONSOLE_BRIDGE_LOG_DEBUG);
+
   MINIROS_INFO("Creating Master object");
   master::Master master(masterRpcManager);
 
@@ -202,6 +205,7 @@ int main(int argc, const char ** argv) {
   std::unique_ptr<master::Rosout> r;
   if (useRosout) {
     MINIROS_INFO("Creating Rosout object");
+    master.registerSelfRef();
     r.reset(new master::Rosout(node));
   }
 

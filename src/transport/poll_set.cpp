@@ -32,6 +32,7 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  */
 
+/// This file will log to "miniros.poll_set" channel.
 #define MINIROS_PACKAGE_NAME "poll_set"
 
 #include <algorithm>
@@ -54,10 +55,6 @@
 
 namespace miniros
 {
-
-const int PollSet::EventUpdate = 1<<30;
-
-const int PollSet::EventTimer = 1<<29;
 
 /// Use this flag to subscribe to "input" events. They are equal to POLLIN.
 const int PollSet::EventIn = POLLIN;
@@ -101,6 +98,11 @@ struct PollSet::Internal {
     :epfd_(create_socket_watcher())
   {
 
+  }
+
+  bool isInternalFd(int fd) const
+  {
+    return fd == signal_pipe_[0] || fd == signal_pipe_[1];
   }
 
   /// It returns a copy of SocketInfo to make sure that shared pointer to tracked object having additional reference.
@@ -156,7 +158,7 @@ bool PollSet::addSocket(int fd, int events, const SocketUpdateFunc& update_func,
     bool b = internal_->socket_info_.insert(std::make_pair(fd, info)).second;
     if (!b)
     {
-      MINIROS_DEBUG("PollSet: Tried to add duplicate fd [%d]", fd);
+      MINIROS_ERROR("PollSet: Tried to add duplicate fd [%d]", fd);
       return false;
     }
 
@@ -164,6 +166,7 @@ bool PollSet::addSocket(int fd, int events, const SocketUpdateFunc& update_func,
 
     internal_->sockets_changed_ = true;
   }
+  MINIROS_DEBUG("PollSet::addSocket(%d)", fd);
 
   signal();
 
@@ -197,10 +200,11 @@ bool PollSet::delSocket(int fd)
     internal_->sockets_changed_ = true;
     signal();
 
+    MINIROS_DEBUG("PollSet::delSocket(%d)", fd);
     return true;
   }
 
-  MINIROS_DEBUG("PollSet: Tried to delete fd [%d] which is not being tracked", fd);
+  MINIROS_WARN("PollSet: Tried to delete fd [%d] which is not being tracked", fd);
 
   return false;
 }
@@ -319,7 +323,7 @@ void PollSet::update(int poll_timeout)
   Error err = poll_sockets(internal_->epfd_, &internal_->ufds_.front(), numFd, poll_timeout, internal_->ofds_);
   if (!err)
   {
-    MINIROS_ERROR("poll failed with error %s", err.toString());
+    MINIROS_ERROR("PollSet::update() poll_sockets failed with error %s", err.toString());
     return;
   }
 
@@ -341,12 +345,24 @@ void PollSet::update(int poll_timeout)
     TrackedObject object = info->object_;
     const int events = info->events_;
 
+    if (!internal_->isInternalFd(fd)) {
+#ifdef POLL_SET_SERIOUS_LOG
+      std::cout << "poll fd=" << fd << " evt=" << eventToString(spfd.revents) << std::endl;
+#endif
+    }
     bool hasEvents = events & revents
             || revents & POLLERR
             || revents & POLLHUP
             || revents & POLLNVAL;
-    if (!func || !hasEvents)
+    if (!func) {
+#ifdef POLL_SET_SERIOUS_LOG
+      std::cerr << "poll no event handler for fd=" << fd << std::endl;
+#endif
       continue;
+    }
+    if (!hasEvents) {
+      continue;
+    }
     // If these are registered events for this socket, OR the events are ERR/HUP/NVAL,
     // call through to the registered function
     bool skip = false;
@@ -366,7 +382,10 @@ void PollSet::update(int poll_timeout)
       continue;
 
     int ret = func(revents & (events|POLLERR|POLLHUP|POLLNVAL));
-    if (info->updateEvents_ && ret != info->events_) {
+    if (ret & ResultDropFD) {
+      delSocket(fd);
+    }
+    else if (info->updateEvents_ && ret != info->events_) {
       std::scoped_lock<std::mutex> lock(internal_->socket_info_mutex_);
       auto it = internal_->socket_info_.find(fd);
       if (it != internal_->socket_info_.end() && it->second.events_ != ret) {
@@ -416,6 +435,10 @@ void PollSet::createNativePollset()
     return;
   }
 
+#ifdef POLL_SET_SERIOUS_LOG
+  std::stringstream ss;
+  ss << "poll updating PollSet ";
+#endif
   // Build the list of structures to pass to poll for the sockets we're servicing
   internal_->ufds_.resize(internal_->socket_info_.size());
   auto sock_it = internal_->socket_info_.begin();
@@ -427,7 +450,13 @@ void PollSet::createNativePollset()
     pfd.fd = info.fd_;
     pfd.events = info.events_;
     pfd.revents = 0;
+#ifdef POLL_SET_SERIOUS_LOG
+    ss << info.fd_ << ":" << eventToString(info.events_) << " ";
+#endif
   }
+#ifdef POLL_SET_SERIOUS_LOG
+  std::cout << ss.str() << std::endl;
+#endif
   internal_->sockets_changed_ = false;
 }
 
@@ -447,26 +476,26 @@ int PollSet::onLocalPipeEvents(int events)
 std::string PollSet::eventToString(int event)
 {
   std::string result;
-  if (event & POLLIN) {
-    result += "I";
-    event &= ~POLLIN;
-  }
-  if (event & POLLOUT) {
-    result += "O";
-    event &= ~POLLOUT;
-  }
-  if (event & POLLERR) {
-    result += "E";
-    event &= ~POLLERR;
-  }
-  if (event & POLLHUP) {
-    result += "H";
-    event &= ~POLLHUP;
-  }
+#define EVT_FLAG(flag, ch) if (event & flag) { result += ch; event &= ~flag; }
+  EVT_FLAG(POLLIN, 'I');
+  EVT_FLAG(POLLOUT, 'O');
+  EVT_FLAG(POLLERR, 'E');
+  EVT_FLAG(POLLHUP, 'H');
 
+#ifdef POLLMSG
+  EVT_FLAG(POLLMSG, 'M');
+#endif
+#ifdef POLLREMOVE
+  EVT_FLAG(POLLREMOVE, "Rm");
+#endif
+#ifdef POLLRDHUP
+  EVT_FLAG(POLLRDHUP, "Rdh");
+#endif
   if (event != 0) {
+    result += "_";
     result += std::to_string(event);
   }
+#undef EVT_FLAG
   return result;
 }
 
