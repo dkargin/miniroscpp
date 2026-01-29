@@ -7,14 +7,16 @@
 #include "miniros/console.h"
 #include "miniros/names.h"
 
+#include <cassert>
+
 namespace miniros {
 namespace master {
 
-RegistrationManager::RegistrationManager()
+RegistrationManager::RegistrationManager(const std::string& name)
   : publishers(Registrations::TOPIC_PUBLICATIONS)
   , subscribers(Registrations::TOPIC_SUBSCRIPTIONS)
   , services(Registrations::SERVICE)
-  , param_subscribers(Registrations::PARAM_SUBSCRIPTIONS)
+  , name_(name)
 {
 }
 
@@ -61,18 +63,24 @@ std::shared_ptr<NodeRef> RegistrationManager::getNodeByAPIUnsafe(const std::stri
   return {};
 }
 
+void RegistrationManager::setPollSet(PollSet* ps)
+{
+  assert(ps);
+  poll_set_ = ps;
+}
+
 std::shared_ptr<NodeRef> RegistrationManager::_register(Registrations& r, const std::string& key, const std::string& nodeName, const std::string& nodeApi,
   const std::string& service_api)
 {
-  RegistrationReport report = registerNodeApi(nodeName, nodeApi);
-  if (!report.node) {
-    MINIROS_ERROR("Failed to register NodeRef(node=%s api=%s)", nodeName.c_str(), nodeApi.c_str());
-    return {};
-  }
-
   std::string nameError;
   if (!names::validate(key, nameError)) {
     MINIROS_ERROR("_register(node=%s,  key=%s) - invalid key: \"%s\"", nodeName.c_str(), key.c_str(), nameError.c_str());
+    return {};
+  }
+
+  RegistrationReport report = registerNodeApi(nodeName, nodeApi);
+  if (!report.node) {
+    MINIROS_ERROR("Failed to register NodeRef(node=%s api=%s)", nodeName.c_str(), nodeApi.c_str());
     return {};
   }
 
@@ -92,7 +100,6 @@ void RegistrationManager::dropRegistrations(const NodeRef& node)
   publishers.unregisterAll(name);
   subscribers.unregisterAll(name);
   services.unregisterAll(name);
-  param_subscribers.unregisterAll(name);
 }
 
 ReturnStruct RegistrationManager::unregisterObject(Registrations& r, const std::string& key,
@@ -124,7 +131,9 @@ ReturnStruct RegistrationManager::unregisterObject(Registrations& r, const std::
 
 void RegistrationManager::unregisterNode(const std::string& nodeName)
 {
+  MINIROS_INFO("RegistrationManager::unregisterNode(%s)", nodeName.c_str());
   std::scoped_lock<std::mutex> lock(m_guard);
+
   auto it = m_nodes.find(nodeName);
   if (it == m_nodes.end())
     return;
@@ -146,8 +155,8 @@ std::shared_ptr<NodeRef> RegistrationManager::register_publisher(const std::stri
 {
   {
     std::scoped_lock<std::mutex> lock(m_guard);
-    if (!m_topicTypes.count(topic))
-      m_topicTypes[topic] = topic_type;
+    if (!topic_types_.count(topic))
+      topic_types_[topic] = topic_type;
   }
   return _register(publishers, topic, caller_id, caller_api);
 }
@@ -157,16 +166,10 @@ std::shared_ptr<NodeRef> RegistrationManager::register_subscriber(const std::str
 {
   {
     std::scoped_lock<std::mutex> lock(m_guard);
-    if (!m_topicTypes.count(topic))
-      m_topicTypes[topic] = topic_type;
+    if (!topic_types_.count(topic))
+      topic_types_[topic] = topic_type;
   }
   return _register(subscribers, topic, nodeName, nodeApi);
-}
-
-std::shared_ptr<NodeRef> RegistrationManager::register_param_subscriber(const std::string& param, const std::string& caller_id,
-  const std::string& caller_api)
-{
-  return _register(param_subscribers, param, caller_id, caller_api);
 }
 
 ReturnStruct RegistrationManager::unregister_service(const std::string& service, const std::string& caller_id,
@@ -186,12 +189,6 @@ ReturnStruct RegistrationManager::unregister_publisher(const std::string& topic,
   const std::string& caller_api)
 {
   return unregisterObject(publishers, topic, caller_id, caller_api);
-}
-
-ReturnStruct RegistrationManager::unregister_param_subscriber(const std::string& param, const std::string& caller_id,
-  const std::string& caller_api)
-{
-  return unregisterObject(param_subscribers, param, caller_id, caller_api);
 }
 
 RegistrationManager::RegistrationReport
@@ -220,13 +217,15 @@ RegistrationManager::registerNodeApi(const std::string& nodeName, const std::str
   report.node.reset(new NodeRef(nodeName, nodeApi));
   report.created = true;
 
-  m_nodes[nodeName] = report.node;
-  m_newNodes.insert(report.node);
+  assert(poll_set_);
+  if (Error err = report.node->activateConnection(name_, poll_set_); !err) {
+    MINIROS_ERROR("RegistrationManager::registerNodeApi(%s) - failed to activate connection", nodeName.c_str());
+  }
 
-  /*
-  if (flags & REG_MASTER) {
-    report.node->setLocal();
-  }*/
+  m_nodes[nodeName] = report.node;
+
+  report.node->setNodeFlags(flags);
+
   return report;
 }
 
@@ -238,13 +237,27 @@ std::set<std::shared_ptr<NodeRef>> RegistrationManager::pullShutdownNodes()
   return result;
 }
 
-std::set<std::shared_ptr<NodeRef>> RegistrationManager::pullNewNodes()
+std::vector<NodeRefPtr> RegistrationManager::checkDeadNodes()
 {
-  std::set<std::shared_ptr<NodeRef>> result;
-  std::scoped_lock<std::mutex> lock(m_guard);
-  std::swap(result, m_newNodes);
-  return result;
+  std::vector<NodeRefPtr> graveyard;
+  {
+    std::scoped_lock<std::mutex> lock(m_guard);
+
+    for (auto& [key, node]: m_nodes) {
+      assert(node);
+      if (node && node->getState() == NodeRef::State::Dead) {
+        graveyard.push_back(node);
+      }
+    }
+  }
+
+  // Drop registrations for dead nodes.
+  for (auto& node: graveyard) {
+    dropRegistrations(*node);
+  }
+  return graveyard;
 }
+
 
 std::vector<std::shared_ptr<NodeRef>> RegistrationManager::getTopicPublishers(const std::string& topic) const
 {
@@ -317,14 +330,14 @@ std::map<std::string, std::string, std::less<>> RegistrationManager::getTopicTyp
 {
   MINIROS_DEBUG_NAMED("reg", "getTopicTypes from %s", caller_id.c_str());
   std::scoped_lock<std::mutex> lock(m_guard);
-  return m_topicTypes;
+  return topic_types_;
 }
 
 std::string RegistrationManager::getTopicType(const std::string_view& name) const
 {
   std::scoped_lock<std::mutex> lock(m_guard);
-  auto it = m_topicTypes.find(name);
-  if (it != m_topicTypes.end()) {
+  auto it = topic_types_.find(name);
+  if (it != topic_types_.end()) {
     return it->second;
   }
   return {};
@@ -332,7 +345,7 @@ std::string RegistrationManager::getTopicType(const std::string_view& name) cons
 
 const std::map<std::string, std::string, std::less<>>& RegistrationManager::getTopicTypesUnsafe(const Lock&) const
 {
-  return m_topicTypes;
+  return topic_types_;
 }
 
 std::vector<std::vector<std::string>> RegistrationManager::getPublishedTopics(const std::string& prefix) const
@@ -343,8 +356,8 @@ std::vector<std::vector<std::string>> RegistrationManager::getPublishedTopics(co
   for (const auto& [Key, Value] : publishers.map) {
     if (names::startsWith(Key, prefix)) {
       for (const auto& s : Value) {
-        auto it = m_topicTypes.find(Key);
-        if (it != m_topicTypes.end()) {
+        auto it = topic_types_.find(Key);
+        if (it != topic_types_.end()) {
           std::vector<std::string> value = {Key, it->second};
           rtn.push_back(value);
           break;

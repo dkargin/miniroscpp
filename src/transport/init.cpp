@@ -484,13 +484,13 @@ void initDefaultLogLevels(const M_string& remappings)
   if (it != remappings.end() && it->second == "1") {
     console::set_logger_level("miniros.http", console::Level::Debug);
     console::set_logger_level("miniros.net", console::Level::Debug);
-    console::set_logger_level("miniros.http.client", console::Level::Info);
+    console::set_logger_level("miniros.http.client", console::Level::Debug);
+    console::set_logger_level("miniros.poll_set", miniros::console::Level::Debug);
   } else {
     console::set_logger_level("miniros.http", console::Level::Error);
     console::set_logger_level("miniros.http.client", console::Level::Error);
     console::set_logger_level("miniros.net", console::Level::Fatal);
   }
-  console::set_logger_level("miniros.poll_set", miniros::console::Level::Error);
 }
 
 void init(const M_string& remappings, const std::string& name, uint32_t options)
@@ -523,9 +523,9 @@ void init(const M_string& remappings, const std::string& name, uint32_t options)
     network::init(remappings);
     auto rpcManager = RPCManager::instance();
     g_master_link.reset(new MasterLink());
-    g_master_link->initLink(remappings, rpcManager);
-    if (options & init_options::LocalMaster)
-      g_master_link->setLocalMaster(true);
+    bool local = options & init_options::LocalMaster;
+    g_master_link->initLink(remappings, rpcManager, local);
+
     // names:: namespace is initialized by this_node
     this_node::init(name, remappings, options);
     file_log::init(remappings);

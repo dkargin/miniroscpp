@@ -21,7 +21,7 @@ class MINIROS_DECL ParameterStorage {
 public:
   using RpcValue = XmlRpc::XmlRpcValue;
 
-  ParameterStorage(RegistrationManager* regManager);
+  ParameterStorage();
   virtual ~ParameterStorage();
 
   bool deleteParam(const std::string& caller_id, const std::string& key);
@@ -40,16 +40,20 @@ public:
   std::string searchParam(const std::string& ns, const std::string& key);
 
   /// Subscribes to a parameter or a subtree.
+  /// Called from Master::unsubscribeParam handler.
   /// @returns pointer to corresponding value.
-  const RpcValue* subscribeParam(const std::string& caller_id, const std::string& caller_api, const std::string& key);
+  const RpcValue* subscribeParam(const std::shared_ptr<NodeRef>& node, const std::string& key);
 
-  bool unsubscribeParam(const std::string& caller_id, const std::string& caller_api, const std::string &key);
+  /// Unsubscribe node from parameter updates.
+  /// Called from Master::unsubscribeParam handler.
+  bool unsubscribeParam(const std::shared_ptr<NodeRef>& node, const std::string &key);
+
+  /// Drop all parameter subscriptions from listener.
+  void dropSubscriptions(const std::shared_ptr<NodeRef>& node);
 
   bool hasParam(const std::string& caller_id, const std::string& key) const;
 
   std::vector<std::string> getParamNames(const std::string& caller_id);
-
-  void dropListener(std::shared_ptr<NodeRef> listener);
 
   /// Dumps parameters as a json to a file.
   /// Thread unsafe.
@@ -69,12 +73,12 @@ protected:
   RpcValue m_parameterRoot;
 
   /// Maps parameter path to a subscriber node.
-  std::map<names::Path, std::set<std::shared_ptr<NodeRef>>> m_parameterListeners;
+  //std::map<names::Path, std::set<std::weak_ptr<NodeRef>>> m_parameterListeners;
+
+  std::map<names::Path, std::set<std::weak_ptr<NodeRef>, std::owner_less<std::weak_ptr<NodeRef>>>> m_parameterListeners;
 
   /// Guards access to parameter data.
   mutable std::mutex m_parameterLock;
-
-  RegistrationManager* m_regManager;
 
   /// Dump all parameters to JSON on each update.
   bool m_dumpParameters = false;

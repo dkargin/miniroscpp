@@ -1,6 +1,8 @@
 #ifndef MINIROS_UTILS_AT_EXIT
 #define MINIROS_UTILS_AT_EXIT
 
+#include <functional>
+
 namespace miniros {
 
 /// Helper class to call some method when gone out of scope.

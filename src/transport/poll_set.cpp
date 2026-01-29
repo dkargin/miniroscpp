@@ -52,6 +52,7 @@
 
 #include <miniros/rosassert.h>
 
+//#define POLL_SET_SERIOUS_LOG
 
 namespace miniros
 {
@@ -166,7 +167,7 @@ bool PollSet::addSocket(int fd, int events, const SocketUpdateFunc& update_func,
 
     internal_->sockets_changed_ = true;
   }
-  MINIROS_DEBUG("PollSet::addSocket(%d)", fd);
+  MINIROS_DEBUG("PollSet::addSocket(%d) evt=%s", fd, eventToString(events).c_str());
 
   signal();
 
@@ -271,6 +272,7 @@ bool PollSet::setEvents(int sock, int events)
     it->second.events_ = events;
     set_events_on_socket(internal_->epfd_, sock, it->second.events_);
     internal_->sockets_changed_ = true;
+    MINIROS_DEBUG("PollSet::setEvents(%d, %s)", sock, eventToString(events).c_str());
     signal();
   }
 

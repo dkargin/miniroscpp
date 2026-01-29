@@ -17,30 +17,18 @@
 
 #include "miniros/http/http_server.h"
 
-
-#include "miniros/http/http_filters.h"
 #include "miniros/http/endpoints/filesystem.h"
-
-#include <xmlrpcpp/XmlRpcServerConnection.h>
+#include "miniros/http/http_filters.h"
 
 namespace miniros {
 namespace master {
 
 Master::Internal::Internal(const std::shared_ptr<RPCManager>& manager)
-    : handler(manager, &regManager, &resolver), parameterStorage(&regManager)
+  : regManager("/master")
+  , handler(manager, &regManager, &resolver)
 {
   rpcManager = manager;
-
   resolver.scanAdapters();
-
-  // TODO: Read environment.
-  // split the URI (if it's valid) into host and port
-  // if (!network.splitURI(ROS.ROS_MASTER_URI, ref _host, ref _port))
-  {
-    host = "localhost";
-    port = 11311;
-    MINIROS_WARN("Invalid XMLRPC uri. Using ROS_MASTER_URI=http://%s:%d", host.c_str(), port);
-  }
 }
 
 Master::Internal::~Internal()
@@ -74,7 +62,6 @@ void Master::Internal::onDiscovery(const DiscoveryEvent& evt)
   report.node->updateHost(hostInfo);
 }
 
-
 Master::Master(std::shared_ptr<RPCManager> manager)
 {
   internal_ = std::make_unique<Internal>(manager);
@@ -89,15 +76,15 @@ Master::~Master()
 
 std::string Master::getUri() const
 {
-  return std::string("http://") + internal_->host + ":" + std::to_string(internal_->port);
+  return internal_->rpcManager->getServerURI();
 }
 
 int Master::getPort() const
 {
-  return internal_ ? internal_->port : 0;
+  return internal_ && internal_->rpcManager ? internal_->rpcManager->getServerPort() : 0;
 }
 
-bool Master::start(PollSet* poll_set)
+bool Master::start(PollSet* poll_set, int port)
 {
   if (!internal_)
     return false;
@@ -115,8 +102,10 @@ bool Master::start(PollSet* poll_set)
   internal_->uuid.generate();
   internal_->parameterStorage.setParam("master", "/run_id", internal_->uuid.toString());
 
-  if (!internal_->rpcManager->start(poll_set, internal_->port))
+  if (!internal_->rpcManager->start(poll_set, port)) {
     return false;
+  }
+  internal_->regManager.setPollSet(poll_set);
 
   if (internal_->discovery) {
     MINIROS_DEBUG("Starting discovery module");
@@ -126,7 +115,8 @@ bool Master::start(PollSet* poll_set)
           internal_->onDiscovery(event);
         });
 
-    if (!internal_->discovery->start(poll_set, internal_->uuid, internal_->port)) {
+    int realPort = internal_->rpcManager->getServerPort();
+    if (!internal_->discovery->start(poll_set, internal_->uuid, realPort)) {
       stop();
       return false;
     }
@@ -216,7 +206,23 @@ void Master::setResolveNodeIP(bool resolv)
 
 void Master::update()
 {
-  internal_->handler.update();
+  auto shutdownNodes = internal_->regManager.pullShutdownNodes();
+
+  for (std::shared_ptr<NodeRef> nr: shutdownNodes) {
+    RpcValue msg;
+    std::stringstream ss;
+    ss << "[" << nr->id() << "] Reason: new node registered with same name";
+    msg = ss.str();
+    nr->sendShutdown(msg);
+  }
+
+  auto graveyard = internal_->regManager.checkDeadNodes();
+  if (!graveyard.empty()) {
+    MINIROS_INFO("Dropping parameter subscriptions from %zu nodes", graveyard.size());
+    for (auto node: graveyard) {
+      internal_->parameterStorage.dropSubscriptions(node);
+    }
+  }
 }
 
 Master::RpcValue Master::lookupService(
@@ -511,28 +517,61 @@ Master::RpcValue Master::searchParam(const std::string& caller_id, const std::st
   return res;
 }
 
+std::shared_ptr<NodeRef> Master::registerNodeApi(const std::string& nodeId, const std::string& nodeApi) const
+{
+  if (!internal_)
+    return {};
+
+  auto report = internal_->regManager.registerNodeApi(nodeId, nodeApi);
+  return report.node;
+}
+
+std::shared_ptr<NodeRef> Master::getNodeByName(const std::string& nodeId) const
+{
+  if (!internal_)
+    return {};
+
+  return internal_->regManager.getNodeByName(nodeId);
+}
+
 Master::RpcValue Master::subscribeParam(const std::string& caller_id, const std::string& caller_api,
   const std::string& key, const ClientInfo&)
 {
   RpcValue res = RpcValue::Array(3);
-  res[0] = 1;
-  res[1] = "subscribeParam done";
-  const RpcValue* val = internal_->parameterStorage.subscribeParam(caller_id, caller_api, key);
-  res[2] = val ? *val : RpcValue::Dict();
+  auto node = registerNodeApi(caller_id, caller_api);
+  if (node) {
+    res[0] = 1;
+    res[1] = "subscribeParam done";
+    const RpcValue* val = internal_->parameterStorage.subscribeParam(node, key);
+    res[2] = val ? *val : RpcValue::Dict();
+  } else {
+    res[0] = 0;
+    res[1] = "Failed to find node";
+    res[2] = 0;
+  }
   return res;
 }
 
 Master::RpcValue Master::unsubscribeParam(const std::string& caller_id, const std::string& caller_api,
   const std::string& key, const ClientInfo&)
 {
+  assert(internal_);
   RpcValue res = RpcValue::Array(3);
-  res[0] = 1;
-  res[1] = "unsubscribeParam done";
-  if (internal_->parameterStorage.unsubscribeParam(caller_id, caller_api, key))
-    res[2] = 1;
+  auto node = getNodeByName(caller_id);
+  if (node) {
+    res[0] = 1;
+    res[1] = "unsubscribeParam done";
+    if (internal_->parameterStorage.unsubscribeParam(node, key)) {
+      res[2] = 1;
+    }
+  } else {
+    MINIROS_ERROR("Master::unsubscribeParam(%s) from %s - no such node", key.c_str(), caller_id.c_str());
+    res[0] = 0;
+    res[1] = "Failed to find node";
+    res[2] = 0;
+  }
   return res;
 }
-
 
 Master::RpcValue Master::getParamNames(const std::string& caller_id, const ClientInfo&)
 {
@@ -567,10 +606,7 @@ void Master::initEvents(NodeHandle& nh)
 
 void Master::registerSelfRef()
 {
-  internal_->regManager.registerNodeApi("/miniroscore", internal_->rpcManager->getServerURI(), RegistrationManager::REG_MASTER);
-  // Need to run update to initialize connection of new local NodeRef to rpcManager.
-  //
-  internal_->handler.update();
+  internal_->regManager.registerNodeApi("/miniroscore", internal_->rpcManager->getServerURI(), NodeRef::NODE_MASTER | NodeRef::NODE_LOCAL);
 }
 
 void enableDiscoveryBroadcasts(bool flag);

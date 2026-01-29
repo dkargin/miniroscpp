@@ -113,7 +113,7 @@ Error Master::Internal::renderTopicInfo(const std::string_view& name, std::strin
   return Error::Ok;
 }
 
-Error Master::Internal::renderNodeInfo(const std::string_view& name, std::string& output) const
+Error Master::Internal::renderNodeInfo(const std::string_view& name, std::string& output, bool showInternalInfo) const
 {
   std::shared_ptr<NodeRef> nodePtr = regManager.getNodeByName(name);
 
@@ -133,6 +133,12 @@ Error Master::Internal::renderNodeInfo(const std::string_view& name, std::string
   ss << "URL: " << print::Url(url, url);
 
   ss << "</p>";
+
+  if (showInternalInfo) {
+    ss << "<p>State = " << nodePtr->getState().toString() << "</p>";
+    ss << "<p>Requests = " << nodePtr->getQueuedRequests() << "</p>";
+  }
+
 
   std::unique_lock nodeLock(*nodePtr);
 

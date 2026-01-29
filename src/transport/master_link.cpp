@@ -74,39 +74,44 @@ MasterLink::~MasterLink()
   }
 }
 
-Error MasterLink::initLink(const M_string& remappings, const std::shared_ptr<RPCManager>& rpcManager)
+Error MasterLink::initLink(const M_string& remappings, const std::shared_ptr<RPCManager>& rpcManager, bool local)
 {
   if (!internal_)
     return Error::InternalError;
 
-  auto it = remappings.find("__master");
-  if (it != remappings.end()) {
-    internal_->uri = it->second;
-  }
-
-  if (internal_->uri.empty()) {
-    char* master_uri_env = NULL;
-#ifdef _MSC_VER
-    _dupenv_s(&master_uri_env, NULL, "ROS_MASTER_URI");
-#else
-    master_uri_env = getenv("ROS_MASTER_URI");
-#endif
-    if (master_uri_env) {
-      internal_->uri = master_uri_env;
-    } else {
-      MINIROS_WARN("Defaulting ROS_MASTER_URI to localhost:11311");
-      internal_->uri = "http://localhost:11311";
+  if (local) {
+    internal_->localMaster = true;
+    internal_->uri = rpcManager->getServerURI();
+  } else {
+    auto it = remappings.find("__master");
+    if (it != remappings.end()) {
+      internal_->uri = it->second;
     }
-#ifdef _MSC_VER
-    // http://msdn.microsoft.com/en-us/library/ms175774(v=vs.80).aspx
-    free(master_uri_env);
-#endif
-  }
 
-  // Split URI into
-  if (!network::splitURI(internal_->uri, internal_->host, internal_->port)) {
-    MINIROS_FATAL("Couldn't parse the master URI [%s] into a host:port pair.", internal_->uri.c_str());
-    return Error::InvalidURI;
+    if (internal_->uri.empty()) {
+      char* master_uri_env = NULL;
+#ifdef _MSC_VER
+      _dupenv_s(&master_uri_env, NULL, "ROS_MASTER_URI");
+#else
+      master_uri_env = getenv("ROS_MASTER_URI");
+#endif
+      if (master_uri_env) {
+        internal_->uri = master_uri_env;
+      } else {
+        MINIROS_WARN("Defaulting ROS_MASTER_URI to localhost:11311");
+        internal_->uri = "http://localhost:11311";
+      }
+#ifdef _MSC_VER
+      // http://msdn.microsoft.com/en-us/library/ms175774(v=vs.80).aspx
+      free(master_uri_env);
+#endif
+    }
+
+    // Split URI into
+    if (!network::splitURI(internal_->uri, internal_->host, internal_->port)) {
+      MINIROS_FATAL("Couldn't parse the master URI [%s] into a host:port pair.", internal_->uri.c_str());
+      return Error::InvalidURI;
+    }
   }
 
   internal_->rpcManager = rpcManager;
@@ -1082,14 +1087,5 @@ bool MasterLink::isLocalMaster() const
     return false;
   return internal_->localMaster;
 }
-
-void MasterLink::setLocalMaster(bool local) const
-{
-  if (!internal_) {
-    return;
-  }
-  internal_->localMaster = local;
-}
-
 
 } // namespace miniros

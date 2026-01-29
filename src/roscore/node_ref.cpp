@@ -14,6 +14,25 @@
 namespace miniros {
 namespace master {
 
+const char* NodeRef::State::toString() const
+{
+  switch (value_) {
+    case Initial:
+      return "Initial";
+    case Connecting:
+      return "Connecting";
+    case Connected:
+      return "Connected";
+    case Verified:
+      return "Verified";
+    case ShuttingDown:
+      return "ShuttingDown";
+    case Dead:
+      return "Dead";
+  }
+  return "Unknown";
+}
+
 NodeRef::NodeRef(const std::string& _id, const std::string& _api)
   :m_id(_id), m_api(_api)
 {
@@ -41,7 +60,6 @@ NodeRef::State NodeRef::getState() const
   return m_state;
 }
 
-
 bool NodeRef::is_empty() const
 {
   std::unique_lock lock(m_guard);
@@ -64,13 +82,27 @@ bool NodeRef::add(Registrations::Type type_, const std::string& key)
     if (!m_services.count(key)) {
       m_services.insert(key);
     }
-  } else if (type_ == Registrations::PARAM_SUBSCRIPTIONS) {
-    if (!m_paramSubscriptions.count(key)) {
-      m_paramSubscriptions.insert(key);
-    }
   } else
     return false;
   return true;
+}
+
+void NodeRef::addParamSubscription(const std::string& key)
+{
+  std::unique_lock lock(m_guard);
+  m_paramSubscriptions.insert(key);
+}
+
+void NodeRef::removeParamSubscription(const std::string& key)
+{
+  std::unique_lock lock(m_guard);
+  m_paramSubscriptions.erase(key);
+}
+
+void NodeRef::removeAllParamSubscriptions()
+{
+  std::unique_lock lock(m_guard);
+  m_paramSubscriptions.clear();
 }
 
 bool NodeRef::remove(Registrations::Type type_, const std::string& key)
@@ -82,8 +114,6 @@ bool NodeRef::remove(Registrations::Type type_, const std::string& key)
     m_topicPublications.erase(key);
   } else if (type_ == Registrations::SERVICE) {
     m_services.erase(key);
-  } else if (type_ == Registrations::PARAM_SUBSCRIPTIONS) {
-    m_paramSubscriptions.erase(key);
   } else {
     return false;
   }
@@ -150,19 +180,73 @@ const std::set<std::string>& NodeRef::getServicesUnsafe() const
   return m_services;
 }
 
+std::set<std::string> NodeRef::getParamSubscriptions() const
+{
+  return m_paramSubscriptions;
+}
+
 void NodeRef::setLocal()
 {
   std::unique_lock lock(m_guard);
-  m_state = State::Local;
+  m_flags |= NODE_LOCAL;
 }
 
 bool NodeRef::isLocal() const
 {
   std::unique_lock lock(m_guard);
-  return m_state == State::Local;
+  return m_flags & NODE_LOCAL;
 }
 
-Error NodeRef::activateConnection(PollSet* ps)
+void NodeRef::setNodeFlags(int flags)
+{
+  std::unique_lock lock(m_guard);
+  m_flags |= flags & (NODE_LOCAL | NODE_MASTER | NODE_FOREIGN);
+}
+
+std::string NodeRef::debugName() const
+{
+  std::stringstream ss;
+  ss << "NodeRef[" << id();
+
+  if (!m_api.empty()) {
+    ss << " " << m_api;
+  }
+  if (m_pid) {
+    ss << " pid=" << m_pid;
+  }
+  ss << "]";
+  return ss.str();
+}
+
+std::shared_ptr<http::HttpClient> NodeRef::makeClient(PollSet* ps)
+{
+  assert(ps);
+  if (!ps)
+    return {};
+  auto client = std::make_shared<http::HttpClient>(ps);
+  std::weak_ptr<NodeRef> wnode = weak_from_this();
+  client->onDisconnect = [wnode](std::shared_ptr<network::NetSocket> socket, http::HttpClient::State state) {
+    if (auto node = wnode.lock()) {
+      return node->handleDisconnect(socket, state);
+    }
+    return http::HttpClient::DisconnectResponse{};
+  };
+
+  client->onConnect = [this](std::shared_ptr<network::NetSocket> socket) {
+    MINIROS_INFO("%s - connected", debugName().c_str());
+    std::unique_lock<std::mutex> lock(m_guard);
+    updateState(State::Connected, lock);
+    return true;
+  };
+
+  client->onResponse = [this](const std::shared_ptr<http::HttpRequest>& req) {
+    m_activeRequests.erase(req);
+  };
+  return client;
+}
+
+
+Error NodeRef::activateConnection(const std::string& callerId, PollSet* ps)
 {
   if (!ps) {
     return Error::InvalidValue;
@@ -171,61 +255,102 @@ Error NodeRef::activateConnection(PollSet* ps)
   if (isLocal())
     return Error::Ok;
 
+  network::URL url;
+
+  // Check if URL is valid
   {
     std::unique_lock lock(m_guard);
 
-    // Create client if it doesn't exist
-    if (!m_client) {
-      m_client = std::make_shared<http::HttpClient>(ps);
-      m_client->onDisconnect = [this](std::shared_ptr<network::NetSocket> socket) {
-        http::HttpClient::DisconnectResponse dr;
-        dr.reconnect = true;
-        dr.reconnectTimeout = 5;
-        std::unique_lock lock(m_guard);
-        MINIROS_INFO("NodeRef(%s) - disconnected. Initiating reconnect", m_id.c_str());
-        m_state = State::Connecting;
-        return dr;
-      };
-
-      m_client->onConnect = [this](std::shared_ptr<network::NetSocket> socket) {
-        MINIROS_INFO("NodeRef(%s) - connected", m_id.c_str());
-        m_state = State::Connected;
-        return true;
-      };
-
-      m_client->onResponse = [this](const std::shared_ptr<http::HttpRequest>& req) {
-        m_activeRequests.erase(req);
-      };
-    }
-
-    // Check if URL is valid
     if (m_apiUrl.host.empty() || m_apiUrl.port == 0) {
       return Error::InvalidAddress;
     }
+    url = m_apiUrl;
+  }
 
+  std::shared_ptr<http::HttpClient> client;
+  {
+    // Create client if it doesn't exist
+    std::unique_lock clock(m_clientGuard);
+    if (m_client)
+      return Error::Ok;
+
+    client = makeClient(ps);
     // Initiate connection to the remote host
-    Error connectErr = m_client->connect(m_apiUrl.host, static_cast<int>(m_apiUrl.port));
+    Error connectErr = client->connect(url.host, static_cast<int>(url.port));
     if (connectErr != Error::Ok && connectErr != Error::WouldBlock) {
       // WouldBlock is expected for non-blocking connections, so only log unexpected errors
-      MINIROS_WARN("NodeRef::activateConnection: Unexpected error initiating connection for node \"%s\" to %s:%u: %s",
-                   m_id.c_str(), m_apiUrl.host.c_str(), m_apiUrl.port, connectErr.toString());
+      MINIROS_WARN("%s::activateConnection: Unexpected error initiating connection to %s:%u: %s",
+                   debugName().c_str(), url.host.c_str(), url.port, connectErr.toString());
       return connectErr;
     }
+    m_client = client;
 
-    m_state = State::Connecting;
+    std::unique_lock lock(m_guard);
+    updateState(State::Connecting, lock);
   }
-  //sendGetPid();
+
+  sendGetPid(callerId);
   return Error::Ok;
 }
+
+http::HttpClient::DisconnectResponse NodeRef::handleDisconnect(std::shared_ptr<network::NetSocket> socket, http::HttpClient::State state)
+{
+  http::HttpClient::DisconnectResponse dr;
+  std::unique_lock<std::mutex> lock(m_guard);
+  if (m_state == State::ShuttingDown) {
+    dr.reconnect = false;
+    deactivateConnectionUnsafe();
+    MINIROS_INFO("%s - disconnected at state=%s, HttpClient state=%s", debugName().c_str(), m_state.toString(), state.toString());
+    updateState(State::Dead, lock);
+  } else {
+    dr.reconnect = true;
+    dr.reconnectTimeout = 5;
+
+    MINIROS_INFO("%s - disconnected at state %s. Initiating reconnect", debugName().c_str(), m_state.toString());
+    updateState(State::Connecting, lock);
+  }
+  return dr;
+}
+
+
+void NodeRef::deactivateConnectionUnsafe()
+{
+  if (m_client) {
+    m_client->close();
+    m_client.reset();
+  }
+  m_reqGetPid.reset();
+  m_reqShutdown.reset();
+  m_activeRequests.clear();
+  m_pid = 0;
+}
+
 
 bool NodeRef::needRequests() const
 {
   std::unique_lock lock(m_guard);
   if (m_state == State::ShuttingDown)
     return false;
-  if (m_state == State::Local)
-    return false;
   return true;
+}
+
+
+void NodeRef::updateState(State newState, Lock& lock)
+{
+  if (newState == m_state)
+    return;
+
+  if (m_state == State::ShuttingDown && newState != State::Dead) {
+    MINIROS_ERROR("%s::updateState(%s) from %s - unexpected transition", debugName().c_str(), newState.toString(), m_state.toString());
+  } else {
+    MINIROS_INFO("%s::updateState(%s) from %s", debugName().c_str(), newState.toString(), m_state.toString());
+  }
+  m_state = newState;
+}
+
+const std::string& NodeRef::id() const
+{
+  return m_id;
 }
 
 Error NodeRef::sendPublisherUpdate(const std::string& callerId, const std::string& topic, const RpcValue& update)
@@ -233,10 +358,9 @@ Error NodeRef::sendPublisherUpdate(const std::string& callerId, const std::strin
   if (!needRequests())
     return Error::Ok;
 
-  // Generate the request body (no parameters needed for shutdown)
-  // Check if client exists
-  assert(m_client);
-  if (!m_client) {
+
+  auto client = getClient();
+  if (!client) {
     MINIROS_WARN("NodeRef::sendPublisherUpdate: No client available for node \"%s\"", m_id.c_str());
     return Error::NotConnected;
   }
@@ -244,43 +368,42 @@ Error NodeRef::sendPublisherUpdate(const std::string& callerId, const std::strin
   auto request = makeRequest("publisherUpdate");
   request->setParams(callerId, topic, update);
   m_activeRequests.insert(request);
-  MINIROS_INFO("NodeRef(%s)::sendPublisherUpdate(%s)", this->getApi().c_str(), topic.c_str());
+  MINIROS_INFO("%s::sendPublisherUpdate(%s)", debugName().c_str(), topic.c_str());
 
-  return m_client->enqueueRequest(request);
+  return client->enqueueRequest(request);
 }
-
 
 Error NodeRef::sendParameterUpdate(const std::string& callerId, const std::string& param, const XmlRpc::XmlRpcValue* value)
 {
   if (!needRequests())
     return Error::Ok;
 
-  // Generate the request body (no parameters needed for shutdown)
-  // Check if client exists
-  assert(m_client);
-  if (!m_client) {
-    MINIROS_WARN("NodeRef::sendShutdown: No client available for node \"%s\"", m_id.c_str());
+  auto client = getClient();
+  if (!client) {
+    MINIROS_WARN("%s::sendParameterUpdate: No client available", debugName().c_str());
     return Error::NotConnected;
   }
 
   auto request = makeRequest("paramUpdate");
   request->setParams(callerId, param, value ? *value : RpcValue::Dict());
-  m_activeRequests.insert(request);
 
-  MINIROS_INFO("NodeRef(%s)::sendParameterUpdate(%s)", this->getApi().c_str(), param.c_str());
-  return m_client->enqueueRequest(request);
+  {
+    std::unique_lock lock(m_guard);
+    m_activeRequests.insert(request);
+  }
+
+  MINIROS_INFO("%s::sendParameterUpdate(%s)", debugName().c_str(), param.c_str());
+  return client->enqueueRequest(request);
 }
-
 
 Error NodeRef::sendShutdown(const std::string& msg)
 {
   if (!needRequests())
     return Error::Ok;
 
-  // Generate the request body (no parameters needed for shutdown)
-  // Check if client exists
-  if (!m_client) {
-    MINIROS_WARN("NodeRef::sendShutdown: No client available for node \"%s\"", m_id.c_str());
+  auto client = getClient();
+  if (!client) {
+    MINIROS_WARN("%s::sendShutdown: No client available", debugName().c_str());
     return Error::NotConnected;
   }
 
@@ -293,42 +416,44 @@ Error NodeRef::sendShutdown(const std::string& msg)
       // Already sent request.
       return Error::Ok;
     }
+    m_reqShutdown->setParams(msg);
   }
 
-  m_reqShutdown->setParams(msg);
-  if (Error err = m_client->enqueueRequest(m_reqShutdown); !err) {
+  if (Error err = client->enqueueRequest(m_reqShutdown); !err) {
     return err;
   }
-  m_state = State::ShuttingDown;
+  std::unique_lock lock(m_guard);
+  updateState(State::ShuttingDown, lock);
   return Error::Ok;
 }
 
-Error NodeRef::sendGetPid()
+std::shared_ptr<http::HttpClient> NodeRef::getClient()
+{
+  std::unique_lock lock(m_clientGuard);
+  return m_client;
+}
+
+Error NodeRef::sendGetPid(const std::string& callerId)
 {
   if (!needRequests())
     return Error::Ok;
 
-  // Check if client exists
-  assert(m_client);
-  if (!m_client) {
-    MINIROS_ERROR("NodeRef::sendGetPid: No client available for node \"%s\"", m_id.c_str());
+  auto client = getClient();
+  if (!client) {
+    MINIROS_ERROR("%s::sendGetPid: No client available", debugName().c_str());
     return Error::NotConnected;
   }
 
   {
     std::unique_lock lock(m_guard);
     if (!m_reqGetPid) {
-
       m_reqGetPid  = makeRequest("getPid");
-      m_reqGetPid->setParamArray(XmlRpc::XmlRpcValue::Array(0));
+      m_reqGetPid->setParams(callerId);
       m_reqGetPid->generateRequestBody();
-
-      m_reqGetPid->onComplete = [this] (int code, const XmlRpc::XmlRpcValue& data, const std::string& msg) {
-        if (code && data.getType() == XmlRpc::XmlRpcValue::TypeInt) {
-          m_pid = data.as<int>();
-          if (m_state == State::Connecting)
-            m_state = State::Verified;
-        }
+      std::weak_ptr<NodeRef> wnode = this->shared_from_this();
+      m_reqGetPid->onComplete = [wnode] (int code, const std::string& msg, const RpcValue& data) {
+        if (auto node = wnode.lock())
+          node->responseGetPid(code, msg, data);
       };
     } else if (m_reqShutdown->state() != http::HttpRequest::State::Idle) {
       // Already sent request.
@@ -336,13 +461,24 @@ Error NodeRef::sendGetPid()
     }
   }
 
-  MINIROS_INFO("NodeRef(%s)::sendGetPid()", getApi().c_str());
-
+  MINIROS_INFO("%s::sendGetPid()", debugName().c_str());
   // Generate the request body (no parameters needed for shutdown)
-  return m_client->enqueueRequest(m_reqGetPid);
+  return client->enqueueRequest(m_reqGetPid);
 }
 
-std::shared_ptr<http::XmlRpcRequest> NodeRef::makeRequest(const std::string& function)
+void NodeRef::responseGetPid(int code, const std::string& msg, const RpcValue& data)
+{
+  if (code && data.getType() == XmlRpc::XmlRpcValue::TypeInt) {
+    std::unique_lock lock(m_guard);
+    m_pid = data.as<int>();
+    if (m_state == State::Connecting)
+      updateState(State::Verified, lock);
+  } else {
+    MINIROS_ERROR("Unexpected response: %s", data.toJsonStr().c_str());
+  }
+}
+
+std::shared_ptr<http::XmlRpcRequest> NodeRef::makeRequest(const std::string& method)
 {
   // Determine the path for XML-RPC endpoint
   std::string path = m_apiUrl.path;
@@ -350,13 +486,13 @@ std::shared_ptr<http::XmlRpcRequest> NodeRef::makeRequest(const std::string& fun
     path = "/RPC2";
   }
 
-  auto request = std::make_shared<http::XmlRpcRequest>("getPid", path.c_str());
+  auto request = std::make_shared<http::XmlRpcRequest>(method.c_str(), path.c_str());
   return request;
 }
 
 size_t NodeRef::getQueuedRequests() const
 {
-  std::unique_lock lock(m_guard);
+  std::unique_lock lock(m_clientGuard);
   if (!m_client)
     return 0;
   return m_client->getQueuedRequests();

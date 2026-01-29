@@ -57,19 +57,26 @@ struct HttpServer::Internal {
   void closeConnection(int fd, const char* reason);
 };
 
-void HttpServer::Internal::closeConnection(int fd, const char* reason)
+void HttpServer::closeConnection(int fd, const std::string& reason)
 {
-  MINIROS_DEBUG("HttpServer[%d]::closeConnection(): %s", fd, reason);
+  assert(internal_);
+  if (!internal_)
+    return;
+  MINIROS_DEBUG("HttpServer[%d]::closeConnection(): %s", fd, reason.c_str());
   std::shared_ptr<HttpServerConnection> connection;
-  auto it = connections.find(fd);
-  if (it != connections.end()) {
-    if (pollSet) {
-      pollSet->delSocket(fd);
+  auto it = internal_->connections.find(fd);
+  if (it != internal_->connections.end()) {
+    if (internal_->pollSet) {
+      internal_->pollSet->delSocket(fd);
     }
     connection = it->second;
     connection->detach();
-    connections.erase(fd);
+    internal_->connections.erase(fd);
     connection->close();
+
+    if (onCloseConnection) {
+      onCloseConnection(connection, reason);
+    }
   }
 }
 
@@ -150,7 +157,7 @@ Error HttpServer::stop()
   internal_->socket_v4.close();
   while (!internal_->connections.empty()) {
     auto it = internal_->connections.begin();
-    internal_->closeConnection(it->first, "HttpServer::stop()");
+    closeConnection(it->first, "HttpServer::stop()");
   }
   MINIROS_DEBUG("HttpServer::stop() finished");
   return Error::Ok;
@@ -201,14 +208,15 @@ void HttpServer::acceptClient(const std::shared_ptr<Lifetime<HttpServer>>& lifet
   std::shared_ptr<HttpServerConnection> connection(new HttpServerConnection(this, client));
   internal_->connections[fd] = connection;
   auto internalCopy = internal_->lifetime;
-  internal_->pollSet->addSocket(fd, PollSet::EventIn | PollSet::EventUpdate, [this, connection, fd, internalCopy](int flags) {
+  internal_->pollSet->addSocket(fd, PollSet::EventIn | PollSet::EventUpdate,
+    [this, connection, fd, internalCopy](int flags) {
     int newFlags = connection->handleEvents(flags);
     // HttpServerConnection can probably be destroyed here.
     std::unique_lock lock(*internalCopy);
     if (!internalCopy->alive)
       return 0;
     if (!newFlags) {
-      internal_->closeConnection(fd, "EOF");
+      closeConnection(fd, "EOF");
     }
     return newFlags;
   }, internalCopy);

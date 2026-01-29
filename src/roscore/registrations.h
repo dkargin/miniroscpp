@@ -41,7 +41,7 @@ public:
         TOPIC_SUBSCRIPTIONS = 1,
         TOPIC_PUBLICATIONS,
         SERVICE = 3,
-        PARAM_SUBSCRIPTIONS = 4
+        //PARAM_SUBSCRIPTIONS = 4
       };
 
     /// Some registration record about network resource.

@@ -10,6 +10,7 @@
 #include "miniros/network/socket.h"
 #include "miniros/http/http_client.h"
 
+#include "internal/invokers.h"
 #include "network/net_adapter.h"
 #include "transport/poll_set.h"
 
@@ -18,22 +19,22 @@
 namespace miniros {
 namespace http {
 
-const char* toString(HttpClient::State state)
+const char* HttpClient::State::toString() const
 {
-  switch (state) {
-    case HttpClient::State::Invalid:
+  switch (value) {
+    case Invalid:
       return "Invalid";
-    case HttpClient::State::Connecting:
+    case Connecting:
       return "Connecting";
-    case HttpClient::State::WaitReconnect:
+    case WaitReconnect:
       return "WaitReconnect";
-    case HttpClient::State::Idle:
+    case Idle:
       return "Idle";
-    case HttpClient::State::WriteRequest:
+    case WriteRequest:
       return "WriteRequest";
-    case HttpClient::State::ReadResponse:
+    case ReadResponse:
       return "ReadResponse";
-    case HttpClient::State::ProcessResponse:
+    case ProcessResponse:
       return "ProcessResponse";
     default:
       assert(false);
@@ -79,7 +80,7 @@ struct HttpClient::Internal {
   std::atomic_int updateCounter = 0;
 
   /// Condition variable for state change.
-  std::condition_variable cv;
+  std::condition_variable_any cv;
 
   Internal(PollSet* ps) : poll_set(ps)
   {
@@ -102,12 +103,18 @@ struct HttpClient::Internal {
     return socket ? socket->fd() : 0;
   }
 
+  /// Get name for debug otput
+  std::string debugName() const
+  {
+    return address.str() + std::string(" fd=") + std::to_string(fd());
+  }
+
   void updateState(State newState)
   {
     if (newState == state)
       return;
 
-    MINIROS_DEBUG("HttpClient(%s fd=%d)::updateState(%s) from %s at step %d", address.str().c_str(),  fd(), toString(newState), toString(state), updateCounter.load());
+    MINIROS_DEBUG("HttpClient[%s]::updateState(%s) from %s at step %d", debugName().c_str(), newState.toString(), state.toString(), updateCounter.load());
     state = newState;
     cv.notify_all();
   }
@@ -115,7 +122,7 @@ struct HttpClient::Internal {
   /// Close socket.
   void close()
   {
-    if (socket) {
+    if (socket && poll_set) {
       poll_set->delSocket(socket->fd());
     }
     socket.reset();
@@ -135,12 +142,14 @@ int HttpClient::eventsForState(State state)
     case State::WaitReconnect:
       return 0;
     case State::Idle:
-      return 0;
+      return PollSet::EventError;
     case State::WriteRequest:
-      return PollSet::EventOut;
+      return PollSet::EventOut | PollSet::EventError;
     case State::ReadResponse:
       return PollSet::EventIn;
     case State::ProcessResponse:
+      return 0;
+    default:
       return 0;
   }
   return 0;
@@ -180,7 +189,7 @@ bool HttpClient::Internal::pullNewTaskUnsafe()
   return true;
 }
 
-void HttpClient::handleDisconnect()
+void HttpClient::handleDisconnect(Lock& lock)
 {
   if (!internal_)
     return;
@@ -189,16 +198,18 @@ void HttpClient::handleDisconnect()
   // Note: This method assumes the lock is already held by the caller (handleEvents)
   // We don't acquire the lock here to avoid deadlock
 
-  // Call onDisconnect callback if set
+  int fd = internal_->fd();
+  // Call onDisconnect callback if set.
   if (onDisconnect && internal_->socket) {
-    DisconnectResponse response = onDisconnect(internal_->socket);
+
+    DisconnectResponse response = invokeUnlocked(lock, onDisconnect, internal_->socket, internal_->state);
     
     if (response.reconnect && internal_->address.valid()) {
-      MINIROS_DEBUG_NAMED("client", "HttpClient::handleDisconnect: attempting reconnection to %s", internal_->address.str().c_str());
+      MINIROS_DEBUG_NAMED("client", "HttpClient[%s]::handleDisconnect: attempting reconnection to %s", internal_->debugName().c_str(), internal_->address.str().c_str());
       // If reconnect timeout is specified, we'd need a timer mechanism
       // For now, attempt immediate reconnection (timeout of 0 means immediate)
       if (response.reconnectTimeout > 0) {
-        MINIROS_WARN_NAMED("client", "HttpClient::handleDisconnect: reconnectTimeout=%zu ms not yet implemented, reconnecting immediately", response.reconnectTimeout);
+        MINIROS_WARN_NAMED("client", "HttpClient[%s]::handleDisconnect: reconnectTimeout=%zu ms not yet implemented, reconnecting immediately", internal_->debugName().c_str(), response.reconnectTimeout);
       }
 
       // Enqueue reconnect event.
@@ -206,10 +217,13 @@ void HttpClient::handleDisconnect()
       internal_->updateState(State::WaitReconnect);
       return;
     }
+  } else {
+    MINIROS_INFO_NAMED("client", "HttpClient[%s]::handleDisconnect() - unhandled disconnect", internal_->debugName().c_str());
   }
   // No callback set or no reconnect required. Just close the current socket and reset state.
   internal_->close();
   internal_->updateState(State::Invalid);
+  MINIROS_INFO_NAMED("client", "HttpClient[%s]::handleDisconnect() - connection is closed", internal_->debugName().c_str());
 }
 
 Error HttpClient::Internal::readResponse()
@@ -226,18 +240,18 @@ Error HttpClient::Internal::readResponse()
     // If we haven't gotten the entire request yet, return (keep reading)
     if (http_frame.state() != HttpParserFrame::ParseComplete) {
       if (readErr == Error::EndOfFile) {
-        MINIROS_DEBUG_NAMED("client", "HttpClient(%d)::readRequest: EOF while reading request", fd);
+        MINIROS_DEBUG_NAMED("client", "HttpClient[%s]::readRequest: EOF while reading request", debugName().c_str());
         http_frame.finishRequest();
         return Error::EndOfFile;
         // Either way we close the connection
       }
-      MINIROS_DEBUG_NAMED("client", "HttpClient(%d)::readRequest got only %d/%d bytes.", fd, http_frame.bodyLength(), http_frame.contentLength());
+      MINIROS_DEBUG_NAMED("client", "HttpClient[%s]::readRequest got only %d/%d bytes.", debugName().c_str(), http_frame.bodyLength(), http_frame.contentLength());
       return Error::WouldBlock;
     }
 
     assert(http_frame.state() == HttpParserFrame::ParseComplete);
     // Otherwise, parse and dispatch the request
-    MINIROS_DEBUG_NAMED("client", "HttpClient(%d)::readRequest read %d/%d bytes.", fd, http_frame.bodyLength(), http_frame.contentLength());
+    MINIROS_DEBUG_NAMED("client", "HttpClient[%s]::readRequest read %d/%d bytes.", debugName().c_str(), http_frame.bodyLength(), http_frame.contentLength());
   } else if (readErr == Error::WouldBlock) {
     return Error::WouldBlock;
   }
@@ -252,7 +266,7 @@ HttpClient::HttpClient(PollSet* ps)
 HttpClient::~HttpClient()
 {
   if (internal_) {
-    std::unique_lock<std::mutex> guard(internal_->process_guard);
+    std::unique_lock guard(internal_->process_guard);
     std::shared_ptr<Internal> copy;
     std::swap(internal_, copy);
     copy->close();
@@ -293,7 +307,7 @@ Error HttpClient::enqueueRequest(const std::shared_ptr<HttpRequest>& request)
   }
 
   {
-    std::unique_lock<std::mutex> lock(internal_->requests_guard);
+    std::unique_lock lock(internal_->requests_guard);
     // Set request status to Queued
     request->updateState(HttpRequest::State::ClientQueued);
     internal_->requests.push_back(request);
@@ -323,7 +337,7 @@ Error HttpClient::connect(const std::string& host, int port)
   if (!address.valid())
     return Error::InvalidAddress;
 
-  std::unique_lock<std::mutex> lock(internal_->process_guard);
+  std::unique_lock lock(internal_->process_guard);
   return connectImplUnsafe(address);
 }
 
@@ -348,11 +362,13 @@ Error HttpClient::connectImplUnsafe(const network::NetAddress& address)
     return err;
   }
 
+  internal_->socket->setKeepAlive(true);
+
   // Store host and port for building request headers
   internal_->address = address;
 
   auto copy = internal_;
-  internal_->poll_set->addSocket(internal_->socket->fd(), PollSet::EventIn | PollSet::EventOut | PollSet::EventUpdate,
+  internal_->poll_set->addSocket(internal_->socket->fd(), PollSet::EventIn | PollSet::EventOut | PollSet::EventUpdate | PollSet::EventError,
     [copy, this](int event)
     {
       return handleSocketEvents(event);
@@ -369,7 +385,7 @@ Error HttpClient::waitConnected(const WallDuration& duration)
   if (!internal_->socket || !internal_->socket->valid())
     return Error::InvalidHandle;
 
-  std::unique_lock<std::mutex> lock(internal_->process_guard);
+  std::unique_lock lock(internal_->process_guard);
   if (internal_->cv.wait_for(lock, std::chrono::duration<double>(duration.toSec()),
     [this]() {
       if (internal_->state == State::Connecting)
@@ -389,48 +405,57 @@ int HttpClient::handleSocketEvents(int evtFlags)
   if (!internal_)
     return 0;
 
-  std::unique_lock<std::mutex> lock(internal_->process_guard);
+  std::unique_lock lock(internal_->process_guard);
   ++internal_->updateCounter;
 
-  if (internal_->state == State::WaitReconnect) {
-    connectImplUnsafe(internal_->address);
-    return eventsForState(internal_->state);
-  }
-
   // The following states are expected to fall through.
-  // The order of processing of these states corresponds to the flow of FSM.
+  // Each "handle" method can update internal state.
+  // The order of processing of these states corresponds to expected flow of FSM.
   int stateChanges = 0;
   bool loop = true;
   do {
+    if (internal_->state == State::WaitReconnect) {
+      // Expecting to be here on a timeout.
+      handleReconnecting(lock, evtFlags);
+      if (internal_->state == State::Invalid)
+        break;
+      evtFlags = 0;
+      stateChanges++;
+    }
+
     if (internal_->state == State::Connecting) {
-      handleConnecting(evtFlags);
+      handleConnecting(lock, evtFlags);
       evtFlags = 0;
       stateChanges++;
     }
 
     if (internal_->state == State::Idle) {
-      std::unique_lock lock2(internal_->requests_guard);
-      if (internal_->pullNewTaskUnsafe()) {
-        internal_->updateState(State::WriteRequest);
+      if (evtFlags & PollSet::EventError) {
+        handleDisconnect(lock);
+      } else {
+        std::unique_lock lock2(internal_->requests_guard);
+        if (internal_->pullNewTaskUnsafe()) {
+          internal_->updateState(State::WriteRequest);
+        }
       }
       evtFlags = 0;
       stateChanges++;
     }
 
     if (internal_->state == State::WriteRequest) {
-      handleWriteRequest(evtFlags, stateChanges > 0);
+      handleWriteRequest(lock, evtFlags, stateChanges > 0);
       evtFlags = 0;
       stateChanges++;
     }
 
     if (internal_->state == State::ReadResponse) {
-      handleReadResponse(evtFlags, stateChanges > 0);
+      handleReadResponse(lock, evtFlags, stateChanges > 0);
       evtFlags = 0;
       stateChanges++;
     }
 
     if (internal_->state == State::ProcessResponse) {
-      handleProcessResponse();
+      handleProcessResponse(lock);
       stateChanges++;
       // Restart loop to attempt to start sending new request.
       if (internal_->state == State::Idle)
@@ -443,12 +468,24 @@ int HttpClient::handleSocketEvents(int evtFlags)
     // Nothing to do here.
   } else if (stateChanges == 0) {
     std::string evt = PollSet::eventToString(evtFlags);
-    MINIROS_WARN("HttpClient unhandled events: %s in state %s", evt.c_str(), toString(internal_->state));
+    MINIROS_WARN("HttpClient unhandled events: %s in state %s", evt.c_str(), internal_->state.toString());
   }
   return eventsForState(internal_->state);
 }
 
-void HttpClient::handleConnecting(int evtFlags)
+void HttpClient::handleReconnecting(Lock& lock, int events)
+{
+  if (events & PollSet::EventOut) {
+    MINIROS_DEBUG_NAMED("client", "HttpClient[%s]::handleReconnecting(%s) - connected", internal_->debugName().c_str(), PollSet::eventToString(events).c_str());
+    connectImplUnsafe(internal_->address);
+  } else if (events & PollSet::EventError) {
+    MINIROS_ERROR_NAMED("client", "HttpClient[%s]::handleReconnecting(%s) - failed to connect", internal_->debugName().c_str(), PollSet::eventToString(events).c_str());
+  } else {
+    MINIROS_ERROR_NAMED("client", "HttpClient[%s]::handleReconnecting(%s) - unhandled events", internal_->debugName().c_str(), PollSet::eventToString(events).c_str());
+  }
+}
+
+void HttpClient::handleConnecting(Lock& lock, int evtFlags)
 {
   if (internal_->state != State::Connecting)
     return;
@@ -456,8 +493,8 @@ void HttpClient::handleConnecting(int evtFlags)
   // Assume socket is in "connecting" state
   assert(internal_->socket->isConnecting());
   if (evtFlags & PollSet::EventError) {
-    MINIROS_ERROR_NAMED("client", "HttpClient[%d]::handleEvents(state=Connecting) - failed to connect", internal_->fd());
-    handleDisconnect();
+    MINIROS_ERROR_NAMED("client", "HttpClient[%s]::handleEvents(state=Connecting) - failed to connect", internal_->debugName().c_str());
+    handleDisconnect(lock);
     return;
   }
 
@@ -467,23 +504,23 @@ void HttpClient::handleConnecting(int evtFlags)
       return;
 
     if (err == Error::Ok) {
-      MINIROS_DEBUG_NAMED("client", "HttpClient[%d]::handleEvents(state=Connecting) - connected", internal_->fd());
+      MINIROS_DEBUG_NAMED("client", "HttpClient[%s]::handleEvents(state=Connecting) - connected", internal_->debugName().c_str());
       // Connection is complete.
       internal_->updateState(State::Idle);
     } else {
-      MINIROS_ERROR_NAMED("HttpClient", "HttpClient[%d]::handleEvents(state=Connecting) - error: %s", internal_->fd(), err.toString());
-      handleDisconnect();
+      MINIROS_ERROR_NAMED("HttpClient", "HttpClient[%s]::handleEvents(state=Connecting) - error: %s", internal_->debugName().c_str(), err.toString());
+      handleDisconnect(lock);
     }
   }
 }
 
-void HttpClient::handleWriteRequest(int evtFlags, bool fallThrough)
+void HttpClient::handleWriteRequest(Lock& lock, int evtFlags, bool fallThrough)
 {
   if (evtFlags & PollSet::EventError) {
     int err = internal_->socket->getSysError();
     // Here we can have some disconnect problem or some generic network problem.
-    MINIROS_WARN_NAMED("client", "HttpClient[%d]::handleWriteRequest socket error in WriteRequest: %i", internal_->fd(), err);
-    handleDisconnect();
+    MINIROS_WARN_NAMED("client", "HttpClient[%s]::handleWriteRequest socket error in WriteRequest: %i", internal_->debugName().c_str(), err);
+    handleDisconnect(lock);
     return;
   }
 
@@ -507,8 +544,8 @@ void HttpClient::handleWriteRequest(int evtFlags, bool fallThrough)
     if (written > 0) {
       internal_->data_sent += written;
       double dur = (SteadyTime::now() - internal_->active_request->getRequestStart()).toSec() * 1000;
-      MINIROS_DEBUG_NAMED("client", "HttpClient[%d]::handleWriteRequest() HttpClient written %d/%d bytes of header, t=%fms",
-        internal_->fd(), static_cast<int>(written), static_cast<int>(totalSize), dur);
+      MINIROS_DEBUG_NAMED("client", "HttpClient[%s]::handleWriteRequest() HttpClient written %d/%d bytes of header, t=%fms",
+        internal_->debugName().c_str(), static_cast<int>(written), static_cast<int>(totalSize), dur);
     }
 
     if (err == Error::WouldBlock) {
@@ -517,8 +554,8 @@ void HttpClient::handleWriteRequest(int evtFlags, bool fallThrough)
     }
 
     if (err != Error::Ok) {
-      MINIROS_ERROR_NAMED("client", "HttpClient[%d]::handleWriteRequest error: %s", internal_->fd(), err.toString());
-      handleDisconnect();
+      MINIROS_ERROR_NAMED("client", "HttpClient[%s]::handleWriteRequest error: %s", internal_->debugName().c_str(), err.toString());
+      handleDisconnect(lock);
       return;
     }
 
@@ -533,21 +570,21 @@ void HttpClient::handleWriteRequest(int evtFlags, bool fallThrough)
     internal_->updateState(State::ReadResponse);
     internal_->http_frame.resetParseState(false); // false = response mode
     auto dur = SteadyTime::now() - internal_->active_request->getRequestStart();
-    MINIROS_DEBUG_NAMED("client", "HttpClient[%d]::handleWriteRequest sent request in %fms, waiting for response",
-      internal_->fd(), dur.toSec()*1000);
+    MINIROS_DEBUG_NAMED("client", "HttpClient[%s]::handleWriteRequest sent request in %fms, waiting for response",
+      internal_->debugName().c_str(), dur.toSec()*1000);
     return;
   }
 
   // Some unhandled event.
   std::string evt = PollSet::eventToString(evtFlags);
-  MINIROS_WARN_NAMED("client", "HttpClient::handleWriteRequest unhandled event in WriteRequest: %s", evt.c_str());
+  MINIROS_WARN_NAMED("client", "HttpClient[%s]::handleWriteRequest unhandled event in WriteRequest: %s", internal_->debugName().c_str(), evt.c_str());
 }
 
-void HttpClient::handleReadResponse(int evtFlags, bool fallThrough)
+void HttpClient::handleReadResponse(Lock& lock, int evtFlags, bool fallThrough)
 {
   if (evtFlags & PollSet::EventError) {
-    MINIROS_WARN_NAMED("client", "HttpClient[%d]::handleReadResponse() got socket error", internal_->fd());
-    handleDisconnect();
+    MINIROS_WARN_NAMED("client", "HttpClient[%s]::handleReadResponse() got socket error", internal_->debugName().c_str());
+    handleDisconnect(lock);
     return;
   }
 
@@ -563,43 +600,46 @@ void HttpClient::handleReadResponse(int evtFlags, bool fallThrough)
     else if (err == Error::EndOfFile) {
       MINIROS_ERROR("Got end of file from remote server");
       // Connection closed by peer
-      handleDisconnect();
+      handleDisconnect(lock);
     } else {
       MINIROS_ERROR("Unexpected error %s", err.toString());
-      handleDisconnect();
+      handleDisconnect(lock);
     }
   } else {
     std::string evt = PollSet::eventToString(evtFlags);
-    MINIROS_WARN_NAMED("client", "HttpClient[%d]::handleReadResponse() unhandled events in ReadResponse: %s at %d",
-      internal_->fd(), evt.c_str(), internal_->updateCounter.load());
+    MINIROS_WARN_NAMED("client", "HttpClient[%s]::handleReadResponse() unhandled events in ReadResponse: %s at %d",
+      internal_->debugName().c_str(), evt.c_str(), internal_->updateCounter.load());
   }
 }
 
-void HttpClient::handleProcessResponse()
+void HttpClient::handleProcessResponse(Lock& lock)
 {
   // Response received and parsed - store it in HttpRequest
   if (internal_->active_request) {
-    internal_->active_request->setResponseHeader(internal_->http_frame);
+    auto req = internal_->active_request;
+    req->setResponseHeader(internal_->http_frame);
 
-    // Store response body
+    // Store response body.
     std::string_view body = internal_->http_frame.body();
     if (!body.empty()) {
-      internal_->active_request->setResponseBody(body.data(), body.size());
+      req->setResponseBody(body.data(), body.size());
     }
 
     // Status should be updated last to prevent possible racing with access to response body.
-    internal_->active_request->updateState(HttpRequest::State::ClientHasResponse);
-    auto dur = internal_->active_request->getRequestFinish() - internal_->active_request->getRequestStart();
-    MINIROS_DEBUG_NAMED("client", "HttpClient[%d]::handleProcessResponse() received response in %fms",
-      internal_->fd(), dur.toSec()*1000);
+    req->updateState(HttpRequest::State::ClientHasResponse);
+
+    internal_->resetResponse();
+
+    auto dur = req->getRequestFinish() - req->getRequestStart();
+    MINIROS_DEBUG_NAMED("client", "HttpClient[%s]::handleProcessResponse() received response in %fms",
+      internal_->debugName().c_str(), dur.toSec()*1000);
 
     if (onResponse) {
-      onResponse(internal_->active_request);
+      invokeUnlocked(lock, onResponse, req);
     }
-    internal_->active_request->processResponse();
+    req->processResponse();
   }
 
-  internal_->resetResponse();
   internal_->updateState(State::Idle);
 }
 

@@ -54,21 +54,21 @@ namespace http {
     void generateRequestBody();
 
     /// Parse ROS-specific XMLRPC response.
-    std::tuple<int, XmlRpc::XmlRpcValue, std::string> parseResponse() const;
+    std::tuple<int, std::string, RpcValue> parseResponse() const;
 
     //! Reset the request for reuse
     void reset() override;
 
     Error processResponse() override;
 
-    std::function<void (int code, const XmlRpc::XmlRpcValue& data, const std::string msg)> onComplete;
+    std::function<void (int code, const std::string& msg, const RpcValue& data)> onComplete;
 
   private:
     //! Generate the XML-RPC request body following the encoding scheme from XmlRpcClient
     std::string generateRequestXml() const;
 
     //! Internal implementation of parseResponse that takes a string_view
-    static bool parseResponseImpl(const std::string_view& responseView, XmlRpc::XmlRpcValue& result, bool& isFault);
+    static bool parseResponseImpl(const std::string_view& responseView, RpcValue& result, bool& isFault);
 
     std::string method_name_;
     RpcValue params_ = RpcValue::Array(0);
