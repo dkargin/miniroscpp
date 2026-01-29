@@ -179,6 +179,9 @@ namespace XmlRpc {
 
     std::ostream& writeJson(std::ostream& os, miniros::JsonState& state, const miniros::JsonSettings& settings) const;
 
+    /// Convert to compact JSON string.
+    std::string toJsonStr(const miniros::JsonSettings& settings = {}) const;
+
   protected:
     // Clean up
     void invalidate();

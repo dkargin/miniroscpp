@@ -84,6 +84,7 @@ int main(int argc, const char ** argv) {
 
   desc.add_options()
     ("help,h", "produce help message")
+    ("port,p", po::value<int>()->default_value(11311), "Server port")
     ("xmlrpc_log", po::value<int>()->default_value(1), "Verbosity level of XmlRpc logging")
     ("rosout", po::value<bool>()->default_value(true), "Enable rosout log aggregator")
     ("dir", po::value<std::string>(), "Path to working directory")
@@ -151,9 +152,13 @@ int main(int argc, const char ** argv) {
 
   MINIROS_INFO("Initializing core transport");
   std::map<std::string, std::string> remappings;
-  if (int port = master.getPort()) {
-    remappings["__rpc_server_port"] = std::to_string(port);
+
+  int port = vm["port"].as<int>();
+  if (port == 0) {
+    port = 11311;
   }
+  remappings["__rpc_server_port"] = std::to_string(port);
+  remappings["__miniros.debug"] = "1";
 
   constexpr int options = init_options::LocalMaster | init_options::NoRosout | init_options::NoSigintHandler;
   init(remappings, "miniroscore", options);
@@ -182,7 +187,7 @@ int main(int argc, const char ** argv) {
   MINIROS_INFO("Starting Master thread");
 
   // Start internal networking.
-  if (Error err = start(); !err) {
+  if (Error err = miniros::start(); !err) {
     MINIROS_ERROR("Failed to start internal networking: %s", err.toString());
     return EXIT_FAILURE;
   }
@@ -195,7 +200,7 @@ int main(int argc, const char ** argv) {
     return EXIT_FAILURE;
   }
 
-  if (!master.start(pollSet)) {
+  if (!master.start(pollSet, port)) {
     MINIROS_ERROR("Failed to start Master");
     return EXIT_FAILURE;
   }
@@ -205,7 +210,7 @@ int main(int argc, const char ** argv) {
   std::unique_ptr<master::Rosout> r;
   if (useRosout) {
     MINIROS_INFO("Creating Rosout object");
-    master.registerSelfRef();
+    //master.registerSelfRef();
     r.reset(new master::Rosout(node));
   }
 
@@ -218,7 +223,7 @@ int main(int argc, const char ** argv) {
 
   notifyNodeStarted();
   double durStartMs = (SteadyTime::now() - timeStart).toSec() * 1000.;
-  MINIROS_INFO("All components have started in %fms", durStartMs);
+  MINIROS_INFO("All components have started in %fms. URL=%s", durStartMs, master.getUri().c_str());
 
   const WallDuration period(0.02);
   while (!g_sigintReceived && master.ok()) {

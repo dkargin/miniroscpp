@@ -57,11 +57,17 @@ public:
   /// Find endpoint for request.
   EndpointHandler* findEndpoint(const HttpParserFrame& frame);
 
+  /// Called when HTTP connection is closed.
+  std::function<void (const std::shared_ptr<HttpServerConnection>&, const std::string& reason)> onCloseConnection;
+
 protected:
   /// Accept client and add it to event processing.
   /// For internal usage only.
   /// @param sock - listening socket.
   void acceptClient(const std::shared_ptr<Lifetime<HttpServer>>& lifetime, network::NetSocket* sock);
+
+  /// Close connection and send all notifications.
+  void closeConnection(int fd, const std::string& reason);
 
 protected:
   struct Internal;

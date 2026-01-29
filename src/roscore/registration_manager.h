@@ -25,11 +25,14 @@ public:
 
   using Lock = std::unique_lock<const RegistrationManager>;
 
-  RegistrationManager();
+  /// Constructor
+  RegistrationManager(const std::string& name);
 
   Registrations publishers;
   Registrations subscribers;
   Registrations services;
+
+  void setPollSet(PollSet* ps);
 
   /// Get nodes which publish specified topic.
   std::vector<std::shared_ptr<NodeRef>> getTopicPublishers(const std::string& topic) const;
@@ -56,10 +59,6 @@ public:
   /// Find node by an API URI.
   /// @returns reference to a node or nullptr if no node is found.
   std::shared_ptr<NodeRef> getNodeByAPI(const std::string& nodeApi) const;
-
-  enum NodeRegFlags {
-    REG_MASTER = 1<<1
-  };
 
   struct RegistrationReport {
     NodeRefPtr node;
@@ -94,21 +93,14 @@ public:
   std::shared_ptr<NodeRef> register_subscriber(const std::string& topic, const std::string& topic_type,
     const std::string& nodeName, const std::string& nodeApi);
 
-  std::shared_ptr<NodeRef> register_param_subscriber(const std::string& param, const std::string& caller_id, const std::string& caller_api);
-
   ReturnStruct unregister_service(const std::string& service, const std::string& caller_id, const std::string& service_api);
 
   ReturnStruct unregister_subscriber(const std::string& topic, const std::string& caller_id, const std::string& caller_api);
 
   ReturnStruct unregister_publisher(const std::string& topic, const std::string& caller_id, const std::string& caller_api);
 
-  ReturnStruct unregister_param_subscriber(const std::string& param, const std::string& caller_id, const std::string& caller_api);
-
   /// Take collection of nodes for shutdown.
   std::set<std::shared_ptr<NodeRef>> pullShutdownNodes();
-
-  /// Take collection of new nodes.
-  std::set<std::shared_ptr<NodeRef>> pullNewNodes();
 
   std::ostream& writeJson(std::ostream& os, miniros::JsonState& state, const miniros::JsonSettings& settings) const;
 
@@ -127,6 +119,8 @@ public:
   const std::map<std::string, std::string, std::less<>>& getTopicTypesUnsafe(const Lock&) const;
 
   std::vector<std::vector<std::string>> getPublishedTopics(const std::string& prefix) const;
+
+  std::vector<NodeRefPtr> checkDeadNodes();
 
   void lock() const;
   void unlock() const;
@@ -155,13 +149,11 @@ protected:
   /// A collection of nodes queued for shutdown.
   std::set<std::shared_ptr<NodeRef>> m_nodesToShutdown;
 
-  /// A collection of new nodes.
-  std::set<std::shared_ptr<NodeRef>> m_newNodes;
-
-  Registrations param_subscribers;
-
   /// Maps topicName to type md5.
-  std::map<std::string, std::string, std::less<>> m_topicTypes;
+  std::map<std::string, std::string, std::less<>> topic_types_;
+
+  PollSet* poll_set_ = nullptr;
+  std::string name_;
 };
 
 } // namespace master

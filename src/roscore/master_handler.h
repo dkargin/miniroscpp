@@ -32,11 +32,6 @@ public:
 
   MasterHandler(RPCManagerPtr rpcManager, RegistrationManager* regManager, AddressResolver* resolver);
 
-  /// Sends immediate command/update to a node.
-  /// This is blocking call. It will wait until response is obtained.
-  Error sendToNode(const std::shared_ptr<NodeRef>& nr, const char* method,
-    const RpcValue& arg1, const RpcValue& arg2 = {});
-
   void notifyTopicSubscribers(const std::string& topic, const std::vector<std::shared_ptr<NodeRef>>& subscribers);
 
   ReturnStruct registerService(const RequesterInfo& requesterInfo, const std::string& service, const std::string& service_api);
@@ -67,10 +62,6 @@ public:
   };
 
   SystemState getSystemState(const RequesterInfo& requesterInfo) const;
-
-  /// Updates internal tasks.
-  /// It is called from the main thread, out of any RPC handlers.
-  void update();
 
 protected:
   AddressResolver* m_resolver;

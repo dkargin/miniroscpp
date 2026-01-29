@@ -584,6 +584,15 @@ namespace XmlRpc {
     return os;
   }
 
+  std::string XmlRpcValue::toJsonStr(const miniros::JsonSettings& settings) const
+  {
+    miniros::JsonState state;
+    std::stringstream ss;
+    writeJson(ss, state, settings);
+    return ss.str();
+  }
+
+
 
   void XmlRpcValue::setBool(bool value)
   {

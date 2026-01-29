@@ -419,6 +419,24 @@ Error NetSocket::setBroadcast(bool broadcast)
   return Error::Ok;
 }
 
+Error NetSocket::setKeepAlive(bool keepAlive)
+{
+  if (!internal_)
+    return Error::InternalError;
+  if (internal_->fd < 0)
+    return Error::InvalidHandle;
+
+  int flag = keepAlive ? 1 : 0;
+
+  if (setsockopt(internal_->fd, SOL_SOCKET, SO_KEEPALIVE, reinterpret_cast<const char*>(&flag), sizeof(flag)) < 0)
+  {
+    MINIROS_ERROR_NAMED("socket", "NetSocket[%d]::setKeepAlive(%d) failed on socket %s", internal_->fd, flag, last_socket_error_string());
+    return Error::SystemError;
+  }
+  return Error::Ok;
+}
+
+
 Error NetSocket::setReuseAddr(bool reuse)
 {
   if (!internal_)

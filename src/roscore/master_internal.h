@@ -26,9 +26,6 @@ class PublishedTopicsEndpoint;
 class TopicTypesEndpoint;
 
 struct Master::Internal {
-  int port = -1;
-  std::string host;
-
   std::shared_ptr<RPCManager> rpcManager;
 
   RegistrationManager regManager;
@@ -72,7 +69,7 @@ struct Master::Internal {
   Error renderTopicInfo(const std::string_view& name, std::string& output) const;
 
   /// Render information about specific node.
-  Error renderNodeInfo(const std::string_view& name, std::string& output) const;
+  Error renderNodeInfo(const std::string_view& name, std::string& output, bool showInternalInfo) const;
 
   /// Callback for broadcasting timer.
   /// It is called from main thread.

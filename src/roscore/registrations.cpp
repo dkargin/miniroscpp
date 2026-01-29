@@ -16,7 +16,7 @@ namespace master {
 Registrations::Registrations(Type type_) : m_type(type_)
 {
   assert(type_ == TOPIC_SUBSCRIPTIONS || type_ == TOPIC_PUBLICATIONS
-    || type_ == SERVICE || type_ == PARAM_SUBSCRIPTIONS);
+    || type_ == SERVICE);
 }
 
 /// Get URL to service.

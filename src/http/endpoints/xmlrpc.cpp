@@ -74,7 +74,8 @@ Error XmlRpcHandler::handle(const network::ClientInfo& clientInfo, std::shared_p
   }
 
   std::string methodName(methodView);
-  MINIROS_INFO("XmlRpcHandler(%d)::executeRequest method '%s'", clientInfo.fd, methodName.c_str());
+
+  MINIROS_INFO("XmlRpcHandler(%d)::executeRequest method '%s'(%s)", clientInfo.fd, methodName.c_str(), params.toJsonStr().c_str());
 
   try {
     if ( ! executeMethod(clientInfo, methodName, params, resultValue) &&

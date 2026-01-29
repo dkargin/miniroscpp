@@ -7,6 +7,7 @@
 #include "miniros/http/http_server.h"
 #include "miniros/http/http_server_connection.h"
 
+#include "internal/invokers.h"
 #include "miniros/transport/poll_set.h"
 
 // ROS log will write to the channel "miniros.http[.server]"
@@ -111,9 +112,14 @@ int HttpServerConnection::handleEvents(int evtFlags)
       clientInfo.remoteAddress = socket_->peerAddress();
       MINIROS_DEBUG("Handling HTTP request to path=\"%s\"", endpoint.c_str());
 
+      requestObject->setPath(std::string{http_frame_.getPath()});
       requestObject->setRequestBody(std::string{http_frame_.body()});
 
-      Error err = handler->handle(clientInfo, requestObject);
+      Error err = Error::Ok;
+      {
+        ScopedUnlock unlock(lock);
+        err = handler->handle(clientInfo, requestObject);
+      }
       if (!err) {
         MINIROS_ERROR("Failed to handle HTTP request to \"%s\"", err.toString());
         prepareFaultResponse(err, *requestObject);
@@ -237,7 +243,6 @@ void HttpServerConnection::detach()
   std::unique_lock<std::mutex> lock(guard_);
   server_ = nullptr;
 }
-
 
 }
 }

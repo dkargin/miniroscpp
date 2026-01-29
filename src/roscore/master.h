@@ -46,6 +46,8 @@ struct ClientInfo;
 
 namespace master {
 
+class NodeRef;
+
 /// Core class of rosmaster/roscore.
 class MINIROS_DECL Master {
 public:
@@ -57,7 +59,7 @@ public:
   Master(std::shared_ptr<RPCManager> manager);
   ~Master();
 
-  bool start(PollSet* poll_set);
+  bool start(PollSet* poll_set, int port);
   void stop();
   bool ok() const;
 
@@ -84,6 +86,9 @@ public:
 
   /// Register NodeRef related to itself.
   void registerSelfRef();
+
+  std::shared_ptr<NodeRef> registerNodeApi(const std::string& nodeId, const std::string& nodeApi) const;
+  std::shared_ptr<NodeRef> getNodeByName(const std::string& nodeId) const;
 
 public: /// Request handlers
   RpcValue lookupService(const std::string& caller_id, const std::string& service, const ClientInfo& ci);

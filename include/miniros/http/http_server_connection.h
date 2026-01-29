@@ -58,7 +58,7 @@ public:
   std::shared_ptr<HttpRequest> makeRequestObject();
 
 protected:
-  State state_ = State::ReadRequest;
+  volatile State state_ = State::ReadRequest;
 
   HttpServer* server_;
 

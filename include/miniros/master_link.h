@@ -74,7 +74,7 @@ public:
   using RpcValue = XmlRpc::XmlRpcValue;
 
   /// Init connection to rosmaster.
-  MINIROS_DECL Error initLink(const M_string& remappings, const std::shared_ptr<RPCManager>& rpcManager);
+  MINIROS_DECL Error initLink(const M_string& remappings, const std::shared_ptr<RPCManager>& rpcManager, bool local);
 
   /// Init rosparam part.
   MINIROS_DECL Error initParam(const M_string& remappings);
@@ -114,10 +114,6 @@ public:
 
   /// Check if this link should work with local RPC manager.
   MINIROS_DECL bool isLocalMaster() const;
-
-  /// Enable local master mode.
-  /// All master requests will be redirected to a local RPC manager.
-  MINIROS_DECL void setLocalMaster(bool local) const;
 
   /** @brief Check whether the master is up
    *

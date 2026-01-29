@@ -27,66 +27,6 @@ MasterHandler::MasterHandler(RPCManagerPtr rpcManager, RegistrationManager* regM
 {
 }
 
-/// Relevant requests:
-///  - paramUpdate
-///  - shutdown from MasterHandler::update
-///  - publisherUpdate through MasterHandler::enqueueNodeCommand(sub, "publisherUpdate", topic, l);
-
-Error MasterHandler::sendToNode(const std::shared_ptr<NodeRef>& nr, const char* method,
-  const RpcValue& arg1, const RpcValue& arg2)
-{
-  if (!nr)
-    return Error::InvalidValue;
-
-  RpcValue args;
-  args[0] = "master";
-  args[1] = arg1;
-  args[2] = arg2;
-
-
-  network::URL url;
-  std::string nodeApi = nr->getApi();
-  if (!url.fromString(nodeApi, false)) {
-    MINIROS_ERROR_NAMED("handler", "Failed to splitURI of node \"%s\"", nodeApi.c_str());
-    return Error::InvalidURI;
-  }
-
-  // It is expected that client is in idle state, so we can send request immediately without waiting for a response for
-  // some previous request.
-  XmlRpc::XmlRpcClient* client = m_rpcManager->getXMLRPCClient(url.host, url.port, url.path);
-  if (!client) {
-    MINIROS_ERROR_NAMED("handler", "Failed to create client to notify node \"%s\"", nodeApi.c_str());
-    return Error::SystemError;
-  }
-
-  AtExit clientDispose([this, client]() {
-    m_rpcManager->releaseXMLRPCClient(client);
-  });
-
-
-  if (!client->isReady()) {
-    MINIROS_FATAL_NAMED("handler", "RPC client is not in idle state");
-    return Error::SystemError;
-  }
-
-  /*
-  /// This notification can happen inside RPC callback. So blocking call will not work here at all.
-  if (!client->executeNonBlock(method, args)) {
-    MINIROS_WARN("Failed to execute node request %s", method);
-    return Error::SystemError;
-  }*/
-
-  RpcValue result;
-  if (!client->execute(method, args, result)) {
-    MINIROS_WARN("Failed to execute node request %s", method);
-    return Error::SystemError;
-  }
-  if (result.size() < 3) {
-    MINIROS_WARN("Unexpected response size=%d for request=\"%s\"", (int)result.size(), method);  
-  }
-  return Error::Ok;
-}
-
 void MasterHandler::notifyTopicSubscribers(const std::string& topic, const std::vector<std::shared_ptr<NodeRef>>& subscribers)
 {
   if (subscribers.empty())
@@ -283,30 +223,6 @@ MasterHandler::SystemState MasterHandler::getSystemState(const RequesterInfo& re
   result.subscribers = m_regManager->subscribers.getState();
   result.services = m_regManager->services.getState();
   return result;
-}
-
-void MasterHandler::update()
-{
-  auto shutdownNodes = m_regManager->pullShutdownNodes();
-
-  auto newNodes = m_regManager->pullNewNodes();
-
-  auto* ps = m_rpcManager->getPollSet();
-  for (std::shared_ptr<NodeRef> nr: newNodes) {
-    assert(nr);
-    Error err = nr->activateConnection(ps);
-    if (!err) {
-      MINIROS_WARN("Failed to initialize client at NodeRef(%s)", nr->id().c_str());
-    }
-  }
-
-  for (std::shared_ptr<NodeRef> nr: shutdownNodes) {
-    RpcValue msg;
-    std::stringstream ss;
-    ss << "[" << nr->id() << "] Reason: new node registered with same name";
-    msg = ss.str();
-    nr->sendShutdown(msg);
-  }
 }
 
 } // namespace master

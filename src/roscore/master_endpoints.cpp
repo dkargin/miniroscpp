@@ -42,7 +42,7 @@ Error NodeInfoEndpoint::handle(const network::ClientInfo& clientInfo, std::share
 
   std::string body = "<!doctype html><html><title>Mini ROS master</title><body>";
 
-  if (name.empty() || !internal->renderNodeInfo(name, body)) {
+  if (name.empty() || !internal->renderNodeInfo(name, body, true)) {
     request->setResponseStatus(404, "Node not found");
   } else {
     request->setResponseStatusOk();

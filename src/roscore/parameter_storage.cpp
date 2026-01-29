@@ -11,17 +11,14 @@
 namespace miniros {
 namespace master {
 
-ParameterStorage::ParameterStorage(RegistrationManager* regManager)
-  :m_regManager(regManager)
+ParameterStorage::ParameterStorage()
 {
-    assert(regManager);
     m_parameterRoot = RpcValue::Dict();
 }
 
 ParameterStorage::~ParameterStorage()
 {
   std::scoped_lock<std::mutex> m_lock(m_parameterLock);
-  m_regManager = nullptr;
 }
 
 bool ParameterStorage::deleteParam(const std::string& caller_id, const std::string& key)
@@ -203,19 +200,39 @@ Error ParameterStorage::checkParamUpdates(const std::string& fullKey, const RpcV
     //  Updated: /a/b/c
     //  Subscriber /a/b/c/d/e
     // Case2: subscriber listens to variable upper in the hierarchy.
-    for (const auto& [subPath, nodes]: m_parameterListeners) {
+    for (auto& [subPath, nodes]: m_parameterListeners) {
       if (subPath.startsWith(path) || path.startsWith(subPath)) {
-        for (auto& node: nodes)
-          node->sendParameterUpdate("/master", subPath.fullPath(), ptr);
+        std::vector<std::weak_ptr<NodeRef>> dead;
+        for (auto& wnode: nodes) {
+          auto node = wnode.lock();
+          if (node) {
+            node->sendParameterUpdate("/master", subPath.fullPath(), ptr);
+          } else {
+            dead.push_back(wnode);
+          }
+        }
+        for (auto wnode: dead) {
+          nodes.erase(wnode);
+        }
       }
     }
   }
   else {
     // Parameter is removed/updated, or it was an elementary value.
-    for (const auto& [subPath, nodes]: m_parameterListeners) {
+    for (auto& [subPath, nodes]: m_parameterListeners) {
       if (subPath.startsWith(path) || path.startsWith(subPath)) {
-        for (auto& node: nodes)
-          node->sendParameterUpdate("/master", subPath.fullPath(), ptr);
+        std::vector<std::weak_ptr<NodeRef>> dead;
+        for (auto& wnode: nodes) {
+          auto node = wnode.lock();
+          if (node) {
+            node->sendParameterUpdate("/master", subPath.fullPath(), ptr);
+          } else {
+            dead.push_back(wnode);
+          }
+        }
+        for (auto wnode: dead) {
+          nodes.erase(wnode);
+        }
       }
     }
   }
@@ -270,51 +287,66 @@ ParameterStorage::RpcValue ParameterStorage::getParam(const std::string& caller_
   fullPath.fromString(fullKey);
 
   std::scoped_lock<std::mutex> m_lock(m_parameterLock);
-  RpcValue* param = this->findParameter(fullPath, false).first;
+  RpcValue* param = findParameter(fullPath, false).first;
   if (param == nullptr)
     return {};
 
   return *param;
 }
 
-const ParameterStorage::RpcValue* ParameterStorage::subscribeParam(
-  const std::string& caller_id, const std::string& caller_api, const std::string& key)
+const ParameterStorage::RpcValue* ParameterStorage::subscribeParam(const std::shared_ptr<NodeRef>& node, const std::string& key)
 {
-  MINIROS_DEBUG_NAMED("rosparam", "subscribeParam(\"%s\") from %s, api=%s", key.c_str(), caller_id.c_str(), caller_api.c_str());
-  std::string fullKey = miniros::names::resolve(caller_id, key, false);
+  if (!node)
+    return nullptr;
+  MINIROS_DEBUG_NAMED("rosparam", "subscribeParam(\"%s\") from %s", key.c_str(), node->debugName().c_str());
+  std::string fullKey = miniros::names::resolve(node->id(), key, false);
 
   names::Path path;
   path.fromString(fullKey);
   std::scoped_lock<std::mutex> m_lock(m_parameterLock);
 
-  if (m_regManager) {
-    std::shared_ptr<NodeRef> nodeRef = m_regManager->getNodeByName(caller_id);
-    auto& listeners = m_parameterListeners[path];
-    listeners.insert(nodeRef);
-  }
+  auto& listeners = m_parameterListeners[path];
+  listeners.insert(node);
+  node->addParamSubscription(key);
 
-  return nullptr;
+  return findParameter(path, false).first;
 }
 
-bool ParameterStorage::unsubscribeParam(
-  const std::string& caller_id, const std::string& caller_api, const std::string& key)
+bool ParameterStorage::unsubscribeParam(const std::shared_ptr<NodeRef>& node, const std::string& key)
 {
-  MINIROS_INFO_NAMED("rosparam", "unsubscribeParam(\"%s\") from %s, api=%s", key.c_str(), caller_id.c_str(), caller_api.c_str());
+  MINIROS_INFO_NAMED("rosparam", "unsubscribeParam(\"%s\") from %s", key.c_str(), node->debugName().c_str());
 
-  std::string fullKey = miniros::names::resolve(caller_id, key, false);
+  std::string fullKey = miniros::names::resolve(node->id(), key, false);
 
   names::Path path;
   path.fromString(fullKey);
 
   std::scoped_lock<std::mutex> lock(m_parameterLock);
-  if (m_regManager) {
+  auto it = m_parameterListeners.find(path);
+  if (it != m_parameterListeners.end()) {
+    it->second.erase(node);
+  }
+  node->removeParamSubscription(key);
+  return true;
+}
+
+void ParameterStorage::dropSubscriptions(const std::shared_ptr<NodeRef>& node)
+{
+  assert(node);
+  if (!node)
+    return;
+
+  std::scoped_lock<std::mutex> lock(m_parameterLock);
+  for (const auto& param: node->getParamSubscriptions()) {
+    names::Path path;
+    path.fromString(param);
+
     auto it = m_parameterListeners.find(path);
     if (it != m_parameterListeners.end()) {
-      std::shared_ptr<NodeRef> nodeRef = m_regManager->getNodeByName(caller_id);
-      it->second.erase(nodeRef);
+      it->second.erase(node);
     }
   }
-  return true;
+  node->removeAllParamSubscriptions();
 }
 
 bool ParameterStorage::hasParam(const std::string& caller_id, const std::string& key) const

@@ -147,13 +147,13 @@ std::string XmlRpcRequest::generateRequestXml() const
 Error XmlRpcRequest::processResponse()
 {
   if (onComplete) {
-    auto [code, data, msg] = parseResponse();
-    onComplete(code, data, msg);
+    auto [code, msg,data] = parseResponse();
+    onComplete(code, msg, data);
   }
   return Error::Ok;
 }
 
-std::tuple<int, XmlRpc::XmlRpcValue, std::string> XmlRpcRequest::parseResponse() const
+std::tuple<int, std::string, XmlRpc::XmlRpcValue> XmlRpcRequest::parseResponse() const
 {
   XmlRpc::XmlRpcValue value;
   using Type = XmlRpc::XmlRpcValue::Type;
@@ -180,15 +180,15 @@ std::tuple<int, XmlRpc::XmlRpcValue, std::string> XmlRpcRequest::parseResponse()
     res = value[0].as<int>();
   }
 
-  if (value.size() > 1) {
-    data = value[1];
+  if (value.size() > 1 && value[1].getType() == Type::TypeString) {
+    msg = value[1].as<std::string>();
   }
 
-  if (value.size() > 2 && value[2].getType() == Type::TypeString) {
-    msg = value[2].as<std::string>();
+  if (value.size() > 2) {
+    data = value[2];
   }
 
-  return {res, data, msg};
+  return {res, msg, data};
 }
 
 bool XmlRpcRequest::parseResponseImpl(const std::string_view& responseView, XmlRpc::XmlRpcValue& result, bool& isFault)

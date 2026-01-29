@@ -69,6 +69,8 @@ public:
   /// Works only with datagram sockets.
   Error setBroadcast(bool broadcast);
 
+  Error setKeepAlive(bool keepAlive);
+
   /// Allocate tcp port and start listening.
   Error tcpListen(int port, NetAddress::Type type, int maxQueuedClients=100);
 
