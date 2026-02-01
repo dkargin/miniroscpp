@@ -7,7 +7,7 @@
 #include "miniros/network/net_adapter.h"
 #include "miniros/network/net_address.h"
 #include "miniros/network/socket.h"
-#include "miniros/transport/io.h"
+#include "miniros/io/io.h"
 
 using Error = miniros::Error;
 

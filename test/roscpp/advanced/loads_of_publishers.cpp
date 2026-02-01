@@ -33,7 +33,7 @@
 #include <miniros/ros.h>
 #include <miniros/init.h>
 
-#include <miniros/transport/callback_queue.h>
+#include <miniros/io/callback_queue.h>
 
 #include "test_roscpp/TestArray.hxx"
 

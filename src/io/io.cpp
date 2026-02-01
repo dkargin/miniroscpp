@@ -42,7 +42,7 @@
 
 #include <errno.h>             // for EFAULT and co.
 #include <miniros/rosassert.h> // don't need if we dont call the pipe functions.
-#include <miniros/transport/io.h>
+#include <miniros/io/io.h>
 #include <sstream>
 #ifdef WIN32
 #else

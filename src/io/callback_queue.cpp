@@ -36,7 +36,7 @@
 #include <functional>
 
 #include "miniros/internal/at_exit.h"
-#include "miniros/transport/callback_queue.h"
+#include "miniros/io/callback_queue.h"
 #include "miniros/rosassert.h"
 
 namespace miniros

@@ -40,7 +40,7 @@
 #include <miniros/types.h>
 #include "transport.h"
 
-#include <miniros/transport/io.h>
+#include <miniros/io/io.h>
 
 namespace miniros
 {

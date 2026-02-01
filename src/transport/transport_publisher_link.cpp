@@ -34,7 +34,12 @@
 
 #define MINIROS_PACKAGE_NAME "transport_publisher_link"
 
+#include <sstream>
+
 #include <miniros/platform.h>  // platform dependendant requirements
+
+#include "miniros/io/poll_manager.h"
+#include "miniros/io/callback_queue.h"
 
 #include "miniros/transport/transport_publisher_link.h"
 #include "miniros/transport/subscription.h"
@@ -44,14 +49,9 @@
 #include "miniros/this_node.h"
 #include "miniros/transport/connection_manager.h"
 #include "miniros/file_log.h"
-#include "miniros/transport/poll_manager.h"
 #include "miniros/transport/transport_tcp.h"
 #include "miniros/transport/timer_manager.h"
-#include "miniros/transport/callback_queue.h"
 #include "miniros/transport/internal_timer_manager.h"
-
-
-#include <sstream>
 
 namespace miniros
 {

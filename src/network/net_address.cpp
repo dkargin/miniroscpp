@@ -5,7 +5,7 @@
 #include <cassert>
 #include <cstring>
 
-#include "miniros/transport/io.h" // cross-platform headers needed
+#include "miniros/io/io.h" // cross-platform headers needed
 
 #include "miniros/network/net_address.h"
 

@@ -32,7 +32,6 @@
 #include <map>
 
 #include "miniros/internal/forwards.h"
-#include "poll_set.h"
 #include "miniros/common.h"
 #include "miniros/publisher.h"
 #include "miniros/rostime.h"

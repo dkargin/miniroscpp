@@ -11,11 +11,10 @@
 #include "master.h"
 #include "rosout.h"
 
-#include "miniros/transport/callback_queue.h"
-#include "miniros/xmlrpcpp/XmlRpcUtil.h"
+#include "miniros/io/callback_queue.h"
+#include "miniros/io/io.h"
 
 #include "miniros/common.h"
-#include "miniros/transport/io.h"
 #include "miniros/transport/rpc_manager.h"
 
 /// This define is injected in replacements/CMakeLists.txt

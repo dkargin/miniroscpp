@@ -35,27 +35,31 @@
 #define MINIROS_PACKAGE_NAME "init"
 
 #include "miniros/init.h"
-#include "../../include/miniros/network/network.h"
+#include "miniros/network/network.h"
 #include "miniros/file_log.h"
 #include "miniros/master_link.h"
 #include "miniros/names.h"
 #include "miniros/this_node.h"
-#include "miniros/transport/callback_queue.h"
+
+#include "miniros/io/callback_queue.h"
+#include "miniros/io/poll_manager.h"
+
 #include "miniros/transport/connection_manager.h"
 #include "miniros/transport/internal_timer_manager.h"
-#include "miniros/transport/poll_manager.h"
 #include "miniros/transport/rosout_appender.h"
 #include "miniros/transport/rpc_manager.h"
 #include "miniros/transport/service_manager.h"
 #include "miniros/transport/subscribe_options.h"
 #include "miniros/transport/topic_manager.h"
 #include "miniros/transport/transport_tcp.h"
-#include "miniros/xmlrpcpp/XmlRpcSocket.h"
 
 // Standard ROS services.
+#include "roscpp/Empty.hxx"
 #include "roscpp/GetLoggers.hxx"
 #include "roscpp/SetLoggerLevel.hxx"
-#include "roscpp/Empty.hxx"
+
+// Needed to set IPv6 flag inside XmlRpcSocket.
+#include "xmlrpcpp/XmlRpcSocket.h"
 
 #include <miniros/console.h>
 #include <miniros/rostime.h>

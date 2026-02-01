@@ -8,8 +8,8 @@
 
 #include "miniros/network/net_adapter.h"
 #include "miniros/network/socket.h"
-#include "miniros/transport/io.h"
-#include "miniros/transport/poll_set.h"
+#include "miniros/io/io.h"
+#include "miniros/io/poll_set.h"
 
 #include "resolver.h"
 

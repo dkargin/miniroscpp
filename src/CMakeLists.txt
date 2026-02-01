@@ -200,6 +200,11 @@ set(transport_SRC
     http/http_server_connection.cpp
     http/http_tools.cpp
 
+    io/callback_queue.cpp
+    io/poll_manager.cpp
+    io/poll_set.cpp
+    io/io.cpp
+
     network/host_info.cpp
     network/network.cpp
     network/net_adapter.cpp
@@ -208,21 +213,17 @@ set(transport_SRC
     network/url.cpp
 
     transport/advertise_service_options.cpp
-    transport/callback_queue.cpp
     transport/connection.cpp
     transport/connection_manager.cpp
     transport/init.cpp
     transport/intraprocess_subscriber_link.cpp
     transport/intraprocess_publisher_link.cpp
     transport/internal_timer_manager.cpp
-    transport/io.cpp
 
     transport/master_link.cpp
     transport/message_deserializer.cpp
 
     transport/node_handle.cpp
-    transport/poll_manager.cpp
-    transport/poll_set.cpp
     transport/publication.cpp
     transport/publisher.cpp
     transport/publisher_link.cpp

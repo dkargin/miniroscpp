@@ -34,7 +34,7 @@
  */
 
 #include <gtest/gtest.h>
-#include "miniros/transport/poll_set.h"
+#include "miniros/io/poll_set.h"
 #include "miniros/transport/transport_tcp.h"
 
 #include <thread>

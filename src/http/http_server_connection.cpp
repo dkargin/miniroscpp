@@ -8,7 +8,7 @@
 #include "miniros/http/http_server_connection.h"
 
 #include "internal/invokers.h"
-#include "miniros/transport/poll_set.h"
+#include "miniros/io/poll_set.h"
 
 // ROS log will write to the channel "miniros.http[.server]"
 #define MINIROS_PACKAGE_NAME "http"
