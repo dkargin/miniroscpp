@@ -9,6 +9,7 @@
 #include "xmlrpcpp/XmlRpcValue.h"
 
 #include "miniros/internal/xml_tools.h"
+#include "miniros/io/poll_set.h"
 
 using namespace XmlRpc;
 

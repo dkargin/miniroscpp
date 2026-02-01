@@ -28,14 +28,14 @@
 #include "miniros/node_handle.h"
 #include "miniros/this_node.h"
 #include "miniros/service.h"
-#include "miniros/transport/callback_queue.h"
+
+#include "miniros/io/callback_queue.h"
 
 #include "miniros/rostime.h"
 #include "miniros/timer.h"
 #include "miniros/wall_timer.h"
 #include "miniros/steady_timer.h"
 
-#include "miniros/transport/rpc_manager.h"
 #include "miniros/transport/topic_manager.h"
 #include "miniros/transport/service_manager.h"
 #include "miniros/master_link.h"

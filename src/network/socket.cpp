@@ -6,9 +6,7 @@
 #include <cstring>
 
 #include "miniros/network/socket.h"
-#include "miniros/transport/io.h"
-
-#include "transport/transport_tcp.h"
+#include "miniros/io/io.h"
 
 #ifndef WIN32
 #include <sys/uio.h>

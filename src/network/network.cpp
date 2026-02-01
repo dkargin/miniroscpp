@@ -32,7 +32,8 @@
 #include "miniros/network/network.h"
 #include "miniros/file_log.h"
 #include "miniros/internal/exceptions.h"
-#include "miniros/transport/io.h" // cross-platform headers needed
+#include "miniros/io/io.h" // cross-platform headers needed
+
 #include <miniros/console.h>
 #include <miniros/rosassert.h>
 

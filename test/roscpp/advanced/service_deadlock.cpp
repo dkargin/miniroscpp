@@ -4,7 +4,7 @@
 #include "miniros/ros.h"
 #include "std_srvs/Empty.hxx"
 #include <miniros/console.h>
-#include <miniros/transport/poll_manager.h>
+#include <miniros/io/poll_manager.h>
 
 bool dummyService(std_srvs::Empty::Request &, std_srvs::Empty::Request &)
 {

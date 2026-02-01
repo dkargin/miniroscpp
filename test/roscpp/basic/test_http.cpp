@@ -14,7 +14,7 @@
 #include "miniros/http/http_endpoint.h"
 #include "miniros/http/http_filters.h"
 
-#include "miniros/transport/poll_manager.h"
+#include "miniros/io/poll_manager.h"
 
 using namespace miniros;
 

@@ -30,7 +30,7 @@
 #include "miniros/transport/service_server_link.h"
 #include "miniros/transport/service_manager.h"
 #include "miniros/transport/transport_tcp.h"
-#include "miniros/transport/poll_manager.h"
+#include "miniros/io/poll_manager.h"
 #include "miniros/init.h"
 #include "miniros/names.h"
 #include "miniros/this_node.h"

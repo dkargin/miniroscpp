@@ -34,9 +34,9 @@
 
 #define MINIROS_PACKAGE_NAME "transport_tcp"
 
-#include "miniros/transport/io.h"
+#include "miniros/io/poll_set.h"
+#include "miniros/io/io.h"
 #include "miniros/transport/transport_tcp.h"
-#include "miniros/transport/poll_set.h"
 #include "miniros/header.h"
 #include "miniros/file_log.h"
 #include <miniros/rosassert.h>

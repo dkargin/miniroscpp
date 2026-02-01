@@ -33,12 +33,13 @@
 #include "miniros/master_link.h"
 #include "miniros/this_node.h"
 #include "miniros/transport/connection_manager.h"
-#include "miniros/transport/poll_manager.h"
+#include "miniros/io/poll_manager.h"
 #include "miniros/transport/publication.h"
 #include "miniros/transport/rosout_appender.h"
 #include "miniros/transport/rpc_manager.h"
 #include "miniros/transport/subscribe_options.h"
 #include "miniros/transport/subscription.h"
+
 #include "miniros/transport/transport_tcp.h"
 #include "miniros/transport/transport_udp.h"
 

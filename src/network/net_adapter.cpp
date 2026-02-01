@@ -15,7 +15,7 @@
 #include "miniros/network/net_adapter.h"
 #include "miniros/network/host_info.h"
 
-#include "miniros/transport/io.h"
+#include "miniros/io/io.h"
 
 namespace miniros {
 namespace network {

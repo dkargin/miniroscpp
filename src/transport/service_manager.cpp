@@ -35,7 +35,7 @@
 #include "miniros/this_node.h"
 #include "miniros/transport/connection.h"
 #include "miniros/transport/connection_manager.h"
-#include "miniros/transport/poll_manager.h"
+#include "miniros/io/poll_manager.h"
 #include "miniros/transport/rpc_manager.h"
 #include "miniros/transport/service_client_link.h"
 #include "miniros/transport/service_manager.h"
