@@ -42,14 +42,19 @@
 #include "miniros/io/io.h"
 #include "miniros/transport/rpc_manager.h"
 
+#include "http/http_client.h"
+
 #include <miniros/rostime.h>
 
 #include "miniros/http/http_server.h"
 #include "miniros/http/endpoints/xmlrpc.h"
 #include "miniros/http/http_filters.h"
 
-#include "miniros/xmlrpcpp/XmlRpcServerConnection.h"
 #include "miniros/internal/xml_tools.h"
+#include "miniros/xmlrpcpp/XmlRpcServerConnection.h"
+#include "miniros/xmlrpcpp/XmlRpcServerMethod.h"
+#include "network/url.h"
+#include "xmlrpcpp/XmlRpcServer.h"
 
 using namespace XmlRpc;
 
@@ -116,7 +121,6 @@ void getPid(const XmlRpcValue& params, XmlRpcValue& result)
 
 const miniros::WallDuration CachedXmlRpcClient::s_zombie_time_(30.0); // reap after 30 seconds
 
-
 struct FunctionInfo
 {
   std::string name;
@@ -145,14 +149,15 @@ struct RPCManager::Internal {
   /// Assigned poll set.
   PollSet* poll_set_ = nullptr;
   std::unique_ptr<http::HttpServer> http_server_;
-  std::vector<CachedXmlRpcClient> clients_;
+
+  std::multimap<network::URL, std::shared_ptr<http::HttpClient>> clients_;
+
   std::mutex clients_mutex_;
 
   std::atomic_bool shutting_down_{false};
 
   WallDuration master_retry_timeout_;
 
-  std::set<ASyncXMLRPCConnectionPtr> added_connections_;
   std::mutex connections_mutex_;
   std::condition_variable connections_event_;
   std::set<ASyncXMLRPCConnectionPtr> removed_connections_;
@@ -249,28 +254,22 @@ void RPCManager::shutdown()
   // kill the last few clients that were started in the shutdown process
   {
     std::scoped_lock<std::mutex> lock(internal_->clients_mutex_);
-
-    for (auto i = internal_->clients_.begin(); i != internal_->clients_.end();)
+    for (auto& [key, client]: internal_->clients_)
     {
-      if (!i->in_use_)
-      {
-        i->client_->close();
-        delete i->client_;
-        i = internal_->clients_.erase(i);
-      }
-      else
-      {
-        ++i;
-      }
+      client->close();
     }
+    internal_->clients_.clear();
   }
 
+  // This assumes each client will actively unregister itself. It will not happen.
+#ifdef USE_DEPRECATED
   // Wait for the clients that are in use to finish and remove themselves from clients_
   for (int wait_count = 0; !internal_->clients_.empty() && wait_count < 10; wait_count++)
   {
     MINIROS_WARN("There were %d dangling xmlrpc connections. Waiting them to finish...", (int)internal_->clients_.size());
     miniros::WallDuration(0.01).sleep();
   }
+#endif
 
   std::scoped_lock<std::mutex> lock(internal_->functions_mutex_);
   internal_->functions_.clear();
@@ -289,7 +288,6 @@ void RPCManager::shutdown()
 
   {
     std::scoped_lock<std::mutex> lock(internal_->connections_mutex_);
-    internal_->added_connections_.clear();
     internal_->removed_connections_.clear();
   }
 
@@ -357,12 +355,6 @@ void RPCManager::serverThreadFunc()
       internal_->connections_event_.wait_for(lock, std::chrono::milliseconds(100));
 
       PollSet* ps = internal_->poll_set_;
-      for (ASyncXMLRPCConnectionPtr c: internal_->added_connections_)
-      {
-        c->addToDispatch(ps);
-        internal_->connections_.insert(c);
-      }
-      internal_->added_connections_.clear();
 
       for (ASyncXMLRPCConnectionPtr c: internal_->removed_connections_)
       {
@@ -383,7 +375,7 @@ void RPCManager::serverThreadFunc()
       return;
     }
 
-    // Lazy check for removed connections.
+    // Lazy check for async connections.
     for (auto& connection: internal_->connections_)
     {
       if (connection->check())
@@ -392,13 +384,14 @@ void RPCManager::serverThreadFunc()
   }
 }
 
-XmlRpcClient* RPCManager::getXMLRPCClient(const std::string &host, const int port, const std::string &uri)
+std::shared_ptr<http::HttpClient> RPCManager::getXMLRPCClient(const std::string &host, const int port, const std::string &uri)
 {
   if (!internal_)
     return nullptr;
   // go through our vector of clients and grab the first available one
   XmlRpcClient *c = nullptr;
 
+  network::URL url;
   std::scoped_lock<std::mutex> lock(internal_->clients_mutex_);
 
   for (auto i = internal_->clients_.begin(); !c && i != internal_->clients_.end(); )
@@ -481,7 +474,7 @@ void RPCManager::addASyncConnection(const ASyncXMLRPCConnectionPtr& conn)
   if (!internal_)
     return;
   std::scoped_lock<std::mutex> lock(internal_->connections_mutex_);
-  internal_->added_connections_.insert(conn);
+  internal_->connections_.insert(conn);
   internal_->connections_event_.notify_all();
 }
 

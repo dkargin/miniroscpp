@@ -97,9 +97,49 @@ void XmlRpcClient::close()
   _connectionState = NO_CONNECTION;
   _disp.exit();
   _disp.removeSource(this);
+  if (_pollSet) {
+    _pollSet->delSocket(_fd);
+  }
   XmlRpcSource::close();
 }
 
+
+int convertEventsToXmlRpc(int flags)
+{
+  int oflags = 0;
+  if (flags & miniros::PollSet::EventIn)
+    oflags |= XmlRpc::XmlRpcDispatch::ReadableEvent;
+  if (flags & miniros::PollSet::EventOut)
+    oflags |= XmlRpc::XmlRpcDispatch::WritableEvent;
+  if (flags & miniros::PollSet::EventError)
+    oflags |= XmlRpc::XmlRpcDispatch::Exception;
+  return oflags;
+}
+
+int convertEventsToPollSet(int flags)
+{
+  int oflags = 0;
+  if (flags & XmlRpc::XmlRpcDispatch::ReadableEvent)
+    oflags |= miniros::PollSet::EventIn;
+  if (flags & XmlRpc::XmlRpcDispatch::WritableEvent)
+    oflags |= miniros::PollSet::EventOut;
+  if (flags & XmlRpc::XmlRpcDispatch::Exception)
+    oflags |= miniros::PollSet::EventError;
+  if (oflags == 0)
+    return miniros::PollSet::ResultDropFD;
+  return oflags;
+}
+
+void XmlRpcClient::attachToPollSet(miniros::PollSet* pollSet)
+{
+  this->_pollSet = pollSet;
+  pollSet->addSocket(_fd, miniros::PollSet::EventOut | miniros::PollSet::EventError | miniros::PollSet::EventUpdate,
+    [this](int flags) {
+    int oflags = convertEventsToXmlRpc(flags);
+    int newEvents = handleEvent(oflags);
+    return convertEventsToPollSet(newEvents);
+  });
+}
 
 // Clear the referenced flag even if exceptions or errors occur.
 struct ClearFlagOnExit {
@@ -263,6 +303,9 @@ bool XmlRpcClient::setupConnection()
   _connectionState = WRITE_REQUEST;
   _bytesWritten = 0;
 
+  if (_pollSet) {
+
+  }
   // Notify the dispatcher to listen on this source (calls handleEvent when the socket is writable)
   _disp.removeSource(this);       // Make sure nothing is left over
   _disp.addSource(this, XmlRpcDispatch::WritableEvent | XmlRpcDispatch::Exception);

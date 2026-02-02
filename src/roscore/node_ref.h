@@ -198,9 +198,6 @@ public:
   /// Get number of queued requests to this node.
   size_t getQueuedRequests() const;
 
-  /// Creates request object.
-  std::shared_ptr<http::XmlRpcRequest> makeRequest(const std::string& function);
-
   /// Get client object.
   std::shared_ptr<http::HttpClient> getClient();
 

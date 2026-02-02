@@ -132,20 +132,7 @@ public:
       XmlRpc::XmlRpcClient* getClient() const;
       TransportUDPPtr getUDPTransport() const;
 
-      void addToDispatch(PollSet* pollSet) override;
-
       void removeFromDispatch(PollSet* pollSet) override;
-
-    /*
-      void addToDispatch(XmlRpc::XmlRpcDispatch* disp) override
-      {
-        disp->addSource(client_, XmlRpc::XmlRpcDispatch::WritableEvent | XmlRpc::XmlRpcDispatch::Exception);
-      }
-
-      void removeFromDispatch(XmlRpc::XmlRpcDispatch* disp) override
-      {
-        disp->removeSource(client_);
-      }*/
 
       bool check() override;
 

@@ -22,6 +22,9 @@
 
 #include <chrono>
 
+namespace miniros {
+class PollSet;
+}
 namespace XmlRpc {
 
   // Arguments and results are represented by XmlRpcValues
@@ -87,6 +90,9 @@ namespace XmlRpc {
     /// Get some printable debug name.
     /// It often contains file descriptor and URL of endpoint.
     const std::string& name() const;
+
+    /// Attach to external poll set. It will be used instead of standard XMLRPC Dispatch.
+    void attachToPollSet(miniros::PollSet* pollSet);
 
   protected:
     void updateName();
@@ -166,6 +172,8 @@ namespace XmlRpc {
 
     /// Guards data inside incoming buffers like _httpFrame.
     std::mutex _dataGuard;
+
+    miniros::PollSet* _pollSet = nullptr;
   };
 }	// namespace XmlRpc
 

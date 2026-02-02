@@ -32,23 +32,30 @@
 #include <memory>
 
 #include "miniros/common.h"
+#include "miniros/xmlrpcpp/XmlRpcValue.h"
+#include "miniros/xmlrpcpp/XmlRpcException.h"
 
-#include "miniros/xmlrpcpp/XmlRpc.h"
-
+namespace XmlRpc {
+class XmlRpcServerConnection;
+class XmlRpcClient;
+}
 
 namespace miniros
 {
 
+namespace network {
+struct ClientInfo;
+}
+
 namespace http {
 class HttpServer;
+class HttpClient;
 }
 /**
  * \brief internal
  */
 namespace xmlrpc
 {
-
-class XmlRpcServerConnection;
 
 MINIROS_DECL XmlRpc::XmlRpcValue responseStr(int code, const std::string& msg, const std::string& response);
 MINIROS_DECL XmlRpc::XmlRpcValue responseInt(int code, const std::string& msg, int response);
@@ -67,7 +74,6 @@ class MINIROS_DECL ASyncXMLRPCConnection : public std::enable_shared_from_this<A
 public:
   virtual ~ASyncXMLRPCConnection() {}
 
-  virtual void addToDispatch(PollSet* disp) = 0;
   virtual void removeFromDispatch(PollSet* disp) = 0;
 
   /// Check if request is complete.
@@ -87,7 +93,7 @@ public:
   }
 
   bool in_use_;
-  miniros::SteadyTime last_use_time_; // for reaping
+  SteadyTime last_use_time_; // for reaping
   XmlRpc::XmlRpcClient* client_;
 
   static const miniros::WallDuration s_zombie_time_; // how long before it is toasted
@@ -132,8 +138,8 @@ public:
   const std::string& getServerURI() const;
   uint32_t getServerPort() const;
 
-  XmlRpc::XmlRpcClient* getXMLRPCClient(const std::string& host, const int port, const std::string& uri);
-  void releaseXMLRPCClient(XmlRpc::XmlRpcClient* c);
+  std::shared_ptr<http::HttpClient> getXMLRPCClient(const std::string& host, const int port, const std::string& uri);
+  void releaseXMLRPCClient(std::shared_ptr<http::HttpClient> c);
 
   void addASyncConnection(const ASyncXMLRPCConnectionPtr& conn);
   void removeASyncConnection(const ASyncXMLRPCConnectionPtr& conn);
@@ -197,7 +203,7 @@ public:
   }
 
   template <class Object, class T0, class T1>
-  bool bindEx2(const std::string& function_name,Object* object, RpcValue (Object::*method)(const T0& arg0, const T1& arg1, const ClientInfo& conn))
+  bool bindEx2(const std::string& function_name, Object* object, RpcValue (Object::*method)(const T0& arg0, const T1& arg1, const ClientInfo& conn))
   {
     return bindEx(function_name, [=](const RpcValue& param, RpcValue& result, const ClientInfo& conn) {
       try {
@@ -217,7 +223,7 @@ public:
   }
 
   template <class Object, class T0, class T1, class T2>
-  bool bindEx3(const std::string& function_name,Object* object,
+  bool bindEx3(const std::string& function_name, Object* object,
     RpcValue (Object::*method)(const T0& arg0, const T1& arg1, const T2& arg2, const ClientInfo& conn))
   {
     return bindEx(function_name, [=](const RpcValue& param, RpcValue& result, const ClientInfo& conn) {
