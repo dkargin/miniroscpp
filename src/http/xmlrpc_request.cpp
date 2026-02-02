@@ -6,8 +6,7 @@
 #include "miniros/internal/xml_tools.h"
 #include "miniros/xmlrpcpp/XmlRpcUtil.h"
 
-#include <sstream>
-#include <cstdio>
+#include "miniros/network/url.h"
 
 namespace miniros {
 namespace http {
@@ -238,6 +237,17 @@ void XmlRpcRequest::reset()
   // Set default headers
   setHeader("Content-Type", "text/xml");
   setHeader("User-Agent", XmlRpc::XMLRPC_VERSION);
+}
+
+std::shared_ptr<XmlRpcRequest> makeRequest(const network::URL& apiUrl, const std::string& method)
+{
+  // Determine the path for XML-RPC endpoint
+  std::string path = apiUrl.path;
+  if (path.empty() || path == "/") {
+    path = "/RPC2";
+  }
+
+  return std::make_shared<http::XmlRpcRequest>(method.c_str(), path.c_str());
 }
 
 } // namespace http

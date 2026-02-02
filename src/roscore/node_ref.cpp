@@ -365,7 +365,7 @@ Error NodeRef::sendPublisherUpdate(const std::string& callerId, const std::strin
     return Error::NotConnected;
   }
 
-  auto request = makeRequest("publisherUpdate");
+  auto request = http::makeRequest(m_apiUrl, "publisherUpdate");
   request->setParams(callerId, topic, update);
   m_activeRequests.insert(request);
   MINIROS_INFO("%s::sendPublisherUpdate(%s)", debugName().c_str(), topic.c_str());
@@ -384,7 +384,7 @@ Error NodeRef::sendParameterUpdate(const std::string& callerId, const std::strin
     return Error::NotConnected;
   }
 
-  auto request = makeRequest("paramUpdate");
+  auto request = http::makeRequest(m_apiUrl, "paramUpdate");
   request->setParams(callerId, param, value ? *value : RpcValue::Dict());
 
   {
@@ -411,7 +411,7 @@ Error NodeRef::sendShutdown(const std::string& msg)
     std::unique_lock lock(m_guard);
     if (!m_reqShutdown) {
       // Create XML-RPC request for shutdown
-      m_reqShutdown = makeRequest("shutdown");
+      m_reqShutdown = http::makeRequest(m_apiUrl, "shutdown");
     } else if (m_reqShutdown->state() != http::HttpRequest::State::Idle) {
       // Already sent request.
       return Error::Ok;
@@ -447,7 +447,7 @@ Error NodeRef::sendGetPid(const std::string& callerId)
   {
     std::unique_lock lock(m_guard);
     if (!m_reqGetPid) {
-      m_reqGetPid  = makeRequest("getPid");
+      m_reqGetPid = http::makeRequest(m_apiUrl, "getPid");
       m_reqGetPid->setParams(callerId);
       m_reqGetPid->generateRequestBody();
       std::weak_ptr<NodeRef> wnode = this->shared_from_this();
@@ -476,18 +476,6 @@ void NodeRef::responseGetPid(int code, const std::string& msg, const RpcValue& d
   } else {
     MINIROS_ERROR("Unexpected response: %s", data.toJsonStr().c_str());
   }
-}
-
-std::shared_ptr<http::XmlRpcRequest> NodeRef::makeRequest(const std::string& method)
-{
-  // Determine the path for XML-RPC endpoint
-  std::string path = m_apiUrl.path;
-  if (path.empty() || path == "/") {
-    path = "/RPC2";
-  }
-
-  auto request = std::make_shared<http::XmlRpcRequest>(method.c_str(), path.c_str());
-  return request;
 }
 
 size_t NodeRef::getQueuedRequests() const

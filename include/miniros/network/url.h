@@ -38,6 +38,10 @@ struct MINIROS_DECL URL {
 
   /// Convert URL back to string.
   std::string str() const;
+
+  friend bool operator < (const URL& a, const URL& b);
+  friend bool operator == (const URL& a, const URL& b);
+  friend bool operator != (const URL& a, const URL& b);
 };
 
 } // namespace network

@@ -296,6 +296,7 @@ ParameterStorage::RpcValue ParameterStorage::getParam(const std::string& caller_
 
 const ParameterStorage::RpcValue* ParameterStorage::subscribeParam(const std::shared_ptr<NodeRef>& node, const std::string& key)
 {
+  assert(node);
   if (!node)
     return nullptr;
   MINIROS_DEBUG_NAMED("rosparam", "subscribeParam(\"%s\") from %s", key.c_str(), node->debugName().c_str());
@@ -314,6 +315,9 @@ const ParameterStorage::RpcValue* ParameterStorage::subscribeParam(const std::sh
 
 bool ParameterStorage::unsubscribeParam(const std::shared_ptr<NodeRef>& node, const std::string& key)
 {
+  assert(node);
+  if (!node)
+    return false;
   MINIROS_INFO_NAMED("rosparam", "unsubscribeParam(\"%s\") from %s", key.c_str(), node->debugName().c_str());
 
   std::string fullKey = miniros::names::resolve(node->id(), key, false);

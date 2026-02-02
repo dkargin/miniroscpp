@@ -61,6 +61,8 @@
 #include "miniros/transport/transport_tcp.h"
 #include "miniros/transport/transport_udp.h"
 
+#include "miniros/xmlrpcpp/XmlRpcClient.h"
+
 using XmlRpc::XmlRpcValue;
 
 namespace miniros
@@ -89,46 +91,6 @@ XmlRpc::XmlRpcClient* Subscription::PendingConnection::getClient() const
 TransportUDPPtr Subscription::PendingConnection::getUDPTransport() const
 {
   return udp_transport_;
-}
-
-int convertEventsToXmlRpc(int flags)
-{
-  int oflags = 0;
-  if (flags & POLLIN)
-    oflags |= XmlRpc::XmlRpcDispatch::ReadableEvent;
-  if (flags & POLLOUT)
-    oflags |= XmlRpc::XmlRpcDispatch::WritableEvent;
-  if (flags & POLLERR)
-    oflags |= XmlRpc::XmlRpcDispatch::Exception;
-  return oflags;
-}
-
-int convertEventsToPollSet(int flags)
-{
-  int oflags = 0;
-  if (flags & XmlRpc::XmlRpcDispatch::ReadableEvent)
-    oflags |= POLLIN;
-  if (flags & XmlRpc::XmlRpcDispatch::WritableEvent)
-    oflags |= POLLOUT;
-  if (flags & XmlRpc::XmlRpcDispatch::Exception)
-    oflags |= POLLERR;
-  if (oflags == 0)
-    return PollSet::ResultDropFD;
-  return oflags;
-}
-
-void Subscription::PendingConnection::addToDispatch(PollSet* pollSet)
-{
-  assert(client_);
-  assert(pollSet);
-
-  /// XMLRPC connection from client has not sent any data, so we need PollSet::EventOut.
-  int fd = client_->getfd();
-  pollSet->addSocket(fd, PollSet::EventOut | PollSet::EventError | PollSet::EventUpdate, [this, pollSet](int flags) {
-    int oflags = convertEventsToXmlRpc(flags);
-    int newEvents = client_->handleEvent(oflags);
-    return convertEventsToPollSet(newEvents);
-  });
 }
 
 void Subscription::PendingConnection::removeFromDispatch(PollSet* pollSet)
@@ -443,6 +405,7 @@ bool Subscription::negotiateConnection(const RPCManagerPtr& rpcManager, const st
   TransportUDPPtr udp_transport;
   int protos = 0;
   V_string transports = transport_hints_.getTransports();
+  PollSet* ps = rpcManager->getPollSet();
   if (transports.empty())
   {
     transport_hints_.reliable();
@@ -453,7 +416,6 @@ bool Subscription::negotiateConnection(const RPCManagerPtr& rpcManager, const st
     if (transport == "UDP")
     {
       int max_datagram_size = transport_hints_.getMaxDatagramSize();
-      PollSet* ps = rpcManager->getPollSet();
       assert(ps);
       udp_transport = std::make_shared<TransportUDP>(ps);
       if (!max_datagram_size)
@@ -519,8 +481,9 @@ bool Subscription::negotiateConnection(const RPCManagerPtr& rpcManager, const st
   // The PendingConnectionPtr takes ownership of c, and will delete it on
   // destruction.
   PendingConnectionPtr conn(std::make_shared<PendingConnection>(c, udp_transport, shared_from_this(), xmlrpc_uri));
-
+  conn->getClient()->attachToPollSet(ps);
   rpcManager->addASyncConnection(conn);
+
   // Put this connection on the list that we'll look at later.
   {
     std::scoped_lock<std::mutex> pending_connections_lock(pending_connections_mutex_);

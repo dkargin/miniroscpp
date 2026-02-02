@@ -32,6 +32,9 @@
 #include "../../include/miniros/network/network.h"
 #include "miniros/init.h"
 #include "miniros/master_link.h"
+
+#include "http/http_client.h"
+#include "http/xmlrpc_request.h"
 #include "miniros/names.h"
 #include "miniros/this_node.h"
 #include "miniros/transport/rpc_manager.h"
@@ -39,6 +42,7 @@
 #include <miniros/rosassert.h>
 
 #include "miniros/xmlrpcpp/XmlRpc.h"
+#include "network/url.h"
 
 namespace miniros {
 
@@ -218,6 +222,7 @@ Error MasterLink::execute(const std::string& method, const RpcValue& request, Rp
 
   std::string master_host = getHost();
   uint32_t master_port = getPort();
+
   if (!manager) {
     MINIROS_ERROR("[%s] - no manager", method.c_str());
     return Error::InternalError;
@@ -234,7 +239,7 @@ Error MasterLink::execute(const std::string& method, const RpcValue& request, Rp
     return Error::Ok;
   }
 
-  XmlRpc::XmlRpcClient* c = manager->getXMLRPCClient(master_host, master_port, "/RPC2");
+  auto c = manager->getXMLRPCClient(master_host, master_port, "/RPC2");
   if (!c) {
     MINIROS_ERROR("[%s] - failed make connection to host=\"%s:%d\"", method.c_str(), master_host.c_str(), master_port);
     return Error::InvalidURI;
@@ -242,14 +247,27 @@ Error MasterLink::execute(const std::string& method, const RpcValue& request, Rp
   bool printed = false;
   bool slept = false;
   bool ok = true;
-  bool b = false;
+  volatile bool b = false;
+
+  network::URL url;
+  auto req = http::makeRequest(url, method);
+  req->setParamArray(request);
+  req->onComplete =
+    [&payload, &b] (int code, const std::string& msg, const RpcValue& data){
+      payload = data;
+      b = true;
+    };
+  Error err = c->enqueueRequest(req);
   do {
     {
 #if defined(__APPLE__)
       std::scoped_lock<std::mutex> lock(internal_->xmlrpc_call_mutex);
 #endif
 
-      b = c->execute(method.c_str(), request, response);
+      // It creates connection, sends header and tries to parse response right here.
+      // b = c->execute(method.c_str(), request, response);
+      req->waitForResponse(WallDuration(0.100));
+      b = req->state() == http::HttpRequest::State::ClientHasResponse;
     }
 
     ok = !miniros::isShuttingDown() && !manager->isShuttingDown();

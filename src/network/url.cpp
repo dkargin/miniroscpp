@@ -99,5 +99,28 @@ std::string URL::str() const
   return ss.str();
 }
 
+bool operator < (const URL& a, const URL& b)
+{
+  if (a.scheme != b.scheme)
+    return a.scheme < b.scheme;
+  if (a.host != b.host)
+    return a.host < b.host;
+  if (a.port != b.port)
+    return a.port < b.port;
+  if (a.path != b.path)
+    return a.path < b.path;
+  return a.query < b.query;
+}
+
+bool operator == (const URL& a, const URL& b)
+{
+  return a.port == b.port && a.host == b.host && a.path == b.path && a.query == b.query && a.scheme == b.scheme;
+}
+
+bool operator != (const URL& a, const URL& b)
+{
+  return !(a == b);
+}
+
 } // namespace network
 } // namespace miniros

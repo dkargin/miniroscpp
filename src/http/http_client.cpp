@@ -274,6 +274,22 @@ HttpClient::~HttpClient()
   MINIROS_DEBUG_NAMED("client", "HttpClient::~HttpClient()");
 }
 
+HttpClient::State HttpClient::getState() const
+{
+  if (!internal_)
+    return State::Invalid;
+  std::unique_lock lock(internal_->process_guard);
+  return internal_->state;
+}
+
+bool HttpClient::isActive() const
+{
+  State s = getState();
+  if (s == State::Invalid || s == State::Idle)
+    return false;
+  return true;
+}
+
 void HttpClient::close()
 {
   if (!internal_)

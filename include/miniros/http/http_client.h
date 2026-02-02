@@ -105,6 +105,12 @@ public:
   /// Called when response is parsed.
   std::function<void (const std::shared_ptr<HttpRequest>& req)> onResponse;
 
+  /// Get high level state.
+  State getState() const;
+
+  /// Check if client is in any "active" state.
+  bool isActive() const;
+
 protected:
   /// Get socket events for specified state.
   static int eventsForState(State state);
