@@ -35,12 +35,15 @@
 #ifndef MINIROS_ROSOUT_APPENDER_H
 #define MINIROS_ROSOUT_APPENDER_H
 
-#include <miniros/message_forward.h>
-#include "miniros/common.h"
-
 #include <mutex>
 #include <condition_variable>
 #include <thread>
+
+#include <miniros/message_forward.h>
+#include "miniros/common.h"
+#include "miniros/console.h"
+
+#include <atomic>
 
 namespace rosgraph_msgs
 {
@@ -79,7 +82,7 @@ protected:
   V_Log log_queue_;
   std::mutex queue_mutex_;
   std::condition_variable queue_condition_;
-  bool shutting_down_;
+  std::atomic_bool shutting_down_;
   bool disable_topics_;
 
   std::thread publish_thread_;

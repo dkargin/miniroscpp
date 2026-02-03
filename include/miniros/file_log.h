@@ -25,17 +25,17 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ROSCPP_FILE_LOG_H
-#define ROSCPP_FILE_LOG_H
+#ifndef MINIROS_FILE_LOG_H
+#define MINIROS_FILE_LOG_H
 
 #include "internal/forwards.h"
+
 #include <miniros/console.h>
-//#include "common.h"
 
 // TODO: Implement
 #ifdef MINIROS_HAS_SANE_LOG
-#define ROSCPP_LOG_DEBUG(...) ROS_DEBUG_NAMED("roscpp_internal", __VA_ARGS__)
-#define ROSCPP_CONN_LOG_DEBUG(...) ROS_DEBUG_NAMED("roscpp_internal.connections", __VA_ARGS__)
+#define MINIROS_LOG_DEBUG(...) MINIROS_DEBUG_NAMED("roscpp_internal", __VA_ARGS__)
+#define MINIROS_CONN_LOG_DEBUG(...) MINIROS_DEBUG_NAMED("roscpp_internal.connections", __VA_ARGS__)
 #else
 
 #endif

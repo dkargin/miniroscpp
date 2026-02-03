@@ -3,6 +3,8 @@
 //
 
 #include "miniros/http/xmlrpc_request.h"
+
+#include "internal/invokers.h"
 #include "miniros/internal/xml_tools.h"
 #include "miniros/xmlrpcpp/XmlRpcUtil.h"
 
@@ -29,9 +31,9 @@ XmlRpcRequest::XmlRpcRequest()
 {
 }
 
-XmlRpcRequest::XmlRpcRequest(const char* methodName, const char* uri)
-  : HttpRequest(HttpMethod::Post, uri ? uri : "/RPC2"),
-    method_name_(methodName ? methodName : "")
+XmlRpcRequest::XmlRpcRequest(const std::string& methodName, const std::string& endpoint)
+  : HttpRequest(HttpMethod::Post, endpoint),
+    method_name_(methodName)
 {
   // Set Content-Type header for XML-RPC
   setHeader("Content-Type", "text/xml");
@@ -145,23 +147,32 @@ std::string XmlRpcRequest::generateRequestXml() const
 
 Error XmlRpcRequest::processResponse()
 {
-  if (onComplete) {
-    auto [code, msg,data] = parseResponse();
+  RpcValue value;
+  bool ok;
+
+  std::string_view responseView = response_body_;
+
+  if (!parseXmlResponseImpl(responseView, value, ok)) {
+    if (onCompleteRaw) {
+      onCompleteRaw(Error::InvalidResponse, {}, ok);
+    }
+    return Error::InvalidResponse;
+  }
+
+  if (onCompleteRaw) {
+    onCompleteRaw(Error::Ok, value, ok);
+  } else if (onComplete) {
+    auto [code, msg,data] = parseResponse(value);
     onComplete(code, msg, data);
   }
+
   return Error::Ok;
 }
 
-std::tuple<int, std::string, XmlRpc::XmlRpcValue> XmlRpcRequest::parseResponse() const
+std::tuple<int, std::string, XmlRpc::XmlRpcValue> XmlRpcRequest::parseResponse(const RpcValue& value) const
 {
-  XmlRpc::XmlRpcValue value;
   using Type = XmlRpc::XmlRpcValue::Type;
   bool ok = false;
-
-  std::string_view responseView = response_body_;
-  if (!parseResponseImpl(responseView, value, ok)) {
-    return {0, {}, "failed to parse response"};
-  }
 
   if (value.getType() != Type::TypeArray) {
     return {0, {}, "invalid response: not an array"};
@@ -190,7 +201,7 @@ std::tuple<int, std::string, XmlRpc::XmlRpcValue> XmlRpcRequest::parseResponse()
   return {res, msg, data};
 }
 
-bool XmlRpcRequest::parseResponseImpl(const std::string_view& responseView, XmlRpc::XmlRpcValue& result, bool& isFault)
+bool XmlRpcRequest::parseXmlResponseImpl(const std::string_view& responseView, XmlRpc::XmlRpcValue& result, bool& isFault)
 {
   std::string response(responseView);
 
@@ -239,15 +250,14 @@ void XmlRpcRequest::reset()
   setHeader("User-Agent", XmlRpc::XMLRPC_VERSION);
 }
 
-std::shared_ptr<XmlRpcRequest> makeRequest(const network::URL& apiUrl, const std::string& method)
+std::shared_ptr<XmlRpcRequest> makeRequest(const std::string& path, const std::string& method)
 {
   // Determine the path for XML-RPC endpoint
-  std::string path = apiUrl.path;
-  if (path.empty() || path == "/") {
-    path = "/RPC2";
+  std::string p = path;
+  if (p.empty() || p == "/") {
+    p = "/RPC2";
   }
-
-  return std::make_shared<http::XmlRpcRequest>(method.c_str(), path.c_str());
+  return std::make_shared<http::XmlRpcRequest>(method.c_str(), std::move(path));
 }
 
 } // namespace http

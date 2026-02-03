@@ -51,6 +51,7 @@
 
 #include "miniros/network/network.h"
 #include "miniros/transport/rpc_manager.h"
+#include "miniros/xmlrpcpp/XmlRpcClient.h"
 
 using std::cout;
 using std::endl;

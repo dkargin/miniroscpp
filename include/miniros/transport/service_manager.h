@@ -47,7 +47,7 @@ class PollManager;
 typedef std::shared_ptr<PollManager> PollManagerPtr;
 
 class RPCManager;
-typedef std::shared_ptr<RPCManager> XMLRPCManagerPtr;
+typedef std::shared_ptr<RPCManager> RPCManagerPtr;
 
 class ConnectionManager;
 typedef std::shared_ptr<ConnectionManager> ConnectionManagerPtr;
@@ -121,7 +121,7 @@ public:
 
   bool advertiseService(const AdvertiseServiceOptions& ops);
 
-  void start(PollManagerPtr pm, MasterLinkPtr master_link, ConnectionManagerPtr cm, XMLRPCManagerPtr rpcm);
+  void start(PollManagerPtr pm, MasterLinkPtr master_link, ConnectionManagerPtr cm, RPCManagerPtr rpcm);
   void shutdown();
 
   MasterLinkPtr getMasterLink() const;
@@ -143,7 +143,7 @@ private:
 
   PollManagerPtr poll_manager_;
   ConnectionManagerPtr connection_manager_;
-  XMLRPCManagerPtr xmlrpc_manager_;
+  RPCManagerPtr xmlrpc_manager_;
   MasterLinkPtr master_link_;
 };
 

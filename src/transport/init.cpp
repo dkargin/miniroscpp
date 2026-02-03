@@ -100,7 +100,7 @@ static bool g_initialized = false;
 static bool g_started = false;
 static bool g_atexit_registered = false;
 static std::mutex g_start_mutex;
-static bool g_ok = false;
+static std::atomic_bool g_ok = false;
 static uint32_t g_init_options = 0;
 static std::atomic_bool g_shutdown_requested = false;
 static std::atomic_bool g_shutting_down = false;
@@ -328,13 +328,17 @@ Error start()
         enable_debug = false;
   }
 
-  if (g_master_link)
-    g_master_link->param("/tcp_keepalive", TransportTCP::s_use_keepalive_, TransportTCP::s_use_keepalive_);
+  RPCManagerPtr rpcm = RPCManager::instance();
+  rpcm->bind("shutdown", shutdownCallback);
 
   PollManagerPtr pm = PollManager::instance();
+  pm->start();
 
-  XMLRPCManagerPtr rpcm = RPCManager::instance();
-  rpcm->bind("shutdown", shutdownCallback);
+  PollSet& pollSet = pm->getPollSet();
+  rpcm->setPollSet(&pollSet);
+
+  if (g_master_link)
+    g_master_link->param("/tcp_keepalive", TransportTCP::s_use_keepalive_, TransportTCP::s_use_keepalive_);
 
   initInternalTimerManager();
 
@@ -355,11 +359,8 @@ Error start()
     return Error::SystemError;
   }
 
-  pm->start();
-
-  PollSet& pollSet = pm->getPollSet();
   int rpcPort = network::getRPCPort();
-  if (Error err = rpcm->start(&pollSet, rpcPort); !err) {
+  if (Error err = rpcm->start(rpcPort); !err) {
     // We can arrive here only if we are completely unable to host TCP/http server.
     MINIROS_ERROR("Failed to start RPCManager at port %d: %s", rpcPort, err.toString());
     shutdown();
@@ -490,6 +491,9 @@ void initDefaultLogLevels(const M_string& remappings)
     console::set_logger_level("miniros.net", console::Level::Debug);
     console::set_logger_level("miniros.http.client", console::Level::Debug);
     console::set_logger_level("miniros.poll_set", miniros::console::Level::Debug);
+    console::set_logger_level("miniros.RPCManager", miniros::console::Level::Debug);
+    console::set_logger_level("miniros.master_link", miniros::console::Level::Debug);
+    console::set_logger_level("miniros.subscription", miniros::console::Level::Debug);
   } else {
     console::set_logger_level("miniros.http", console::Level::Error);
     console::set_logger_level("miniros.http.client", console::Level::Error);
@@ -638,7 +642,7 @@ CallbackQueue* getGlobalCallbackQueue()
 
 bool ok()
 {
-  return g_ok;
+  return g_ok.load(std::memory_order_relaxed);
 }
 
 void shutdownLocked(std::unique_lock<std::recursive_mutex>& lock)

@@ -116,7 +116,10 @@ void PollManager::threadFunc()
 
     poll_set_.update(updatePeriodMS);
   }
-  MINIROS_INFO("PollManager thread exit");
+
+#ifdef POLL_SERIOUS_DEBUG
+  std::cout << "PollManager thread exit" << std::endl;
+#endif
 }
 
 void PollManager::addPollThreadWatcher(PollWatcher* watcher) {

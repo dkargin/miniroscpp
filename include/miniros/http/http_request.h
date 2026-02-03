@@ -38,6 +38,8 @@ public:
     ClientWaitResponse,
     /// Got HTTP response but waiting for client to process it.
     ClientHasResponse,
+    /// processResponse was called.
+    ClientDone,
 
     /// Receiving request.
     ServerReceive,
@@ -49,7 +51,7 @@ public:
 
   HttpRequest();
 
-  HttpRequest(HttpMethod method, const char* path);
+  HttpRequest(HttpMethod method, const std::string& path);
 
   virtual ~HttpRequest();
 
@@ -126,20 +128,39 @@ public:
   /// Set response header from HttpFrame parser state.
   void setResponseHeader(const HttpParserFrame& frame);
 
-  void setResponseHeader(const HttpResponseHeader& responseHeader);
-
   /// Get response header.
   /// It is not thread safe until state == HasResponse.
   const HttpResponseHeader& responseHeader() const;
 
-  /// Wait until status changes to Status::HasResponse.
+  /// Wait until status changes to Status::ClientHasResponse.
   Error waitForResponse(const WallDuration& duration) const;
+
+  /// Wait for specific status.
+  Error waitForState(State state, const WallDuration& duration) const;
 
   /// Reset response-related data.
   void resetResponse();
 
   /// Process response.
+  /// It is called by HttpClient/Server. No additional lock is set on response object.
+  /// HttpClient updates state of request to ClientDone right after processResponse is called.
   virtual Error processResponse() { return Error::Ok; }
+
+  /// Called by HttpClient when it has failed to send request.
+  void notifyFailToSend();
+
+  void setFailureCallback(std::function<void()>&& cb);
+
+  bool shouldRetry() const
+  {
+    return retry_ > 0;
+  }
+
+  /// Enable sending retries.
+  void setRetry(int val)
+  {
+    retry_ = val;
+  }
 
 protected:
   State state_ = State::Idle;
@@ -159,10 +180,16 @@ protected:
   /// Request body
   std::string request_body_;
 
+  /// Retry to send connection.
+  int retry_ = 0;
+
   HttpResponseHeader response_header_;
 
   /// Response body
   std::string response_body_;
+
+  /// Called by HttpClient when it has failed to send request.
+  std::function<void ()> on_fail_;
 
   mutable std::mutex mutex_;
   mutable std::condition_variable cv_;

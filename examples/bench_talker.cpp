@@ -16,6 +16,8 @@
 
 int main(int argc, char **argv)
 {
+  std::cout << "Starting listener node" << std::endl;
+
   //XmlRpc::setVerbosity(4);
   auto timeStart = std::chrono::high_resolution_clock::now();
   /**

@@ -42,6 +42,9 @@
 
 namespace miniros
 {
+namespace network {
+struct URL;
+}
 
 class PublisherLink;
 typedef std::shared_ptr<PublisherLink> PublisherLinkPtr;
@@ -122,40 +125,21 @@ public:
 
   // We'll keep a list of these objects, representing in-progress XMLRPC 
   // connections to other nodes.
-  class MINIROS_DECL PendingConnection : public ASyncXMLRPCConnection
-  {
-    public:
-      PendingConnection(XmlRpc::XmlRpcClient* client, TransportUDPPtr udp_transport, const SubscriptionWPtr& parent, const std::string& remote_uri);
-
-      ~PendingConnection() override;
-
-      XmlRpc::XmlRpcClient* getClient() const;
-      TransportUDPPtr getUDPTransport() const;
-
-      void removeFromDispatch(PollSet* pollSet) override;
-
-      bool check() override;
-
-      const std::string& getRemoteURI();
-
-    private:
-      XmlRpc::XmlRpcClient* client_;
-      TransportUDPPtr udp_transport_;
-      SubscriptionWPtr parent_;
-      std::string remote_uri_;
-  };
+  struct PendingConnection;
 
   typedef std::shared_ptr<PendingConnection> PendingConnectionPtr;
 
-  void pendingConnectionDone(const PendingConnectionPtr& pending_conn, XmlRpc::XmlRpcValue& result);
+  /// Internal callback for negotiating connection.
+  /// It is invoked in PollSet thread by the chain: HttpClient - XmlRpcRequest::onCompleteRaw.
+  void pendingConnectionDone(const PendingConnectionPtr& pending_conn, const network::URL& url, const XmlRpc::XmlRpcValue& result);
 
   void getPublishTypes(bool& ser, bool& nocopy, const std::type_info& ti);
 
   void headerReceived(const PublisherLinkPtr& link, const Header& h);
 
 private:
-  Subscription(const Subscription &); // not copyable
-  Subscription &operator =(const Subscription &); // nor assignable
+  Subscription(const Subscription &) = delete; // not copyable
+  Subscription &operator =(const Subscription &) = delete; // nor assignable
 
   void dropAllConnections();
 

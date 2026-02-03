@@ -54,6 +54,10 @@
 #include "miniros/transport/message_deserializer.h"
 #include "miniros/transport/publication.h"
 #include "miniros/transport/subscription.h"
+
+#include "http/http_client.h"
+#include "http/xmlrpc_request.h"
+#include "internal/xml_tools.h"
 #include "miniros/transport/subscription_callback_helper.h"
 #include "miniros/transport/subscription_queue.h"
 #include "miniros/transport/transport_hints.h"
@@ -68,55 +72,33 @@ using XmlRpc::XmlRpcValue;
 namespace miniros
 {
 
-Subscription::PendingConnection::PendingConnection(XmlRpc::XmlRpcClient* client, TransportUDPPtr udp_transport, const SubscriptionWPtr& parent, const std::string& remote_uri)
-: client_(client)
-, udp_transport_(udp_transport)
+struct Subscription::PendingConnection
+{
+  PendingConnection(TransportUDPPtr udp_transport, const SubscriptionWPtr& parent, const std::string& remote_uri);
+  ~PendingConnection();
+
+  TransportUDPPtr getUDPTransport() const;
+  const std::string& getRemoteURI();
+
+  TransportUDPPtr udp_transport_;
+  SubscriptionWPtr parent_;
+  std::string remote_uri_;
+};
+
+Subscription::PendingConnection::PendingConnection(TransportUDPPtr udp_transport, const SubscriptionWPtr& parent, const std::string& remote_uri)
+: udp_transport_(udp_transport)
 , parent_(parent)
 , remote_uri_(remote_uri)
 {
-  assert(client_);
 }
 
 Subscription::PendingConnection::~PendingConnection()
 {
-  if (client_)
-    delete client_;
-}
-
-XmlRpc::XmlRpcClient* Subscription::PendingConnection::getClient() const
-{
-  return client_;
 }
 
 TransportUDPPtr Subscription::PendingConnection::getUDPTransport() const
 {
   return udp_transport_;
-}
-
-void Subscription::PendingConnection::removeFromDispatch(PollSet* pollSet)
-{
-  assert(client_);
-  assert(pollSet);
-  int fd = client_->getfd();
-  pollSet->delSocket(fd);
-}
-
-bool Subscription::PendingConnection::check()
-{
-  SubscriptionPtr parent = parent_.lock();
-  if (!parent)
-  {
-    return true;
-  }
-
-  XmlRpc::XmlRpcValue result;
-  if (client_->executeCheckDone(result))
-  {
-    parent->pendingConnectionDone(std::dynamic_pointer_cast<PendingConnection>(shared_from_this()), result);
-    return true;
-  }
-
-  return false;
 }
 
 const std::string& Subscription::PendingConnection::getRemoteURI()
@@ -291,18 +273,21 @@ bool Subscription::pubUpdate(const RPCManagerPtr& rpcManager, const V_string& ne
     for (const std::string& up_i: new_pubs)
       ss << up_i << ", ";
 
-    ss << " already have these connections: ";
+    ss << " already have these connections {";
     {
       std::scoped_lock<std::mutex> lock(publisher_links_mutex_);
       for (PublisherLinkPtr& plink: publisher_links_)
         ss << plink->getPublisherXMLRPCURI() << ", ";
     }
 
+    ss << " } pending = { ";
+
     {
       std::scoped_lock<std::mutex> lock(pending_connections_mutex_);
       for (const PendingConnectionPtr& conn: pending_connections_)
         ss << conn->getRemoteURI() << ", ";
     }
+    ss << "}";
 
     MINIROS_DEBUG("Publisher update for [%s]: %s", name_.c_str(), ss.str().c_str());
   }
@@ -451,45 +436,47 @@ bool Subscription::negotiateConnection(const RPCManagerPtr& rpcManager, const st
   params[0] = this_node::getName();
   params[1] = name_;
   params[2] = protos_array;
-  std::string peer_host;
-  uint32_t peer_port;
-  if (!network::splitURI(xmlrpc_uri, peer_host, peer_port))
+
+  network::URL url;
+  if (!url.fromString(xmlrpc_uri, false))
   {
     MINIROS_ERROR("Bad xml-rpc URI: [%s]", xmlrpc_uri.c_str());
     return false;
   }
 
-  XmlRpc::XmlRpcClient* c = new XmlRpc::XmlRpcClient(peer_host.c_str(), peer_port, "/");
- // if (!c.execute("requestTopic", params, result) || !g_node->validateXmlrpcResponse("requestTopic", result, proto))
+  // The PendingConnectionPtr takes ownership of c, and will delete it on
+  // destruction.
+  PendingConnectionPtr conn = std::make_shared<PendingConnection>(udp_transport, shared_from_this(), xmlrpc_uri);
+
+  auto c = rpcManager->getXMLRPCClient(url.host, url.port, "/");
+  auto req = http::makeRequest("/", "requestTopic");
+  req->setParamArray(params);
+
+  req->onCompleteRaw = [conn, url](Error err, const http::XmlRpcRequest::RpcValue& data, bool ok) {
+      if (SubscriptionPtr parent = conn->parent_.lock())
+      {
+        parent->pendingConnectionDone(conn, url, data);
+      }
+  };
+  req->setRetry(0);
 
   // Initiate the negotiation.  We'll come back and check on it later.
-  if (!c->executeNonBlock("requestTopic", params))
+  if (!c->enqueueRequest(req))
   {
-    MINIROS_ERROR("Failed to contact publisher [%s:%d] for topic [%s]",
-              peer_host.c_str(), peer_port, name_.c_str());
-    delete c;
+    MINIROS_ERROR("Failed to contact publisher [%s:%d] for topic [%s]", url.host.c_str(), url.port, name_.c_str());
     if (udp_transport)
     {
       udp_transport->close();
     }
-
     return false;
   }
 
-  MINIROS_INFO("Began asynchronous xmlrpc connection to [%s:%d] fd=%d", peer_host.c_str(), peer_port, c->getfd());
-
-  // The PendingConnectionPtr takes ownership of c, and will delete it on
-  // destruction.
-  PendingConnectionPtr conn(std::make_shared<PendingConnection>(c, udp_transport, shared_from_this(), xmlrpc_uri));
-  conn->getClient()->attachToPollSet(ps);
-  rpcManager->addASyncConnection(conn);
-
+  MINIROS_INFO("Began asynchronous xmlrpc connection to [%s:%d] fd=%d", url.host.c_str(), url.port, c->fd());
   // Put this connection on the list that we'll look at later.
   {
     std::scoped_lock<std::mutex> pending_connections_lock(pending_connections_mutex_);
     pending_connections_.insert(conn);
   }
-
   return true;
 }
 
@@ -501,7 +488,7 @@ void closeTransport(const TransportUDPPtr& trans)
   }
 }
 
-void Subscription::pendingConnectionDone(const PendingConnectionPtr& conn, XmlRpcValue& result)
+void Subscription::pendingConnectionDone(const PendingConnectionPtr& conn, const network::URL& url, const XmlRpcValue& result)
 {
   std::scoped_lock<std::mutex> lock(shutdown_mutex_);
   if (shutting_down_ || dropped_)
@@ -514,42 +501,40 @@ void Subscription::pendingConnectionDone(const PendingConnectionPtr& conn, XmlRp
     pending_connections_.erase(conn);
   }
 
+  auto cm = ConnectionManager::instance();
+
   TransportUDPPtr udp_transport;
 
-  std::string peer_host = conn->getClient()->getHost();
-  uint32_t peer_port = conn->getClient()->getPort();
-  std::stringstream ss;
-  ss << "http://" << peer_host << ":" << peer_port << "/";
-  std::string xmlrpc_uri = ss.str();
+  std::string xmlrpc_uri = url.str();
   udp_transport = conn->getUDPTransport();
 
-  XmlRpc::XmlRpcValue proto;
-  if(!RPCManager::instance()->validateXmlrpcResponse("requestTopic", result, proto))
+  xml::XmlCodec codec;
+  XmlRpcValue proto;
+  if(!codec.validateXmlrpcResponse("requestTopic", result, proto))
   {
-  	MINIROS_DEBUG("Failed to contact publisher [%s:%d] for topic [%s]",
-              peer_host.c_str(), peer_port, name_.c_str());
-  	closeTransport(udp_transport);
-  	return;
+    MINIROS_DEBUG("Failed to contact publisher [%s] for topic [%s]", xmlrpc_uri.c_str(), name_.c_str());
+    closeTransport(udp_transport);
+    return;
   }
 
   if (proto.size() == 0)
   {
-  	MINIROS_DEBUG("Couldn't agree on any common protocols with [%s] for topic [%s]", xmlrpc_uri.c_str(), name_.c_str());
-  	closeTransport(udp_transport);
-  	return;
+    MINIROS_DEBUG("Couldn't agree on any common protocols with [%s] for topic [%s]", xmlrpc_uri.c_str(), name_.c_str());
+    closeTransport(udp_transport);
+    return;
   }
 
   if (proto.getType() != XmlRpcValue::TypeArray)
   {
-  	MINIROS_DEBUG("Available protocol info returned from %s is not a list.", xmlrpc_uri.c_str());
-  	closeTransport(udp_transport);
-  	return;
+    MINIROS_DEBUG("Available protocol info returned from %s is not a list.", xmlrpc_uri.c_str());
+    closeTransport(udp_transport);
+    return;
   }
   if (proto[0].getType() != XmlRpcValue::TypeString)
   {
-  	MINIROS_DEBUG("Available protocol info list doesn't have a string as its first element.");
-  	closeTransport(udp_transport);
-  	return;
+    MINIROS_DEBUG("Available protocol info list doesn't have a string as its first element.");
+    closeTransport(udp_transport);
+    return;
   }
 
   std::string proto_name = proto[0];
@@ -576,9 +561,9 @@ void Subscription::pendingConnectionDone(const PendingConnectionPtr& conn, XmlRp
       connection->initialize(transport, false, HeaderReceivedFunc());
       pub_link->initialize(connection);
 
-      ConnectionManager::instance()->addConnection(connection);
+      cm->addConnection(connection);
 
-      std::scoped_lock<std::mutex> lock(publisher_links_mutex_);
+      std::scoped_lock<std::mutex> lock2(publisher_links_mutex_);
       addPublisherLink(pub_link);
 
       MINIROS_DEBUG("Connected to publisher of topic [%s] at [%s:%d]", name_.c_str(), pub_host.c_str(), pub_port);
@@ -635,9 +620,9 @@ void Subscription::pendingConnectionDone(const PendingConnectionPtr& conn, XmlRp
       connection->setHeader(h);
       pub_link->initialize(connection);
 
-      ConnectionManager::instance()->addConnection(connection);
+      cm->addConnection(connection);
 
-      std::scoped_lock<std::mutex> lock(publisher_links_mutex_);
+      std::scoped_lock<std::mutex> lock2(publisher_links_mutex_);
       addPublisherLink(pub_link);
 
       MINIROS_DEBUG("Connected to publisher of topic [%s] at [%s:%d]", name_.c_str(), pub_host.c_str(), pub_port);

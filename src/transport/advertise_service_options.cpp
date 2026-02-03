@@ -2,6 +2,7 @@
 //
 
 #include "miniros/console.h"
+#include "miniros/rosassert.h"
 
 #include "miniros/transport/advertise_service_options.h"
 

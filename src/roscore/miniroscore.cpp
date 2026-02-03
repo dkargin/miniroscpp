@@ -17,6 +17,8 @@
 #include "miniros/common.h"
 #include "miniros/transport/rpc_manager.h"
 
+#include "miniros/xmlrpcpp/XmlRpcUtil.h" //< Needed to set log level.
+
 /// This define is injected in replacements/CMakeLists.txt
 #ifdef USE_LOCAL_PROGRAM_OPTIONS
 #include "program_options/program_options.h"

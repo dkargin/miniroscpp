@@ -44,7 +44,7 @@ public:
   /// @param own - should socket completely own descriptor and close it in destructor.
   NetSocket(int fd, Type type, bool own);
 
-  ~NetSocket();
+  virtual ~NetSocket();
 
   /// No copy allowed.
   NetSocket(const NetSocket& other) = delete;
@@ -75,8 +75,14 @@ public:
   Error tcpListen(int port, NetAddress::Type type, int maxQueuedClients=100);
 
   /// Connect to specified TCP address.
+  /// Previous connection will be immediately closed.
   /// @param address - destination address
   /// @param nonblock - connect in nonblock mode. Actual state should be processed by PollSet.
+  /// @returns possible errors:
+  ///  - InvalidAddress if address is invalid.
+  ///  - SystemError if failed to create socket or initiate connection.
+  ///  - Timeout - got a timeout while connecting.
+  ///  Socket will remain in closed state in case of error.
   Error tcpConnect(const NetAddress& address, bool nonblock);
 
   /// Enter listening mode.
@@ -128,9 +134,6 @@ public:
   ///   Any other error - failed to connect.
   Error checkConnected();
 
-  /// Bind socket to a specific network adapter.
-  Error bind(const NetAddress& adapter);
-
   /// Accept connection.
   std::pair<std::shared_ptr<NetSocket>, Error> accept();
 
@@ -139,7 +142,7 @@ public:
   ///
   /// @param s - output buffer.
   /// @param address - address of sender. Can be nullptr
-  std::pair<size_t, Error> recv(WriteBuf& s, NetAddress* address);
+  virtual std::pair<size_t, Error> recv(WriteBuf& s, NetAddress* address);
 
   /// Send data into a socket.
   /// Stream sockets will try to send data iteratively until EAWOULDBLOCK happens.
@@ -149,11 +152,11 @@ public:
   /// @param size - size of data in bytes.
   /// @param address - destination address. It is only relevant to datagram sockets.
   /// @returns a tuple with number of bytes actually sent and error code.
-  std::pair<size_t, Error> send(const void* rawData, size_t size, const NetAddress* address);
+  virtual std::pair<size_t, Error> send(const void* rawData, size_t size, const NetAddress* address);
 
   /// Write two separate buffers to a socket.
   /// It is often HTTP header and a payload from a separate buffer.
-  std::pair<size_t, Error> write2(const char* header, size_t headerSize,
+  virtual std::pair<size_t, Error> write2(const char* header, size_t headerSize,
     const char* body, size_t bodySize,
     size_t written = 0);
 

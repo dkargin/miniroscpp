@@ -39,7 +39,6 @@ struct NetSocket::Internal {
   void close()
   {
     if (own && fd != MINIROS_INVALID_SOCKET) {
-      MINIROS_DEBUG_NAMED("socket", "NetSocket::close(%d)", fd);
       close_socket(fd);
     }
     own = false;
@@ -223,12 +222,12 @@ Error NetSocket::tcpListen(int port, NetAddress::Type type, int maxQueuedClients
 
 Error NetSocket::tcpConnect(const NetAddress& address, bool nonblock)
 {
-  if (!address.valid()) {
-    return Error::InvalidAddress;
-  }
-
   if (valid()) {
     close();
+  }
+
+  if (!address.valid()) {
+    return Error::InvalidAddress;
   }
 
   // Determine address family based on address type

@@ -25,6 +25,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+// It will log to "miniros.RPCManager" channel.
 #define MINIROS_PACKAGE_NAME "RPCManager"
 
 #include <atomic>
@@ -43,6 +44,7 @@
 #include "miniros/transport/rpc_manager.h"
 
 #include "http/http_client.h"
+#include "io/poll_set.h"
 
 #include <miniros/rostime.h>
 
@@ -135,10 +137,8 @@ struct FunctionInfo
 };
 
 struct RPCManager::Internal {
-
-  std::string uri_;
-  int port_ = 0;
-  std::thread server_thread_;
+  /// Own URL for RPC requests.
+  network::URL url_;
 
 #if defined(__APPLE__)
   // OSX has problems with lots of concurrent xmlrpc calls
@@ -146,11 +146,14 @@ struct RPCManager::Internal {
 #endif
   XmlRpc::XmlRpcMethods server_;
 
+  /// Time to close http::HttpClient from Idle state.
+  int clientIdleTimeoutMs = 30*1000;
+
   /// Assigned poll set.
   PollSet* poll_set_ = nullptr;
   std::unique_ptr<http::HttpServer> http_server_;
 
-  std::multimap<network::URL, std::shared_ptr<http::HttpClient>> clients_;
+  std::map<network::URL, std::shared_ptr<http::HttpClient>> clients_;
 
   std::mutex clients_mutex_;
 
@@ -186,23 +189,26 @@ RPCManager::~RPCManager()
   shutdown();
 }
 
-Error RPCManager::start(PollSet* poll_set, int port)
+Error RPCManager::start(int port)
 {
   if (!internal_)
     return Error::InternalError;
 
-  if (internal_->server_thread_.joinable()) {
-    MINIROS_INFO("Manager is already running at port %d", internal_->port_);
+  if (!internal_->poll_set_) {
+    MINIROS_FATAL("RPCManager::start(%d) - poll set was zero", port);
+    return Error::InternalError;
+  }
+
+  if (internal_->http_server_) {
+    MINIROS_INFO("Manager is already running at port %d", internal_->url_.port);
     return Error::Ok;
   }
 
   internal_->shutting_down_ = false;
   bind("getPid", getPid);
 
-  internal_->poll_set_ = poll_set;
-
   if (!internal_->http_server_) {
-    internal_->http_server_.reset(new http::HttpServer(poll_set));
+    internal_->http_server_.reset(new http::HttpServer(internal_->poll_set_));
   }
 
   auto xmlrpc_enpoint = std::make_shared<http::XmlRpcHandler>(&internal_->server_);
@@ -217,22 +223,20 @@ Error RPCManager::start(PollSet* poll_set, int port)
     return err;
   }
 
-  internal_->port_ = internal_->http_server_->getPort();
-  if (port == 0) {
-    MINIROS_INFO("Started RPC manager at free port %d", internal_->port_);
-  } else {
-    MINIROS_INFO("Started RPC manager at port %d", internal_->port_);
-  }
-
-  MINIROS_ASSERT(internal_->port_ != 0);
-
   std::string host = network::getHost();
   assert(!host.empty());
-  std::stringstream ss;
-  ss << "http://" << host << ":" << internal_->port_ << "/";
-  internal_->uri_ = ss.str();
+  internal_->url_.port = internal_->http_server_->getPort();
+  internal_->url_.host = host;
+  internal_->url_.scheme = "http://";
 
-  internal_->server_thread_ = std::thread(&RPCManager::serverThreadFunc, this);
+  if (port == 0) {
+    MINIROS_INFO("Started RPC manager at free port %d", internal_->url_.port);
+  } else {
+    MINIROS_INFO("Started RPC manager at port %d", internal_->url_.port);
+  }
+
+  MINIROS_ASSERT(internal_->url_.port != 0);
+
   return Error::Ok;
 }
 
@@ -240,6 +244,7 @@ void RPCManager::shutdown()
 {
   if (!internal_)
     return;
+
   if (internal_->shutting_down_)
     return;
 
@@ -248,8 +253,6 @@ void RPCManager::shutdown()
   }
 
   internal_->shutting_down_ = true;
-  if (internal_->server_thread_.joinable())
-      internal_->server_thread_.join();
 
   // kill the last few clients that were started in the shutdown process
   {
@@ -294,197 +297,86 @@ void RPCManager::shutdown()
   internal_->http_server_.reset();
 }
 
-bool RPCManager::validateXmlrpcResponse(const std::string& method, XmlRpcValue &response,
-                                    XmlRpcValue &payload)
+std::shared_ptr<http::HttpClient> RPCManager::getXMLRPCClient(const std::string &host, const int port, const std::string &path)
 {
-  if (response.getType() != XmlRpcValue::TypeArray)
-  {
-    MINIROS_DEBUG("XML-RPC call [%s] didn't return an array",
-        method.c_str());
-    return false;
-  }
-  if (response.size() != 2 && response.size() != 3)
-  {
-    MINIROS_DEBUG("XML-RPC call [%s] didn't return a 2 or 3-element array",
-        method.c_str());
-    return false;
-  }
-  if (response[0].getType() != XmlRpcValue::TypeInt)
-  {
-    MINIROS_DEBUG("XML-RPC call [%s] didn't return a int as the 1st element",
-        method.c_str());
-    return false;
-  }
-  int status_code = response[0];
-  if (response[1].getType() != XmlRpcValue::TypeString)
-  {
-    MINIROS_DEBUG("XML-RPC call [%s] didn't return a string as the 2nd element",
-        method.c_str());
-    return false;
-  }
-  std::string status_string = response[1];
-  if (status_code != 1)
-  {
-    MINIROS_DEBUG("XML-RPC call [%s] returned an error (%d): [%s]",
-        method.c_str(), status_code, status_string.c_str());
-    return false;
-  }
-  if (response.size() > 2)
-  {
-    payload = response[2];
-  }
-  else
-  {
-    std::string empty_array = "<value><array><data></data></array></value>";
-    size_t offset = 0;
-    xml::XmlCodec codec;
-    return codec.parseXmlRpcValue(payload, empty_array, offset);
-  }
-  return true;
-}
-
-void RPCManager::serverThreadFunc()
-{
-  disableAllSignalsInThisThread();
-  setThreadName("RPCManager");
-
-  while(!internal_->shutting_down_)
-  {
-    {
-      std::unique_lock<std::mutex> lock(internal_->connections_mutex_);
-      internal_->connections_event_.wait_for(lock, std::chrono::milliseconds(100));
-
-      PollSet* ps = internal_->poll_set_;
-
-      for (ASyncXMLRPCConnectionPtr c: internal_->removed_connections_)
-      {
-        c->removeFromDispatch(ps);
-        internal_->connections_.erase(c);
-      }
-
-      internal_->removed_connections_.clear();
-    }
-
-    while (internal_->unbind_requested_)
-    {
-      WallDuration(0.01).sleep();
-    }
-
-    if (internal_->shutting_down_)
-    {
-      return;
-    }
-
-    // Lazy check for async connections.
-    for (auto& connection: internal_->connections_)
-    {
-      if (connection->check())
-        removeASyncConnection(connection);
-    }
-  }
-}
-
-std::shared_ptr<http::HttpClient> RPCManager::getXMLRPCClient(const std::string &host, const int port, const std::string &uri)
-{
-  if (!internal_)
+  if (!internal_ || !internal_->poll_set_)
     return nullptr;
-  // go through our vector of clients and grab the first available one
-  XmlRpcClient *c = nullptr;
 
+  // Construct URL key for the map
   network::URL url;
+  url.scheme = "http://";
+  url.host = host;
+  url.port = static_cast<uint32_t>(port);
+  url.path = path;
+
   std::scoped_lock<std::mutex> lock(internal_->clients_mutex_);
 
-  for (auto i = internal_->clients_.begin(); !c && i != internal_->clients_.end(); )
+  // Try to find existing client
+  auto it = internal_->clients_.find(url);
+  if (it != internal_->clients_.end())
   {
-    if (!i->in_use_)
-    {
-      // see where it's pointing
-      if (i->client_->getHost() == host &&
-          i->client_->getPort() == port &&
-          i->client_->getUri()  == uri)
-      {
-        // hooray, it's pointing at our destination. re-use it.
-        if (i->client_->isReady()) {
-          c = i->client_;
-          i->in_use_ = true;
-          i->last_use_time_ = SteadyTime::now();
-          break;
-        }
-      }
-      if (i->last_use_time_ + CachedXmlRpcClient::s_zombie_time_ < SteadyTime::now())
-      {
-        // toast this guy. he's dead and nobody is reusing him.
-        delete i->client_;
-        i = internal_->clients_.erase(i);
-      }
-      else
-      {
-        ++i; // move along. this guy isn't dead yet.
-      }
-    }
-    else
-    {
-      ++i;
-    }
+    // Found existing client, return it
+    return it->second;
   }
 
-  if (!c)
+  // Create new client
+  auto client = std::make_shared<http::HttpClient>(internal_->poll_set_);
+  int reconnectTimeoutMs = 500;
+  client->setDisconnectHandler(
+    [wclient = std::weak_ptr(client), reconnectTimeoutMs](std::shared_ptr<network::NetSocket>& socket, http::HttpClient::State state)
+    {
+      auto client = wclient.lock();
+      if (client && client->getReconnectAttempts() < 10 && client->getQueuedRequests() > 0) {
+        client->reconnect(reconnectTimeoutMs);
+      }
+    });
+  client->setIdleTimeoutHandler(internal_->clientIdleTimeoutMs,
+    [wclient = std::weak_ptr(client), this](std::shared_ptr<network::NetSocket>& socket, http::HttpClient::State state)
+    {
+      auto client = wclient.lock();
+      if (client) {
+        releaseXMLRPCClient(client);
+      }
+    });
+  // Start connection to host
+  Error connectErr = client->connect(host, port);
+  if (connectErr != Error::Ok && connectErr != Error::WouldBlock)
   {
-    // allocate a new one
-    c = new XmlRpcClient(host.c_str(), port, uri.c_str());
-    CachedXmlRpcClient mc(c);
-    mc.in_use_ = true;
-    mc.last_use_time_ = SteadyTime::now();
-    internal_->clients_.push_back(mc);
-    //ROS_INFO("%d xmlrpc clients allocated\n", xmlrpc_clients.size());
+    // Connection failed (WouldBlock is expected for non-blocking connections)
+    MINIROS_WARN("RPCManager::getXMLRPCClient: Failed to initiate connection to %s:%d: %s",
+                 host.c_str(), port, connectErr.toString());
+    return nullptr;
   }
-  // ONUS IS ON THE RECEIVER TO UNSET THE IN_USE FLAG
-  // by calling releaseXMLRPCClient
-  return c;
+
+  // Store client in map
+  internal_->clients_[url] = client;
+
+  return client;
 }
 
-void RPCManager::releaseXMLRPCClient(XmlRpcClient *c)
+void RPCManager::releaseXMLRPCClient(std::shared_ptr<http::HttpClient> c)
 {
   if (!internal_)
     return;
+  // TODO: Put client on timeout.
+  // In case of "idle" state it should disconnect itself and remove it from RPC manager.
   std::scoped_lock<std::mutex> lock(internal_->clients_mutex_);
+  auto rootUrl = c->getRootURL("http://");
+  auto it = internal_->clients_.find(rootUrl);
 
-  for (auto i = internal_->clients_.begin(); i != internal_->clients_.end(); ++i)
-  {
-    if (c == i->client_)
-    {
-      if (internal_->shutting_down_)
-      {
-        // if we are shutting down we won't be re-using the client
-        i->client_->close();
-        delete i->client_;
-        internal_->clients_.erase(i);
+  if (it == internal_->clients_.end()) {
+    // Brute force search for this client.
+    for (it = internal_->clients_.begin(); it != internal_->clients_.end(); it++) {
+      if (it->second == c) {
+        break;
       }
-      else
-      {
-        i->in_use_ = false;
-      }
-      break;
     }
   }
-}
 
-void RPCManager::addASyncConnection(const ASyncXMLRPCConnectionPtr& conn)
-{
-  if (!internal_)
-    return;
-  std::scoped_lock<std::mutex> lock(internal_->connections_mutex_);
-  internal_->connections_.insert(conn);
-  internal_->connections_event_.notify_all();
-}
-
-void RPCManager::removeASyncConnection(const ASyncXMLRPCConnectionPtr& conn)
-{
-  if (!internal_)
-    return;
-  std::scoped_lock<std::mutex> lock(internal_->connections_mutex_);
-  internal_->removed_connections_.insert(conn);
-  internal_->connections_event_.notify_all();
+  if (it != internal_->clients_.end()) {
+    MINIROS_INFO("RPCManager::releaseXMLRPCClient dropping stale client to %s fd=%d", rootUrl.str().c_str(), c->fd());
+    internal_->clients_.erase(it);
+  }
 }
 
 bool RPCManager::bind(const std::string& function_name, const XMLRPCFunc& cb)
@@ -671,15 +563,15 @@ bool RPCManager::isLocalRPC(const std::string& host, int port) const
   return getServerPort() == port;
 }
 
-const std::string& RPCManager::getServerURI() const
+std::string RPCManager::getServerURI() const
 {
   static std::string empty;
-  return internal_ ? internal_->uri_ : empty;
+  return internal_ ? internal_->url_.str() : empty;
 }
 
 uint32_t RPCManager::getServerPort() const
 {
-  return internal_ ? internal_->port_ : 0;
+  return internal_ ? internal_->url_.port : 0;
 }
 
 http::HttpServer* RPCManager::getHttpServer()
@@ -692,5 +584,12 @@ PollSet* RPCManager::getPollSet() const
   return internal_ ? internal_->poll_set_ : nullptr;
 }
 
+void RPCManager::setPollSet(PollSet* poll_set)
+{
+  assert(internal_);
+  if (!internal_)
+    return;
+  internal_->poll_set_ = poll_set;
+}
 
 } // namespace miniros
