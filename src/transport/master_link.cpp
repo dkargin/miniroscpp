@@ -30,12 +30,13 @@
 // Will log to "miniros.master_link"
 #define MINIROS_PACKAGE_NAME "master_link"
 
-#include "../../include/miniros/network/network.h"
+#include "miniros/network/network.h"
 #include "miniros/init.h"
 #include "miniros/master_link.h"
 
 #include "http/http_client.h"
 #include "http/xmlrpc_request.h"
+#include "internal/profiling.h"
 #include "internal/xml_tools.h"
 #include "miniros/names.h"
 #include "miniros/this_node.h"
@@ -44,7 +45,8 @@
 #include <miniros/rosassert.h>
 
 #include "miniros/xmlrpcpp/XmlRpc.h"
-#include "network/url.h"
+
+#include "internal/local_log.h"
 
 namespace miniros {
 
@@ -104,7 +106,7 @@ Error MasterLink::initLink(const M_string& remappings, const std::shared_ptr<RPC
       if (master_uri_env) {
         internal_->uri = master_uri_env;
       } else {
-        MINIROS_WARN("Defaulting ROS_MASTER_URI to localhost:11311");
+        LOCAL_WARN("%s", "Defaulting ROS_MASTER_URI to localhost:11311");
         internal_->uri = "http://localhost:11311";
       }
 #ifdef _MSC_VER
@@ -216,6 +218,14 @@ struct ResponseState {
   std::atomic_bool needed = true;
   std::atomic_bool b = false;
 
+  SteadyTime start_time = SteadyTime::now();
+
+  /// Return time from
+  WallDuration elapsed() const
+  {
+    return SteadyTime::now() - start_time;
+  }
+
   ResponseState(XmlRpc::XmlRpcValue& response, XmlRpc::XmlRpcValue& payload) : response(response), payload(payload) {}
 };
 
@@ -224,19 +234,19 @@ Error MasterLink::execute(const std::string& method, const RpcValue& request, Rp
 {
   if (!internal_)
     return Error::InternalError;
+  std::string name = "execute(" + method  + ")";
+  MINIROS_PROFILE_SCOPE2("MasterLink", name.c_str());
 
   RPCManagerPtr manager = internal_->rpcManager.lock();
   if (!manager) {
     return Error::NoMaster;
   }
 
-  miniros::SteadyTime start_time = miniros::SteadyTime::now();
-
   std::string master_host = getHost();
   uint32_t master_port = getPort();
 
   if (!manager) {
-    MINIROS_ERROR("[%s] - no manager", method.c_str());
+    LOCAL_ERROR("[%s] - no manager", method.c_str());
     return Error::InternalError;
   }
 
@@ -253,26 +263,25 @@ Error MasterLink::execute(const std::string& method, const RpcValue& request, Rp
 
   auto c = manager->getXMLRPCClient(master_host, master_port, "/RPC2");
   if (!c) {
-    MINIROS_ERROR("[%s] - failed make connection to host=\"%s:%d\"", method.c_str(), master_host.c_str(), master_port);
+    LOCAL_ERROR("[%s] - failed make connection to host=\"%s:%d\"", method.c_str(), master_host.c_str(), master_port);
     return Error::InvalidURI;
   }
   bool printed = false;
   bool slept = false;
   // Flag for tracking global shutdown.
-  bool ok = true;
+  bool noShutdown = true;
 
   // This is semi-shared response state.
   // It is needed to keep some state in case callback will be called after we exit this function.
   auto state = std::make_shared<ResponseState>(response, payload);
   auto req = http::makeRequest("/RPC2", method);
   req->setParamArray(request);
-  req->onCompleteRaw = [wstate = std::weak_ptr(state), method](Error err, const RpcValue& rawResponse, bool ok_) {
-    if (auto state = wstate.lock()) {
+  req->onCompleteRaw = [state, method](Error err, const RpcValue& rawResponse, bool ok_) {
       // This callback can happen outside this function.
       state->response = rawResponse;
       state->b.store(true);
-    } else {
-      MINIROS_WARN("MasterLink::execute - unexpected response for request %s", method.c_str());
+    if (state.use_count() == 1) {
+      LOCAL_WARN("MasterLink::execute - unexpected response for request %s after %fs", method.c_str(), state->elapsed().toSec());
     }
   };
 
@@ -288,39 +297,45 @@ Error MasterLink::execute(const std::string& method, const RpcValue& request, Rp
   }
 
   if (Error err = c->enqueueRequest(req); err != Error::Ok) {
-    MINIROS_ERROR("Failed to enqueue request");
+    LOCAL_ERROR("Failed to enqueue request %s", method.c_str());
     return err;
   }
 
   do {
+    WallDuration waitDuration;
     {
 #if defined(__APPLE__)
       std::scoped_lock<std::mutex> lock(internal_->xmlrpc_call_mutex);
 #endif
-      if (Error err = req->waitForState(http::HttpRequest::State::Done, WallDuration(0.100)); err == Error::Ok) {
+      auto waitStart = SteadyTime::now();
+      if (Error err = req->waitForState(http::HttpRequest::State::Done, WallDuration(0.500)); err == Error::Ok) {
         // b is set to true in callback.
       }
       else if (err != Error::Timeout) {
         // Some serious error here.
       }
+      waitDuration = SteadyTime::now() - waitStart;
     }
 
-    ok = !miniros::isShuttingDown() && !manager->isShuttingDown();
+    noShutdown = !miniros::isShuttingDown() && !manager->isShuttingDown();
 
-    if (!state->b && ok) {
+    auto s = req->state();
+    if (s == http::HttpRequest::State::ClientQueued && noShutdown) {
+      // Not initiated connection.
       if (!printed && wait_for_master) {
-        MINIROS_ERROR("[%s] Failed to contact master at [%s:%d].  %s", method.c_str(), master_host.c_str(), master_port,
+        LOCAL_ERROR("[%s] Failed to contact master at [%s:%d].  %s", method.c_str(), master_host.c_str(), master_port,
           wait_for_master ? "Retrying..." : "");
         printed = true;
       }
 
       if (!wait_for_master) {
         // TODO: Do we need to drop request?
+        auto elapsed = state->elapsed();
         return Error::NoMaster;
       }
 
-      if (!internal_->retry_timeout.isZero() && (miniros::SteadyTime::now() - start_time) >= internal_->retry_timeout) {
-        MINIROS_ERROR("[%s] Timed out trying to connect to the master after [%f] seconds", method.c_str(), internal_->retry_timeout.toSec());
+      if (!internal_->retry_timeout.isZero() && state->elapsed() >= internal_->retry_timeout) {
+        LOCAL_ERROR("[%s] Timed out trying to connect to the master after [%f] seconds", method.c_str(), internal_->retry_timeout.toSec());
         // TODO: Do we need to drop request?
         return Error::NoMaster;
       }
@@ -335,15 +350,15 @@ Error MasterLink::execute(const std::string& method, const RpcValue& request, Rp
       break;
     }
 
-    ok = !miniros::isShuttingDown() && !manager->isShuttingDown();
-  } while (ok);
+    noShutdown = !miniros::isShuttingDown() && !manager->isShuttingDown();
+  } while (noShutdown);
 
-  if (ok && slept) {
-    MINIROS_INFO("Connected to master at [%s:%d]", master_host.c_str(), master_port);
+  if (noShutdown && slept) {
+    LOCAL_INFO("Connected to master at [%s:%d]", master_host.c_str(), master_port);
   }
 
-  if (!ok) {
-    MINIROS_ERROR("[%s] Got shutdown request during RPC call", method.c_str());
+  if (!noShutdown) {
+    LOCAL_ERROR("[%s] Got shutdown request during RPC call", method.c_str());
     return Error::ShutdownInterrupt;
   }
   // Since MAsterLink can be used very early, this logging can cause recursive print.
@@ -573,7 +588,7 @@ bool MasterLink::getParamImpl(const std::string& key, RpcValue& v, bool use_cach
       auto it = internal_->params.find(mapped_key);
       if (it != internal_->params.end()) {
         if (it->second.valid()) {
-          MINIROS_DEBUG_NAMED("cached_parameters", "Using cached parameter value for key [%s]", mapped_key.c_str());
+          LOCAL_DEBUG_NAMED("cached_parameters", "Using cached parameter value for key [%s]", mapped_key.c_str());
 
           v = it->second;
           return true;
@@ -591,12 +606,12 @@ bool MasterLink::getParamImpl(const std::string& key, RpcValue& v, bool use_cach
         params[2] = mapped_key;
 
         if (!this->execute("subscribeParam", params, result, payload, false)) {
-          MINIROS_DEBUG_NAMED(
+          LOCAL_DEBUG_NAMED(
             "cached_parameters", "Subscribe to parameter [%s]: call to the master failed", mapped_key.c_str());
           internal_->subscribed_params.erase(mapped_key);
           use_cache = false;
         } else {
-          MINIROS_DEBUG_NAMED("cached_parameters", "Subscribed to parameter [%s]", mapped_key.c_str());
+          LOCAL_DEBUG_NAMED("cached_parameters", "Subscribed to parameter [%s]", mapped_key.c_str());
         }
       }
     }
@@ -614,7 +629,7 @@ bool MasterLink::getParamImpl(const std::string& key, RpcValue& v, bool use_cach
   if (use_cache) {
     std::scoped_lock<std::mutex> lock(internal_->params_mutex);
 
-    MINIROS_DEBUG_NAMED(
+    LOCAL_DEBUG_NAMED(
       "cached_parameters", "Caching parameter [%s] with value type [%d]", mapped_key.c_str(), v.getType());
     internal_->params[mapped_key] = v;
   }

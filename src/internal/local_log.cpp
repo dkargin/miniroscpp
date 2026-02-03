@@ -15,7 +15,7 @@ int getVerbosity()
 }
 
 void InternalLog::log(console::Level level, const char* channel, const char* fmt, ...) {
-  if (static_cast<int>(level) > getVerbosity())
+  if (static_cast<int>(level) < getVerbosity())
     return;
   va_list va;
   char buf[1024];

@@ -41,6 +41,8 @@
 #include "internal/at_exit.h"
 
 #include "miniros/io/poll_set.h"
+
+#include "internal/profiling.h"
 #include "miniros/io/io.h"
 
 #include "miniros/internal/local_log.h"
@@ -134,6 +136,8 @@ bool PollSet::addSocket(int fd, int events, const SocketUpdateFunc& update_func,
   if (fd < 0)
     return false;
 
+  MINIROS_PROFILE_SCOPE2("PollSet", "addSocket");
+
   Internal::SocketInfo info;
   info.fd_ = fd;
   if (events & EventUpdate) {
@@ -173,6 +177,7 @@ bool PollSet::delSocket(int fd)
   {
     return false;
   }
+  MINIROS_PROFILE_SCOPE2("PollSet", "delSocket");
 
   std::scoped_lock<std::mutex> lock(internal_->socket_info_mutex_);
   auto it = internal_->socket_info_.find(fd);
@@ -303,6 +308,8 @@ void PollSet::signal()
 
 void PollSet::update(int poll_timeout)
 {
+  MINIROS_PROFILE_SCOPE2("PollSet", "update");
+
   createNativePollset();
 
   AtExit ae([this]() {
@@ -315,11 +322,14 @@ void PollSet::update(int poll_timeout)
   // delSocket also can be called during poll and its processing.
 
   const nfds_t numFd = static_cast<nfds_t>(internal_->ufds_.size());
-  Error err = poll_sockets(internal_->epfd_, &internal_->ufds_.front(), numFd, poll_timeout, internal_->ofds_);
-  if (!err)
   {
-    LOCAL_ERROR("PollSet::update() poll_sockets failed with error %s", err.toString());
-    return;
+    MINIROS_PROFILE_SCOPE("poll");
+    Error err = poll_sockets(internal_->epfd_, &internal_->ufds_.front(), numFd, poll_timeout, internal_->ofds_);
+    if (!err)
+    {
+      LOCAL_ERROR("PollSet::update() poll_sockets failed with error %s", err.toString());
+      return;
+    }
   }
 
   for (const socket_pollfd& spfd: internal_->ofds_)
@@ -395,6 +405,7 @@ void PollSet::update(int poll_timeout)
 
 void PollSet::processTimers()
 {
+  MINIROS_PROFILE_SCOPE2("PollSet", "processTimers");
   // Fire timer events.
   SteadyTime now = SteadyTime::now();
   std::vector<int> expiredTimers;

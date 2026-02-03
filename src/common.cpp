@@ -73,6 +73,7 @@
 #endif
 #endif
 
+#include "internal/profiling.h"
 
 
 namespace miniros {
@@ -101,6 +102,7 @@ void setThreadName(const char* threadName) {
   pthread_t handle = pthread_self();
   pthread_setname_np(handle, threadName);
 #endif
+  profiling::writeCurrentThreadNameInTrace(threadName);
 }
 
 #ifdef MINIROS_USE_LIBSYSTEMD

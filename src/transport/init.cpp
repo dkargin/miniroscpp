@@ -59,6 +59,7 @@
 #include "roscpp/SetLoggerLevel.hxx"
 
 // Needed to set IPv6 flag inside XmlRpcSocket.
+#include "internal/profiling.h"
 #include "xmlrpcpp/XmlRpcSocket.h"
 
 #include <miniros/console.h>
@@ -302,6 +303,7 @@ bool isStarted()
 /// This function is expected to be called after miniros::init.
 Error start()
 {
+  MINIROS_PROFILE_SCOPE("miniros::start");
   SteadyTime time_start = SteadyTime::now();
 
   std::scoped_lock<std::mutex> lock(g_start_mutex);
@@ -376,6 +378,7 @@ Error start()
 
   if (!(g_init_options & init_options::NoRosout))
   {
+    MINIROS_PROFILE_SCOPE("init rosout");
     ROSOutAppender* appender = new ROSOutAppender(topicManager);
     if (!appender->init()) {}
     auto prev = g_rosout_appender.exchange(appender);
@@ -503,6 +506,7 @@ void initDefaultLogLevels(const M_string& remappings)
 
 void init(const M_string& remappings, const std::string& name, uint32_t options)
 {
+  MINIROS_PROFILE_SCOPE("miniros::init");
   if (!g_atexit_registered)
   {
     g_atexit_registered = true;

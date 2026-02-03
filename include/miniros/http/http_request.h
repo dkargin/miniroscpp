@@ -64,6 +64,11 @@ public:
   /// Set request path/URI
   void setPath(const std::string& path);
 
+  virtual std::string debugName() const
+  {
+    return path();
+  }
+
   const std::string& path() const;
 
   /// Add URL parameter (query string parameter)

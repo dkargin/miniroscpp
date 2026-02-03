@@ -88,6 +88,8 @@ set(cpp_common_SRC
     serialization.cpp
     internal/xml_tools.cpp
     internal/local_log.cpp
+    internal/profiling.cpp
+    internal/static_write_buf.cpp
     b64/b64decode.cpp
     b64/b64encode.cpp
 )
