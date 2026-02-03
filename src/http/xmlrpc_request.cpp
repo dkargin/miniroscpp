@@ -257,7 +257,7 @@ std::shared_ptr<XmlRpcRequest> makeRequest(const std::string& path, const std::s
   if (p.empty() || p == "/") {
     p = "/RPC2";
   }
-  return std::make_shared<http::XmlRpcRequest>(method.c_str(), std::move(path));
+  return std::make_shared<http::XmlRpcRequest>(method.c_str(), std::move(p));
 }
 
 } // namespace http

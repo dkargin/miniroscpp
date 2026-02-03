@@ -10,6 +10,7 @@
 #include "miniros/http/http_request.h"
 #include "miniros/console.h"
 
+#include <cassert>
 
 /// This file will log to "miniros.http" channel.
 #define MINIROS_PACKAGE_NAME "http"
@@ -21,7 +22,9 @@ HttpRequest::HttpRequest() : method_(HttpMethod::Get), path_("/")
 {}
 
 HttpRequest::HttpRequest(HttpMethod method, const std::string& path) : method_(method), path_(path)
-{}
+{
+  assert(!path.empty());
+}
 
 HttpRequest::~HttpRequest()
 {}

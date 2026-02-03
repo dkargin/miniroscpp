@@ -28,9 +28,11 @@
 #define MINIROS_PACKAGE_NAME "connection_manager"
 
 #include "miniros/transport/connection_manager.h"
-#include "miniros/network/network.h"
+
+#include "internal/profiling.h"
 #include "miniros/file_log.h"
 #include "miniros/io/poll_manager.h"
+#include "miniros/network/network.h"
 #include "miniros/transport/connection.h"
 #include "miniros/transport/service_client_link.h"
 #include "miniros/transport/transport_subscriber_link.h"
@@ -71,6 +73,7 @@ ConnectionManager::~ConnectionManager()
 
 bool ConnectionManager::start(PollManagerPtr pollManager)
 {
+  MINIROS_PROFILE_SCOPE2("ConnectionManager", "start");
   assert(!poll_manager_);
 
   poll_manager_ = pollManager;

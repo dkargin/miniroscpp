@@ -30,6 +30,8 @@ public:
 
 #define LOCAL_INFO(format, ...) LOCAL_LOG(miniros::console::Level::Info, format, __VA_ARGS__)
 #define LOCAL_DEBUG(format, ...) LOCAL_LOG(miniros::console::Level::Debug, format, __VA_ARGS__)
+#define LOCAL_DEBUG_NAMED(channel, format, ...) LOCAL_LOG_NAMED(miniros::console::Level::Debug, (channel),  format, __VA_ARGS__)
+
 #define LOCAL_WARN(format, ...) LOCAL_LOG(miniros::console::Level::Warn, format, __VA_ARGS__)
 #define LOCAL_ERROR(format, ...) LOCAL_LOG(miniros::console::Level::Error, format, __VA_ARGS__)
 

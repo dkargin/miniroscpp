@@ -12,8 +12,9 @@
 #include "miniros/http/http_client.h"
 
 #include "internal/invokers.h"
-#include "network/net_adapter.h"
+#include "internal/profiling.h"
 #include "io/poll_set.h"
+#include "network/net_adapter.h"
 
 #define MINIROS_PACKAGE_NAME "http"
 
@@ -265,7 +266,7 @@ bool HttpClient::Internal::pullNewTask(Lock& processLock)
   requests.pop_front();
 
   if (!active_request) {
-    MINIROS_WARN_NAMED("client", "HttpClient::pullNewTask: null request");
+    MINIROS_WARN("HttpClient::pullNewTask: null request");
     return false;
   }
 
@@ -311,7 +312,7 @@ void HttpClient::Internal::handleDisconnect(Lock& lock)
   }
 
   // No callback set or no reconnect required. Just close the current socket astd::strchr(nd reset state.
-  MINIROS_INFO_NAMED("client", "HttpClient[%s]::handleDisconnect() - connection is closed from state %s", debugName().c_str(), stateCopy.toString());
+  MINIROS_INFO("HttpClient[%s]::handleDisconnect() - connection is closed from state %s", debugName().c_str(), stateCopy.toString());
 
   if (onDisconnect) {
     // Copying all mutable data, which can be changed during callback.
@@ -391,23 +392,23 @@ Error HttpClient::Internal::readResponse()
 
     const int fd = socket->fd();
     double dur = (SteadyTime::now() - active_request->getRequestStart()).toSec() * 1000;
-    MINIROS_DEBUG_NAMED("client", "HttpClient(%d)::readHeader: ContentLength=%d, parsed=%d t=%fms", fd, response_http_frame.contentLength(), parsed, dur);
+    MINIROS_DEBUG("HttpClient(%d)::readHeader: ContentLength=%d, parsed=%d t=%fms", fd, response_http_frame.contentLength(), parsed, dur);
 
     // If we haven't gotten the entire request yet, return (keep reading)
     if (response_http_frame.state() != HttpParserFrame::ParseComplete) {
       if (readErr == Error::EndOfFile) {
-        MINIROS_DEBUG_NAMED("client", "HttpClient[%s]::readRequest: EOF while reading request", debugName().c_str());
+        MINIROS_DEBUG("HttpClient[%s]::readRequest: EOF while reading request", debugName().c_str());
         response_http_frame.finishResponse();
         return Error::EndOfFile;
         // Either way we close the connection
       }
-      MINIROS_DEBUG_NAMED("client", "HttpClient[%s]::readRequest got only %d/%d bytes.", debugName().c_str(), response_http_frame.bodyLength(), response_http_frame.contentLength());
+      MINIROS_DEBUG("HttpClient[%s]::readRequest got only %d/%d bytes.", debugName().c_str(), response_http_frame.bodyLength(), response_http_frame.contentLength());
       return Error::WouldBlock;
     }
 
     assert(response_http_frame.state() == HttpParserFrame::ParseComplete);
     // Otherwise, parse and dispatch the request
-    MINIROS_DEBUG_NAMED("client", "HttpClient[%s]::readRequest read %d/%d bytes.", debugName().c_str(), response_http_frame.bodyLength(), response_http_frame.contentLength());
+    MINIROS_DEBUG("HttpClient[%s]::readRequest read %d/%d bytes.", debugName().c_str(), response_http_frame.bodyLength(), response_http_frame.contentLength());
   } else if (readErr == Error::WouldBlock) {
     return Error::WouldBlock;
   }
@@ -429,7 +430,7 @@ HttpClient::~HttpClient()
     // Explicitly unlock to prevent potential deadlock in destructor if Internal.
     lock.unlock();
   }
-  MINIROS_INFO_NAMED("client", "HttpClient::~HttpClient()");
+  MINIROS_INFO("HttpClient::~HttpClient()");
 }
 
 HttpClient::State HttpClient::getState() const
@@ -499,6 +500,7 @@ Error HttpClient::enqueueRequest(const std::shared_ptr<HttpRequest>& request)
     return Error::InternalError;
   }
 
+  MINIROS_INFO("HttpClient::enqueueRequest %s", request->debugName().c_str());
   {
     std::unique_lock lock(internal_->requests_guard);
     // Set request status to Queued
@@ -516,7 +518,7 @@ Error HttpClient::enqueueRequest(const std::shared_ptr<HttpRequest>& request)
     if (internal_->pullNewTask(lock2)) {
       internal_->updateState(lock2, State::WriteRequest);
       if (!internal_->poll_set->setEvents(internal_->socket->fd(), eventsForState(internal_->state))) {
-        MINIROS_ERROR_NAMED("client", "HttpClient(%d) Failed to update poll set to enable events to send request", internal_->fd());
+        MINIROS_ERROR("HttpClient(%d) Failed to update poll set to enable events to send request", internal_->fd());
       }
     }
   }
@@ -536,6 +538,7 @@ Error HttpClient::dropRequest(const std::shared_ptr<HttpRequest>& request)
     return Error::InternalError;
   }
 
+  MINIROS_INFO("HttpClient::dropRequest %s", request->debugName().c_str());
   std::unique_lock processLock(internal_->process_guard);
   std::unique_lock lock(internal_->requests_guard);
 
@@ -619,7 +622,7 @@ Error HttpClient::Internal::connectImpl(const std::shared_ptr<Internal>& I, Lock
     connected = true;
   } else {
     // Failed to initialize connection.
-    MINIROS_WARN_NAMED("client", "HttpClient::connect failed to initialize connection to %s:%d", address.address.c_str(), address.port());
+    MINIROS_WARN("HttpClient::connect failed to initialize connection to %s:%d", address.address.c_str(), address.port());
     return err;
   }
 
@@ -663,6 +666,8 @@ int HttpClient::handleSocketEvents(const std::shared_ptr<Internal>& I, int evtFl
 {
   if (!I)
     return 0;
+
+  MINIROS_PROFILE_SCOPE2("HttpClient", "handleSocketEvents");
 
   std::unique_lock lock(I->process_guard);
   /// Keep a copy of itself.
@@ -765,6 +770,7 @@ void HttpClient::Internal::handleConnecting(Lock& lock, int evtFlags)
 {
   if (state != State::Connecting)
     return;
+  MINIROS_PROFILE_SCOPE2("HttpClient", "handleConnecting");
 
   // Assume socket is in "connecting" state
   assert(socket->isConnecting());
@@ -794,6 +800,7 @@ void HttpClient::Internal::handleConnecting(Lock& lock, int evtFlags)
 
 void HttpClient::Internal::handleWriteRequest(Lock& lock, int evtFlags, bool fallThrough)
 {
+  MINIROS_PROFILE_SCOPE2("HttpClient", "handleWriteRequest");
   if (evtFlags & PollSet::EventError) {
     int err = socket->getSysError();
     // Here we can have some disconnect problem or some generic network problem.
@@ -860,6 +867,8 @@ void HttpClient::Internal::handleWriteRequest(Lock& lock, int evtFlags, bool fal
 
 void HttpClient::Internal::handleReadResponse(Lock& lock, int evtFlags, bool fallThrough)
 {
+  MINIROS_PROFILE_SCOPE2("HttpClient", "handleReadResponse");
+
   if (evtFlags & PollSet::EventError) {
     MINIROS_WARN_NAMED("client", "HttpClient[%s]::handleReadResponse() got socket error", debugName().c_str());
     handleDisconnect(lock);
@@ -892,6 +901,7 @@ void HttpClient::Internal::handleReadResponse(Lock& lock, int evtFlags, bool fal
 
 void HttpClient::Internal::handleProcessResponse(Lock& lock)
 {
+  MINIROS_PROFILE_SCOPE2("HttpClient", "handleProcessResponse");
   // Response received and parsed - store it in HttpRequest
   if (active_request) {
     auto req = active_request;

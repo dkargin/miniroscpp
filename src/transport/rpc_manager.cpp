@@ -44,6 +44,7 @@
 #include "miniros/transport/rpc_manager.h"
 
 #include "http/http_client.h"
+#include "internal/profiling.h"
 #include "io/poll_set.h"
 
 #include <miniros/rostime.h>
@@ -193,6 +194,8 @@ Error RPCManager::start(int port)
 {
   if (!internal_)
     return Error::InternalError;
+  MINIROS_PROFILE_SCOPE2("RPCManager", "start");
+
 
   if (!internal_->poll_set_) {
     MINIROS_FATAL("RPCManager::start(%d) - poll set was zero", port);
