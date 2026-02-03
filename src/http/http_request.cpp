@@ -144,6 +144,14 @@ std::string HttpRequest::buildPathWithQuery() const
   return result;
 }
 
+bool needBody(HttpMethod method)
+{
+  if (method == HttpMethod::Get || method == HttpMethod::Put || method == HttpMethod::Options) {
+    return false;
+  }
+  return true;
+}
+
 std::string HttpRequest::buildHeader(const std::string& host, int port) const
 {
   std::ostringstream header;
@@ -169,12 +177,12 @@ std::string HttpRequest::buildHeader(const std::string& host, int port) const
   }
 
   // Content-Length header (if body is present)
-  if (!request_body_.empty()) {
+  if (needBody(method_) && request_body_.empty()) {
+    MINIROS_WARN("Unexpected empty request to %s", fullPath.c_str());
+  } else {
     char buff[40];
     std::snprintf(buff, sizeof(buff), "%zu", request_body_.size());
     header << "Content-Length: " << buff << "\r\n";
-  } else {
-    MINIROS_WARN("Unexpected empty request");
   }
 
   // Other custom headers
@@ -325,11 +333,11 @@ Error HttpRequest::waitForState(State state, const WallDuration& duration) const
 Error HttpRequest::waitForResponse(const WallDuration& duration) const
 {
   std::unique_lock lock(mutex_);
-  if (state_ == State::ClientHasResponse)
+  if (state_ == State::Done)
     return Error::Ok;
   std::chrono::duration<double> d(duration.toSec());
   if (!cv_.wait_for(lock, d, [this]() {
-    return state_ == State::ClientHasResponse;
+    return state_ == State::Done;
   })) {
     return Error::Timeout;
   }

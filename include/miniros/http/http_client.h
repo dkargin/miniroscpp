@@ -93,8 +93,13 @@ public:
   ///  - Internal error if internal_ is empty.
   Error dropRequest(const std::shared_ptr<HttpRequest>& request);
 
-  /// Close connection and detach from socket.
-  void close();
+  /// Close and release internal data.
+  /// It will:
+  ///  - detach from PollSet
+  ///  - close socket
+  ///  - drop all connections
+  /// It will leave client in Invalid unusable state.
+  void release();
 
   /// Detach from socket.
   std::shared_ptr<network::NetSocket> detach();

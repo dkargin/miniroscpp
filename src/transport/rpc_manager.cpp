@@ -259,7 +259,7 @@ void RPCManager::shutdown()
     std::scoped_lock<std::mutex> lock(internal_->clients_mutex_);
     for (auto& [key, client]: internal_->clients_)
     {
-      client->close();
+      client->release();
     }
     internal_->clients_.clear();
   }
