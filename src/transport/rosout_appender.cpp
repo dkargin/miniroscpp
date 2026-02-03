@@ -56,7 +56,7 @@ ROSOutAppender::ROSOutAppender(const TopicManagerPtr& tm)
 
 ROSOutAppender::~ROSOutAppender()
 {
-  shutting_down_ = true;
+  shutting_down_.store(true);
 
   {
     std::scoped_lock<std::mutex> lock(queue_mutex_);
@@ -142,14 +142,14 @@ void ROSOutAppender::log(::miniros::console::Level level, const char* str, const
 void ROSOutAppender::logThread()
 {
   setThreadName("ROSOutAppender");
-  while (!shutting_down_)
+  while (!shutting_down_.load(std::memory_order_relaxed))
   {
     V_Log local_queue;
 
     {
       std::unique_lock<std::mutex> lock(queue_mutex_);
 
-      if (shutting_down_)
+      if (shutting_down_.load(std::memory_order_relaxed))
       {
         break;
       }

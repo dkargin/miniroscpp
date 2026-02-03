@@ -102,10 +102,12 @@ bool Master::start(PollSet* poll_set, int port)
   internal_->uuid.generate();
   internal_->parameterStorage.setParam("master", "/run_id", internal_->uuid.toString());
 
-  if (!internal_->rpcManager->start(poll_set, port)) {
+  internal_->rpcManager->setPollSet(poll_set);
+  internal_->regManager.setPollSet(poll_set);
+
+  if (!internal_->rpcManager->start(port)) {
     return false;
   }
-  internal_->regManager.setPollSet(poll_set);
 
   if (internal_->discovery) {
     MINIROS_DEBUG("Starting discovery module");

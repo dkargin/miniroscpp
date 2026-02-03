@@ -181,8 +181,6 @@ public:
   /// Send request to read PID value of remote process.
   Error sendGetPid(const std::string& callerId);
 
-  http::HttpClient::DisconnectResponse handleDisconnect(std::shared_ptr<network::NetSocket> socket, http::HttpClient::State state);
-
   /// Response method for GetPid request.
   void responseGetPid(int code, const std::string& msg, const RpcValue& data);
 
@@ -207,6 +205,9 @@ protected:
 
   /// Creates client object.
   std::shared_ptr<http::HttpClient> makeClient(PollSet* ps);
+
+  /// Handler for disconnect events from HttpClient.
+  void handleDisconnect(const std::weak_ptr<http::HttpClient>& client);
 
 protected:
   std::set<std::string> m_paramSubscriptions;

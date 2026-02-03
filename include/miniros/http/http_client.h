@@ -12,6 +12,7 @@
 
 #include "miniros/http/http_tools.h"
 #include "miniros/http/http_request.h"
+#include "miniros/network/url.h"
 
 #include <condition_variable>
 
@@ -40,8 +41,14 @@ public:
       /// No socket or connection available.
       Invalid,
       /// Connecting to server or on timeout.
+      /// Client has some valid socket, valid destination address, but connection is not established.
+      /// User can start adding requests to client. They will be processed right after connection is established.
       Connecting,
-      /// Waiting for reconnect.
+      /// Disconnected from server.
+      /// Client has some destination address, valid socket FD, but do not participate in PollSet spinning.
+      Disconnected,
+      /// Waiting for reconnection timer.
+      /// Client has some destination address, valid socket fd and waits for PollSet timeout event.
       WaitReconnect,
       /// Has valid socket but there are no requests to process.
       Idle,
@@ -69,10 +76,22 @@ public:
 
   /// Start connecting to specified server.
   /// Actual connection will be completed later.
+  /// @returns Possible errors:
+  ///  - InvalidAddress if address/port are invalid.
+  ///  - other errors from NetSocket::tcpConnect.
   Error connect(const std::string& address, int port);
 
   /// Add request to queue.
+  /// @returns Possible errors:
+  ///  - InvalidValue if request is empty.
+  ///  - InternalError if internal_ is empty.
   Error enqueueRequest(const std::shared_ptr<HttpRequest>& request);
+
+  /// Drop request from queue.
+  /// @returns possible errors:
+  ///  - InvalidValue if request is empty or if request is not actually stored in queue.
+  ///  - Internal error if internal_ is empty.
+  Error dropRequest(const std::shared_ptr<HttpRequest>& request);
 
   /// Close connection and detach from socket.
   void close();
@@ -91,19 +110,40 @@ public:
   /// Get number of queued requests, including active one.
   size_t getQueuedRequests() const;
 
-  struct DisconnectResponse {
-    bool reconnect = false;
-    size_t reconnectTimeout = 0;
-  };
-
   /// Called when TCP connection is broken.
-  std::function<DisconnectResponse (std::shared_ptr<NetSocket>& socket, State state)> onDisconnect;
+  using DisconnectHandler = std::function<void (std::shared_ptr<NetSocket>& socket, State state)>;
+
+  /// Sets callback for disconnect event.
+  /// Handler will be called when disconnect will happen. It can be during async connection, or any other active state.
+  /// This handler will be called in some unspecified background thread (from PollSet callbacks).
+  /// User can call any method of HttpClient from this handler.
+  void setDisconnectHandler(DisconnectHandler&& handler);
+
+  using TimeoutHandler = std::function<void (std::shared_ptr<NetSocket>& socket, State state)>;
+  /// Set handler for timeout in idle state.
+  void setIdleTimeoutHandler(int timeoutMs, TimeoutHandler&& handler);
+
+  /// Activate reconnection.
+  /// @param timeoutMs - number of milliseconds to wait for reconnection.
+  /// @returns possible errors:
+  ///  - InternalError if internal structures are null.
+  ///  - InvalidHandle - socket is null.
+  ///  - other errors from connect methods if timeout is 0.
+  Error reconnect(int timeoutMs);
+
+  /// Get current number of reconnection attempts.
+  int getReconnectAttempts() const;
 
   /// Called when client has successfully established TCP connection.
-  std::function<bool (std::shared_ptr<NetSocket> socket)> onConnect;
+  /// @returns if connection should be kept. false if connection should be dropped.
+  using ConnectHandler = std::function<bool (const std::shared_ptr<NetSocket>& socket)>;
+  void setConnectHandler(ConnectHandler&& onConnect);
 
-  /// Called when response is parsed.
-  std::function<void (const std::shared_ptr<HttpRequest>& req)> onResponse;
+  /// Called when client has successfully established TCP connection.
+  using ResponseHandler = std::function<void (const std::shared_ptr<HttpRequest>& req)>;
+
+  /// Sets callback function for processed event.
+  void setResponseHandler(ResponseHandler&& onResponse);
 
   /// Get high level state.
   State getState() const;
@@ -111,50 +151,24 @@ public:
   /// Check if client is in any "active" state.
   bool isActive() const;
 
+  /// Get internal file descriptor.
+  int fd() const;
+
+  /// Get root URL to base address of connected server (without path and query parameters).
+  network::URL getRootURL(const std::string& scheme) const;
+
 protected:
   /// Get socket events for specified state.
   static int eventsForState(State state);
 
+  struct Internal;
+
   using Lock = std::unique_lock<std::mutex>;
 
-  Error connectImplUnsafe(const network::NetAddress& address);
-
   /// Handle socket events from PollSet.
-  int handleSocketEvents(int events);
-
-  /// Handle State::Reconnecting.
-  /// Can switch to:
-  ///    - Connecting
-  ///    - Invalid
-  void handleReconnecting(Lock& lock, int events);
-
-  /// Handle State::Connecting.
-  /// Can switch to Idle.
-  void handleConnecting(Lock& lock, int events);
-
-  /// Handle State::WriteRequest.
-  /// Can switch to:
-  ///   - ReadResponse when all request is sent
-  ///   - WaitReconnect if error and reconnect is required.
-  void handleWriteRequest(Lock& lock, int events, bool fallThrough);
-
-  /// Handle State::ReadResponse.
-  /// Can switch to:
-  ///   - ReadResponse when all request is sent
-  ///   - WaitReconnect if error and reconnect is required.
-  void handleReadResponse(Lock& lock, int events, bool fallThrough);
-
-  /// Handle State::ProcessResponse.
-  /// Can switch to:
-  ///    - WriteRequest if there is another request.
-  ///    - Idle if no requests.
-  void handleProcessResponse(Lock& lock);
-
-  /// Handle disconnection: call onDisconnect callback and attempt reconnection if requested.
-  void handleDisconnect(Lock& lock);
+  static int handleSocketEvents(const std::shared_ptr<Internal>& I, int events);
 
 private:
-  struct Internal;
   /// Shared pointer is used to resolve racing condition with handleEvent callback from other thread.
   std::shared_ptr<Internal> internal_;
 };

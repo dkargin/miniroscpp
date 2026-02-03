@@ -69,7 +69,7 @@ ServiceManager::~ServiceManager()
   shutdown();
 }
 
-void ServiceManager::start(PollManagerPtr pm, MasterLinkPtr master_link, ConnectionManagerPtr cm, XMLRPCManagerPtr rpcm)
+void ServiceManager::start(PollManagerPtr pm, MasterLinkPtr master_link, ConnectionManagerPtr cm, RPCManagerPtr rpcm)
 {
   shutting_down_ = false;
 

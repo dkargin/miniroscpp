@@ -4,6 +4,7 @@
 
 #include <cassert>
 #include <cstring>
+#include <sstream>
 
 #include "miniros/io/io.h" // cross-platform headers needed
 

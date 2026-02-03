@@ -2,6 +2,7 @@
 // Created by dkargin on 7/22/25.
 //
 
+#include "miniros/console.h"
 #include "miniros/http/endpoints/xmlrpc.h"
 
 #include "http/http_request.h"

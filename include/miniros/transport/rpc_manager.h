@@ -120,29 +120,20 @@ public:
   RPCManager();
   ~RPCManager();
 
-  /** @brief Validate an XML/RPC response
-   *
-   * @param method The RPC method that was invoked.
-   * @param response The resonse that was received.
-   * @param payload The payload that was received.
-   *
-   * @return true if validation succeeds, false otherwise.
-   *
-   * @todo Consider making this private.
-   */
-  bool validateXmlrpcResponse(const std::string& method, RpcValue &response, RpcValue &payload);
-
   /**
    * @brief Get the xmlrpc server URI of this node
    */
-  const std::string& getServerURI() const;
+  std::string getServerURI() const;
   uint32_t getServerPort() const;
 
-  std::shared_ptr<http::HttpClient> getXMLRPCClient(const std::string& host, const int port, const std::string& uri);
-  void releaseXMLRPCClient(std::shared_ptr<http::HttpClient> c);
+  /// @param host - hostname of node
+  /// @param port - XMLRPC port of node
+  /// @param path - URL path. Requests to master typically go to "/RPC2". Node API goes to "/".
+  std::shared_ptr<http::HttpClient> getXMLRPCClient(const std::string& host, const int port, const std::string& path);
 
-  void addASyncConnection(const ASyncXMLRPCConnectionPtr& conn);
-  void removeASyncConnection(const ASyncXMLRPCConnectionPtr& conn);
+  /// Notify that specific client is not needed.
+  /// It should put this client on some timer after which it will be removed.
+  void releaseXMLRPCClient(std::shared_ptr<http::HttpClient> c);
 
   /// Get access to HTTP server.
   /// This pointer lifetime is tied to this instance of RPCManager.
@@ -272,7 +263,7 @@ public:
   /// Unbind all callbacks, associated with specific object.
   size_t unbind(const void* object);
 
-  NODISCARD Error start(PollSet* poll_set, int port = 0);
+  NODISCARD Error start(int port = 0);
   void shutdown();
 
   bool isShuttingDown() const;
@@ -280,13 +271,16 @@ public:
   /// Get assigned poll set.
   PollSet* getPollSet() const;
 
+  /// Assign poll set.
+  /// It should be done before calling 'start'.
+  /// It is done with separate function to allow usage of 'getXMLRPCClient` before calling 'start'.
+  void setPollSet(PollSet* poll_set);
+
 private:
 
   bool executeLocalMethod(const std::string& methodName, const RpcValue& request, RpcValue& response);
 
   bool executeLocalMulticall(const std::string& methodName, const RpcValue& request, RpcValue& response);
-
-  void serverThreadFunc();
 
   struct Internal;
   std::unique_ptr<Internal> internal_;

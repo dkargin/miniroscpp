@@ -30,5 +30,6 @@ Notable internal channels:
 
  - **miniros.http** - root channel for all internal http/XMLRPC components
  - **miniros.http.client** - channel for HTTP client.
- - **miniros.net** - channel for high level network components. It contains classes NetSocket, NetAddress, .... 
- - **miniros.poll_set** - channel exclusively for PollSet object.
+ - **miniros.net** - channel for high level network components. It contains classes NetSocket, NetAddress, ... . 
+ - **miniros.RPCManager** - channel for **RPCManager**.
+ - **miniros.master_link** - everything related to **MasterLink**.

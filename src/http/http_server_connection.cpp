@@ -4,6 +4,7 @@
 
 #include <cassert>
 
+#include "miniros/console.h"
 #include "miniros/http/http_server.h"
 #include "miniros/http/http_server_connection.h"
 

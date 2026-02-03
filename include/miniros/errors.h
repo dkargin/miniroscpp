@@ -57,6 +57,8 @@ struct MINIROS_DECL Error {
     Timeout,
     /// Sending of request or response was postponed.
     ResponsePostponed,
+    /// Can not complete operation because of some resource is in use.
+    ResourceInUse,
   };
 
   Error() :code(Ok)

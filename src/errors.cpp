@@ -51,6 +51,8 @@ const char* Error::toString() const {
       return "Timeout";
     case Error::ResponsePostponed:
       return "ResponsePostponed";
+    case Error::ResourceInUse:
+      return "ResourceInUse";
   }
   return "Unknown error";
 }

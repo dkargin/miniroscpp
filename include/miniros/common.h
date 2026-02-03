@@ -31,6 +31,7 @@
 /// This file contains some very common includes.
 #include <string>
 
+#include "miniros/console.h"
 #include "miniros/rosassert.h"
 #include "miniros/internal/forwards.h"
 #include "miniros/serialized_message.h"

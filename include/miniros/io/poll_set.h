@@ -36,8 +36,9 @@
 #define MINIROS_POLL_SET_H
 
 #include <functional>
+#include <memory>
 
-#include "miniros/common.h"
+#include "miniros/macros.h"
 
 namespace miniros
 {
@@ -47,6 +48,9 @@ namespace miniros
  *
  * PollSet provides thread-safe ways of adding and deleting sockets, as well as adding
  * and deleting events.
+ *
+ * Warning: PollSet must not use rosconsole in any way. This class is used too early
+ * and used for all socket interactions, including rosconsole.
  */
 class MINIROS_DECL PollSet
 {
@@ -127,6 +131,7 @@ public:
 
   /**
    * \brief Enable oneshot timer event for a socket.
+   * It will overwrite previous timer if this event was already set.
    * @param sock The socket to run event.
    * @param timeoutMs time for event to happen.
    */

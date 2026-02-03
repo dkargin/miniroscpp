@@ -27,6 +27,7 @@
 
 #include <mutex>
 
+// Will log to "miniros.master_link"
 #define MINIROS_PACKAGE_NAME "master_link"
 
 #include "../../include/miniros/network/network.h"
@@ -35,6 +36,7 @@
 
 #include "http/http_client.h"
 #include "http/xmlrpc_request.h"
+#include "internal/xml_tools.h"
 #include "miniros/names.h"
 #include "miniros/this_node.h"
 #include "miniros/transport/rpc_manager.h"
@@ -207,6 +209,16 @@ bool MasterLink::getNodes(std::vector<std::string>& nodes) const
   return true;
 }
 
+struct ResponseState {
+  XmlRpc::XmlRpcValue& response;
+  XmlRpc::XmlRpcValue& payload;
+
+  std::atomic_bool needed = true;
+  std::atomic_bool b = false;
+
+  ResponseState(XmlRpc::XmlRpcValue& response, XmlRpc::XmlRpcValue& payload) : response(response), payload(payload) {}
+};
+
 Error MasterLink::execute(const std::string& method, const RpcValue& request, RpcValue& response,
   RpcValue& payload, bool wait_for_master) const
 {
@@ -233,7 +245,7 @@ Error MasterLink::execute(const std::string& method, const RpcValue& request, Rp
     if (Error err = manager->executeLocalRPC(method, request, response); err != Error::Ok) {
       return Error::InvalidValue;
     }
-    if (!manager->validateXmlrpcResponse(method, response, payload)) {
+    if (!xml::XmlCodec::validateXmlrpcResponse(method, response, payload)) {
       return Error::InvalidResponse;
     }
     return Error::Ok;
@@ -246,33 +258,56 @@ Error MasterLink::execute(const std::string& method, const RpcValue& request, Rp
   }
   bool printed = false;
   bool slept = false;
+  // Flag for tracking global shutdown.
   bool ok = true;
-  volatile bool b = false;
 
-  network::URL url;
-  auto req = http::makeRequest(url, method);
+  // This is semi-shared response state.
+  // It is needed to keep some state in case callback will be called after we exit this function.
+  auto state = std::make_shared<ResponseState>(response, payload);
+  auto req = http::makeRequest("/RPC2", method);
   req->setParamArray(request);
-  req->onComplete =
-    [&payload, &b] (int code, const std::string& msg, const RpcValue& data){
-      payload = data;
-      b = true;
-    };
-  Error err = c->enqueueRequest(req);
+  req->onCompleteRaw = [wstate = std::weak_ptr(state), method](Error err, const RpcValue& rawResponse, bool ok_) {
+    if (auto state = wstate.lock()) {
+      // This callback can happen outside this function.
+      state->response = rawResponse;
+      state->b.store(true);
+    } else {
+      MINIROS_WARN("MasterLink::execute - unexpected response for request %s", method.c_str());
+    }
+  };
+
+  if (!wait_for_master) {
+    req->setFailureCallback([wc = std::weak_ptr(c), wreq = std::weak_ptr(req)]()
+    {
+      if (auto req = wreq.lock()) {
+        if (auto c = wc.lock()) {
+          c->dropRequest(req);
+        }
+      }
+    });
+  }
+
+  if (Error err = c->enqueueRequest(req); err != Error::Ok) {
+    MINIROS_ERROR("Failed to enqueue request");
+    return err;
+  }
+
   do {
     {
 #if defined(__APPLE__)
       std::scoped_lock<std::mutex> lock(internal_->xmlrpc_call_mutex);
 #endif
-
-      // It creates connection, sends header and tries to parse response right here.
-      // b = c->execute(method.c_str(), request, response);
-      req->waitForResponse(WallDuration(0.100));
-      b = req->state() == http::HttpRequest::State::ClientHasResponse;
+      if (Error err = req->waitForState(http::HttpRequest::State::ClientDone, WallDuration(0.100)); err == Error::Ok) {
+        // b is set to true in callback.
+      }
+      else if (err != Error::Timeout) {
+        // Some serious error here.
+      }
     }
 
     ok = !miniros::isShuttingDown() && !manager->isShuttingDown();
 
-    if (!b && ok) {
+    if (!state->b && ok) {
       if (!printed && wait_for_master) {
         MINIROS_ERROR("[%s] Failed to contact master at [%s:%d].  %s", method.c_str(), master_host.c_str(), master_port,
           wait_for_master ? "Retrying..." : "");
@@ -280,21 +315,21 @@ Error MasterLink::execute(const std::string& method, const RpcValue& request, Rp
       }
 
       if (!wait_for_master) {
-        manager->releaseXMLRPCClient(c);
+        // TODO: Do we need to drop request?
         return Error::NoMaster;
       }
 
       if (!internal_->retry_timeout.isZero() && (miniros::SteadyTime::now() - start_time) >= internal_->retry_timeout) {
         MINIROS_ERROR("[%s] Timed out trying to connect to the master after [%f] seconds", method.c_str(), internal_->retry_timeout.toSec());
-        manager->releaseXMLRPCClient(c);
+        // TODO: Do we need to drop request?
         return Error::NoMaster;
       }
 
       (void)miniros::WallDuration(0.05).sleep();
       slept = true;
     } else {
-      if (!manager->validateXmlrpcResponse(method, response, payload)) {
-        manager->releaseXMLRPCClient(c);
+      if (!xml::XmlCodec::validateXmlrpcResponse(method, response, payload)) {
+        // It is either malformed response, or fault response from server.
         return Error::InvalidResponse;
       }
       break;
@@ -307,15 +342,14 @@ Error MasterLink::execute(const std::string& method, const RpcValue& request, Rp
     MINIROS_INFO("Connected to master at [%s:%d]", master_host.c_str(), master_port);
   }
 
-  manager->releaseXMLRPCClient(c);
-
   if (!ok) {
     MINIROS_ERROR("[%s] Got shutdown request during RPC call", method.c_str());
     return Error::ShutdownInterrupt;
   }
-  auto time = SteadyTime::now() - start_time;
+  // Since MAsterLink can be used very early, this logging can cause recursive print.
+  // auto time = SteadyTime::now() - start_time;
   //MINIROS_DEBUG("Finished \"%s\" in %fms", method.c_str(), time.toSec()*1000.0);
-  return Error::Ok;;
+  return Error::Ok;
 }
 
 void MasterLink::invalidateParentParams(const std::string& key)

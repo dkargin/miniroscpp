@@ -225,23 +225,25 @@ std::shared_ptr<http::HttpClient> NodeRef::makeClient(PollSet* ps)
     return {};
   auto client = std::make_shared<http::HttpClient>(ps);
   std::weak_ptr<NodeRef> wnode = weak_from_this();
-  client->onDisconnect = [wnode](std::shared_ptr<network::NetSocket> socket, http::HttpClient::State state) {
-    if (auto node = wnode.lock()) {
-      return node->handleDisconnect(socket, state);
-    }
-    return http::HttpClient::DisconnectResponse{};
-  };
+  std::weak_ptr<http::HttpClient> wclient;
+  client->setDisconnectHandler(
+    [wnode, wclient](std::shared_ptr<network::NetSocket> socket, http::HttpClient::State state)
+    {
+      if (auto node = wnode.lock()) {
+        node->handleDisconnect(wclient);
+      }
+    });
 
-  client->onConnect = [this](std::shared_ptr<network::NetSocket> socket) {
+  client->setConnectHandler([this](std::shared_ptr<network::NetSocket> socket) {
     MINIROS_INFO("%s - connected", debugName().c_str());
     std::unique_lock<std::mutex> lock(m_guard);
     updateState(State::Connected, lock);
     return true;
-  };
+  });
 
-  client->onResponse = [this](const std::shared_ptr<http::HttpRequest>& req) {
+  client->setResponseHandler([this](const std::shared_ptr<http::HttpRequest>& req) {
     m_activeRequests.erase(req);
-  };
+  });
   return client;
 }
 
@@ -293,23 +295,25 @@ Error NodeRef::activateConnection(const std::string& callerId, PollSet* ps)
   return Error::Ok;
 }
 
-http::HttpClient::DisconnectResponse NodeRef::handleDisconnect(std::shared_ptr<network::NetSocket> socket, http::HttpClient::State state)
+void NodeRef::handleDisconnect(const std::weak_ptr<http::HttpClient>& wclient)
 {
-  http::HttpClient::DisconnectResponse dr;
+  auto client = wclient.lock();
+  if (!client)
+    return;
   std::unique_lock<std::mutex> lock(m_guard);
   if (m_state == State::ShuttingDown) {
-    dr.reconnect = false;
     deactivateConnectionUnsafe();
-    MINIROS_INFO("%s - disconnected at state=%s, HttpClient state=%s", debugName().c_str(), m_state.toString(), state.toString());
+    MINIROS_INFO("%s - disconnected at state=%s, HttpClient state=%s", debugName().c_str(), m_state.toString(), client->getState().toString());
     updateState(State::Dead, lock);
   } else {
-    dr.reconnect = true;
-    dr.reconnectTimeout = 5;
-
-    MINIROS_INFO("%s - disconnected at state %s. Initiating reconnect", debugName().c_str(), m_state.toString());
-    updateState(State::Connecting, lock);
+    if (Error err = client->reconnect(5)) {
+      MINIROS_INFO("%s - disconnected at state %s. Initiating reconnect", debugName().c_str(), m_state.toString());
+      updateState(State::Connecting, lock);
+    } else {
+      MINIROS_INFO("%s - disconnected at state %s. Failed to initiate reconnect: %s", debugName().c_str(), m_state.toString(), err.toString());
+      updateState(State::Dead, lock);
+    }
   }
-  return dr;
 }
 
 
@@ -365,7 +369,7 @@ Error NodeRef::sendPublisherUpdate(const std::string& callerId, const std::strin
     return Error::NotConnected;
   }
 
-  auto request = http::makeRequest(m_apiUrl, "publisherUpdate");
+  auto request = http::makeRequest(m_apiUrl.path, "publisherUpdate");
   request->setParams(callerId, topic, update);
   m_activeRequests.insert(request);
   MINIROS_INFO("%s::sendPublisherUpdate(%s)", debugName().c_str(), topic.c_str());
@@ -384,9 +388,8 @@ Error NodeRef::sendParameterUpdate(const std::string& callerId, const std::strin
     return Error::NotConnected;
   }
 
-  auto request = http::makeRequest(m_apiUrl, "paramUpdate");
+  auto request = http::makeRequest(m_apiUrl.path, "paramUpdate");
   request->setParams(callerId, param, value ? *value : RpcValue::Dict());
-
   {
     std::unique_lock lock(m_guard);
     m_activeRequests.insert(request);
@@ -411,7 +414,7 @@ Error NodeRef::sendShutdown(const std::string& msg)
     std::unique_lock lock(m_guard);
     if (!m_reqShutdown) {
       // Create XML-RPC request for shutdown
-      m_reqShutdown = http::makeRequest(m_apiUrl, "shutdown");
+      m_reqShutdown = http::makeRequest(m_apiUrl.path, "shutdown");
     } else if (m_reqShutdown->state() != http::HttpRequest::State::Idle) {
       // Already sent request.
       return Error::Ok;
@@ -447,7 +450,7 @@ Error NodeRef::sendGetPid(const std::string& callerId)
   {
     std::unique_lock lock(m_guard);
     if (!m_reqGetPid) {
-      m_reqGetPid = http::makeRequest(m_apiUrl, "getPid");
+      m_reqGetPid = http::makeRequest(m_apiUrl.path, "getPid");
       m_reqGetPid->setParams(callerId);
       m_reqGetPid->generateRequestBody();
       std::weak_ptr<NodeRef> wnode = this->shared_from_this();

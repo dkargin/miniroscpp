@@ -9,6 +9,8 @@
 #include "miniros/b64/decode.h"
 #include "miniros/xmlrpcpp/XmlRpcValue.h"
 
+#include "miniros/console.h"
+
 namespace miniros {
 namespace xml {
 // Returns contents between <tag> and </tag>, updates offset to char after </tag>
@@ -488,5 +490,53 @@ bool XmlCodec::parseXmlRpcStruct(Value& value, const std::string_view& valueXml,
   value.setStruct(std::move(map));
   return true;
 }
+
+bool XmlCodec::validateXmlrpcResponse(const std::string& method, const Value &response, Value &payload)
+{
+  if (response.getType() != Value::TypeArray)
+  {
+    MINIROS_DEBUG("XML-RPC call [%s] didn't return an array",
+        method.c_str());
+    return false;
+  }
+  if (response.size() != 2 && response.size() != 3)
+  {
+    MINIROS_DEBUG("XML-RPC call [%s] didn't return a 2 or 3-element array",
+        method.c_str());
+    return false;
+  }
+  if (response[0].getType() != Value::TypeInt)
+  {
+    MINIROS_DEBUG("XML-RPC call [%s] didn't return a int as the 1st element",
+        method.c_str());
+    return false;
+  }
+  int status_code = response[0];
+  if (response[1].getType() != Value::TypeString)
+  {
+    MINIROS_DEBUG("XML-RPC call [%s] didn't return a string as the 2nd element", method.c_str());
+    return false;
+  }
+  std::string status_string = response[1];
+  if (status_code != 1)
+  {
+    // This is error from server.
+    // MINIROS_DEBUG("XML-RPC call [%s] returned an error (%d): [%s]", method.c_str(), status_code, status_string.c_str());
+    return false;
+  }
+  if (response.size() > 2)
+  {
+    payload = response[2];
+  }
+  else
+  {
+    std::string empty_array = "<value><array><data></data></array></value>";
+    size_t offset = 0;
+    xml::XmlCodec codec;
+    return codec.parseXmlRpcValue(payload, empty_array, offset);
+  }
+  return true;
+}
+
 } // namespace xml
 } // namespace miniros

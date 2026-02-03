@@ -2,11 +2,17 @@
 // Created by dkargin on 11/14/25.
 //
 
-#include "miniros/http/http_request.h"
 #include <sstream>
 #include <cstdio>
 #include <cctype>
 #include <iomanip>
+
+#include "miniros/http/http_request.h"
+#include "miniros/console.h"
+
+
+/// This file will log to "miniros.http" channel.
+#define MINIROS_PACKAGE_NAME "http"
 
 namespace miniros {
 namespace http {
@@ -14,7 +20,7 @@ namespace http {
 HttpRequest::HttpRequest() : method_(HttpMethod::Get), path_("/")
 {}
 
-HttpRequest::HttpRequest(HttpMethod method, const char* path) : method_(method), path_(path)
+HttpRequest::HttpRequest(HttpMethod method, const std::string& path) : method_(method), path_(path)
 {}
 
 HttpRequest::~HttpRequest()
@@ -246,6 +252,18 @@ void HttpRequest::setResponseHeader(const HttpParserFrame& frame)
   response_header_.contentType = frame.getContentType();
 }
 
+void HttpRequest::setFailureCallback(std::function<void()>&& cb)
+{
+  on_fail_ = std::move(cb);
+}
+
+void HttpRequest::notifyFailToSend()
+{
+  if (on_fail_) {
+    on_fail_();
+  }
+}
+
 const std::string& HttpRequest::responseBody() const
 {
   return response_body_;
@@ -262,12 +280,6 @@ void HttpRequest::setResponseBody(const char* data, size_t size)
 {
   std::unique_lock lock(mutex_);
   response_body_.assign(data, size);
-}
-
-void HttpRequest::setResponseHeader(const HttpResponseHeader& responseHeader)
-{
-  std::unique_lock lock(mutex_);
-  response_header_ = responseHeader;
 }
 
 void HttpRequest::resetResponse()
@@ -294,6 +306,20 @@ void HttpRequest::setResponseStatusOk()
 const HttpResponseHeader& HttpRequest::responseHeader() const
 {
   return response_header_;
+}
+
+Error HttpRequest::waitForState(State state, const WallDuration& duration) const {
+  std::unique_lock lock(mutex_);
+  if (state_ == state)
+    return Error::Ok;
+  std::chrono::duration<double> d(duration.toSec());
+  if (!cv_.wait_for(lock, d, [this, state]() {
+    return state_ == state;
+  }))
+  {
+    return state != state_ ? Error::Timeout : Error::Ok;
+  }
+  return Error::Ok;
 }
 
 Error HttpRequest::waitForResponse(const WallDuration& duration) const

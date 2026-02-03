@@ -32,9 +32,6 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  */
 
-/// This file will log to "miniros.poll_set" channel.
-#define MINIROS_PACKAGE_NAME "poll_set"
-
 #include <algorithm>
 #include <vector>
 #include <map>
@@ -45,8 +42,8 @@
 
 #include "miniros/io/poll_set.h"
 #include "miniros/io/io.h"
-#include "miniros/file_log.h"
-#include "miniros/rosassert.h"
+
+#include "miniros/internal/local_log.h"
 
 //#define POLL_SET_SERIOUS_LOG
 
@@ -119,8 +116,8 @@ PollSet::PollSet()
   internal_.reset(new Internal());
 
   if ( create_signal_pair(internal_->signal_pipe_) != 0 ) {
-    MINIROS_FATAL("create_signal_pair() failed");
-    MINIROS_BREAK();
+    // Really no idea how to recover from this kind of error.
+    perror("PollSet::PollSet - create_signal_pair() failed");
   }
   addSocket(internal_->signal_pipe_[0], POLLIN, [this](int events){return onLocalPipeEvents(events);});
 }
@@ -155,7 +152,7 @@ bool PollSet::addSocket(int fd, int events, const SocketUpdateFunc& update_func,
     bool b = internal_->socket_info_.insert(std::make_pair(fd, info)).second;
     if (!b)
     {
-      MINIROS_ERROR("PollSet: Tried to add duplicate fd [%d]", fd);
+      printf("PollSet: Tried to add duplicate fd [%d]", fd);
       return false;
     }
 
@@ -163,7 +160,7 @@ bool PollSet::addSocket(int fd, int events, const SocketUpdateFunc& update_func,
 
     internal_->sockets_changed_ = true;
   }
-  MINIROS_DEBUG("PollSet::addSocket(%d) evt=%s", fd, eventToString(events).c_str());
+  LOCAL_DEBUG("PollSet::addSocket(%d) evt=%s", fd, eventToString(events).c_str());
 
   signal();
 
@@ -197,11 +194,11 @@ bool PollSet::delSocket(int fd)
     internal_->sockets_changed_ = true;
     signal();
 
-    MINIROS_DEBUG("PollSet::delSocket(%d)", fd);
+    LOCAL_DEBUG("PollSet::delSocket(%d)", fd);
     return true;
   }
 
-  MINIROS_WARN("PollSet: Tried to delete fd [%d] which is not being tracked", fd);
+  LOCAL_WARN("PollSet: Tried to delete fd [%d] which is not being tracked", fd);
 
   return false;
 }
@@ -215,7 +212,7 @@ bool PollSet::addEvents(int sock, int events)
 
   if (it == internal_->socket_info_.end())
   {
-    MINIROS_DEBUG("PollSet: Tried to add events [%d] to fd [%d] which does not exist in this pollset", events, sock);
+    LOCAL_DEBUG("PollSet: Tried to add events [%d] to fd [%d] which does not exist in this pollset", events, sock);
     return false;
   }
 
@@ -240,7 +237,7 @@ bool PollSet::delEvents(int sock, int events)
   }
   else
   {
-    MINIROS_DEBUG("PollSet: Tried to delete events [%d] to fd [%d] which does not exist in this pollset", events, sock);
+    LOCAL_DEBUG("PollSet: Tried to delete events [%d] to fd [%d] which does not exist in this pollset", events, sock);
     return false;
   }
 
@@ -260,7 +257,7 @@ bool PollSet::setEvents(int sock, int events)
 
   if (it == internal_->socket_info_.end())
   {
-    MINIROS_DEBUG("PollSet: Tried to set events [%d] to fd [%d] which does not exist in this pollset", events, sock);
+    LOCAL_DEBUG("PollSet: Tried to set events [%d] to fd [%d] which does not exist in this pollset", events, sock);
     return false;
   }
 
@@ -268,7 +265,7 @@ bool PollSet::setEvents(int sock, int events)
     it->second.events_ = events;
     set_events_on_socket(internal_->epfd_, sock, it->second.events_);
     internal_->sockets_changed_ = true;
-    MINIROS_DEBUG("PollSet::setEvents(%d, %s)", sock, eventToString(events).c_str());
+    LOCAL_DEBUG("PollSet::setEvents(%d, %s)", sock, eventToString(events).c_str());
     signal();
   }
 
@@ -282,7 +279,7 @@ bool PollSet::setTimerEvent(int sock, int timeoutMs)
 
   if (it == internal_->socket_info_.end())
   {
-    MINIROS_DEBUG("PollSet: Tried to set timer fd [%d] which does not exist in this pollset", sock);
+    LOCAL_DEBUG("PollSet: Tried to set timer fd [%d] which does not exist in this pollset", sock);
     return false;
   }
   internal_->socket_timers_[sock] = SteadyTime::now() + WallDuration(timeoutMs*0.001);
@@ -321,7 +318,7 @@ void PollSet::update(int poll_timeout)
   Error err = poll_sockets(internal_->epfd_, &internal_->ufds_.front(), numFd, poll_timeout, internal_->ofds_);
   if (!err)
   {
-    MINIROS_ERROR("PollSet::update() poll_sockets failed with error %s", err.toString());
+    LOCAL_ERROR("PollSet::update() poll_sockets failed with error %s", err.toString());
     return;
   }
 
