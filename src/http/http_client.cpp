@@ -104,8 +104,7 @@ struct HttpClient::Internal {
   ~Internal()
   {
     std::unique_lock lock(process_guard);
-    detachPollSet(lock);
-    closeSocket(lock);
+    release(lock);
   }
 
   void resetRequest();
@@ -197,6 +196,30 @@ struct HttpClient::Internal {
   /// Pulls new task from queue and updates state.
   /// @returns true if managed to pull new task.
   bool pullNewTask(Lock& processLock);
+
+  /// Completely release own state.
+  void release(Lock& lock)
+  {
+    detachPollSet(lock);
+    closeSocket(lock);
+
+    std::unique_lock reqLock(requests_guard);
+    if (active_request) {
+      auto req = active_request;
+      active_request.reset();
+      req->updateState(http::HttpRequest::State::Idle);
+      req->notifyFailToSend();
+    }
+
+    auto copy = requests;
+    requests.clear();
+    for (const auto& req: copy) {
+      req->updateState(http::HttpRequest::State::Idle);
+      req->notifyFailToSend();
+    }
+
+    state = State::Invalid;
+  }
 };
 
 int HttpClient::eventsForState(State state)
@@ -402,8 +425,9 @@ HttpClient::~HttpClient()
     std::unique_lock lock(internal_->process_guard);
     std::shared_ptr<Internal> copy;
     std::swap(internal_, copy);
-    copy->detachPollSet(lock);
-    copy->closeSocket(lock);
+    copy->release(lock);
+    // Explicitly unlock to prevent potential deadlock in destructor if Internal.
+    lock.unlock();
   }
   MINIROS_INFO_NAMED("client", "HttpClient::~HttpClient()");
 }
@@ -446,14 +470,13 @@ network::URL HttpClient::getRootURL(const std::string& scheme) const
   return url;
 }
 
-void HttpClient::close()
+void HttpClient::release()
 {
   if (!internal_)
     return;
 
   std::unique_lock lock(internal_->process_guard);
-  internal_->closeSocket(lock);
-  internal_->state = State::Invalid;
+  internal_->release(lock);
 }
 
 std::shared_ptr<network::NetSocket> HttpClient::detach()
@@ -719,7 +742,7 @@ int HttpClient::handleSocketEvents(const std::shared_ptr<Internal>& I, int evtFl
 
   if (I->state == State::Idle && (evtFlags & PollSet::EventOut)) {
     // Nothing to do here.
-  } else if (stateChanges == 0) {
+  } else if (stateChanges == 0 && state != State::Invalid) {
     std::string evt = PollSet::eventToString(evtFlags);
     MINIROS_WARN("HttpClient unhandled events: %s in state %s", evt.c_str(), state.toString());
   }
@@ -895,7 +918,7 @@ void HttpClient::Internal::handleProcessResponse(Lock& lock)
       copy(req);
     }
     req->processResponse();
-    req->updateState(HttpRequest::State::ClientDone);
+    req->updateState(HttpRequest::State::Done);
   }
 
   updateState(lock, State::Idle);

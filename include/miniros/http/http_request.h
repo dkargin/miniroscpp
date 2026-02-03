@@ -38,8 +38,9 @@ public:
     ClientWaitResponse,
     /// Got HTTP response but waiting for client to process it.
     ClientHasResponse,
-    /// processResponse was called.
-    ClientDone,
+
+    /// Response is finished and removed from HttpClient processing.
+    Done,
 
     /// Receiving request.
     ServerReceive,

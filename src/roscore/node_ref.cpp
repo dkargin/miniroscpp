@@ -320,7 +320,7 @@ void NodeRef::handleDisconnect(const std::weak_ptr<http::HttpClient>& wclient)
 void NodeRef::deactivateConnectionUnsafe()
 {
   if (m_client) {
-    m_client->close();
+    m_client->release();
     m_client.reset();
   }
   m_reqGetPid.reset();

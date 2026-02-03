@@ -107,7 +107,7 @@ TEST_F(HttpServerTest, SimpleGet)
   EXPECT_EQ(request->waitForResponse(WallDuration(5.0)), Error::Ok);
 
   // Verify we actually got a response
-  ASSERT_EQ(request->state(), http::HttpRequest::State::ClientHasResponse);
+  ASSERT_EQ(request->state(), http::HttpRequest::State::Done);
   {
     const auto& responseHeader = request->responseHeader();
     EXPECT_EQ(responseHeader.statusCode, 200);
@@ -125,7 +125,7 @@ TEST_F(HttpServerTest, SimpleGet)
 
   EXPECT_EQ(request->waitForResponse(WallDuration(5.0)), Error::Ok);
   // Verify we actually got a response
-  ASSERT_EQ(request->state(), http::HttpRequest::State::ClientHasResponse);
+  ASSERT_EQ(request->state(), http::HttpRequest::State::Done);
   {
     const auto& responseHeader = request->responseHeader();
     EXPECT_EQ(responseHeader.statusCode, 200);
@@ -198,7 +198,7 @@ TEST_F(HttpServerTest, PostWithJson)
   EXPECT_EQ(request->waitForResponse(WallDuration(5.0)), Error::Ok);
 
   // Verify we actually got a response
-  ASSERT_EQ(request->state(), http::HttpRequest::State::ClientHasResponse);
+  ASSERT_EQ(request->state(), http::HttpRequest::State::Done);
   {
     const auto& responseHeader = request->responseHeader();
     EXPECT_EQ(responseHeader.statusCode, 200);
