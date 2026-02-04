@@ -41,7 +41,7 @@ public:
       /// Writing HTTP response to client.
       WriteResponse,
       /// Connection is closing/exiting.
-      Exit,
+      Disconnected,
     };
 
     State(State_t val) : value(val) {}
@@ -57,9 +57,6 @@ public:
   protected:
     State_t value;
   };
-
-  /// Incremental reading of request.
-  Error readRequest();
 
   void resetResponse();
 
@@ -87,6 +84,15 @@ protected:
   /// Updates internal state.
   void updateState(Lock& lock, State newState);
 
+  /// Incremental reading of request.
+  Error doReadRequest(Lock& lock);
+
+  /// Handles State::ReadRequest.
+  /// Expected transitions:
+  ///  - ProcessRequest if got full HTTP request.
+  ///  - Disconnected if error on socket.
+  void handleReadRequest(Lock& lock, int& evtFlags, bool fallThrough);
+
   /// Handle State::ProcessRequest.
   /// Expected transitions:
   ///  - WriteResponse if got response immediately
@@ -94,7 +100,10 @@ protected:
   bool handleProcessRequest(Lock& lock);
 
   /// Handle State::WriteResponse.
-  void handleWriteResponse(Lock& lock, int evtFlags, bool fallThrough);
+  void handleWriteResponse(Lock& lock, int& evtFlags, bool fallThrough);
+
+  /// Process disconnect event.
+  void handleDisconnect(Lock& lock);
 
   /// Start writing response to socket. It serializes response to buffers and switches state to WriteResponse.
   void doWriteResponse(Lock& lock, const std::shared_ptr<HttpRequest>& requestObject, Error error);

@@ -6,6 +6,8 @@
 
 #include "miniros/internal/local_log.h"
 
+#include <cstring>
+
 namespace miniros {
 namespace internal {
 
@@ -14,24 +16,28 @@ int getVerbosity()
   return static_cast<int>(console::Level::Debug);
 }
 
-void InternalLog::log(console::Level level, const char* channel, const char* fmt, ...) {
-  if (static_cast<int>(level) < getVerbosity())
-    return;
+void InternalLog::log(const console::LogLocation& loc, const char* channel, const char* fmt, ...) {
   va_list va;
-  char buf[1024] = {};
+  char buf[512] = {};
   va_start( va, fmt);
-  int written = std::vsnprintf(buf,sizeof(buf)-1,fmt,va);
+  int written = std::vsnprintf(buf,sizeof(buf)-2,fmt,va);
   va_end(va);
 
-  if (written < 0)
+  if (written <= 0)
     return;
 
-  buf[sizeof(buf)-1] = 0;
+  // vsnprintf can return value longer than initial buffer.
+  // This value corresponds to actual length of the line.
+  if (written > sizeof(buf)) {
+    written = sizeof(buf) - 1;
+  }
 
-  if (level == console::Level::Error || level == console::Level::Warn) {
-    fprintf(stderr, "%s\n", buf);
+  buf[written] = 0;
+
+  if (loc.level_ == console::Level::Error || loc.level_ == console::Level::Warn) {
+    fprintf(stderr,"%s\n", buf);
   } else {
-    fprintf(stdout, "%s\n", buf);
+    fprintf(stdout,"%s\n", buf);
   }
 }
 }

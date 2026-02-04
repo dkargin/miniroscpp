@@ -103,7 +103,7 @@ namespace {
 // xml encodings (xml-encoded entities are preceded with '&')
 constexpr char  AMP = '&';
 constexpr char  rawEntity[] = { '<',   '>',   '&',    '\'',    '\"',    0 };
-constexpr char* const xmlEntity[] = { "lt;", "gt;", "amp;", "apos;", "quot;", 0 };
+constexpr const char* const xmlEntity[] = { "lt;", "gt;", "amp;", "apos;", "quot;", 0 };
 constexpr int   xmlEntLen[] = { 3,     3,     4,      5,       5 };
 }
 

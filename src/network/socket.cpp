@@ -586,6 +586,7 @@ std::pair<size_t, Error> NetSocket::send(const void* rawData, size_t size, const
     LOCAL_DEBUG_NAMED("socket", "NetSocket(%d)::send returned %d.", (int)internal_->fd, n);
     if (n > 0) {
       if (isDatagram()) {
+        written = n;
         break;
       }
       sp += n;

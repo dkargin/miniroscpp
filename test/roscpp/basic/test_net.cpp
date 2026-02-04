@@ -91,13 +91,13 @@ TEST(SocketUDP, SimplestBroadcast)
 
   auto [sent1, err1] = socket.send(msg, strlen(msg) + 1, &brAddress);
   ASSERT_EQ(err1, Error::Ok);
-  ASSERT_GT(sent1, 0);
+  ASSERT_EQ(sent1, 6);
 
   const char msg2[] = "world";
   NetAddress address = NetAddress::fromIp4String("255.255.255.255", port);
   auto [sent2, err2] = socket.send(msg2, sizeof(msg2), &address);
   ASSERT_EQ(err2, Error::Ok);
-  ASSERT_GT(sent2, 0);
+  ASSERT_EQ(sent2, 6);
 }
 
 int main(int argc, char** argv)

@@ -34,18 +34,18 @@
 
 #define MINIROS_PACKAGE_NAME "transport_tcp"
 
+#include <sstream>
+#include <cstring>
+#include <fcntl.h>
+#include <errno.h>
+
 #include "miniros/io/poll_set.h"
 #include "miniros/io/io.h"
 #include "miniros/transport/transport_tcp.h"
 #include "miniros/header.h"
 #include "miniros/file_log.h"
 #include <miniros/rosassert.h>
-#include <sstream>
-#include <cstring>
 
-
-#include <fcntl.h>
-#include <errno.h>
 namespace miniros
 {
 

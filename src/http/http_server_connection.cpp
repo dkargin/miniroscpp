@@ -43,15 +43,15 @@ const char* HttpServerConnection::State::toString() const
       return "ProcessRequest";
     case WriteResponse:
       return "WriteResponse";
-    case Exit:
-      return "Exit";
+    case Disconnected:
+      return "Disconnected";
     default:
       assert(false);
   }
   return "Unknown";
 }
 
-Error HttpServerConnection::readRequest()
+Error HttpServerConnection::doReadRequest(Lock& lock)
 {
   if (http_frame_.state() == HttpParserFrame::ParseRequestHeader) {
     request_start_ = SteadyTime::now();
@@ -80,7 +80,7 @@ Error HttpServerConnection::readRequest()
   assert(http_frame_.state() == HttpParserFrame::ParseComplete);
   // Otherwise, parse and dispatch the request
   LOCAL_DEBUG("HttpServerConnection(peer=%s fd=%d)::readRequest read %d/%d bytes.", peer.c_str(), fd, http_frame_.bodyLength(), http_frame_.contentLength());
-  state_ = State::ProcessRequest;
+  updateState(lock, state_ = State::ProcessRequest);
   return Error::Ok;
 }
 
@@ -198,9 +198,49 @@ bool HttpServerConnection::handleProcessRequest(Lock& lock)
   return true;
 }
 
-void HttpServerConnection::handleWriteResponse(Lock& lock, int evtFlags, bool fallThrough)
+void HttpServerConnection::handleDisconnect(Lock& lock)
 {
-  if (evtFlags & PollSet::EventOut || fallThrough) {
+  updateState(lock, State::Disconnected);
+}
+
+
+void HttpServerConnection::handleReadRequest(Lock& lock, int& evtFlags, bool fallThrough)
+{
+  if (!fallThrough && evtFlags & PollSet::EventError) {
+    handleDisconnect(lock);
+    evtFlags = 0;
+  }
+
+  if (evtFlags & PollSet::EventIn || fallThrough) {
+    Error err = doReadRequest(lock);
+
+    evtFlags &= (~PollSet::EventIn);
+
+    // What to do with EOF?
+
+    if (err == Error::Ok) {
+      // Remain in the same ReadRequest state.
+    }
+    else if (err == Error::EndOfFile) {
+      handleDisconnect(lock);
+    } else {
+      LOCAL_ERROR("Unexpected error %s", err.toString());
+    }
+  } else {
+    LOCAL_WARN("HttpServerConnection::handleReadRequest() unhandled events in ReadRequest: %o", evtFlags);
+  }
+}
+
+
+void HttpServerConnection::handleWriteResponse(Lock& lock, int& evtFlags, bool fallThrough)
+{
+  if (!fallThrough && evtFlags & PollSet::EventError) {
+    handleDisconnect(lock);
+    evtFlags = 0;
+  }
+  else if (evtFlags & PollSet::EventOut || fallThrough) {
+    evtFlags &= (~PollSet::EventOut);
+
     std::pair<size_t, Error> r;
 
     const std::string& responseBody = active_request->responseBody();
@@ -237,7 +277,6 @@ void HttpServerConnection::handleWriteResponse(Lock& lock, int evtFlags, bool fa
       }
       data_sent_ = 0;
 
-      state_ = State::ReadRequest;
       http_frame_.finishRequest();
       updateState(lock, State::ReadRequest);
       double dur = (SteadyTime::now() - request_start_).toSec() * 1000;
@@ -245,8 +284,6 @@ void HttpServerConnection::handleWriteResponse(Lock& lock, int evtFlags, bool fa
     } else {
       LOCAL_ERROR("HttpServerConnection writeResponse error: %s", err.toString());
     }
-  } else {
-    LOCAL_WARN("HttpServerConnection unhandled event in WriteResponse: %o", PollSet::eventToString(evtFlags).c_str());
   }
 }
 
@@ -254,27 +291,13 @@ int HttpServerConnection::handleEvents(int evtFlags)
 {
   Lock lock(guard_, THIS_LOCATION);
 
+  const int startEvt = evtFlags;
+
+  // Set to true if we transition multiple FSM states.
   bool stateFallback = false;
   if (state_ == State::ReadRequest) {
-    if (evtFlags & PollSet::EventIn) {
-      Error err = readRequest();
-      // What to do with EOF?
-
-      if (err == Error::Ok) {
-        // Remain in the same ReadRequest state.
-      }
-      else if (err == Error::EndOfFile) {
-        // Returning 0 will make this connection be closed.
-        // TODO: Handle disconnect & close.
-        return 0;
-      } else {
-        LOCAL_ERROR("Unexpected error %s", err.toString());
-        return 0;
-      }
-    } else {
-      LOCAL_WARN("HttpServerConnection unhandled events in ReadRequest: %o", evtFlags);
-      return 0;
-    }
+    handleReadRequest(lock, evtFlags, stateFallback);
+    evtFlags = 0;
   }
 
   if (state_ == State::ProcessRequest) {
@@ -283,9 +306,15 @@ int HttpServerConnection::handleEvents(int evtFlags)
 
   if (state_ == State::WriteResponse) {
     handleWriteResponse(lock, evtFlags, stateFallback);
+    evtFlags = 0;
   }
 
-  LOCAL_WARN("HttpServerConnection unhandled events: %s in state %s", PollSet::eventToString(evtFlags).c_str(), state_.toString());
+  if (evtFlags != 0) {
+    LOCAL_WARN("HttpServerConnection::handleEvents(%s) unhandled events: %s in state %s",
+      PollSet::eventToString(startEvt).c_str(),
+      PollSet::eventToString(evtFlags).c_str(),
+      state_.toString());
+  }
   return eventsForState(state_);
 }
 
@@ -311,6 +340,8 @@ int HttpServerConnection::eventsForState(State state) const
       return PollSet::EventIn;
     case State::ProcessRequest:
       return 0;
+    case State::Disconnected:
+      return PollSet::ResultDropFD;
     default:
       return 0;
   }

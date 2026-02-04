@@ -313,7 +313,7 @@ Error MasterLink::execute(const std::string& method, const RpcValue& request, Rp
       std::scoped_lock<std::mutex> lock(internal_->xmlrpc_call_mutex);
 #endif
       auto waitStart = SteadyTime::now();
-      if (Error err = req->waitForState(http::HttpRequest::State::Done, WallDuration(300)); err == Error::Ok) {
+      if (Error err = req->waitForState(http::HttpRequest::State::Done, WallDuration(0.3)); err == Error::Ok) {
         // b is set to true in callback.
       }
       else if (err != Error::Timeout) {
