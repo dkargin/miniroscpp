@@ -8,7 +8,7 @@
 #include "miniros/http/http_server.h"
 #include "miniros/http/http_server_connection.h"
 
-#include "internal/invokers.h"
+#include "internal/scoped_locks.h"
 #include "miniros/io/poll_set.h"
 
 // ROS log will write to the channel "miniros.http[.server]"
@@ -62,6 +62,26 @@ Error HttpServerConnection::readRequest()
   return Error::Ok;
 }
 
+class HttpServerCallback : public CallbackInterface {
+public:
+  ~HttpServerCallback() override
+  {
+  }
+
+  CallResult call() override
+  {
+    // TODO: Implement
+  }
+
+  /// Request object.
+  std::shared_ptr<HttpRequest> request;
+  /// Handler to serve response.
+  std::shared_ptr<EndpointHandler> handler;
+
+  /// Response should be sent to this connection.
+  std::weak_ptr<HttpServerConnection> connection;
+};
+
 std::shared_ptr<HttpRequest> HttpServerConnection::makeRequestObject()
 {
   return std::make_shared<HttpRequest>();
@@ -97,13 +117,24 @@ int HttpServerConnection::handleEvents(int evtFlags)
 
   if (state_ == State::ProcessRequest) {
     resetResponse();
-    // Execute request:
-    EndpointHandler* handler = server_ ? server_->findEndpoint(http_frame_) : nullptr;
+
     auto requestObject = makeRequestObject();
-    requestObject->updateState(HttpRequest::State::ServerHandleRequest);
     requestObject->resetResponse();
+    requestObject->updateState(HttpRequest::State::ServerHandleRequest);
 
     std::string endpoint{http_frame_.getPath()};
+    requestObject->setPath(std::string{http_frame_.getPath()});
+    requestObject->setRequestBody(std::string{http_frame_.body()});
+
+    // Execute request:
+    if (!server_) {
+      MINIROS_ERROR("HttpServerConnection::handleEvents connection detached from server \"%s\"", endpoint.c_str());
+      prepareFaultResponse(Error::InternalError, *requestObject);
+      return 0;
+    }
+
+    auto [handler, cb] = server_->findEndpoint(http_frame_);
+
     if (!handler) {
       MINIROS_ERROR("No handler for endpoint \"%s\"", endpoint.c_str());
       prepareFaultResponse(Error::FileNotFound, *requestObject);
@@ -113,11 +144,11 @@ int HttpServerConnection::handleEvents(int evtFlags)
       clientInfo.remoteAddress = socket_->peerAddress();
       MINIROS_DEBUG("Handling HTTP request to path=\"%s\"", endpoint.c_str());
 
-      requestObject->setPath(std::string{http_frame_.getPath()});
-      requestObject->setRequestBody(std::string{http_frame_.body()});
-
       Error err = Error::Ok;
-      {
+      if (cb) {
+        // TODO: Implement processing in background CallbackQueue.
+        cb->addCallback();
+      } else {
         ScopedUnlock unlock(lock);
         err = handler->handle(clientInfo, requestObject);
       }
@@ -133,10 +164,6 @@ int HttpServerConnection::handleEvents(int evtFlags)
     responseHeader.writeHeader(response_header_buffer_, requestObject->responseBody().size());
     state_ = State::WriteResponse;
     stateFallback = true;
-
-    if (!server_) {
-      close();
-    }
   }
 
   if (state_ == State::WriteResponse) {

@@ -5,11 +5,12 @@
 #ifndef MINIROS_HTTP_REQUEST_H
 #define MINIROS_HTTP_REQUEST_H
 
-#include <string>
-#include <map>
-#include <vector>
-#include <mutex>
+#include "miniros/internal/scoped_locks.h"
+
 #include <condition_variable>
+#include <map>
+#include <mutex>
+#include <string>
 
 #include "miniros/macros.h"
 #include "miniros/http/http_tools.h"
@@ -64,10 +65,7 @@ public:
   /// Set request path/URI
   void setPath(const std::string& path);
 
-  virtual std::string debugName() const
-  {
-    return path();
-  }
+  virtual std::string debugName() const;
 
   const std::string& path() const;
 
@@ -107,7 +105,7 @@ public:
   /// Reset request for reuse
   virtual void reset();
 
-  void updateState(State status);
+  void updateState(State state);
 
   State state() const;
 
@@ -168,6 +166,18 @@ public:
     retry_ = val;
   }
 
+  /// Get some global request ID.
+  /// It is incremented with each new request.
+  int id() const
+  {
+    return request_id_;
+  }
+
+  /// Time from the moment request was sent.
+  WallDuration elapsed() const;
+
+  using Lock = TimeCheckLock<std::mutex>;
+
 protected:
   State state_ = State::Idle;
   /// Timestamp when request was sent.
@@ -198,7 +208,10 @@ protected:
   std::function<void ()> on_fail_;
 
   mutable std::mutex mutex_;
-  mutable std::condition_variable cv_;
+  mutable std::condition_variable_any cv_;
+
+  /// Some global request id.
+  const int request_id_;
 };
 
 } // namespace http

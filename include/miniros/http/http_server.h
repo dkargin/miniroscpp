@@ -10,8 +10,7 @@
 
 #include "miniros/http/http_tools.h"
 #include "miniros/http/http_endpoint.h"
-
-#include <regex>
+#include "miniros/io/callback_queue.h"
 
 namespace miniros {
 
@@ -52,13 +51,16 @@ public:
   /// Multiple filters can be used for the same endpoint.
   /// @param filter - filter object. HTTP server will take care of removal of this object.
   /// @param handler - handler for specified endpoint.
-  Error registerEndpoint(std::unique_ptr<EndpointFilter>&& filter, const std::shared_ptr<EndpointHandler>& handler);
+  /// @param cb - callback queue to send requests to. Set to nullptr to execute request right inside spinner thread.
+  Error registerEndpoint(std::unique_ptr<EndpointFilter>&& filter, const std::shared_ptr<EndpointHandler>& handler, const CallbackQueuePtr& cb);
 
   /// Find endpoint for request.
-  EndpointHandler* findEndpoint(const HttpParserFrame& frame);
+  std::pair<std::shared_ptr<EndpointHandler>, std::shared_ptr<CallbackQueue>> findEndpoint(const HttpParserFrame& frame);
 
   /// Called when HTTP connection is closed.
-  std::function<void (const std::shared_ptr<HttpServerConnection>&, const std::string& reason)> onCloseConnection;
+  using CloseConnectionHandler = std::function<void (const std::shared_ptr<HttpServerConnection>&, const std::string& reason)>;
+
+  void setCloseConnectionHandler(CloseConnectionHandler&& handler);
 
 protected:
   /// Accept client and add it to event processing.

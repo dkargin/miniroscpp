@@ -106,8 +106,7 @@ typedef std::shared_ptr<RPCManager> RPCManagerPtr;
 typedef std::function<void(const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result)> XMLRPCFunc;
 
 // Extended RPC callback function.
-typedef std::function<int (const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result, const network::ClientInfo& conn)> XMLRPCFuncEx;
-
+typedef std::function<void (const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result, const network::ClientInfo& conn)> XMLRPCFuncEx;
 
 class MINIROS_DECL RPCManager
 {
@@ -159,17 +158,7 @@ public:
     Object* object, RpcValue (Object::*method)(const ClientInfo& conn))
   {
     return bindEx(function_name, [=](const RpcValue& param, RpcValue& result, const ClientInfo& conn) {
-      try {
-        result = (object->*method)(conn);
-      } catch (XmlRpc::XmlRpcException ex) {
-        MINIROS_WARN("RPCManager: got exception while handling request \"%s\": %s", function_name.c_str(), ex.getMessage().c_str());
-        result = RpcValue::Array(3);
-        result[0] = 0;
-        result[1] = ex.getMessage();
-        result[2] = ex.getCode();
-        return false;
-      }
-      return true;
+      result = (object->*method)(conn);
     }, object);
   }
 
@@ -178,18 +167,8 @@ public:
     Object* object, RpcValue (Object::*method)(const T0& arg0, const ClientInfo& conn))
   {
     return bindEx(function_name, [=](const RpcValue& param, RpcValue& result, const ClientInfo& conn) {
-      try {
-        T0 arg0 = param[0].as<T0>();
-        result = (object->*method)(arg0, conn);
-      } catch (XmlRpc::XmlRpcException ex) {
-        MINIROS_WARN("RPCManager: got exception while handling request \"%s\": %s", function_name.c_str(), ex.getMessage().c_str());
-        result = RpcValue::Array(3);
-        result[0] = 0;
-        result[1] = ex.getMessage();
-        result[2] = ex.getCode();
-        return false;
-      }
-      return true;
+      T0 arg0 = param[0].as<T0>();
+      result = (object->*method)(arg0, conn);
     }, object);
   }
 
@@ -197,19 +176,9 @@ public:
   bool bindEx2(const std::string& function_name, Object* object, RpcValue (Object::*method)(const T0& arg0, const T1& arg1, const ClientInfo& conn))
   {
     return bindEx(function_name, [=](const RpcValue& param, RpcValue& result, const ClientInfo& conn) {
-      try {
-        T0 arg0 = param[0].as<T0>();
-        T1 arg1 = param[1].as<T1>();
-        result = (object->*method)(arg0, arg1, conn);
-      } catch (XmlRpc::XmlRpcException ex) {
-        MINIROS_WARN("RPCManager: got exception while handling request \"%s\": %s", function_name.c_str(), ex.getMessage().c_str());
-        result = RpcValue::Array(3);
-        result[0] = 0;
-        result[1] = ex.getMessage();
-        result[2] = ex.getCode();
-        return false;
-      }
-      return true;
+      T0 arg0 = param[0].as<T0>();
+      T1 arg1 = param[1].as<T1>();
+      result = (object->*method)(arg0, arg1, conn);
     }, object);
   }
 
@@ -218,20 +187,10 @@ public:
     RpcValue (Object::*method)(const T0& arg0, const T1& arg1, const T2& arg2, const ClientInfo& conn))
   {
     return bindEx(function_name, [=](const RpcValue& param, RpcValue& result, const ClientInfo& conn) {
-      try {
-        T0 arg0 = param[0].as<T0>();
-        T1 arg1 = param[1].as<T1>();
-        T2 arg2 = param[2].as<T2>();
-        result = (object->*method)(arg0, arg1, arg2, conn);
-      } catch (XmlRpc::XmlRpcException ex) {
-        MINIROS_WARN("RPCManager: got exception while handling request \"%s\": %s", function_name.c_str(), ex.getMessage().c_str());
-        result = RpcValue::Array(3);
-        result[0] = 0;
-        result[1] = ex.getMessage();
-        result[2] = ex.getCode();
-        return false;
-      }
-      return true;
+      T0 arg0 = param[0].as<T0>();
+      T1 arg1 = param[1].as<T1>();
+      T2 arg2 = param[2].as<T2>();
+      result = (object->*method)(arg0, arg1, arg2, conn);
     }, object);
   }
 
@@ -240,21 +199,11 @@ public:
     RpcValue (Object::*method)(const T0& arg0, const T1& arg1, const T2& arg2, const T3& arg3, const ClientInfo& conn))
   {
     return bindEx(function_name, [=](const RpcValue& param, RpcValue& result, const ClientInfo& conn) {
-      try {
-        T0 arg0 = param[0].as<T0>();
-        T1 arg1 = param[1].as<T1>();
-        T2 arg2 = param[2].as<T2>();
-        T3 arg3 = param[3].as<T3>();
-        result = (object->*method)(arg0, arg1, arg2, arg3, conn);
-      } catch (XmlRpc::XmlRpcException ex) {
-        MINIROS_WARN("RPCManager: got exception while handling request \"%s\": %s", function_name.c_str(), ex.getMessage().c_str());
-        result = RpcValue::Array(3);
-        result[0] = 0;
-        result[1] = ex.getMessage();
-        result[2] = ex.getCode();
-        return false;
-      }
-      return true;
+      T0 arg0 = param[0].as<T0>();
+      T1 arg1 = param[1].as<T1>();
+      T2 arg2 = param[2].as<T2>();
+      T3 arg3 = param[3].as<T3>();
+      result = (object->*method)(arg0, arg1, arg2, arg3, conn);
     }, object);
   }
 
@@ -263,7 +212,10 @@ public:
   /// Unbind all callbacks, associated with specific object.
   size_t unbind(const void* object);
 
-  NODISCARD Error start(int port = 0);
+  /// Start RPC server.
+  /// @param cb - callback queue for serving XMLRPC requests.
+  /// @param port - TCP port to start XMLRPC server.
+  NODISCARD Error start(const std::shared_ptr<CallbackQueue>& cb, int port);
   void shutdown();
 
   bool isShuttingDown() const;

@@ -171,8 +171,14 @@ private:
   // Must lock the advertised topics mutex before calling this function
   bool isTopicAdvertised(const std::string& topic);
 
+  /// Send XMLRPC request to register publisher.
+  /// It will receive and process a list of subscribers from master.
   bool registerSubscriber(const SubscriptionPtr& s, const std::string& datatype);
+
+  /// Send XMLRPC request to unregister subscriber.
   bool unregisterSubscriber(const std::string& topic);
+
+  /// Send RPC request to unregister publisher.
   bool unregisterPublisher(const std::string& topic);
 
   PublicationPtr lookupPublicationWithoutLock(const std::string &topic);

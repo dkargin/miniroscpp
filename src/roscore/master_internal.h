@@ -56,6 +56,8 @@ struct Master::Internal {
   /// Timer for periodic broadcasts.
   SteadyTimer timerBroadcasts;
 
+  std::shared_ptr<CallbackQueue> callbackQueue;
+
   /// Some unique UUID of this instance.
   UUID uuid;
 

@@ -21,6 +21,10 @@
 #include "miniros/http/http_filters.h"
 
 namespace miniros {
+
+/// Implemented in transport/init.cpp
+CallbackQueuePtr getInternalCallbackQueue();
+
 namespace master {
 
 Master::Internal::Internal(const std::shared_ptr<RPCManager>& manager)
@@ -95,7 +99,10 @@ bool Master::start(PollSet* poll_set, int port)
 
   MINIROS_DEBUG("Starting RPC module");
 
-  setupBindings();
+  auto cb = getInternalCallbackQueue();
+
+  setupBindings(cb);
+  internal_->callbackQueue = cb;
 
   // It was done in roslaunch by calling generate_run_id() function.
   // It should be uuid.uuid1()
@@ -105,7 +112,7 @@ bool Master::start(PollSet* poll_set, int port)
   internal_->rpcManager->setPollSet(poll_set);
   internal_->regManager.setPollSet(poll_set);
 
-  if (!internal_->rpcManager->start(port)) {
+  if (!internal_->rpcManager->start(cb, port)) {
     return false;
   }
 
@@ -141,7 +148,7 @@ bool Master::ok() const
   return internal_ && internal_->rpcManager && !internal_->rpcManager->isShuttingDown();
 }
 
-void Master::setupBindings()
+void Master::setupBindings(const std::shared_ptr<CallbackQueue>& cb)
 {
   if (!internal_)
     return;
@@ -179,18 +186,18 @@ void Master::setupBindings()
     internal_->httpPublishedTopicsEndpoint.reset(new PublishedTopicsEndpoint(internal_.get()));
     internal_->httpTopicTypesEndpoint.reset(new TopicTypesEndpoint(internal_.get()));
 
-    server->registerEndpoint(std::make_unique<http::SimpleFilter>(http::HttpMethod::Get, "/"), internal_->httpRootEndpoint);
+    server->registerEndpoint(std::make_unique<http::SimpleFilter>(http::HttpMethod::Get, "/"), internal_->httpRootEndpoint, cb);
     server->registerEndpoint(
       std::make_unique<http::SimpleFilter>(http::HttpMethod::Get, "/node/", http::SimpleFilter::CheckType::Prefix),
-      internal_->httpNodeInfoEndpoint);
+      internal_->httpNodeInfoEndpoint, cb);
     server->registerEndpoint(std::make_unique<http::SimpleFilter>(http::HttpMethod::Get, "/topic/", http::SimpleFilter::CheckType::Prefix),
-      internal_->httpTopicInfoEndpoint);
+      internal_->httpTopicInfoEndpoint, cb);
     server->registerEndpoint(std::make_unique<http::SimpleFilter>(http::HttpMethod::Get, "/api2/published_topics"),
-      internal_->httpPublishedTopicsEndpoint);
+      internal_->httpPublishedTopicsEndpoint, cb);
     server->registerEndpoint(std::make_unique<http::SimpleFilter>(http::HttpMethod::Get, "/api2/topic_types"),
-      internal_->httpTopicTypesEndpoint);
+      internal_->httpTopicTypesEndpoint, cb);
     server->registerEndpoint(std::make_unique<http::SimpleFilter>(http::HttpMethod::Get, "/favicon.ico"),
-      std::make_shared<MasterFaviconEndpoint>());
+      std::make_shared<MasterFaviconEndpoint>(), cb);
 
     // This endpoint is only for testing purposes. Clients could create endpoints by themselves if needed.
     //auto fsEndpoint = std::make_shared<http::FilesystemEndpoint>("/files/", ".");

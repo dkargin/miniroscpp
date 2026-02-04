@@ -5,10 +5,9 @@
 #ifndef MINIROS_HTTP_CLIENT_H
 #define MINIROS_HTTP_CLIENT_H
 
-#include <deque>
+#include <functional>
 #include <memory>
 #include <mutex>
-#include <functional>
 
 #include "miniros/http/http_tools.h"
 #include "miniros/http/http_request.h"
@@ -69,6 +68,9 @@ public:
 
     /// Convert state to string.
     const char* toString() const;
+
+    /// Check if state corresponds to active request.
+    bool hasRequest() const;
 
   protected:
     State_t value;
@@ -163,12 +165,7 @@ public:
   network::URL getRootURL(const std::string& scheme) const;
 
 protected:
-  /// Get socket events for specified state.
-  static int eventsForState(State state);
-
   struct Internal;
-
-  using Lock = std::unique_lock<std::mutex>;
 
   /// Handle socket events from PollSet.
   static int handleSocketEvents(const std::shared_ptr<Internal>& I, int events);

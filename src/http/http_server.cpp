@@ -10,6 +10,8 @@
 #include "miniros/internal/lifetime.h"
 
 #include "miniros/http/http_server.h"
+
+#include "internal/scoped_locks.h"
 #include "miniros/http/http_server_connection.h"
 
 // ROS log will write to the channel "miniros.http[.server]"
@@ -21,9 +23,17 @@ namespace http {
 struct Binding {
   std::unique_ptr<EndpointFilter> filter;
   std::shared_ptr<EndpointHandler> endpoint;
+  CallbackQueuePtr callbackQueue;
+
+  Binding(std::unique_ptr<EndpointFilter>&& filter, const std::shared_ptr<EndpointHandler>& endpoint, const CallbackQueuePtr& cb)
+    : filter(std::move(filter)), endpoint(endpoint), callbackQueue(cb)
+  {}
 };
 
 struct HttpServer::Internal {
+  using Lock = std::unique_lock<Lifetime<HttpServer>>;
+
+  CloseConnectionHandler onCloseConnection;
   /// A collection of endpoints.
   std::vector<Binding> endpoints;
   /// A mutex for endpoints.
@@ -54,30 +64,44 @@ struct HttpServer::Internal {
     MINIROS_DEBUG("HttpServer::~Internal()");
   }
 
-  void closeConnection(int fd, const char* reason);
+  void closeConnection(Lock& lock, int fd, const std::string& reason);
 };
+
+void HttpServer::Internal::closeConnection(Lock& lock, int fd, const std::string& reason)
+{
+  MINIROS_DEBUG("HttpServer[%d]::closeConnection(): %s", fd, reason.c_str());
+  std::shared_ptr<HttpServerConnection> connection;
+  auto it = connections.find(fd);
+  if (it != connections.end()) {
+    if (pollSet) {
+      pollSet->delSocket(fd);
+    }
+    connection = it->second;
+    connection->detach();
+    connections.erase(fd);
+    connection->close();
+
+    if (onCloseConnection) {
+      auto handler = onCloseConnection;
+      ScopedUnlock unlock(lock);
+      handler(connection, reason);
+    }
+  }
+}
+
+
+void HttpServer::setCloseConnectionHandler(CloseConnectionHandler&& handler)
+{
+  internal_->onCloseConnection = std::move(handler);
+}
 
 void HttpServer::closeConnection(int fd, const std::string& reason)
 {
   assert(internal_);
   if (!internal_)
     return;
-  MINIROS_DEBUG("HttpServer[%d]::closeConnection(): %s", fd, reason.c_str());
-  std::shared_ptr<HttpServerConnection> connection;
-  auto it = internal_->connections.find(fd);
-  if (it != internal_->connections.end()) {
-    if (internal_->pollSet) {
-      internal_->pollSet->delSocket(fd);
-    }
-    connection = it->second;
-    connection->detach();
-    internal_->connections.erase(fd);
-    connection->close();
-
-    if (onCloseConnection) {
-      onCloseConnection(connection, reason);
-    }
-  }
+  std::unique_lock lock(*internal_->lifetime);
+  internal_->closeConnection(lock, fd, reason);
 }
 
 HttpServer::HttpServer(PollSet* pollSet)
@@ -157,7 +181,7 @@ Error HttpServer::stop()
   internal_->socket_v4.close();
   while (!internal_->connections.empty()) {
     auto it = internal_->connections.begin();
-    closeConnection(it->first, "HttpServer::stop()");
+    internal_->closeConnection(lock, it->first, "HttpServer::stop()");
   }
   MINIROS_DEBUG("HttpServer::stop() finished");
   return Error::Ok;
@@ -209,42 +233,47 @@ void HttpServer::acceptClient(const std::shared_ptr<Lifetime<HttpServer>>& lifet
   internal_->connections[fd] = connection;
   auto internalCopy = internal_->lifetime;
   internal_->pollSet->addSocket(fd, PollSet::EventIn | PollSet::EventUpdate,
-    [this, connection, fd, internalCopy](int flags) {
-    int newFlags = connection->handleEvents(flags);
-    // HttpServerConnection can probably be destroyed here.
-    std::unique_lock lock(*internalCopy);
-    if (!internalCopy->alive)
-      return 0;
-    if (!newFlags) {
-      closeConnection(fd, "EOF");
-    }
-    return newFlags;
+    [this, wconnection = std::weak_ptr(connection), fd, internalCopy](int flags)
+    {
+      // HttpServerConnection can probably be destroyed here.
+      std::unique_lock lock(*internalCopy);
+
+      auto connection = wconnection.lock();
+      if (!connection)
+        return 0;
+      int newFlags = connection->handleEvents(flags);
+      if (!internalCopy->alive) {
+        return 0;
+      }
+      if (!newFlags) {
+        internal_->closeConnection(lock, fd, "EOF");
+      }
+      return newFlags;
   }, internalCopy);
 }
 
-Error HttpServer::registerEndpoint(std::unique_ptr<EndpointFilter>&& filter, const std::shared_ptr<EndpointHandler>& handler)
+Error HttpServer::registerEndpoint(std::unique_ptr<EndpointFilter>&& filter, const std::shared_ptr<EndpointHandler>& handler, const CallbackQueuePtr& cb)
 {
   if (!internal_)
     return Error::InternalError;
 
-  Binding binding{std::move(filter), handler};
 
   std::unique_lock<std::mutex> lock(internal_->endpointsGuard);
-  internal_->endpoints.emplace_back(std::move(binding));
+  internal_->endpoints.emplace_back(std::move(filter), handler, cb);
   return Error::Ok;
 }
 
-EndpointHandler* HttpServer::findEndpoint(const HttpParserFrame& frame)
+std::pair<std::shared_ptr<EndpointHandler>, std::shared_ptr<CallbackQueue>> HttpServer::findEndpoint(const HttpParserFrame& frame)
 {
   std::unique_lock<std::mutex> lock(internal_->endpointsGuard);
 
   for (const Binding& binding: internal_->endpoints) {
     if (binding.filter->check(frame)) {
-      return binding.endpoint.get();
+      return {binding.endpoint, binding.callbackQueue};
     }
   }
 
-  return nullptr;
+  return {};
 }
 
 }

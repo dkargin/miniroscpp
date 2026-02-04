@@ -50,10 +50,7 @@ public:
 
   void setParams(const RpcValue& param0);
 
-  std::string debugName() const override
-  {
-    return path_ + "@" + method_name_;
-  }
+  std::string debugName() const override;
 
   //! Get the parameters
   const RpcValue& params() const;

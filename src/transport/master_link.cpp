@@ -48,6 +48,8 @@
 
 #include "internal/local_log.h"
 
+#include <cassert>
+
 namespace miniros {
 
 struct MasterLink::Internal {
@@ -245,6 +247,7 @@ Error MasterLink::execute(const std::string& method, const RpcValue& request, Rp
   std::string master_host = getHost();
   uint32_t master_port = getPort();
 
+  assert(manager);
   if (!manager) {
     LOCAL_ERROR("[%s] - no manager", method.c_str());
     return Error::InternalError;
@@ -276,12 +279,14 @@ Error MasterLink::execute(const std::string& method, const RpcValue& request, Rp
   auto state = std::make_shared<ResponseState>(response, payload);
   auto req = http::makeRequest("/RPC2", method);
   req->setParamArray(request);
-  req->onCompleteRaw = [state, method](Error err, const RpcValue& rawResponse, bool ok_) {
+  std::string reqName = req->debugName();
+  req->onCompleteRaw = [state, c, reqName](Error err, const RpcValue& rawResponse, bool ok_) {
+    if (state.use_count() == 1) {
+      LOCAL_WARN("MasterLink::execute - unexpected response for request %s after %fs", reqName.c_str(), state->elapsed().toSec());
+    } else {
       // This callback can happen outside this function.
       state->response = rawResponse;
       state->b.store(true);
-    if (state.use_count() == 1) {
-      LOCAL_WARN("MasterLink::execute - unexpected response for request %s after %fs", method.c_str(), state->elapsed().toSec());
     }
   };
 
@@ -308,7 +313,7 @@ Error MasterLink::execute(const std::string& method, const RpcValue& request, Rp
       std::scoped_lock<std::mutex> lock(internal_->xmlrpc_call_mutex);
 #endif
       auto waitStart = SteadyTime::now();
-      if (Error err = req->waitForState(http::HttpRequest::State::Done, WallDuration(0.500)); err == Error::Ok) {
+      if (Error err = req->waitForState(http::HttpRequest::State::Done, WallDuration(300)); err == Error::Ok) {
         // b is set to true in callback.
       }
       else if (err != Error::Timeout) {
@@ -330,6 +335,7 @@ Error MasterLink::execute(const std::string& method, const RpcValue& request, Rp
 
       if (!wait_for_master) {
         // TODO: Do we need to drop request?
+        LOCAL_ERROR("[%s] Timed out trying to connect to the master after [%f] seconds", method.c_str(), internal_->retry_timeout.toSec());
         auto elapsed = state->elapsed();
         return Error::NoMaster;
       }
@@ -361,9 +367,7 @@ Error MasterLink::execute(const std::string& method, const RpcValue& request, Rp
     LOCAL_ERROR("[%s] Got shutdown request during RPC call", method.c_str());
     return Error::ShutdownInterrupt;
   }
-  // Since MAsterLink can be used very early, this logging can cause recursive print.
-  // auto time = SteadyTime::now() - start_time;
-  //MINIROS_DEBUG("Finished \"%s\" in %fms", method.c_str(), time.toSec()*1000.0);
+  LOCAL_DEBUG("Finished \"%s\" in %fms", method.c_str(), state->elapsed().toSec()*1000.0);
   return Error::Ok;
 }
 

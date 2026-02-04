@@ -102,14 +102,15 @@ struct PollSet::Internal {
   }
 
   /// It returns a copy of SocketInfo to make sure that shared pointer to tracked object having additional reference.
-  std::optional<SocketInfo> findSocketInfo(int fd) const
+  bool findSocketInfo(int fd, SocketInfo& out) const
   {
     std::scoped_lock<std::mutex> lock(socket_info_mutex_);
     auto it = socket_info_.find(fd);
     // the socket has been entirely deleted
     if (it == socket_info_.end())
-      return {};
-    return {it->second};
+      return false;
+    out = it->second;
+    return true;
   }
 };
 
@@ -284,11 +285,12 @@ bool PollSet::setTimerEvent(int sock, int timeoutMs)
 
   if (it == internal_->socket_info_.end())
   {
-    LOCAL_DEBUG("PollSet: Tried to set timer fd [%d] which does not exist in this pollset", sock);
+    LOCAL_DEBUG("PollSet::setTimerEvent(%d) - fd does not exist", sock);
     return false;
   }
   internal_->socket_timers_[sock] = SteadyTime::now() + WallDuration(timeoutMs*0.001);
   signal();
+  LOCAL_DEBUG("PollSet::setTimerEvent(%d) timeout=%d", sock, timeoutMs);
   return true;
 }
 
@@ -310,6 +312,10 @@ void PollSet::update(int poll_timeout)
 {
   MINIROS_PROFILE_SCOPE2("PollSet", "update");
 
+  static SteadyTime lastUpdateFinish = SteadyTime::now();
+
+  SteadyTime updateStart = SteadyTime::now();
+  auto gap = updateStart - lastUpdateFinish;
   createNativePollset();
 
   AtExit ae([this]() {
@@ -340,15 +346,15 @@ void PollSet::update(int poll_timeout)
     if (revents == 0)
       continue;
 
-    auto info = internal_->findSocketInfo(fd);
-    if (!info)
+    Internal::SocketInfo info;
+    if (!internal_->findSocketInfo(fd, info))
       continue;
 
     // Store off the function and transport in case the socket is deleted from another thread
-    SocketUpdateFunc func = info->func_;
+    SocketUpdateFunc func = info.func_;
     // This pointer helps keeping transport alive until we exit this block.
-    TrackedObject object = info->object_;
-    const int events = info->events_;
+    TrackedObject object = info.object_;
+    const int events = info.events_;
 
     if (!internal_->isInternalFd(fd)) {
 #ifdef POLL_SET_SERIOUS_LOG
@@ -390,17 +396,23 @@ void PollSet::update(int poll_timeout)
     if (ret & ResultDropFD) {
       delSocket(fd);
     }
-    else if (info->updateEvents_ && ret != info->events_) {
+    else if (info.updateEvents_ && ret != info.events_) {
       std::scoped_lock<std::mutex> lock(internal_->socket_info_mutex_);
       auto it = internal_->socket_info_.find(fd);
       if (it != internal_->socket_info_.end() && it->second.events_ != ret) {
         it->second.events_ = ret;
         set_events_on_socket(internal_->epfd_, fd, it->second.events_);
+        LOCAL_DEBUG("PollSet fd=%d adjust events from %s to %s", fd, eventToString(info.events_).c_str(), eventToString(ret).c_str());
       }
     }
   } // for socket event
 
   processTimers();
+
+  SteadyTime updateDone = SteadyTime::now();
+  auto dur = updateDone - updateStart;
+  LOCAL_DEBUG("PollSet processed in %fs, gap=%fs", dur.toSec(), gap.toSec());
+  lastUpdateFinish = updateDone;
 }
 
 void PollSet::processTimers()
@@ -424,10 +436,12 @@ void PollSet::processTimers()
   }
 
   for (auto fd: expiredTimers) {
-    auto info = internal_->findSocketInfo(fd);
-    if (!info || !info->func_)
+    Internal::SocketInfo info;
+    if (!internal_->findSocketInfo(fd, info))
       continue;
-    (void)info->func_(EventTimer);
+    if (!info.func_)
+      continue;
+    (void)info.func_(EventTimer);
   }
 }
 
