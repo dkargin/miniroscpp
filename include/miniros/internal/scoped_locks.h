@@ -5,8 +5,7 @@
 #ifndef MINIROS_SCOPED_LOCKS_H
 #define MINIROS_SCOPED_LOCKS_H
 
-#include <exception>
-#include <functional>
+#include <cassert>
 
 #include "miniros/internal/code_location.h"
 #include "miniros/internal/local_log.h"
@@ -38,18 +37,9 @@ public:
     this->lock();
   }
 
-  TimeCheckLock(TimeCheckLock&& other) noexcept
-    : loc_(other.loc_)
-  {
-    lock_start_ = other.lock_start_;
-    lock_acquired_ = other.lock_acquired_;
-    lock_ = other.lock_;
-    other.lock_ = nullptr;
-  }
-
   ~TimeCheckLock()
   {
-    if (lock_) {
+    if (lock_ && locked_) {
       lock_->unlock();
     }
   }
@@ -60,6 +50,7 @@ public:
       lock_start_ = SteadyTime::now();
       lock_->lock();
       lock_acquired_ = SteadyTime::now();
+      locked_ = true;
 
       auto duration = timeToLock().toSec();
       if (duration > timeout_) {
@@ -70,8 +61,11 @@ public:
 
   void unlock()
   {
-    if (lock_)
+    if (lock_) {
+      assert(locked_ == true);
       lock_->unlock();
+      locked_ = false;
+    }
   }
 
   /// Get time spent on locking.
@@ -81,7 +75,8 @@ public:
   }
 
 private:
-  Lock* lock_ = nullptr;;
+  Lock* lock_ = nullptr;
+  bool locked_ = false;
   internal::CodeLocation loc_;
   double timeout_ = 0;
   SteadyTime lock_start_;

@@ -10,6 +10,7 @@
 
 #include "internal/scoped_locks.h"
 #include "miniros/io/poll_set.h"
+#include "xmlrpcpp/XmlRpcException.h"
 
 // ROS log will write to the channel "miniros.http[.server]"
 #define MINIROS_PACKAGE_NAME "http"
@@ -17,15 +18,14 @@
 namespace miniros {
 namespace http {
 
-HttpServerConnection::HttpServerConnection(HttpServer* server, std::shared_ptr<network::NetSocket> socket)
-  :server_(server), socket_(socket)
+HttpServerConnection::HttpServerConnection(HttpServer* server, std::shared_ptr<network::NetSocket> socket, PollSet* poll_set)
+  :server_(server), socket_(socket), poll_set_(poll_set)
 {
   http_frame_.finishRequest();
 }
 
 HttpServerConnection::~HttpServerConnection()
 {
-  MINIROS_DEBUG("~HttpServerConnection()");
   std::unique_lock<std::mutex> lock(guard_);
 }
 
@@ -41,23 +41,23 @@ Error HttpServerConnection::readRequest()
 
   std::string peer = socket_->peerAddress().str();
   double dur = (SteadyTime::now() - request_start_).toSec() * 1000;
-  MINIROS_DEBUG("HttpServerConnection(peer=%s fd=%d)::readHeader: ContentLength=%d, parsed=%d t=%fms", peer.c_str(), fd, http_frame_.contentLength(), parsed, dur);
+  LOCAL_DEBUG("HttpServerConnection(peer=%s fd=%d)::readHeader: ContentLength=%d, parsed=%d t=%fms", peer.c_str(), fd, http_frame_.contentLength(), parsed, dur);
 
   // If we haven't gotten the entire request yet, return (keep reading)
   if (http_frame_.state() != HttpParserFrame::ParseComplete) {
     if (readErr == Error::EndOfFile) {
-      MINIROS_DEBUG("HttpServerConnection(peer=%s fd=%d)::readRequest: EOF while reading request", peer.c_str(), fd);
+      LOCAL_DEBUG("HttpServerConnection(peer=%s fd=%d)::readRequest: EOF while reading request", peer.c_str(), fd);
       http_frame_.finishRequest();
       return Error::EndOfFile;
       // Either way we close the connection
     }
-    MINIROS_DEBUG("HttpServerConnection(peer=%s fd=%d)::readRequest got only %d/%d bytes.", peer.c_str(), fd, http_frame_.bodyLength(), http_frame_.contentLength());
+    LOCAL_DEBUG("HttpServerConnection(peer=%s fd=%d)::readRequest got only %d/%d bytes.", peer.c_str(), fd, http_frame_.bodyLength(), http_frame_.contentLength());
     return Error::Ok;
   }
 
   assert(http_frame_.state() == HttpParserFrame::ParseComplete);
   // Otherwise, parse and dispatch the request
-  MINIROS_DEBUG("HttpServerConnection(peer=%s fd=%d)::readRequest read %d/%d bytes.", peer.c_str(), fd, http_frame_.bodyLength(), http_frame_.contentLength());
+  LOCAL_DEBUG("HttpServerConnection(peer=%s fd=%d)::readRequest read %d/%d bytes.", peer.c_str(), fd, http_frame_.bodyLength(), http_frame_.contentLength());
   state_ = State::ProcessRequest;
   return Error::Ok;
 }
@@ -70,7 +70,36 @@ public:
 
   CallResult call() override
   {
-    // TODO: Implement
+    int reqId = request->id();
+
+    auto conn = connection.lock();
+    if (!conn) {
+      LOCAL_DEBUG("HttpServerCallback::call(%d) connection expired", reqId);
+      return Invalid;
+    }
+
+    // Execute request handler
+    Error err = Error::Ok;
+
+    // Must provide some reasonable response even in case of internal exception.
+    try {
+      err = handler->handle(clientInfo, request);
+      if (!err) {
+        LOCAL_ERROR("Failed to handle HTTP request: %s", err.toString());
+      }
+    } catch (XmlRpc::XmlRpcException& ex) {
+      LOCAL_ERROR("HttpServerCallback::call(req=%d) XMLRPC exception: %s", reqId, ex.getMessage().c_str());
+      err = Error::InvalidValue;
+    } catch (std::runtime_error& ex) {
+      LOCAL_ERROR("HttpServerCallback::call(req=%d) runtime exception: %s", reqId, ex.what());
+      err = Error::InternalError;
+    } catch (...) {
+      LOCAL_ERROR("HttpServerCallback::call(req=%d) unknown exception", reqId);
+      err = Error::InternalError;
+    }
+    // Complete request processing (this will prepare response and trigger EventOut)
+    conn->onAsyncRequestComplete(request, err);
+    return Success;
   }
 
   /// Request object.
@@ -78,18 +107,131 @@ public:
   /// Handler to serve response.
   std::shared_ptr<EndpointHandler> handler;
 
+  /// Client information captured at request time.
+  network::ClientInfo clientInfo;
+
   /// Response should be sent to this connection.
   std::weak_ptr<HttpServerConnection> connection;
 };
 
-std::shared_ptr<HttpRequest> HttpServerConnection::makeRequestObject()
+std::shared_ptr<HttpRequest> HttpServerConnection::makeRequestObject(Lock& lock)
 {
-  return std::make_shared<HttpRequest>();
+  auto requestObject = std::make_shared<HttpRequest>();
+  requestObject->resetResponse();
+  requestObject->updateState(HttpRequest::State::ServerHandleRequest);
+
+  requestObject->setPath(std::string{http_frame_.getPath()});
+  requestObject->setRequestBody(std::string{http_frame_.body()});
+  return requestObject;
+}
+
+bool HttpServerConnection::handleProcessRequest(Lock& lock)
+{
+  resetResponse();
+
+  auto requestObject = makeRequestObject(lock);
+
+  std::string endpoint{http_frame_.getPath()};
+
+  // Execute request:
+  if (!server_) {
+    LOCAL_ERROR("HttpServerConnection::handleEvents connection fd=%d detached from server", socket_->fd());
+    prepareFaultResponse(Error::InternalError, *requestObject);
+    return false;
+  }
+
+  network::ClientInfo clientInfo;
+  clientInfo.fd = socket_->fd();
+  clientInfo.remoteAddress = socket_->peerAddress();
+  LOCAL_DEBUG("Handling HTTP request to path=\"%s\"", endpoint.c_str());
+
+  auto [handler, cb] = server_->findEndpoint(http_frame_);
+
+  if (!handler) {
+    LOCAL_ERROR("No handler for endpoint \"%s\"", endpoint.c_str());
+    doWriteResponse(lock, requestObject, Error::FileNotFound);
+    return true;
+  }
+
+  if (cb) {
+    // Send request to CallbackQueue for processing in different thread
+    auto callback = std::make_shared<HttpServerCallback>();
+    callback->handler = handler;
+    callback->request = requestObject;
+    callback->clientInfo = clientInfo;
+    callback->connection = weak_from_this();
+    cb->addCallback(callback, reinterpret_cast<uint64_t>(requestObject.get()));
+    // Return 0 - no events to wait for. Callback will trigger EventOut when done.
+    return false;
+  }
+
+  // Process request immediately in current thread
+  Error err = Error::Ok;
+  {
+    ScopedUnlock unlock(lock);
+    err = handler->handle(clientInfo, requestObject);
+  }
+
+  doWriteResponse(lock, requestObject, err);
+  return true;
+}
+
+void HttpServerConnection::handleWriteResponse(Lock& lock, int evtFlags, bool fallThrough)
+{
+  if (evtFlags & PollSet::EventOut || fallThrough) {
+    std::pair<size_t, Error> r;
+
+    const std::string& responseBody = active_request->responseBody();
+    size_t responseBodySize = responseBody.size();
+
+    if (responseBodySize > 0) {
+      r = socket_->write2(
+        response_header_buffer_.c_str(), response_header_buffer_.size(),
+        responseBody.c_str(), responseBodySize, data_sent_);
+
+    } else {
+      const char* data = response_header_buffer_.c_str() + data_sent_;
+      size_t toSend = response_header_buffer_.size() - data_sent_;
+      r = socket_->send(data, toSend, nullptr);
+    }
+
+    const size_t totalSize = response_header_buffer_.size() + responseBodySize;
+    auto [written, err] = r;
+
+    if (written > 0) {
+      data_sent_ += written;
+      double dur = (SteadyTime::now() - request_start_).toSec() * 1000;
+      LOCAL_DEBUG("HttpServerConnection written %d/%d bytes of header, t=%fms",
+        static_cast<int>(written), static_cast<int>(totalSize), dur);
+    }
+
+    if (err == Error::WouldBlock)
+      return;
+
+    if (err == Error::Ok) {
+      if (data_sent_ < totalSize) {
+        // Failed to write all data, so we need to yield to spinner.
+        return;
+      }
+      data_sent_ = 0;
+
+      state_ = State::ReadRequest;
+      http_frame_.finishRequest();
+      updateState(lock, State::ReadRequest);
+      double dur = (SteadyTime::now() - request_start_).toSec() * 1000;
+      LOCAL_DEBUG("Served HTTP response in %fms", dur);
+    } else {
+      LOCAL_ERROR("HttpServerConnection writeResponse error: %s", err.toString());
+    }
+  } else {
+    LOCAL_WARN("HttpServerConnection unhandled event in WriteResponse: %o", PollSet::eventToString(evtFlags).c_str());
+  }
 }
 
 int HttpServerConnection::handleEvents(int evtFlags)
 {
-  std::unique_lock<std::mutex> lock(guard_);
+  Lock lock(guard_, THIS_LOCATION);
+
   bool stateFallback = false;
   if (state_ == State::ReadRequest) {
     if (evtFlags & PollSet::EventIn) {
@@ -97,129 +239,59 @@ int HttpServerConnection::handleEvents(int evtFlags)
       // What to do with EOF?
 
       if (err == Error::Ok) {
-        // Request is not finished. Need to wait for another packet.
-        if (state_ == State::ReadRequest) {
-          return PollSet::EventIn;
-        }
+        // Remain in the same ReadRequest state.
       }
       else if (err == Error::EndOfFile) {
         // Returning 0 will make this connection be closed.
+        // TODO: Handle disconnect & close.
         return 0;
       } else {
-        MINIROS_ERROR("Unexpected error %s", err.toString());
+        LOCAL_ERROR("Unexpected error %s", err.toString());
         return 0;
       }
     } else {
-      MINIROS_WARN("HttpServerConnection unhandled events in ReadRequest: %o", evtFlags);
+      LOCAL_WARN("HttpServerConnection unhandled events in ReadRequest: %o", evtFlags);
       return 0;
     }
   }
 
   if (state_ == State::ProcessRequest) {
-    resetResponse();
-
-    auto requestObject = makeRequestObject();
-    requestObject->resetResponse();
-    requestObject->updateState(HttpRequest::State::ServerHandleRequest);
-
-    std::string endpoint{http_frame_.getPath()};
-    requestObject->setPath(std::string{http_frame_.getPath()});
-    requestObject->setRequestBody(std::string{http_frame_.body()});
-
-    // Execute request:
-    if (!server_) {
-      MINIROS_ERROR("HttpServerConnection::handleEvents connection detached from server \"%s\"", endpoint.c_str());
-      prepareFaultResponse(Error::InternalError, *requestObject);
-      return 0;
-    }
-
-    auto [handler, cb] = server_->findEndpoint(http_frame_);
-
-    if (!handler) {
-      MINIROS_ERROR("No handler for endpoint \"%s\"", endpoint.c_str());
-      prepareFaultResponse(Error::FileNotFound, *requestObject);
-    } else {
-      network::ClientInfo clientInfo;
-      clientInfo.fd = socket_->fd();
-      clientInfo.remoteAddress = socket_->peerAddress();
-      MINIROS_DEBUG("Handling HTTP request to path=\"%s\"", endpoint.c_str());
-
-      Error err = Error::Ok;
-      if (cb) {
-        // TODO: Implement processing in background CallbackQueue.
-        cb->addCallback();
-      } else {
-        ScopedUnlock unlock(lock);
-        err = handler->handle(clientInfo, requestObject);
-      }
-      if (!err) {
-        MINIROS_ERROR("Failed to handle HTTP request to \"%s\"", err.toString());
-        prepareFaultResponse(err, *requestObject);
-      }
-    }
-
-    const HttpResponseHeader& responseHeader = requestObject->responseHeader();
-    requestObject->updateState(HttpRequest::State::ServerSendResponse);
-    active_request = requestObject;
-    responseHeader.writeHeader(response_header_buffer_, requestObject->responseBody().size());
-    state_ = State::WriteResponse;
-    stateFallback = true;
+    stateFallback = handleProcessRequest(lock);
   }
 
   if (state_ == State::WriteResponse) {
-    if (evtFlags & PollSet::EventOut || stateFallback) {
-      std::pair<size_t, Error> r;
-
-      const std::string& responseBody = active_request->responseBody();
-      size_t responseBodySize = responseBody.size();
-
-      if (responseBodySize > 0) {
-        r = socket_->write2(
-          response_header_buffer_.c_str(), response_header_buffer_.size(),
-          responseBody.c_str(), responseBodySize, data_sent_);
-
-      } else {
-        const char* data = response_header_buffer_.c_str() + data_sent_;
-        size_t toSend = response_header_buffer_.size() - data_sent_;
-        r = socket_->send(data, toSend, nullptr);
-      }
-
-      const size_t totalSize = response_header_buffer_.size() + responseBodySize;
-      auto [written, err] = r;
-
-      if (written > 0) {
-        data_sent_ += written;
-        double dur = (SteadyTime::now() - request_start_).toSec() * 1000;
-        MINIROS_DEBUG("HttpServerConnection written %d/%d bytes of header, t=%fms",
-          static_cast<int>(written), static_cast<int>(totalSize), dur);
-      }
-
-      if (err == Error::WouldBlock)
-        return PollSet::EventOut;
-
-      if (err == Error::Ok) {
-        if (data_sent_ < totalSize) {
-          // Failed to write all data, so we need to yield to spinner.
-          return PollSet::EventOut;
-        }
-        data_sent_ = 0;
-        state_ = State::ReadRequest;
-        http_frame_.finishRequest();
-        auto dur = SteadyTime::now() - request_start_;
-        MINIROS_DEBUG("Served HTTP response in %fms", dur.toSec()*1000);
-        return PollSet::EventIn;
-      } else {
-        MINIROS_ERROR("HttpServerConnection writeResponse error: %s", err.toString());
-        return 0;
-      }
-    } else {
-      MINIROS_WARN("HttpServerConnection unhandled event in WriteResponse: %o", evtFlags);
-      return 0;
-    }
+    handleWriteResponse(lock, evtFlags, stateFallback);
   }
 
-  MINIROS_WARN("HttpServerConnection unhandled events: %o in state %d", evtFlags, (int)state_);
-  return 0;
+  LOCAL_WARN("HttpServerConnection unhandled events: %s in state %d", PollSet::eventToString(evtFlags).c_str(), (int)state_);
+  return eventsForState(state_);
+}
+
+void HttpServerConnection::doWriteResponse(Lock& lock, const std::shared_ptr<HttpRequest>& req, Error error)
+{
+  // Prepare fault response if handler returned error
+  if (!error) {
+    prepareFaultResponse(error, *req);
+  }
+  const HttpResponseHeader& responseHeader = req->responseHeader();
+  req->updateState(HttpRequest::State::ServerSendResponse);
+  active_request = req;
+  responseHeader.writeHeader(response_header_buffer_, req->responseBody().size());
+  updateState(lock, State::WriteResponse);
+}
+
+int HttpServerConnection::eventsForState(State state) const
+{
+  switch (state) {
+    case State::WriteResponse:
+      return PollSet::EventOut;
+    case State::ReadRequest:
+      return PollSet::EventIn;
+    case State::ProcessRequest:
+      return 0;
+    default:
+      return 0;
+  }
 }
 
 void HttpServerConnection::close()
@@ -235,7 +307,40 @@ void HttpServerConnection::resetResponse()
   data_sent_ = 0;
 }
 
-void HttpServerConnection::prepareFaultResponse(Error error, http::HttpRequest& request) const
+void HttpServerConnection::detach()
+{
+  Lock lock(guard_, THIS_LOCATION);
+  server_ = nullptr;
+}
+
+void HttpServerConnection::onAsyncRequestComplete(std::shared_ptr<HttpRequest> request, Error err)
+{
+  Lock lock(guard_, THIS_LOCATION);
+  
+  // Check if connection is still in ProcessRequest state
+  if (state_ != State::ProcessRequest) {
+    LOCAL_DEBUG("HttpServerConnection::onAsyncRequestComplete(%d) unexpected state for sending response %d", request->id(), (int)state_);
+    return;
+  }
+
+  // Prepare response
+  doWriteResponse(lock, request, err);
+
+  assert(socket_);
+  int fd = socket_->fd();
+  poll_set_->addEvents(fd, PollSet::EventOut);
+}
+
+void HttpServerConnection::updateState(Lock& lock, State newState)
+{
+  if (state_ == newState)
+    return;
+
+  auto oldState = state_;
+  state_ = newState;
+}
+
+void HttpServerConnection::prepareFaultResponse(Error error, http::HttpRequest& request)
 {
   request.resetResponse();
   switch (error.code) {
@@ -264,12 +369,6 @@ void HttpServerConnection::prepareFaultResponse(Error error, http::HttpRequest& 
       "</html>", "text/html");
       break;
   }
-}
-
-void HttpServerConnection::detach()
-{
-  std::unique_lock<std::mutex> lock(guard_);
-  server_ = nullptr;
 }
 
 }

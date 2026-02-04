@@ -118,7 +118,7 @@ struct HttpClient::Internal {
     release(lock);
   }
 
-  void resetRequest();
+  void resetIntermediateBuffers();
   Error readResponse();
 
   int fd() const
@@ -273,7 +273,7 @@ int HttpClient::Internal::eventsForState(State s) const
   return 0;
 }
 
-void HttpClient::Internal::resetRequest()
+void HttpClient::Internal::resetIntermediateBuffers()
 {
   request_body.resize(0);
   request_header_buffer.resize(0);
@@ -419,23 +419,23 @@ Error HttpClient::Internal::readResponse()
 
     const int fd = socket->fd();
     double dur = (SteadyTime::now() - active_request->getRequestStart()).toSec() * 1000;
-    MINIROS_DEBUG("HttpClient(%d)::readHeader: ContentLength=%d, parsed=%d t=%fms", fd, response_http_frame.contentLength(), parsed, dur);
+    LOCAL_DEBUG("HttpClient(%d)::readHeader: ContentLength=%d, parsed=%d t=%fms", fd, response_http_frame.contentLength(), parsed, dur);
 
     // If we haven't gotten the entire request yet, return (keep reading)
     if (response_http_frame.state() != HttpParserFrame::ParseComplete) {
       if (readErr == Error::EndOfFile) {
-        MINIROS_DEBUG("HttpClient[%s]::readRequest: EOF while reading request", debugName().c_str());
+        LOCAL_DEBUG("HttpClient[%s]::readRequest: EOF while reading request", debugName().c_str());
         response_http_frame.finishResponse();
         return Error::EndOfFile;
         // Either way we close the connection
       }
-      MINIROS_DEBUG("HttpClient[%s]::readRequest got only %d/%d bytes.", debugName().c_str(), response_http_frame.bodyLength(), response_http_frame.contentLength());
+      LOCAL_DEBUG("HttpClient[%s]::readRequest got only %d/%d bytes.", debugName().c_str(), response_http_frame.bodyLength(), response_http_frame.contentLength());
       return Error::WouldBlock;
     }
 
     assert(response_http_frame.state() == HttpParserFrame::ParseComplete);
     // Otherwise, parse and dispatch the request
-    MINIROS_DEBUG("HttpClient[%s]::readRequest read %d/%d bytes.", debugName().c_str(), response_http_frame.bodyLength(), response_http_frame.contentLength());
+    LOCAL_DEBUG("HttpClient[%s]::readRequest read %d/%d bytes.", debugName().c_str(), response_http_frame.bodyLength(), response_http_frame.contentLength());
   } else if (readErr == Error::WouldBlock) {
     return Error::WouldBlock;
   }
@@ -957,7 +957,7 @@ void HttpClient::Internal::handleProcessResponse(Lock& lock)
     // Status should be updated last to prevent possible racing with access to response body.
     req->updateState(HttpRequest::State::ClientHasResponse);
 
-    resetRequest();
+    resetIntermediateBuffers();
 
     auto dur = req->getRequestFinish() - req->getRequestStart();
     MINIROS_DEBUG_NAMED("client", "HttpClient[%s]::handleProcessResponse() received response in %fms",

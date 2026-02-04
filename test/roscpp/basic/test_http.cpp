@@ -65,12 +65,17 @@ public:
   int counter = 0;
 };
 
+
+/// Global timeouts for tests. Can be changed to larger values for debug purposes.
+constexpr double connectionTimeoutSec = 50;
+constexpr double responseTimeoutSec = 50;
+
 TEST_F(HttpServerTest, ConnectNoServer)
 {
   http::HttpClient client(&poll_manager_.getPollSet());
 
   client.connect("127.0.0.1", 19999);
-  Error conErr = client.waitConnected(WallDuration(5));
+  Error conErr = client.waitConnected(WallDuration(connectionTimeoutSec));
   EXPECT_EQ(conErr, Error::NotConnected);
 }
 
@@ -82,7 +87,7 @@ TEST_F(HttpServerTest, SimpleGet)
   auto dataHandler = std::make_shared<DataEndpointHandler>();
   Error regErr = server_->registerEndpoint(
     std::make_unique<http::SimpleFilter>(http::HttpMethod::Get, "/data"),
-    dataHandler);
+    dataHandler, {});
   ASSERT_EQ(regErr, Error::Ok);
 
   // Create HTTP client
@@ -92,7 +97,7 @@ TEST_F(HttpServerTest, SimpleGet)
   Error conErr = client.connect("127.0.0.1", port);
   MINIROS_INFO("Started connection");
   ASSERT_TRUE(conErr == Error::Ok || conErr == Error::Timeout);
-  ASSERT_EQ(client.waitConnected(WallDuration(20)), Error::Ok);
+  ASSERT_EQ(client.waitConnected(WallDuration(connectionTimeoutSec)), Error::Ok);
 
   MINIROS_INFO("Test connected to local server");
 
@@ -104,7 +109,7 @@ TEST_F(HttpServerTest, SimpleGet)
   ASSERT_EQ(enqErr, Error::Ok);
 
   // Wait for response (poll until status becomes HasResponse)
-  EXPECT_EQ(request->waitForResponse(WallDuration(5.0)), Error::Ok);
+  EXPECT_EQ(request->waitForResponse(WallDuration(responseTimeoutSec)), Error::Ok);
 
   // Verify we actually got a response
   ASSERT_EQ(request->state(), http::HttpRequest::State::Done);
@@ -121,9 +126,10 @@ TEST_F(HttpServerTest, SimpleGet)
   }
 
   // Send second request.
-  client.enqueueRequest(request);
+  Error err2 = client.enqueueRequest(request);
+  ASSERT_EQ(err2, Error::Ok);
 
-  EXPECT_EQ(request->waitForResponse(WallDuration(5.0)), Error::Ok);
+  EXPECT_EQ(request->waitForResponse(WallDuration(responseTimeoutSec)), Error::Ok);
   // Verify we actually got a response
   ASSERT_EQ(request->state(), http::HttpRequest::State::Done);
   {
@@ -166,7 +172,7 @@ TEST_F(HttpServerTest, PostWithJson)
   auto jsonHandler = std::make_shared<JsonPostEndpointHandler>();
   Error regErr = server_->registerEndpoint(
     std::make_unique<http::SimpleFilter>(http::HttpMethod::Post, "/api/data"),
-    jsonHandler);
+    jsonHandler, {});
   ASSERT_EQ(regErr, Error::Ok);
 
   // Create HTTP client
@@ -176,7 +182,7 @@ TEST_F(HttpServerTest, PostWithJson)
   Error conErr = client.connect("127.0.0.1", port);
   MINIROS_INFO("Started connection for POST test");
   ASSERT_TRUE(conErr == Error::Ok || conErr == Error::Timeout);
-  ASSERT_EQ(client.waitConnected(WallDuration(20)), Error::Ok);
+  ASSERT_EQ(client.waitConnected(WallDuration(connectionTimeoutSec)), Error::Ok);
 
   MINIROS_INFO("Connected to local server for POST test");
 
@@ -195,7 +201,7 @@ TEST_F(HttpServerTest, PostWithJson)
   ASSERT_EQ(enqErr, Error::Ok);
 
   // Wait for response (poll until status becomes HasResponse)
-  EXPECT_EQ(request->waitForResponse(WallDuration(5.0)), Error::Ok);
+  EXPECT_EQ(request->waitForResponse(WallDuration(responseTimeoutSec)), Error::Ok);
 
   // Verify we actually got a response
   ASSERT_EQ(request->state(), http::HttpRequest::State::Done);

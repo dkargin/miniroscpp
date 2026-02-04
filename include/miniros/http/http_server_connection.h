@@ -22,9 +22,9 @@ class HttpServer;
 
 /// A Connection to HttpServer from Client.
 /// It handles parsing HTTP request from client, picking right endpoint handler and sending response back.
-class HttpServerConnection {
+class HttpServerConnection : public std::enable_shared_from_this<HttpServerConnection> {
 public:
-  HttpServerConnection(HttpServer* server, std::shared_ptr<network::NetSocket> socket);
+  HttpServerConnection(HttpServer* server, std::shared_ptr<network::NetSocket> socket, PollSet* pollSet);
   ~HttpServerConnection();
 
   /// Handler for socket/poll events.
@@ -48,16 +48,38 @@ public:
   void close();
 
   /// Fill in fault response.
-  void prepareFaultResponse(Error error, http::HttpRequest& request) const;
+  static void prepareFaultResponse(Error error, http::HttpRequest& request);
 
   /// Detach from server.
   /// Breaks link with Http server.
   void detach();
 
+  using Lock = TimeCheckLock<std::mutex>;
+
   /// Allocate new request object or reuse some existing object from the pool.
-  std::shared_ptr<HttpRequest> makeRequestObject();
+  std::shared_ptr<HttpRequest> makeRequestObject(Lock& lock);
+
+  /// It is called from CallbackQueue thread when response is ready.
+  void onAsyncRequestComplete(std::shared_ptr<HttpRequest> request, Error err);
+
+  int eventsForState(State state) const;
 
 protected:
+  /// Updates internal state.
+  void updateState(Lock& lock, State newState);
+
+  /// Handle State::ProcessRequest.
+  /// Expected transitions:
+  ///  - WriteResponse if got response immediately
+  ///  - stay in ProcessRequest if response is sent to callback queue.
+  bool handleProcessRequest(Lock& lock);
+
+  /// Handle State::WriteResponse.
+  void handleWriteResponse(Lock& lock, int evtFlags, bool fallThrough);
+
+  /// Start writing response to socket. It serializes response to buffers and switches state to WriteResponse.
+  void doWriteResponse(Lock& lock, const std::shared_ptr<HttpRequest>& requestObject, Error error);
+
   volatile State state_ = State::ReadRequest;
 
   HttpServer* server_;
@@ -75,7 +97,9 @@ protected:
   SteadyTime request_start_;
   std::shared_ptr<network::NetSocket> socket_;
 
-  std::mutex guard_;
+  PollSet* poll_set_ = nullptr;
+
+  mutable std::mutex guard_;
 };
 
 }

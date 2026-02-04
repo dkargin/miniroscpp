@@ -22,7 +22,15 @@ struct CodeLocation {
 
   std::string str() const
   {
-    return std::string(m_file) + ":" + std::to_string(m_line) + " " + std::string(m_method);
+    std::string result;
+    result.reserve(255);
+    if (m_file) {
+      result += std::string(m_file) + ":" + std::to_string(m_line);
+    }
+    if (m_method) {
+      result += std::string(m_method);
+    }
+    return result;
   }
 
   friend bool operator == (const CodeLocation& c1, const CodeLocation& c2)
