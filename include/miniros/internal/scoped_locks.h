@@ -54,7 +54,7 @@ public:
 
       auto duration = timeToLock().toSec();
       if (duration > timeout_) {
-        LOCAL_WARN("TimeCheckLog long lock at %s for %fs", loc_.str(), duration);
+        LOCAL_WARN("TimeCheckLog long lock at %s for %fs", loc_.str().c_str(), duration);
       }
     }
   }

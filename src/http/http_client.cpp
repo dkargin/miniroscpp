@@ -191,7 +191,7 @@ struct HttpClient::Internal {
         updateCounter.load(), activeReq->id(), activeReq->elapsed().toSec());
     } else {
       assert(!state.hasRequest());
-      LOCAL_INFO("HttpClient[%s]::updateState(%s) from %s at step=%d dt=%f", debugName().c_str(),
+      LOCAL_INFO("HttpClient[%s]::updateState(%s) from %s at step=%d", debugName().c_str(),
         newState.toString(), oldState.toString(), updateCounter.load());
     }
   }

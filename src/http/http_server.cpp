@@ -71,6 +71,8 @@ void HttpServer::Internal::closeConnection(Lock& lock, int fd, const std::string
 {
   MINIROS_DEBUG("HttpServer[%d]::closeConnection(): %s", fd, reason.c_str());
   std::shared_ptr<HttpServerConnection> connection;
+  // TODO: Connection can close and unsubscribe itself.
+  // TODO: Still need to notify external users with onCloseConnection.
   auto it = connections.find(fd);
   if (it != connections.end()) {
     if (pollSet) {

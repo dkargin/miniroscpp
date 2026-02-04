@@ -157,7 +157,7 @@ bool PollSet::addSocket(int fd, int events, const SocketUpdateFunc& update_func,
     bool b = internal_->socket_info_.insert(std::make_pair(fd, info)).second;
     if (!b)
     {
-      printf("PollSet: Tried to add duplicate fd [%d]", fd);
+      LOCAL_WARN("PollSet: Tried to add duplicate fd [%d]", fd);
       return false;
     }
 
