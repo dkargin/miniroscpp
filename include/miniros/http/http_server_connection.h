@@ -32,11 +32,30 @@ public:
   /// @returns new event mask
   int handleEvents(int evtFlags);
 
-  enum class State {
-    ReadRequest,
-    ProcessRequest,
-    WriteResponse,
-    Exit,
+  struct MINIROS_DECL State {
+    enum State_t {
+      /// Reading HTTP request from client.
+      ReadRequest,
+      /// Processing request (finding handler, executing it).
+      ProcessRequest,
+      /// Writing HTTP response to client.
+      WriteResponse,
+      /// Connection is closing/exiting.
+      Exit,
+    };
+
+    State(State_t val) : value(val) {}
+
+    operator State_t() const
+    {
+      return value;
+    }
+
+    /// Convert state to string.
+    const char* toString() const;
+
+  protected:
+    State_t value;
   };
 
   /// Incremental reading of request.
@@ -80,7 +99,7 @@ protected:
   /// Start writing response to socket. It serializes response to buffers and switches state to WriteResponse.
   void doWriteResponse(Lock& lock, const std::shared_ptr<HttpRequest>& requestObject, Error error);
 
-  volatile State state_ = State::ReadRequest;
+  State state_ = State::ReadRequest;
 
   HttpServer* server_;
 
@@ -96,6 +115,9 @@ protected:
 
   SteadyTime request_start_;
   std::shared_ptr<network::NetSocket> socket_;
+
+  /// Cached file descriptor.
+  int debugFd_ = 0;
 
   PollSet* poll_set_ = nullptr;
 

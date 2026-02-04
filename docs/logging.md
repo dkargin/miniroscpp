@@ -29,7 +29,14 @@ You can add `__miniros.debug:=1` to remappings to set more verbose internal log.
 Notable internal channels:
 
  - **miniros.http** - root channel for all internal http/XMLRPC components
- - **miniros.http.client** - channel for HTTP client.
  - **miniros.net** - channel for high level network components. It contains classes NetSocket, NetAddress, ... . 
  - **miniros.RPCManager** - channel for **RPCManager**.
- - **miniros.master_link** - everything related to **MasterLink**.
+ 
+Some part of internal logging is done through local log to prevent potential recursive calls. Classed which use only internal logging:
+
+ - PollSet
+ - MasterLink (incapsulated global calls from ros::param and ros::master).
+ - http::HttpServer
+ - http::HttpServerConnection
+ - http::HttpClient
+ - http::HttpRequest
