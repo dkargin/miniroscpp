@@ -4,7 +4,7 @@
 
 #include "miniros/http/xmlrpc_request.h"
 
-#include "internal/invokers.h"
+#include "internal/scoped_locks.h"
 #include "miniros/internal/xml_tools.h"
 #include "miniros/xmlrpcpp/XmlRpcUtil.h"
 
@@ -55,6 +55,18 @@ void XmlRpcRequest::setParamArray(const XmlRpc::XmlRpcValue& params)
 {
   params_ = params;
   generateRequestBody();
+}
+
+std::string XmlRpcRequest::debugName() const
+{
+  char name[1024];
+  int len = std::snprintf(name, sizeof(name) - 1, "%s@%s[%d]", path_.c_str(), method_name_.c_str(), id());
+  if (len >= 0) {
+    name[len] = 0;
+  } else {
+    return "";
+  }
+  return std::string(name);
 }
 
 void XmlRpcRequest::setParams(const XmlRpc::XmlRpcValue& param0)

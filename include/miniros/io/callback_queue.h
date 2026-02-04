@@ -60,8 +60,8 @@ public:
   CallbackQueue(bool enabled = true);
   ~CallbackQueue() override;
 
-  virtual void addCallback(const CallbackInterfacePtr& callback, uint64_t removal_id = 0) override;
-  virtual void removeByID(uint64_t removal_id) override;
+  void addCallback(const CallbackInterfacePtr& callback, uint64_t removal_id = 0) override;
+  void removeByID(uint64_t removal_id) override;
 
   enum CallOneResult
   {
@@ -107,11 +107,11 @@ public:
   void callAvailable(miniros::WallDuration timeout);
 
   /**
-   * \brief returns whether or not the queue is empty
+   * \brief returns whether the queue is empty
    */
   bool empty() { return isEmpty(); }
   /**
-   * \brief returns whether or not the queue is empty
+   * \brief returns whether the queue is empty
    */
   bool isEmpty();
   /**

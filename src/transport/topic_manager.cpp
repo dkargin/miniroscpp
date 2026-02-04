@@ -152,15 +152,22 @@ void TopicManager::shutdown()
 
   MINIROS_DEBUG("Shutting down topics...");
   MINIROS_DEBUG("  shutting down publishers");
+
+  std::vector<std::string> droppedTopics;
   {
     std::scoped_lock<std::recursive_mutex> adv_lock(advertised_topics_mutex_);
 
     for (PublicationPtr pub : advertised_topics_) {
-      if (!pub->isDropped())
-        unregisterPublisher(pub->getName());
+      if (!pub->isDropped()) {
+        droppedTopics.push_back(pub->getName());
+      }
       pub->drop();
     }
     advertised_topics_.clear();
+  }
+
+  for (auto topic: droppedTopics) {
+    unregisterPublisher(topic);
   }
 
   // unregister all of our subscriptions
@@ -433,17 +440,18 @@ bool TopicManager::unadvertise(const std::string& topic, const SubscriberCallbac
   pub->removeCallbacks(callbacks);
 
   {
-    std::scoped_lock<std::recursive_mutex> lock(advertised_topics_mutex_);
+    std::unique_lock<std::recursive_mutex> lock(advertised_topics_mutex_);
     if (pub->getNumCallbacks() == 0) {
-      unregisterPublisher(pub->getName());
+      std::string pubName = pub->getName();
       pub->drop();
 
       advertised_topics_.erase(i);
-
       {
-        std::scoped_lock<std::mutex> lock(advertised_topic_names_mutex_);
-        advertised_topic_names_.remove(pub->getName());
+        std::unique_lock<std::mutex> lock(advertised_topic_names_mutex_);
+        advertised_topic_names_.remove(pubName);
       }
+      lock.unlock();
+      unregisterPublisher(pubName);
     }
   }
 
@@ -960,14 +968,7 @@ TopicManager::RpcValue TopicManager::pubUpdateCallback(
   const std::string& callerId, const std::string& topic, const RpcValue& publishers, const network::ClientInfo& ci)
 {
   std::stringstream ss;
-  /*
-  if (params.size() < 3)
-    return Error::InvalidValue;
-  if (params[1].getType() != XmlRpc::XmlRpcValue::TypeString)
-    return Error::InvalidValue;
-  if (params[2].getType() != XmlRpc::XmlRpcValue::TypeArray)
-    return Error::InvalidValue;
-  std::string topic = params[1];*/
+
   std::vector<std::string> pubs;
   for (int idx = 0; idx < publishers.size(); idx++) {
     std::string pub = publishers[idx];

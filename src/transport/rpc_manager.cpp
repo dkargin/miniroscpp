@@ -57,6 +57,7 @@
 #include "miniros/xmlrpcpp/XmlRpcServerConnection.h"
 #include "miniros/xmlrpcpp/XmlRpcServerMethod.h"
 #include "network/url.h"
+#include "xmlrpcpp/XmlRpcException.h"
 #include "xmlrpcpp/XmlRpcServer.h"
 
 using namespace XmlRpc;
@@ -108,8 +109,16 @@ public:
 
   void execute(const XmlRpcValue &params, XmlRpcValue &result, const network::ClientInfo& clientInfo) override
   {
-    if (m_func)
-      m_func(params, result, clientInfo);
+    try {
+      if (m_func)
+        m_func(params, result, clientInfo);
+    } catch (XmlRpc::XmlRpcException ex) {
+      MINIROS_WARN("RPCManager: got exception while handling request \"%s\": %s", _name.c_str(), ex.getMessage().c_str());
+      result = XmlRpcValue::Array(3);
+      result[0] = 0;
+      result[1] = ex.getMessage();
+      result[2] = ex.getCode();
+    }
   }
 
 private:
@@ -154,7 +163,7 @@ struct RPCManager::Internal {
   PollSet* poll_set_ = nullptr;
   std::unique_ptr<http::HttpServer> http_server_;
 
-  std::map<network::URL, std::shared_ptr<http::HttpClient>> clients_;
+  std::multimap<network::URL, std::shared_ptr<http::HttpClient>> clients_;
 
   std::mutex clients_mutex_;
 
@@ -190,7 +199,7 @@ RPCManager::~RPCManager()
   shutdown();
 }
 
-Error RPCManager::start(int port)
+Error RPCManager::start(const CallbackQueuePtr& cb, int port)
 {
   if (!internal_)
     return Error::InternalError;
@@ -217,10 +226,10 @@ Error RPCManager::start(int port)
   auto xmlrpc_enpoint = std::make_shared<http::XmlRpcHandler>(&internal_->server_);
 
   // miniroscore endpoints tend to go here.
-  internal_->http_server_->registerEndpoint(std::make_unique<http::SimpleFilter>(http::HttpMethod::Post, "/"), xmlrpc_enpoint);
+  internal_->http_server_->registerEndpoint(std::make_unique<http::SimpleFilter>(http::HttpMethod::Post, "/"), xmlrpc_enpoint, cb);
 
   // Common endpoint for regular ROS endpoints.
-  internal_->http_server_->registerEndpoint(std::make_unique<http::SimpleFilter>(http::HttpMethod::Post, "/RPC2"), xmlrpc_enpoint);
+  internal_->http_server_->registerEndpoint(std::make_unique<http::SimpleFilter>(http::HttpMethod::Post, "/RPC2"), xmlrpc_enpoint, cb);
 
   if (Error err = internal_->http_server_->start(port); !err) {
     return err;
@@ -314,12 +323,16 @@ std::shared_ptr<http::HttpClient> RPCManager::getXMLRPCClient(const std::string 
 
   std::scoped_lock<std::mutex> lock(internal_->clients_mutex_);
 
-  // Try to find existing client
-  auto it = internal_->clients_.find(url);
-  if (it != internal_->clients_.end())
+  // Try to find existing client in Idle state
+  auto range = internal_->clients_.equal_range(url);
+  for (auto it = range.first; it != range.second; ++it)
   {
-    // Found existing client, return it
-    return it->second;
+    auto client = it->second;
+    if (client && client->getState() == http::HttpClient::State::Idle)
+    {
+      // Found existing client in Idle state, return it
+      return client;
+    }
   }
 
   // Create new client
@@ -351,8 +364,8 @@ std::shared_ptr<http::HttpClient> RPCManager::getXMLRPCClient(const std::string 
     return nullptr;
   }
 
-  // Store client in map
-  internal_->clients_[url] = client;
+  // Store client in multimap
+  internal_->clients_.insert(std::make_pair(url, client));
 
   return client;
 }
@@ -365,11 +378,19 @@ void RPCManager::releaseXMLRPCClient(std::shared_ptr<http::HttpClient> c)
   // In case of "idle" state it should disconnect itself and remove it from RPC manager.
   std::scoped_lock<std::mutex> lock(internal_->clients_mutex_);
   auto rootUrl = c->getRootURL("http://");
-  auto it = internal_->clients_.find(rootUrl);
-
-  if (it == internal_->clients_.end()) {
-    // Brute force search for this client.
-    for (it = internal_->clients_.begin(); it != internal_->clients_.end(); it++) {
+  
+  // Search within the URL range first (more efficient for multimap)
+  auto range = internal_->clients_.equal_range(rootUrl);
+  auto it = range.first;
+  for (; it != range.second; ++it) {
+    if (it->second == c) {
+      break;
+    }
+  }
+  
+  // If not found in URL range, do brute force search
+  if (it == range.second) {
+    for (it = internal_->clients_.begin(); it != internal_->clients_.end(); ++it) {
       if (it->second == c) {
         break;
       }

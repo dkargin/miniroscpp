@@ -8,27 +8,31 @@
 #include <iomanip>
 
 #include "miniros/http/http_request.h"
-#include "miniros/console.h"
 
+#include "internal/scoped_locks.h"
+#include "miniros/internal/local_log.h"
+
+#include <atomic>
 #include <cassert>
 
-/// This file will log to "miniros.http" channel.
-#define MINIROS_PACKAGE_NAME "http"
-
+namespace {
+static std::atomic_int g_requestId{0};
+}
 namespace miniros {
 namespace http {
 
-HttpRequest::HttpRequest() : method_(HttpMethod::Get), path_("/")
+
+HttpRequest::HttpRequest() : method_(HttpMethod::Get), path_("/"), request_id_(++g_requestId)
 {}
 
-HttpRequest::HttpRequest(HttpMethod method, const std::string& path) : method_(method), path_(path)
+HttpRequest::HttpRequest(HttpMethod method, const std::string& path)
+  : method_(method), path_(path), request_id_(++g_requestId)
 {
   assert(!path.empty());
 }
 
 HttpRequest::~HttpRequest()
 {}
-
 
 void HttpRequest::setMethod(HttpMethod method)
 {
@@ -49,6 +53,11 @@ void HttpRequest::setPath(const std::string& path)
 const std::string& HttpRequest::path() const
 {
   return path_;
+}
+
+std::string HttpRequest::debugName() const
+{
+  return path() + "[" + std::to_string(id()) + "]";
 }
 
 /// Add URL parameter (query string parameter)
@@ -181,7 +190,7 @@ std::string HttpRequest::buildHeader(const std::string& host, int port) const
 
   // Content-Length header (if body is present)
   if (needBody(method_) && request_body_.empty()) {
-    MINIROS_WARN("Unexpected empty request to %s", fullPath.c_str());
+    LOCAL_WARN("Unexpected empty request to %s", fullPath.c_str());
   } else {
     char buff[40];
     std::snprintf(buff, sizeof(buff), "%zu", request_body_.size());
@@ -217,46 +226,53 @@ void HttpRequest::reset()
   response_body_.clear();
 }
 
-void HttpRequest::updateState(State status)
+void HttpRequest::updateState(State state)
 {
-  std::unique_lock lock(mutex_);
-  if (state_ == status)
+  Lock lock(mutex_, THIS_LOCATION);
+  if (state_ == state)
     return;
 
-  if (status == State::ClientHasResponse) {
+  if (state == State::ClientHasResponse) {
     request_finish_ = SteadyTime::now();
   }
-  state_ = status;
+  state_ = state;
   cv_.notify_all();
 }
 
 HttpRequest::State HttpRequest::state() const
 {
-  std::unique_lock lock(mutex_);
+  Lock lock(mutex_, THIS_LOCATION);
   return state_;
 }
 
 void HttpRequest::setRequestStart(const SteadyTime& time)
 {
-  std::unique_lock lock(mutex_);
+  Lock lock(mutex_, THIS_LOCATION);
   request_start_ = time;
 }
 
 SteadyTime HttpRequest::getRequestStart() const
 {
-  std::unique_lock lock(mutex_);
+  Lock lock(mutex_, THIS_LOCATION);
   return request_start_;
 }
 
 SteadyTime HttpRequest::getRequestFinish() const
 {
-  std::unique_lock lock(mutex_);
+  Lock lock(mutex_, THIS_LOCATION);
   return request_finish_;
 }
 
+WallDuration HttpRequest::elapsed() const
+{
+  Lock lock(mutex_, THIS_LOCATION);
+  return SteadyTime::now() - request_start_;
+}
+
+
 void HttpRequest::setResponseHeader(const HttpParserFrame& frame)
 {
-  std::unique_lock lock(mutex_);
+  Lock lock(mutex_, THIS_LOCATION);
   response_header_.protocol = frame.getProtocolName();
   response_header_.statusCode = frame.responseCode;
   response_header_.status = frame.getResponseStatus();
@@ -282,34 +298,34 @@ const std::string& HttpRequest::responseBody() const
 
 void HttpRequest::setResponseBody(const std::string& body, const std::string& contentType)
 {
-  std::unique_lock lock(mutex_);
+  Lock lock(mutex_, THIS_LOCATION);
   response_body_ = body;
   response_header_.contentType = contentType;
 }
 
 void HttpRequest::setResponseBody(const char* data, size_t size)
 {
-  std::unique_lock lock(mutex_);
+  Lock lock(mutex_, THIS_LOCATION);
   response_body_.assign(data, size);
 }
 
 void HttpRequest::resetResponse()
 {
-  std::unique_lock lock(mutex_);
+  Lock lock(mutex_, THIS_LOCATION);
   response_header_.reset();
   response_body_.clear();
 }
 
 void HttpRequest::setResponseStatus(int code, const char* status)
 {
-  std::unique_lock lock(mutex_);
+  Lock lock(mutex_, THIS_LOCATION);
   response_header_.statusCode = code;
   response_header_.status = status;
 }
 
 void HttpRequest::setResponseStatusOk()
 {
-  std::unique_lock lock(mutex_);
+  Lock lock(mutex_, THIS_LOCATION);
   response_header_.statusCode = 200;
   response_header_.status = "OK";
 }
@@ -320,28 +336,27 @@ const HttpResponseHeader& HttpRequest::responseHeader() const
 }
 
 Error HttpRequest::waitForState(State state, const WallDuration& duration) const {
-  std::unique_lock lock(mutex_);
+  Lock lock(mutex_, THIS_LOCATION);
+
   if (state_ == state)
     return Error::Ok;
   std::chrono::duration<double> d(duration.toSec());
-  if (!cv_.wait_for(lock, d, [this, state]() {
-    return state_ == state;
-  }))
+  if (!cv_.wait_for(lock, d, [this, state]() { return state_ == state; }))
   {
-    return state != state_ ? Error::Timeout : Error::Ok;
+    return Error::Timeout;
   }
   return Error::Ok;
 }
 
 Error HttpRequest::waitForResponse(const WallDuration& duration) const
 {
-  std::unique_lock lock(mutex_);
+  Lock lock(mutex_, THIS_LOCATION);
+
   if (state_ == State::Done)
     return Error::Ok;
   std::chrono::duration<double> d(duration.toSec());
-  if (!cv_.wait_for(lock, d, [this]() {
-    return state_ == State::Done;
-  })) {
+  if (!cv_.wait_for(lock, d, [this]() {return state_ == State::Done;}))
+  {
     return Error::Timeout;
   }
   return Error::Ok;

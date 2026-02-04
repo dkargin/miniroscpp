@@ -339,6 +339,8 @@ Error start()
   PollSet& pollSet = pm->getPollSet();
   rpcm->setPollSet(&pollSet);
 
+  auto internalCallbackQueue = getInternalCallbackQueue();
+
   if (g_master_link)
     g_master_link->param("/tcp_keepalive", TransportTCP::s_use_keepalive_, TransportTCP::s_use_keepalive_);
 
@@ -362,7 +364,7 @@ Error start()
   }
 
   int rpcPort = network::getRPCPort();
-  if (Error err = rpcm->start(rpcPort); !err) {
+  if (Error err = rpcm->start(internalCallbackQueue, rpcPort); !err) {
     // We can arrive here only if we are completely unable to host TCP/http server.
     MINIROS_ERROR("Failed to start RPCManager at port %d: %s", rpcPort, err.toString());
     shutdown();
@@ -385,8 +387,6 @@ Error start()
     assert(!prev);
     miniros::console::register_appender(g_rosout_appender);
   }
-
-  auto internalCallbackQueue = getInternalCallbackQueue();
 
   if (g_shutting_down) goto end;
 

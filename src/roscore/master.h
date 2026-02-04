@@ -39,6 +39,7 @@ namespace miniros {
 class PollSet;
 class RPCManager;
 class NodeHandle;
+class CallbackQueue;
 
 namespace network {
 struct ClientInfo;
@@ -64,7 +65,7 @@ public:
   bool ok() const;
 
   /// Setup RPC callbacks.
-  void setupBindings();
+  void setupBindings(const std::shared_ptr<CallbackQueue>& cb);
 
   std::string getUri() const;
   int getPort() const;
