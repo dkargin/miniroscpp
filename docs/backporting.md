@@ -41,7 +41,7 @@ https://github.com/ros/ros_comm/pull/2351 - rosbag fix
 Stopped parsing list at: https://github.com/ros/ros_comm/pulls?page=12&q=is%3Apr+is%3Aclosed
 
 
-## Merged ##
+## Merged to noetic/one ##
 
 BAG, Merged [Ensure latched messages are updated on every split](https://github.com/ros/ros_comm/pull/2261)
 
@@ -49,7 +49,7 @@ BAG, Merged [Exposed record snapshot feature for command line](https://github.co
 
 [Fix printing XmlRpcValue with GTest](https://github.com/ros/ros_comm/pull/2224)
 
-[use recursive mutex to fix dead lock](https://github.com/ros/ros_comm/pull/2209) - fixes to rospararm requester. Simular thing is needed to MasterLink. Though valgrind/helgrind does not like recursive mutexes, but deadlock is still deadly.
+[use recursive mutex to fix dead lock](https://github.com/ros/ros_comm/pull/2209) - fixes to rospararm requester. Simular thing is needed to MasterLink. Though valgrind/helgrind does not like recursive mutexes, but deadlock is still deadly. Not relevant anymore, since requests are done through completely other means.
 
 [keep the persistent connection only if rosmaster supports http1.1](https://github.com/ros/ros_comm/pull/2208) - nice update to XmlRpcClient. Though it will be update to use new http_toos package.
 

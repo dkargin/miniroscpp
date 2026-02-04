@@ -245,9 +245,10 @@ void HttpServer::acceptClient(const std::shared_ptr<Lifetime<HttpServer>>& lifet
       if (!internalCopy->alive) {
         return 0;
       }
+      /*
       if (!newFlags) {
         internal_->closeConnection(lock, fd, "EOF");
-      }
+      }*/
       return newFlags;
   }, internalCopy);
 }

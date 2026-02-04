@@ -30,7 +30,7 @@ cmake ..
 make
 ```
 
-It generates `libminiroscpp.so` library, that contains all the code inside.
+It generates `libminiroscpp.so` library. It contains all client code inside. Rosbag client API is located in `libbag_storage.so`.
 
 You can force miniros use system version of **bzip** by setting CMake option `MINIROS_USE_SYSTEM_BZIP2=ON`. `MINIROS_USE_SYSTEM_LZ4` does the same for **lz4**.
 

@@ -6,6 +6,8 @@
 #include <cstring>
 
 #include "miniros/network/socket.h"
+
+#include "internal/local_log.h"
 #include "miniros/io/io.h"
 
 #ifndef WIN32
@@ -581,7 +583,7 @@ std::pair<size_t, Error> NetSocket::send(const void* rawData, size_t size, const
     } else {
       n = ::send(internal_->fd, sp, static_cast<socklen_t>(size - written), flags);
     }
-    MINIROS_DEBUG("NetSocket(%d)::send returned %d.", internal_->fd, n);
+    LOCAL_DEBUG_NAMED("socket", "NetSocket(%d)::send returned %d.", (int)internal_->fd, n);
     if (n > 0) {
       if (isDatagram()) {
         break;
@@ -595,7 +597,7 @@ std::pair<size_t, Error> NetSocket::send(const void* rawData, size_t size, const
     if (expectingBlock(err)) {
       wouldBlock = true;
     } else {
-      MINIROS_WARN("Error while sending: %s", strerror(errno));
+      LOCAL_WARN("Error while sending: %s", strerror(errno));
       return {written, Error::SystemError};
     }
   }

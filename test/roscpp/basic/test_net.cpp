@@ -66,10 +66,11 @@ TEST(Adapters, SameNet)
   EXPECT_FALSE(adapter.matchNetAddress(address2));
 }
 
-TEST(SocketUDP, send)
+TEST(SocketUDP, SimplestBroadcast)
 {
+  // Just sending packet to some broadcast address.
   NetSocket socket;
-  constexpr int port = 11311;
+  constexpr int port = 11811;
 
   ASSERT_TRUE(socket.initUDP(false));
   ASSERT_TRUE(socket.setBroadcast(true));
@@ -78,21 +79,25 @@ TEST(SocketUDP, send)
   const char msg[] = "hello";
   const char HOSTNAME[] = "127.0.0.1";
 
+  // Sending to broadcast address from sockaddr_in
   sockaddr_in servaddr;
-
   bzero(&servaddr, sizeof(servaddr));
   servaddr.sin_family = AF_INET;
   servaddr.sin_addr.s_addr = INADDR_BROADCAST; //inet_addr(HOSTNAME);
   servaddr.sin_port = htons(port);
 
-  int ret = sendto(socket.fd(), msg, strlen(msg) + 1, 0, // +1 to include terminator
-        (sockaddr*)&servaddr, sizeof(servaddr));
-  ASSERT_GE(ret, 0);
+  NetAddress brAddress;
+  brAddress.assignRawAddress(NetAddress::AddressIPv4, &servaddr, sizeof(servaddr));
+
+  auto [sent1, err1] = socket.send(msg, strlen(msg) + 1, &brAddress);
+  ASSERT_EQ(err1, Error::Ok);
+  ASSERT_GT(sent1, 0);
 
   const char msg2[] = "world";
   NetAddress address = NetAddress::fromIp4String("255.255.255.255", port);
-  auto [sent, err] = socket.send(msg2, sizeof(msg2), &address);
-  ASSERT_EQ(err, Error::Ok);
+  auto [sent2, err2] = socket.send(msg2, sizeof(msg2), &address);
+  ASSERT_EQ(err2, Error::Ok);
+  ASSERT_GT(sent2, 0);
 }
 
 int main(int argc, char** argv)

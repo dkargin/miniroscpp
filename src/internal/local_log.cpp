@@ -18,7 +18,7 @@ void InternalLog::log(console::Level level, const char* channel, const char* fmt
   if (static_cast<int>(level) < getVerbosity())
     return;
   va_list va;
-  char buf[1024];
+  char buf[1024] = {};
   va_start( va, fmt);
   int written = std::vsnprintf(buf,sizeof(buf)-1,fmt,va);
   va_end(va);

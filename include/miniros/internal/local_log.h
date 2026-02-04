@@ -25,7 +25,7 @@ public:
 }
 
 
-#define LOCAL_LOG_NAMED(level, channel, format, ...) miniros::internal::InternalLog::log((level), (format), __VA_ARGS__);
+#define LOCAL_LOG_NAMED(level, channel, format, ...) miniros::internal::InternalLog::log((level), (channel), (format), __VA_ARGS__);
 #define LOCAL_LOG(level, format, ...) miniros::internal::InternalLog::log((level), nullptr, (format), __VA_ARGS__);
 
 #define LOCAL_INFO(format, ...) LOCAL_LOG(miniros::console::Level::Info, format, __VA_ARGS__)
@@ -33,6 +33,8 @@ public:
 #define LOCAL_DEBUG_NAMED(channel, format, ...) LOCAL_LOG_NAMED(miniros::console::Level::Debug, (channel),  format, __VA_ARGS__)
 
 #define LOCAL_WARN(format, ...) LOCAL_LOG(miniros::console::Level::Warn, format, __VA_ARGS__)
+#define LOCAL_WARN_NAMED(channel, format, ...) LOCAL_LOG_NAMED(miniros::console::Level::Warn, (channel), format, __VA_ARGS__)
+
 #define LOCAL_ERROR(format, ...) LOCAL_LOG(miniros::console::Level::Error, format, __VA_ARGS__)
 
 #endif // MINIROS_LOCAL_LOG_H

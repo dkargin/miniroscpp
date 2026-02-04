@@ -22,11 +22,33 @@ HttpServerConnection::HttpServerConnection(HttpServer* server, std::shared_ptr<n
   :server_(server), socket_(socket), poll_set_(poll_set)
 {
   http_frame_.finishRequest();
+  assert(socket);
+  if (socket_) {
+    debugFd_ = socket_->fd();
+  }
 }
 
 HttpServerConnection::~HttpServerConnection()
 {
   std::unique_lock<std::mutex> lock(guard_);
+  LOCAL_DEBUG("~HttpServerConnection(%d)", debugFd_);
+}
+
+const char* HttpServerConnection::State::toString() const
+{
+  switch (value) {
+    case ReadRequest:
+      return "ReadRequest";
+    case ProcessRequest:
+      return "ProcessRequest";
+    case WriteResponse:
+      return "WriteResponse";
+    case Exit:
+      return "Exit";
+    default:
+      assert(false);
+  }
+  return "Unknown";
 }
 
 Error HttpServerConnection::readRequest()
@@ -263,7 +285,7 @@ int HttpServerConnection::handleEvents(int evtFlags)
     handleWriteResponse(lock, evtFlags, stateFallback);
   }
 
-  LOCAL_WARN("HttpServerConnection unhandled events: %s in state %d", PollSet::eventToString(evtFlags).c_str(), (int)state_);
+  LOCAL_WARN("HttpServerConnection unhandled events: %s in state %s", PollSet::eventToString(evtFlags).c_str(), state_.toString());
   return eventsForState(state_);
 }
 
@@ -319,7 +341,7 @@ void HttpServerConnection::onAsyncRequestComplete(std::shared_ptr<HttpRequest> r
   
   // Check if connection is still in ProcessRequest state
   if (state_ != State::ProcessRequest) {
-    LOCAL_DEBUG("HttpServerConnection::onAsyncRequestComplete(%d) unexpected state for sending response %d", request->id(), (int)state_);
+    LOCAL_DEBUG("HttpServerConnection::onAsyncRequestComplete(%d) unexpected state for sending response %s", request->id(), state_.toString());
     return;
   }
 
@@ -338,6 +360,7 @@ void HttpServerConnection::updateState(Lock& lock, State newState)
 
   auto oldState = state_;
   state_ = newState;
+  LOCAL_INFO("HttpServerConnection::updateState from %s to %s", oldState.toString(), newState.toString());
 }
 
 void HttpServerConnection::prepareFaultResponse(Error error, http::HttpRequest& request)

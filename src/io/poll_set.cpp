@@ -411,7 +411,7 @@ void PollSet::update(int poll_timeout)
 
   SteadyTime updateDone = SteadyTime::now();
   auto dur = updateDone - updateStart;
-  LOCAL_DEBUG("PollSet processed in %fs, gap=%fs", dur.toSec(), gap.toSec());
+  //LOCAL_DEBUG("PollSet processed in %fs, gap=%fs", dur.toSec(), gap.toSec());
   lastUpdateFinish = updateDone;
 }
 
