@@ -229,7 +229,7 @@ void HttpServer::acceptClient(const std::shared_ptr<Lifetime<HttpServer>>& lifet
 
   assert(internal_->pollSet);
 
-  std::shared_ptr<HttpServerConnection> connection(new HttpServerConnection(this, client));
+  std::shared_ptr<HttpServerConnection> connection(new HttpServerConnection(this, client, internal_->pollSet));
   internal_->connections[fd] = connection;
   auto internalCopy = internal_->lifetime;
   internal_->pollSet->addSocket(fd, PollSet::EventIn | PollSet::EventUpdate,
