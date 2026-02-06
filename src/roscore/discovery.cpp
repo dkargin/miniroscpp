@@ -4,6 +4,8 @@
 
 #include <cassert>
 
+#include "internal_config.h"
+
 #include "discovery.h"
 
 #include "miniros/network/net_adapter.h"
@@ -36,6 +38,9 @@ struct DiscoveryPacket {
   /// Master RPC port.
   int16_t masterPort = 0;
 
+  /// Internal API version of node.
+  int16_t version = 0;
+
   /// Sender address.
   sockaddr addr{};
 
@@ -55,11 +60,16 @@ struct Discovery::Internal {
 
   /// Port for discovery broadcast.
   int broadcastPort = 0;
+  /// Pre-computed address for broadcasts.
+  network::NetAddress broadcastAddr;
 
-  /// Adapter-based broadcasts.
-  bool adapterBroadcasts = false;
+  /// Iterate adapters for direct broadcasting.
+  bool useAdapterBroadcasts = false;
 
-  int rpcPort = 0;
+  /// Master XMLRPC port to advertise/
+  network::NetAddress rpcAddress;
+
+  network::URL rpcUrl;
 
   /// UUID to be broadcasted.
   UUID uuid;
@@ -191,14 +201,18 @@ void Discovery::Internal::onSocketEvent(network::NetSocket& s, int role, int eve
   DiscoveryPacket packet{};
   memcpy(&packet, rawData.data(), sizeof(packet));
 
-  error = network::fillAddress(&packet.addr, discoveryEvent.masterAddress);
+  network::NetAddress masterAddr;
+  error = network::fillAddress(&packet.addr, masterAddr);
   if (!error) {
-    MINIROS_WARN("Faled to extract address from discovery packet: %s", error.toString());
+    MINIROS_WARN("Failed to extract address from discovery packet from %s: %s", discoveryEvent.senderAddress.str().c_str(), error.toString());
     return;
   }
 
   discoveryEvent.uuid = packet.uuid;
-  discoveryEvent.masterAddress.setPort(packet.masterPort);
+  discoveryEvent.version = packet.version;
+  discoveryEvent.masterUri.scheme = "http://";
+  discoveryEvent.masterUri.port = packet.masterPort;
+  discoveryEvent.masterUri.host = masterAddr.address;
 
   if (callback) {
     callback(discoveryEvent);
@@ -217,7 +231,7 @@ Discovery::~Discovery()
     internal_->detachSockets();
 }
 
-Error Discovery::start(PollSet* pollSet, const UUID& uuid, int rpcPort, int broadcastPort)
+Error Discovery::start(PollSet* pollSet, const UUID& uuid, const network::URL& rpcUrl)
 {
   if (!internal_) {
     return Error::InternalError;
@@ -226,15 +240,20 @@ Error Discovery::start(PollSet* pollSet, const UUID& uuid, int rpcPort, int broa
   if (!uuid.valid())
     return Error::InvalidValue;
 
-  if (broadcastPort == 0)
-    broadcastPort = rpcPort;
-
   internal_->uuid = uuid;
   internal_->pollSet = pollSet;
-  internal_->rpcPort = rpcPort;
+  internal_->rpcUrl = rpcUrl;
+  auto rpcAddr = network::NetAddress::fromURL(rpcUrl);
+  if (!rpcAddr.valid()) {
+    MINIROS_ERROR("Failed to get address for RPC URL=%s", rpcUrl.str().c_str());
+    return Error::InvalidAddress;
+  }
+  internal_->rpcAddress = rpcAddr;
+  internal_->broadcastAddr = network::NetAddress::fromIp4String("255.255.255.255", internal_->broadcastPort);
+  assert(internal_->broadcastAddr.valid());
 
-  if (Error err = internal_->initSockets(broadcastPort); err != Error::Ok) {
-    MINIROS_ERROR("Failed to initialize discovery sockets for port %d: %s", broadcastPort, err.toString());
+  if (Error err = internal_->initSockets(internal_->broadcastPort); err != Error::Ok) {
+    MINIROS_ERROR("Failed to initialize discovery sockets for port %d: %s", internal_->broadcastPort, err.toString());
     return err;
   }
 
@@ -257,6 +276,9 @@ Error Discovery::doBroadcast()
   if (!internal_->resolver) {
     return Error::InternalError;
   }
+  if (!internal_->socket.valid()) {
+    return Error::NotConnected;
+  }
 
   assert(internal_->broadcastPort);
 
@@ -264,11 +286,19 @@ Error Discovery::doBroadcast()
   packet.op = 0;
   packet.size = sizeof(packet);
   packet.uuid = internal_->uuid;
-  packet.masterPort = internal_->rpcPort;
+  packet.masterPort = internal_->rpcAddress.port();
+  packet.version = MINIROS_INTERNAL_API_VERSION;
 
-  int interfaces = 0;
-  int skipped = 0;
-  if (internal_->adapterBroadcasts) {
+  // Set packet.addr from rpcAddress
+  if (internal_->rpcAddress.valid() && internal_->rpcAddress.rawAddress()) {
+    const sockaddr* rpcAddr = static_cast<const sockaddr*>(internal_->rpcAddress.rawAddress());
+    size_t addrSize = internal_->rpcAddress.rawAddressSize();
+    memcpy(&packet.addr, rpcAddr, addrSize);
+  }
+
+  if (internal_->useAdapterBroadcasts) {
+    int interfaces = 0;
+    int skipped = 0;
     internal_->resolver->iterateAdapters(
       [&interfaces, &skipped, &packet, this](const network::NetAdapter* adapter)
       {
@@ -297,17 +327,18 @@ Error Discovery::doBroadcast()
     if (interfaces == 0 && skipped > 0) {
       MINIROS_DEBUG("No interface has valid broadcast address, skipped=%d", skipped);
     } else {
-      MINIROS_DEBUG("Broadcasted to %d interfaces", interfaces);
+      MINIROS_DEBUG_NAMED("Discovery", "Broadcasted discovery packets to %d interfaces", interfaces);
     }
+  } else {
+    // Single "broadest" broadcast.
+    internal_->socket.send(&packet, sizeof(packet), &internal_->broadcastAddr);
   }
-
   if (internal_->multicastEnabled) {
     auto [written, error] = internal_->socket.send(&packet, sizeof(packet), &internal_->multicastGroup);
     if (error != Error::Ok) {
       MINIROS_WARN("Failed to multicast");
     }
   }
-  MINIROS_DEBUG_NAMED("Discovery", "Broadcasted discovery packets to %d interfaces", interfaces);
   return Error::Ok;
 }
 
@@ -324,6 +355,7 @@ Error Discovery::setMulticast(const std::string& group)
     return Error::InternalError;
 
   if (internal_->multicastEnabled) {
+    assert(false);
     // TODO: implement resubscription to multicast group.
     return Error::NotImplemented;
   }
@@ -331,11 +363,11 @@ Error Discovery::setMulticast(const std::string& group)
   return Error::Ok;
 }
 
-void Discovery::setAdapterBroadcasts(bool flag)
+void Discovery::setUdpBroadcasts(int port)
 {
   if (!internal_)
     return;
-  internal_->adapterBroadcasts = flag;
+  internal_->broadcastPort = port;
 }
 
 }

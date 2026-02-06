@@ -11,6 +11,8 @@
 #include <memory>
 
 #include "miniros/network/net_address.h"
+#include "miniros/network/url.h"
+
 #include "miniros/macros.h"
 #include "miniros/errors.h"
 
@@ -26,14 +28,18 @@ class AddressResolver;
 struct DiscoveryEvent {
   /// Address extracted from UDP socket.
   network::NetAddress senderAddress;
-  /// Address of the master in packet itself.
-  network::NetAddress masterAddress;
+
+  /// Corresponding ROS_MASTER_URI.
+  network::URL masterUri;
 
   /// UUID of master.
   UUID uuid;
 
   /// Name of master node.
   std::string name;
+
+  /// Version of master.
+  int version = 0;
 };
 
 /// Discovery deals with finding other miniros masters across the network.
@@ -47,9 +53,8 @@ public:
   /// Start discovery.
   /// @param pollSet - pollset to spin events.
   /// @param uuid - UUID of master.
-  /// @param rpcPort - TCP port of master RPC endpoint.
-  /// @param broadcastPort - port for UDP discovery broadcasts. Set to 0 to make it equal to rpcPort.
-  Error start(PollSet* pollSet, const UUID& uuid, int rpcPort, int broadcastPort = 0);
+  /// @param rpcUrl - URL of master RPC endpoint.
+  Error start(PollSet* pollSet, const UUID& uuid, const network::URL& rpcUrl);
 
   /// Stop discovery.
   void stop();
@@ -62,8 +67,8 @@ public:
   /// Set multicast group for discovery broadcasts.
   Error setMulticast(const std::string& group);
 
-  /// Enable/disable
-  void setAdapterBroadcasts(bool flag);
+  /// Enable/disable local UDP broadcasts
+  void setUdpBroadcasts(int port);
 
   void setDiscoveryCallback(DiscoveryEventCallback callback);
 

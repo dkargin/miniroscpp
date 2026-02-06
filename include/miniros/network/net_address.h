@@ -13,6 +13,8 @@
 namespace miniros {
 namespace network {
 
+struct URL;
+
 /// Network address.
 /// Main goal of this structure is to hide system-dependent details from user code.
 class MINIROS_DECL NetAddress {
@@ -104,6 +106,15 @@ public:
   {
     return fromString(Type::AddressIPv6, address, port);
   }
+
+  /// Create network address from URL string.
+  /// @param address - URL string to parse (e.g., "http://example.com:8080/path")
+  /// @param port - default port to use if URL doesn't specify one
+  NODISCARD static NetAddress fromURL(const std::string& address, int port);
+
+  /// Create network address from URL object.
+  /// @param url - URL object containing host and port information
+  NODISCARD static NetAddress fromURL(const URL& url);
 
 protected:
   Type type_ = AddressInvalid;

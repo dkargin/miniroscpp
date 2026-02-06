@@ -92,7 +92,7 @@ int main(int argc, const char ** argv) {
     ("resolve", po::value<bool>()->default_value(false), "Resolve node IP address")
     ("dump_parameters", po::value<bool>()->default_value(false), "Dump all ROSParam values on every update")
     ("pidfile", po::value<std::string>(), "Path to a PID file")
-    ("discoveryBroadcasts", po::value<bool>()->default_value(false), "Enable master discovery broadcasts")
+    ("discovery", po::value<int>(), "Sets UDP port for master discovery.")
     ("discoveryGroup", po::value<std::string>(), "Multicast address for master discovery")
     ;
 
@@ -172,9 +172,9 @@ int main(int argc, const char ** argv) {
     pidFile.create(vm["pidfile"].as<std::string>().c_str());
   }
 
-  if (vm.count("discoveryBroadcasts")) {
-    bool useDiscovery = vm["discoveryBroadcasts"].as<bool>();
-    master.enableDiscoveryBroadcasts(useDiscovery);
+  if (vm.count("discovery")) {
+    int discoveryPort = vm["discovery"].as<int>();
+    master.enableDiscoveryBroadcasts(discoveryPort);
   }
 
   if (vm.count("discoveryGroup")) {

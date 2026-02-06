@@ -15,6 +15,8 @@
 
 #include "miniros/transport/rpc_manager.h"
 
+#include "internal_config.h"
+
 #include "miniros/http/http_server.h"
 
 #include "miniros/http/endpoints/filesystem.h"
@@ -48,20 +50,32 @@ void Master::Internal::onBroadcast(const SteadyTimerEvent& evt)
   discovery->doBroadcast();
 }
 
+int isVersionCompatible(int version)
+{
+  return version == MINIROS_INTERNAL_API_VERSION;
+}
+
 void Master::Internal::onDiscovery(const DiscoveryEvent& evt)
 {
-  if (uuid == evt.uuid)
+  if (uuid == evt.uuid) {
+    // Discovered self.
     return;
-  std::string name = std::string("/") + evt.uuid.toString();
-  std::string URI = evt.masterAddress.str();
-  auto report = regManager.registerNodeApi(name, URI);
+  }
+  if (!isVersionCompatible(evt.version)) {
+    return;
+  }
+  std::string name = "/master" + std::string("_") + evt.uuid.toString();
+  network::URL masterUrl;
+  std::string URI = evt.masterUri.str();
+
+  auto report = regManager.registerNodeApi(name, URI, NodeRef::NODE_MASTER | NodeRef::NODE_MINIROS);
   if (report.created) {
     MINIROS_INFO("Registered new master=%s at %s", name.c_str(), URI.c_str());
   }
   RequesterInfo reqInfo;
   reqInfo.callerId = name;
   reqInfo.callerApi = URI;
-  reqInfo.clientAddress = evt.masterAddress;
+  reqInfo.clientAddress = evt.senderAddress;
   auto hostInfo = resolver.updateHost(reqInfo);
   report.node->updateHost(hostInfo);
 }
@@ -80,7 +94,7 @@ Master::~Master()
 
 std::string Master::getUri() const
 {
-  return internal_->rpcManager->getServerURI();
+  return internal_->rpcManager->getServerUrlStr();
 }
 
 int Master::getPort() const
@@ -124,8 +138,8 @@ bool Master::start(PollSet* poll_set, int port)
           internal_->onDiscovery(event);
         });
 
-    int realPort = internal_->rpcManager->getServerPort();
-    if (!internal_->discovery->start(poll_set, internal_->uuid, realPort)) {
+    auto url = internal_->rpcManager->getServerUrl();
+    if (!internal_->discovery->start(poll_set, internal_->uuid, url)) {
       stop();
       return false;
     }
@@ -531,7 +545,7 @@ std::shared_ptr<NodeRef> Master::registerNodeApi(const std::string& nodeId, cons
   if (!internal_)
     return {};
 
-  auto report = internal_->regManager.registerNodeApi(nodeId, nodeApi);
+  auto report = internal_->regManager.registerNodeApi(nodeId, nodeApi, 0);
   return report.node;
 }
 
@@ -609,27 +623,20 @@ void Master::initEvents(NodeHandle& nh)
 {
   if (!internal_)
     return;
-  WallDuration period(0.5);
+  WallDuration period(10);
   internal_->timerBroadcasts = nh.createSteadyTimer(period, &Internal::onBroadcast, internal_.get());
 }
 
-void Master::registerSelfRef()
-{
-  internal_->regManager.registerNodeApi("/miniroscore", internal_->rpcManager->getServerURI(), NodeRef::NODE_MASTER | NodeRef::NODE_LOCAL);
-}
-
-void enableDiscoveryBroadcasts(bool flag);
-
-void Master::enableDiscoveryBroadcasts(bool flag)
+void Master::enableDiscoveryBroadcasts(int port)
 {
   if (!internal_)
     return;
 
-  if (flag && !internal_->discovery) {
+  if (port && !internal_->discovery) {
     internal_->discovery.reset(new Discovery(&internal_->resolver));
-    internal_->discovery->setAdapterBroadcasts(flag);
+    internal_->discovery->setUdpBroadcasts(port);
   }
-  else if (!flag && internal_->discovery) {
+  else if (!port && internal_->discovery) {
     internal_->discovery.reset();
   }
 }

@@ -78,7 +78,7 @@ std::shared_ptr<NodeRef> RegistrationManager::_register(Registrations& r, const 
     return {};
   }
 
-  RegistrationReport report = registerNodeApi(nodeName, nodeApi);
+  RegistrationReport report = registerNodeApi(nodeName, nodeApi, 0);
   if (!report.node) {
     MINIROS_ERROR("Failed to register NodeRef(node=%s api=%s)", nodeName.c_str(), nodeApi.c_str());
     return {};

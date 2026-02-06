@@ -146,8 +146,11 @@ struct FunctionInfo
 };
 
 struct RPCManager::Internal {
+
   /// Own URL for RPC requests.
   network::URL url_;
+  /// String representation of URL.
+  std::string url_str_;
 
 #if defined(__APPLE__)
   // OSX has problems with lots of concurrent xmlrpc calls
@@ -180,6 +183,15 @@ struct RPCManager::Internal {
   std::map<std::string, FunctionInfo> functions_;
 
   std::atomic_bool unbind_requested_{false};
+
+  void assignUrl(const std::string& host, int port)
+  {
+    url_.port = port;
+    url_.host = host;
+    url_.scheme = "http://";
+
+    url_str_ = url_.str();
+  }
 };
 
 const RPCManagerPtr& RPCManager::instance()
@@ -236,9 +248,7 @@ Error RPCManager::start(const CallbackQueuePtr& cb, int port)
 
   std::string host = network::getHost();
   assert(!host.empty());
-  internal_->url_.port = internal_->http_server_->getPort();
-  internal_->url_.host = host;
-  internal_->url_.scheme = "http://";
+  internal_->assignUrl(host, port);
 
   if (port == 0) {
     MINIROS_INFO("Started RPC manager at free port %d", internal_->url_.port);
@@ -586,10 +596,16 @@ bool RPCManager::isLocalRPC(const std::string& host, int port) const
   return getServerPort() == port;
 }
 
-std::string RPCManager::getServerURI() const
+const network::URL& RPCManager::getServerUrl() const
 {
-  static std::string empty;
-  return internal_ ? internal_->url_.str() : empty;
+  static const network::URL empty{};
+  return internal_ ? internal_->url_ : empty;
+}
+
+const std::string& RPCManager::getServerUrlStr() const
+{
+  static const std::string empty{};
+  return internal_ ? internal_->url_str_ : empty;
 }
 
 uint32_t RPCManager::getServerPort() const
