@@ -136,11 +136,8 @@ struct ProfilingDomain::Internal {
 
   Internal()
   {
-#ifdef HAS_RENDERDOC
-    initRenderDoc();
-#endif
     startTimeNanos = GetCurrentTimeNanos();
-    const char* dump = getenv("TRACE");
+    const char* dump = getenv("MINIROS_TRACE");
     if (dump != nullptr) {
       int tid = getGoodThreadId();
       std::string traceName = dump;
@@ -466,12 +463,6 @@ void writeCurrentThreadNameInTrace(const std::string& name)
   event.args_string["name"] = name;
 
   g_profilingDomain.writeEvent(event);
-}
-
-
-void writeThreadNameInTrace(const std::string& name, int64_t threadId)
-{
-
 }
 
 } // namespace profiling

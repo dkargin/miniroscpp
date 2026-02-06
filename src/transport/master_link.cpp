@@ -46,7 +46,7 @@
 
 #include "miniros/xmlrpcpp/XmlRpc.h"
 
-#include "internal/local_log.h"
+#include "rosconsole/local_log.h"
 
 #include <cassert>
 
@@ -269,6 +269,8 @@ Error MasterLink::execute(const std::string& method, const RpcValue& request, Rp
     LOCAL_ERROR("[%s] - failed make connection to host=\"%s:%d\"", method.c_str(), master_host.c_str(), master_port);
     return Error::InvalidURI;
   }
+  // TODO: Use local PollSet to spin events. It will prevent some potential deadlocks
+  // and help with standalone operation of MasterLink without fully initialized RPC manager.
   bool printed = false;
   bool slept = false;
   // Flag for tracking global shutdown.
@@ -367,7 +369,7 @@ Error MasterLink::execute(const std::string& method, const RpcValue& request, Rp
     LOCAL_ERROR("[%s] Got shutdown request during RPC call", method.c_str());
     return Error::ShutdownInterrupt;
   }
-  LOCAL_DEBUG("Finished \"%s\" in %fms", method.c_str(), state->elapsed().toSec()*1000.0);
+  LOCAL_DEBUG("MasterLink::execute(\"%s\") in %fms", method.c_str(), state->elapsed().toSec()*1000.0);
   return Error::Ok;
 }
 

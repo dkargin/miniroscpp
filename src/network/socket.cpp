@@ -7,7 +7,7 @@
 
 #include "miniros/network/socket.h"
 
-#include "internal/local_log.h"
+#include "rosconsole/local_log.h"
 #include "miniros/io/io.h"
 
 #ifndef WIN32

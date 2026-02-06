@@ -43,7 +43,6 @@
 #include "miniros/io/io.h"
 #include "miniros/transport/transport_tcp.h"
 #include "miniros/header.h"
-#include "miniros/file_log.h"
 #include <miniros/rosassert.h>
 
 namespace miniros

@@ -8,7 +8,6 @@
 #include "miniros/ros.h"
 
 // Messages for miniros have .hxx file extension to make them distinguishable from original ROS messages.
-#include "../src/console_impl.h"
 #include "std_msgs/String.hxx"
 
 void chatterCallback(const std_msgs::String::ConstPtr& msg)

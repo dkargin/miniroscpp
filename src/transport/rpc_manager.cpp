@@ -37,7 +37,6 @@
 #include <thread>
 
 #include "miniros/network/network.h"
-#include "miniros/file_log.h"
 #include "miniros/master_link.h"
 #include "miniros/rosassert.h"
 #include "miniros/io/io.h"

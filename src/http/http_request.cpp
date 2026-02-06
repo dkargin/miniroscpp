@@ -10,7 +10,7 @@
 #include "miniros/http/http_request.h"
 
 #include "internal/scoped_locks.h"
-#include "miniros/internal/local_log.h"
+#include "miniros/rosconsole/local_log.h"
 
 #include <atomic>
 #include <cassert>

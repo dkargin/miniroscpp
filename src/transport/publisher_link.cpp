@@ -38,7 +38,6 @@
 #include "miniros/transport/connection.h"
 #include "miniros/transport/transport.h"
 #include "miniros/transport/connection_manager.h"
-#include "miniros/file_log.h"
 
 #include <sstream>
 

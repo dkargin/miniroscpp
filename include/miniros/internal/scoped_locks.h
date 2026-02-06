@@ -8,7 +8,7 @@
 #include <cassert>
 
 #include "miniros/internal/code_location.h"
-#include "miniros/internal/local_log.h"
+#include "miniros/rosconsole/local_log.h"
 #include "miniros/rostime.h"
 
 namespace miniros {
