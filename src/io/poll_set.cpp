@@ -45,9 +45,9 @@
 #include "internal/profiling.h"
 #include "miniros/io/io.h"
 
-#include "miniros/internal/local_log.h"
+#include "miniros/rosconsole/local_log.h"
 
-//#define POLL_SET_SERIOUS_LOG
+#define MINIROS_PACKAGE_NAME "poll_set"
 
 namespace miniros
 {
@@ -356,19 +356,11 @@ void PollSet::update(int poll_timeout)
     TrackedObject object = info.object_;
     const int events = info.events_;
 
-    if (!internal_->isInternalFd(fd)) {
-#ifdef POLL_SET_SERIOUS_LOG
-      std::cout << "poll fd=" << fd << " evt=" << eventToString(spfd.revents) << std::endl;
-#endif
-    }
     bool hasEvents = events & revents
             || revents & POLLERR
             || revents & POLLHUP
             || revents & POLLNVAL;
     if (!func) {
-#ifdef POLL_SET_SERIOUS_LOG
-      std::cerr << "poll no event handler for fd=" << fd << std::endl;
-#endif
       continue;
     }
     if (!hasEvents) {
@@ -455,10 +447,6 @@ void PollSet::createNativePollset()
     return;
   }
 
-#ifdef POLL_SET_SERIOUS_LOG
-  std::stringstream ss;
-  ss << "poll updating PollSet ";
-#endif
   // Build the list of structures to pass to poll for the sockets we're servicing
   internal_->ufds_.resize(internal_->socket_info_.size());
   auto sock_it = internal_->socket_info_.begin();
@@ -470,13 +458,7 @@ void PollSet::createNativePollset()
     pfd.fd = info.fd_;
     pfd.events = info.events_;
     pfd.revents = 0;
-#ifdef POLL_SET_SERIOUS_LOG
-    ss << info.fd_ << ":" << eventToString(info.events_) << " ";
-#endif
   }
-#ifdef POLL_SET_SERIOUS_LOG
-  std::cout << ss.str() << std::endl;
-#endif
   internal_->sockets_changed_ = false;
 }
 

@@ -30,7 +30,7 @@
 #include "miniros/transport/connection_manager.h"
 
 #include "internal/profiling.h"
-#include "miniros/file_log.h"
+
 #include "miniros/io/poll_manager.h"
 #include "miniros/network/network.h"
 #include "miniros/transport/connection.h"

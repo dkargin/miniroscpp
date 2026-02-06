@@ -12,7 +12,6 @@
 #include "miniros/network/socket.h"
 #include "miniros/http/http_client.h"
 
-#include "internal/local_log.h"
 #include "internal/profiling.h"
 #include "internal/scoped_locks.h"
 #include "io/poll_set.h"
@@ -186,12 +185,12 @@ struct HttpClient::Internal {
     std::shared_ptr<HttpRequest> activeReq;
     activeReq = active_request;
     if (activeReq) {
-      LOCAL_INFO("HttpClient[%s]::updateState(%s) from %s at step=%d req=%d dt=%f", debugName().c_str(),
+      LOCAL_DEBUG("HttpClient[%s]::updateState(%s) from %s at step=%d req=%d dt=%f", debugName().c_str(),
         newState.toString(), oldState.toString(),
         updateCounter.load(), activeReq->id(), activeReq->elapsed().toSec());
     } else {
       assert(!state.hasRequest());
-      LOCAL_INFO("HttpClient[%s]::updateState(%s) from %s at step=%d", debugName().c_str(),
+      LOCAL_DEBUG("HttpClient[%s]::updateState(%s) from %s at step=%d", debugName().c_str(),
         newState.toString(), oldState.toString(), updateCounter.load());
     }
   }

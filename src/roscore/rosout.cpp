@@ -38,7 +38,7 @@
 
 #include "rosout.h"
 
-#include "miniros/file_log.h"
+#include "miniros/rosconsole/file_log.h"
 
 #ifdef WIN32
   #ifdef ERROR

@@ -42,7 +42,6 @@
 #include <typeinfo>
 
 #include "miniros/network/network.h"
-#include "miniros/file_log.h"
 #include "miniros/this_node.h"
 #include "miniros/io/poll_manager.h"
 

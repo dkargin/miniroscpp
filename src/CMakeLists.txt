@@ -79,19 +79,22 @@ set(cpp_common_SRC
     debug.cpp
     errors.cpp
     header.cpp
-    console.cpp
     common.cpp
-    console_print.cpp
-    file_log.cpp
     launcher.cpp
     names.cpp
     serialization.cpp
+
     internal/xml_tools.cpp
-    internal/local_log.cpp
     internal/profiling.cpp
     internal/static_write_buf.cpp
+
     b64/b64decode.cpp
     b64/b64encode.cpp
+
+    rosconsole/console.cpp
+    rosconsole/local_log.cpp
+    rosconsole/console_print.cpp
+    rosconsole/file_log.cpp
 )
 
 set(rosbag_SRC "")

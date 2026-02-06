@@ -48,7 +48,6 @@
 #include "miniros/transport/transport.h"
 #include "miniros/this_node.h"
 #include "miniros/transport/connection_manager.h"
-#include "miniros/file_log.h"
 #include "miniros/transport/transport_tcp.h"
 #include "miniros/transport/timer_manager.h"
 #include "miniros/transport/internal_timer_manager.h"

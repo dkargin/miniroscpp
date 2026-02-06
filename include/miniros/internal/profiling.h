@@ -1,3 +1,6 @@
+/// This is an internal file. It should not go to userspace, or it can break ABI.
+///
+
 #ifndef MINIROS_PROFILING_H
 #define MINIROS_PROFILING_H
 
@@ -128,6 +131,8 @@ void writeCurrentThreadNameInTrace(const std::string& name);
 
 #define UNIQUE_NAME(base) CONCAT3(base, _ , __LINE__)
 
+#ifdef MINIROS_USE_PROFILING
+
 #define MINIROS_PROFILE_SCOPE(name) \
     static profiling::ProfilingLocation UNIQUE_NAME(_p_loc) (name); \
     profiling::ProfilingScope UNIQUE_NAME(_scope) (&UNIQUE_NAME(_p_loc), &profiling::g_profilingDomain);
@@ -135,5 +140,11 @@ void writeCurrentThreadNameInTrace(const std::string& name);
 #define MINIROS_PROFILE_SCOPE2(object, name) \
     static profiling::ProfilingLocation UNIQUE_NAME(_p_loc) (object, name); \
     profiling::ProfilingScope UNIQUE_NAME(_scope) (&UNIQUE_NAME(_p_loc), &profiling::g_profilingDomain);
+#else
+
+#define MINIROS_PROFILE_SCOPE(name)
+#define MINIROS_PROFILE_SCOPE2(object, name)
+
+#endif
 
 #endif

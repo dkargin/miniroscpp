@@ -36,7 +36,6 @@
 #include "miniros/this_node.h"
 #include "miniros/transport/connection_manager.h"
 #include "miniros/transport/topic_manager.h"
-#include "miniros/file_log.h"
 
 namespace miniros
 {
