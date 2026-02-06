@@ -38,11 +38,12 @@
 #include "internal_config.h"
 
 #include "miniros/common.h"
+#include "rosconsole/local_log.h"
 
-
-#include <errno.h>             // for EFAULT and co.
-#include <miniros/rosassert.h> // don't need if we dont call the pipe functions.
+#include <cassert>
+#include <errno.h> // for EFAULT and co.
 #include <miniros/io/io.h>
+#include <miniros/rosassert.h> // don't need if we dont call the pipe functions.
 #include <sstream>
 #ifdef WIN32
 #else
@@ -182,10 +183,48 @@ bool set_events_on_socket(int epfd, int fd, int events)
 ** Service Robotics/Libssh Functions
 *****************************************************************************/
 
-Error poll_sockets(int epfd, socket_pollfd* fds, nfds_t nfds, int timeout, std::vector<socket_pollfd>& events)
+static Error poll_sockets_poll(int epfd, socket_pollfd* fds, nfds_t nfds, int timeout, std::vector<socket_pollfd>& events)
 {
-  events.clear();
-#if defined(WIN32)
+  UNUSED(epfd);
+  // Clear the `revents` fields
+  for (nfds_t i = 0; i < nfds; i++) {
+    fds[i].revents = 0;
+  }
+
+  // use an existing poll implementation
+  int result = poll(fds, nfds, timeout);
+  if (result < 0)
+  {
+    /* Possible errors from `man poll`
+     - EFAULT fds points outside the process's accessible address space.  The array given as argument was not contained in the calling program's address space.
+     - EINTR  A signal occurred before any requested event; see signal(7).
+     - EINVAL The nfds value exceeds the RLIMIT_NOFILE value.
+     - EINVAL (ppoll()) The timeout value expressed in *tmo_p is invalid (negative).
+     - ENOMEM Unable to allocate memory for kernel data structures.
+    */
+    // EINTR means that we got interrupted by a signal, and is not an error
+    int err = errno;
+    if (err == EINTR)
+      return Error::Ok;
+    if (err == ENOMEM)
+      return Error::OutOfMemory;
+    if (err == EINVAL)
+      return Error::InvalidValue;
+    LOCAL_ERROR("Unexpected error in poll: %s", strerror(errno));
+    return Error::SystemError;
+  }
+  for (nfds_t i = 0; i < nfds; i++) {
+    if (fds[i].revents) {
+      events.push_back(fds[i]);
+      fds[i].revents = 0;
+    }
+  }
+  return Error::Ok;
+}
+
+/// Poller based on ancient `select`
+static Error poll_sockets_select(int epfd, socket_pollfd* fds, nfds_t nfds, int timeout, std::vector<socket_pollfd>& events)
+{
   fd_set readfds, writefds, exceptfds;
   struct timeval tv, *ptv;
   socket_fd_t max_fd;
@@ -209,7 +248,7 @@ Error poll_sockets(int epfd, socket_pollfd* fds, nfds_t nfds, int timeout, std::
   **********************/
   // also find the largest descriptor.
   for (rc = -1, max_fd = 0, i = 0; i < nfds; i++) {
-    if (fds[i].fd == INVALID_SOCKET) {
+    if (fds[i].fd == MINIROS_INVALID_SOCKET) {
       continue;
     }
     if (fds[i].events & (POLLIN | POLLRDNORM)) {
@@ -275,7 +314,7 @@ Error poll_sockets(int epfd, socket_pollfd* fds, nfds_t nfds, int timeout, std::
   }
 
   for (rc = 0, i = 0; i < nfds; i++) {
-    if (fds[i].fd != INVALID_SOCKET) {
+    if (fds[i].fd != MINIROS_INVALID_SOCKET) {
       fds[i].revents = 0;
 
       if (FD_ISSET(fds[i].fd, &readfds)) {
@@ -315,7 +354,12 @@ Error poll_sockets(int epfd, socket_pollfd* fds, nfds_t nfds, int timeout, std::
     }
     events.push_back(fds[i]);
   }
-#elif defined(HAVE_EPOLL)
+  return Error::Ok;
+}
+
+#ifdef HAVE_EPOLL
+static Error poll_sockets_epoll(int epfd, socket_pollfd* fds, nfds_t nfds, int timeout, std::vector<socket_pollfd>& events)
+{
   UNUSED(nfds);
   UNUSED(fds);
   struct epoll_event ev[nfds];
@@ -323,11 +367,20 @@ Error poll_sockets(int epfd, socket_pollfd* fds, nfds_t nfds, int timeout, std::
   int fd_cnt = ::epoll_wait(epfd, ev, nfds, timeout);
 
   if (fd_cnt < 0) {
-    // EINTR means that we got interrupted by a signal, and is not an error
-    if (errno != EINTR) {
-      MINIROS_ERROR("Error in epoll_wait! %s", strerror(errno));
-      return Error::SystemError;
+    /* Expected errors:
+      - EBADF  epfd is not a valid file descriptor.
+      - EFAULT The memory area pointed to by events is not accessible with write permissions.
+      - EINTR  The call was interrupted by a signal handler before either (1) any of the requested events occurred or (2) the timeout expired; see signal(7).
+      - EINVAL epfd is not an epoll file descriptor, or maxevents is less than or equal to zero.
+     */
+    int err = errno;
+    if (err == EINTR) {
+      return Error::Ok;
     }
+    if (err == EBADF || err == EINVAL || err == EFAULT)
+      return Error::InvalidValue;
+    LOCAL_ERROR("Unexpected error in epoll_wait: %s", strerror(errno));
+    return Error::SystemError;
   } else {
     for (int i = 0; i < fd_cnt; i++) {
       socket_pollfd pfd;
@@ -336,32 +389,24 @@ Error poll_sockets(int epfd, socket_pollfd* fds, nfds_t nfds, int timeout, std::
       events.push_back(pfd);
     }
   }
-#else
-  UNUSED(epfd);
-  // Clear the `revents` fields
-  for (nfds_t i = 0; i < nfds; i++) {
-    fds[i].revents = 0;
-  }
+  return Error::Ok;
+}
 
-  // use an existing poll implementation
-  int result = poll(fds, nfds, timeout);
-  if (result < 0) {
-    // EINTR means that we got interrupted by a signal, and is not an error
-    if (errno != EINTR) {
-      MINIROS_ERROR("Error in poll! %s", strerror(errno));
-      return Error::SystemError;
-    }
-    return Error::Ok;
-  }
-  for (nfds_t i = 0; i < nfds; i++) {
-    if (fds[i].revents) {
-      events.push_back(fds[i]);
-      fds[i].revents = 0;
-    }
-  }
+#endif
+
+Error poll_sockets(int epfd, socket_pollfd* fds, nfds_t nfds, int timeout, std::vector<socket_pollfd>& events)
+{
+  events.clear();
+#if defined(WIN32)
+  return poll_sockets_select(epfd, fds, nfds, timeout, events);
+#elif defined(HAVE_EPOLL)
+  return poll_sockets_epoll(epfd, fds, nfds, timeout, events);
+#else
+  return poll_sockets_poll(epfd, fds, nfds, timeout, events);
 #endif // poll_sockets functions
 
-  return Error::Ok;
+  assert(false);
+  return Error::NotImplemented;
 }
 /*****************************************************************************
 ** Socket Utilities
