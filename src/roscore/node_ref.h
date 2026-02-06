@@ -82,14 +82,15 @@ public:
 
   using RpcValue = XmlRpc::XmlRpcValue;
 
-
   enum NodeFlags {
     /// Node is located in the same process.
     NODE_LOCAL = 1 << 1,
     /// This node belongs to another master.
     NODE_FOREIGN = 1 << 2,
+    /// This is miniros-based node.
+    NODE_MINIROS = 1 << 3,
     /// This node is master.
-    NODE_MASTER = 1 << 3,
+    NODE_MASTER = 1 << 4,
   };
 
   NodeRef(const std::string& _id, const std::string& _api);

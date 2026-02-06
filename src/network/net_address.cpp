@@ -9,6 +9,7 @@
 #include "miniros/io/io.h" // cross-platform headers needed
 
 #include "miniros/network/net_address.h"
+#include "miniros/network/url.h"
 
 namespace miniros {
 namespace network {
@@ -225,6 +226,35 @@ NetAddress NetAddress::fromString(Type type, const std::string& address, int por
   // Free the addrinfo structure
   freeaddrinfo(res);
   return result;
+}
+
+NetAddress NetAddress::fromURL(const std::string& address, int port)
+{
+  URL url;
+  if (!url.fromString(address, false)) {
+    // If URL parsing fails, return invalid address
+    return NetAddress();
+  }
+  return fromURL(url);
+}
+
+NetAddress NetAddress::fromURL(const URL& url)
+{
+  // If host is empty, return invalid address
+  if (url.host.empty()) {
+    return NetAddress();
+  }
+
+  // Use port from URL if available, otherwise return invalid address
+  // (since we don't have a default port parameter in this overload)
+  if (url.port == 0) {
+    return NetAddress();
+  }
+
+  int targetPort = static_cast<int>(url.port);
+
+  // Use AddressUnspecified to allow both IPv4 and IPv6, and DNS resolution
+  return fromString(AddressUnspecified, url.host, targetPort);
 }
 
 Error NetAddress::setPort(int port)

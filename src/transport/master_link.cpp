@@ -91,7 +91,7 @@ Error MasterLink::initLink(const M_string& remappings, const std::shared_ptr<RPC
 
   if (local) {
     internal_->localMaster = true;
-    internal_->uri = rpcManager->getServerURI();
+    internal_->uri = rpcManager->getServerUrlStr();
   } else {
     auto it = remappings.find("__master");
     if (it != remappings.end()) {
@@ -582,7 +582,7 @@ bool MasterLink::getParamImpl(const std::string& key, RpcValue& v, bool use_cach
   auto rpcManager = internal_->rpcManager.lock();
   if (!rpcManager)
     return false;
-  auto URI = rpcManager->getServerURI();
+  auto URI = rpcManager->getServerUrlStr();
   std::string mapped_key = miniros::names::resolve(key);
   if (mapped_key.empty())
     mapped_key = "/";

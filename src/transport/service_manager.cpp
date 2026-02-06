@@ -144,7 +144,7 @@ bool ServiceManager::advertiseService(const AdvertiseServiceOptions& ops)
   std::snprintf(uri_buf, sizeof(uri_buf), "rosrpc://%s:%d",
            network::getHost().c_str(), connection_manager_->getTCPPort());
   args[2] = string(uri_buf);
-  args[3] = xmlrpc_manager_->getServerURI();
+  args[3] = xmlrpc_manager_->getServerUrlStr();
   master_link_->execute("registerService", args, result, payload, true);
 
   return true;

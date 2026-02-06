@@ -68,7 +68,7 @@ public:
 
   /// Register or update node API.
   /// @returns a pair with {newNode, replacedNode}. Second part is present only if there were an existing node with the same name.
-  RegistrationReport registerNodeApi(const std::string& nodeName, const std::string& nodeApi, int flags = 0);
+  RegistrationReport registerNodeApi(const std::string& nodeName, const std::string& nodeApi, int flags);
 
   /// Internal method for registering an object.
   /// It can allocate new NodeRef for an object, or update an existing one.

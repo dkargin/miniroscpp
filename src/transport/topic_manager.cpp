@@ -410,7 +410,7 @@ bool TopicManager::advertise(const AdvertiseOptions& ops, const SubscriberCallba
   args[0] = this_node::getName();
   args[1] = ops.topic;
   args[2] = ops.datatype;
-  args[3] = rpc_manager_->getServerURI();
+  args[3] = rpc_manager_->getServerUrlStr();
   return master_link_->execute("registerPublisher", args, result, payload, true);
 }
 
@@ -447,7 +447,7 @@ bool TopicManager::unadvertise(const std::string& topic, const SubscriberCallbac
 
       advertised_topics_.erase(i);
       {
-        std::unique_lock<std::mutex> lock(advertised_topic_names_mutex_);
+        std::unique_lock<std::mutex> lock2(advertised_topic_names_mutex_);
         advertised_topic_names_.remove(pubName);
       }
       lock.unlock();
@@ -465,7 +465,7 @@ bool TopicManager::unregisterPublisher(const std::string& topic)
   XmlRpcValue args, result, payload;
   args[0] = this_node::getName();
   args[1] = topic;
-  args[2] = rpc_manager_->getServerURI();
+  args[2] = rpc_manager_->getServerUrlStr();
   return master_link_->execute("unregisterPublisher", args, result, payload, false);
 }
 
@@ -488,10 +488,11 @@ bool TopicManager::registerSubscriber(const SubscriptionPtr& s, const std::strin
   }
 
   XmlRpcValue args, result, payload;
+  std::string ownUrl = rpc_manager_->getServerUrlStr();
   args[0] = this_node::getName();
   args[1] = s->getName();
   args[2] = datatype;
-  args[3] = rpc_manager_->getServerURI();
+  args[3] = ownUrl;
 
   if (!master_link_->execute("registerSubscriber", args, result, payload, true)) {
     return false;
@@ -505,7 +506,7 @@ bool TopicManager::registerSubscriber(const SubscriptionPtr& s, const std::strin
     if (i != 0)
       ss << ", ";
     ss << pubUri;
-    if (pubUri != rpc_manager_->getServerURI()) {
+    if (pubUri != ownUrl) {
       pub_uris.push_back(pubUri);
     }
   }
@@ -553,7 +554,7 @@ bool TopicManager::unregisterSubscriber(const std::string& topic)
   XmlRpcValue args, result, payload;
   args[0] = this_node::getName();
   args[1] = topic;
-  args[2] = rpc_manager_->getServerURI();
+  args[2] = rpc_manager_->getServerUrlStr();
 
   return master_link_->execute("unregisterSubscriber", args, result, payload, false);
 }

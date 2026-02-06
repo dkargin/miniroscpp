@@ -236,8 +236,8 @@ void Subscription::addLocalConnection(const RPCManagerPtr& rpcManager, const Pub
 
   MINIROS_DEBUG("Creating intraprocess link for topic [%s]", name_.c_str());
 
-  IntraProcessPublisherLinkPtr pub_link(std::make_shared<IntraProcessPublisherLink>(shared_from_this(), rpcManager->getServerURI(), transport_hints_));
-  IntraProcessSubscriberLinkPtr sub_link(std::make_shared<IntraProcessSubscriberLink>(pub));
+  auto pub_link = std::make_shared<IntraProcessPublisherLink>(shared_from_this(), rpcManager->getServerUrlStr(), transport_hints_);
+  auto sub_link = std::make_shared<IntraProcessSubscriberLink>(pub);
   pub_link->setPublisher(sub_link);
   sub_link->setSubscriber(pub_link);
 
@@ -265,7 +265,7 @@ bool Subscription::pubUpdate(const RPCManagerPtr& rpcManager, const V_string& ne
 
   bool retval = true;
 
-  const std::string ownURI = rpcManager->getServerURI();
+  const std::string ownURI = rpcManager->getServerUrlStr();
   {
     std::stringstream ss;
 

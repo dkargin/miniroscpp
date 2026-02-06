@@ -73,7 +73,7 @@ public:
   void setResolveNodeIP(bool resolv);
 
   /// Enable automatic discovery of other masters.
-  void enableDiscoveryBroadcasts(bool flag);
+  void enableDiscoveryBroadcasts(int port);
 
   /// Set multicast address for service discovery.
   /// Can return an error if multicast address is invalid.
@@ -84,9 +84,6 @@ public:
 
   /// Init periodic events.
   void initEvents(NodeHandle& nh);
-
-  /// Register NodeRef related to itself.
-  void registerSelfRef();
 
   std::shared_ptr<NodeRef> registerNodeApi(const std::string& nodeId, const std::string& nodeApi) const;
   std::shared_ptr<NodeRef> getNodeByName(const std::string& nodeId) const;

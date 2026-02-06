@@ -31,9 +31,8 @@
 #include <string>
 #include <memory>
 
-#include "miniros/common.h"
 #include "miniros/xmlrpcpp/XmlRpcValue.h"
-#include "miniros/xmlrpcpp/XmlRpcException.h"
+#include "miniros/network/url.h"
 
 namespace XmlRpc {
 class XmlRpcServerConnection;
@@ -122,7 +121,13 @@ public:
   /**
    * @brief Get the xmlrpc server URI of this node
    */
-  std::string getServerURI() const;
+  const network::URL& getServerUrl() const;
+
+  /**
+   * @brief Get the xmlrpc server URI of this node
+   */
+  const std::string& getServerUrlStr() const;
+
   uint32_t getServerPort() const;
 
   /// @param host - hostname of node
