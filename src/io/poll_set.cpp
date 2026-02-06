@@ -212,6 +212,9 @@ bool PollSet::delSocket(int fd)
 
 bool PollSet::addEvents(int sock, int events)
 {
+  if (events == 0)
+    return true;
+
   std::scoped_lock<std::mutex> lock(internal_->socket_info_mutex_);
 
   auto it = internal_->socket_info_.find(sock);
@@ -222,9 +225,18 @@ bool PollSet::addEvents(int sock, int events)
     return false;
   }
 
+  int oldEvents = it->second.events_;
   it->second.events_ |= events;
 
-  set_events_on_socket(internal_->epfd_, sock, it->second.events_);
+  // Removing from watcher if there are no requested events.
+  // Adding back to watcher if we added new events.
+  if (oldEvents == 0) {
+    add_socket_to_watcher(internal_->epfd_, sock, it->second.events_);
+  } else if (it->second.events_ == 0) {
+    del_socket_from_watcher(internal_->epfd_, sock);
+  } else {
+    set_events_on_socket(internal_->epfd_, sock, it->second.events_);
+  }
 
   internal_->sockets_changed_ = true;
   signal();
@@ -237,17 +249,19 @@ bool PollSet::delEvents(int sock, int events)
   std::scoped_lock<std::mutex> lock(internal_->socket_info_mutex_);
 
   auto it = internal_->socket_info_.find(sock);
-  if (it != internal_->socket_info_.end())
-  {
-    it->second.events_ &= ~events;
-  }
-  else
+  if (it == internal_->socket_info_.end())
   {
     LOCAL_DEBUG("PollSet: Tried to delete events [%d] to fd [%d] which does not exist in this pollset", events, sock);
     return false;
   }
 
-  set_events_on_socket(internal_->epfd_, sock, it->second.events_);
+  it->second.events_ &= ~events;
+
+  if (it->second.events_ == 0) {
+    del_socket_from_watcher(internal_->epfd_, sock);
+  } else {
+    set_events_on_socket(internal_->epfd_, sock, it->second.events_);
+  }
 
   internal_->sockets_changed_ = true;
   signal();
@@ -403,7 +417,7 @@ void PollSet::update(int poll_timeout)
 
   SteadyTime updateDone = SteadyTime::now();
   auto dur = updateDone - updateStart;
-  //LOCAL_DEBUG("PollSet processed in %fs, gap=%fs", dur.toSec(), gap.toSec());
+  LOCAL_DEBUG("PollSet processed in %fs, gap=%fs", dur.toSec(), gap.toSec());
   lastUpdateFinish = updateDone;
 }
 
