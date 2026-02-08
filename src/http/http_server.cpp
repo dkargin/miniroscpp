@@ -69,7 +69,7 @@ struct HttpServer::Internal {
 
 void HttpServer::Internal::closeConnection(Lock& lock, int fd, const std::string& reason)
 {
-  MINIROS_DEBUG("HttpServer[%d]::closeConnection(): %s", fd, reason.c_str());
+  MINIROS_INFO("HttpServer::closeConnection() fd=%d: %s", fd, reason.c_str());
   std::shared_ptr<HttpServerConnection> connection;
   // TODO: Connection can close and unsubscribe itself.
   // TODO: Still need to notify external users with onCloseConnection.
@@ -153,7 +153,7 @@ Error HttpServer::start(int port)
         MINIROS_WARN("HttpServer socket: unexpected event %d", flags);
       }
       return 0;
-    }, lifetime);
+    }, lifetime, THIS_LOCATION);
 
   if (!added)
   {
@@ -255,7 +255,7 @@ void HttpServer::acceptClient(const std::shared_ptr<Lifetime<HttpServer>>& lifet
         internal_->closeConnection(lock, fd, "EOF");
       }*/
       return newFlags;
-  }, internalCopy);
+  }, internalCopy, THIS_LOCATION);
 }
 
 Error HttpServer::registerEndpoint(std::unique_ptr<EndpointFilter>&& filter, const std::shared_ptr<EndpointHandler>& handler, const CallbackQueuePtr& cb)

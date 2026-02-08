@@ -39,6 +39,7 @@
 #include <memory>
 
 #include "miniros/macros.h"
+#include "miniros/internal/code_location.h"
 
 namespace miniros
 {
@@ -92,7 +93,7 @@ public:
    * \param object The (optional) object associated with this socket. Mainly
    * used to prevent the transport from being deleted while we're calling the update function
    */
-  bool addSocket(int sock, int events, const SocketUpdateFunc& update_func, const TrackedObject& object = TrackedObject());
+  bool addSocket(int sock, int events, const SocketUpdateFunc& update_func, const TrackedObject& object = TrackedObject(), const internal::CodeLocation& loc = {});
 
   /**
    * \brief Delete a socket

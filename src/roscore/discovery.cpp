@@ -170,7 +170,7 @@ Error Discovery::Internal::initSockets(int port)
         MINIROS_WARN("Discovery socket: unexpected event %d", flags);
       }
       return 0;
-    }))
+    }, {}, THIS_LOCATION))
   {
     MINIROS_ERROR("Failed to register listening socket");
     return Error::InternalError;
@@ -214,6 +214,7 @@ void Discovery::Internal::onSocketEvent(network::NetSocket& s, int role, int eve
   discoveryEvent.masterUri.port = packet.masterPort;
   discoveryEvent.masterUri.host = masterAddr.address;
 
+  MINIROS_INFO("Got broadcast from %s", discoveryEvent.masterUri.host.c_str());
   if (callback) {
     callback(discoveryEvent);
   }
