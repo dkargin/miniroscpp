@@ -67,7 +67,7 @@ public:
 
   void udprosIncomingConnection(const TransportUDPPtr& transport, Header& header);
 
-  NODISCARD bool start(PollManagerPtr pollManager);
+  MINIROS_NODISCARD bool start(PollManagerPtr pollManager);
   void shutdown();
 
 private:

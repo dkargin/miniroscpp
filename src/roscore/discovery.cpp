@@ -88,7 +88,7 @@ struct Discovery::Internal {
     assert(resolver);
   }
 
-  NODISCARD Error initSockets(int port);
+  MINIROS_NODISCARD Error initSockets(int port);
 
   void onSocketEvent(network::NetSocket& s, int role, int event);
 

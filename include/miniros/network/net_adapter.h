@@ -66,7 +66,7 @@ protected:
   } flags_;
 };
 
-NODISCARD Error scanAdapters(std::vector<NetAdapter>& adapters);
+MINIROS_NODISCARD Error scanAdapters(std::vector<NetAdapter>& adapters);
 
 }
 }

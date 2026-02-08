@@ -115,7 +115,7 @@ int create_socket_watcher()
 #if defined(HAVE_EPOLL)
   epfd = ::epoll_create1(0);
   if (epfd < 0) {
-    MINIROS_ERROR("Unable to create epoll watcher: %s", strerror(errno));
+    LOCAL_ERROR("Unable to create epoll watcher: %s", strerror(errno));
   }
 #endif
   return epfd;
@@ -126,8 +126,23 @@ void close_socket_watcher(int fd)
   if (fd >= 0)
     ::close(fd);
 }
+/**
+  EBADF  epfd or fd is not a valid file descriptor.
+  EEXIST op was EPOLL_CTL_ADD, and the supplied file descriptor fd is already registered with this epoll instance.
+  EINVAL epfd is not an epoll file descriptor, or fd is the same as epfd, or the requested operation op is not supported by this interface.
+  EINVAL An invalid event type was specified along with EPOLLEXCLUSIVE in events.
+  EINVAL op was EPOLL_CTL_MOD and events included EPOLLEXCLUSIVE.
+  EINVAL op was EPOLL_CTL_MOD and the EPOLLEXCLUSIVE flag has previously been applied to this epfd, fd pair.
+  EINVAL EPOLLEXCLUSIVE was specified in event and fd refers to an epoll instance.
+  ELOOP  fd refers to an epoll instance and this EPOLL_CTL_ADD operation would result in a circular loop of epoll instances monitoring one another or a nesting depth of epoll instances greater than 5.
+  ENOENT op was EPOLL_CTL_MOD or EPOLL_CTL_DEL, and fd is not registered with this epoll instance.
+  ENOMEM There was insufficient memory to handle the requested op control operation.
+  ENOSPC The limit imposed by /proc/sys/fs/epoll/max_user_watches was encountered while trying to register (EPOLL_CTL_ADD) a new file descriptor on an epoll instance.  See epoll(7) for further details.
+  EPERM  The target file fd does not support epoll.  This error can occur if fd refers to, for example, a regular file or a directory.
+*/
 
-bool add_socket_to_watcher(int epfd, int fd, int events)
+
+Error add_socket_to_watcher(int epfd, int fd, int events)
 {
 #if defined(HAVE_EPOLL)
   struct epoll_event ev;
@@ -137,29 +152,43 @@ bool add_socket_to_watcher(int epfd, int fd, int events)
   ev.data.fd = fd;
 
   if (::epoll_ctl(epfd, EPOLL_CTL_ADD, fd, &ev)) {
-    MINIROS_ERROR("Unable to add FD to epoll: %s", strerror(errno));
-    return false;
+    int err = errno;
+    if (err == ENOMEM || err == ENOSPC)
+      return Error::OutOfMemory;
+    if (err == ENOENT)
+      return Error::InvalidHandle;
+    if (err == EINVAL || err == ELOOP)
+      return Error::InvalidValue;
+    return Error::SystemError;
   }
 #else
   UNUSED(epfd);
   UNUSED(fd);
 #endif
-  return true;
+  return Error::Ok;
 }
 
-void del_socket_from_watcher(int epfd, int fd)
+Error del_socket_from_watcher(int epfd, int fd)
 {
 #if defined(HAVE_EPOLL)
   if (::epoll_ctl(epfd, EPOLL_CTL_DEL, fd, NULL)) {
-    MINIROS_ERROR("Unable to remove FD to epoll: %s", strerror(errno));
+    int err = errno;
+    if (err == ENOMEM || err == ENOSPC)
+      return Error::OutOfMemory;
+    if (err == ENOENT)
+      return Error::InvalidHandle;
+    if (err == EINVAL || err == ELOOP)
+      return Error::InvalidValue;
+    return Error::SystemError;
   }
 #else
   UNUSED(epfd);
   UNUSED(fd);
 #endif
+  return Error::Ok;
 }
 
-bool set_events_on_socket(int epfd, int fd, int events)
+Error set_events_on_socket(int epfd, int fd, int events)
 {
 #if defined(HAVE_EPOLL)
   struct epoll_event ev;
@@ -168,15 +197,21 @@ bool set_events_on_socket(int epfd, int fd, int events)
   ev.events = events;
   ev.data.fd = fd;
   if (::epoll_ctl(epfd, EPOLL_CTL_MOD, fd, &ev)) {
-    MINIROS_ERROR("Unable to modify FD epoll for fd=%d: %s", fd, strerror(errno));
-    return false;
+    int err = errno;
+    if (err == ENOMEM || err == ENOSPC)
+      return Error::OutOfMemory;
+    if (err == ENOENT)
+      return Error::InvalidHandle;
+    if (err == EINVAL || err == ELOOP)
+      return Error::InvalidValue;
+    return Error::SystemError;
   }
 #else
   UNUSED(epfd);
   UNUSED(fd);
   UNUSED(events);
 #endif
-  return true;
+  return Error::Ok;
 }
 
 /*****************************************************************************

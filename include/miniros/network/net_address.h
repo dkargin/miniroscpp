@@ -91,18 +91,18 @@ public:
   /// @param type - address family.
   /// @param address - hostname or IP (or similar) address.
   /// @param port - numeric port.
-  NODISCARD static NetAddress fromString(Type type, const std::string& address, int port);
+  MINIROS_NODISCARD static NetAddress fromString(Type type, const std::string& address, int port);
 
   /// Create network address from string representation of IP4 address.
   /// This function will not resolve DNS names.
-  NODISCARD static NetAddress fromIp4String(const std::string& address, int port)
+  MINIROS_NODISCARD static NetAddress fromIp4String(const std::string& address, int port)
   {
     return fromString(Type::AddressIPv4, address, port);
   }
 
   /// Create network address from string representation of IPv6 address.
   /// This function will not resolve DNS names.
-  NODISCARD static NetAddress fromIp6String(const std::string& address, int port)
+  MINIROS_NODISCARD static NetAddress fromIp6String(const std::string& address, int port)
   {
     return fromString(Type::AddressIPv6, address, port);
   }
@@ -110,11 +110,11 @@ public:
   /// Create network address from URL string.
   /// @param address - URL string to parse (e.g., "http://example.com:8080/path")
   /// @param port - default port to use if URL doesn't specify one
-  NODISCARD static NetAddress fromURL(const std::string& address, int port);
+  MINIROS_NODISCARD static NetAddress fromURL(const std::string& address, int port);
 
   /// Create network address from URL object.
   /// @param url - URL object containing host and port information
-  NODISCARD static NetAddress fromURL(const URL& url);
+  MINIROS_NODISCARD static NetAddress fromURL(const URL& url);
 
 protected:
   Type type_ = AddressInvalid;

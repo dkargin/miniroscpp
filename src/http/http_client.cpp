@@ -218,8 +218,10 @@ struct HttpClient::Internal {
   /// Completely release own state.
   void release(Lock& lock)
   {
+    LOCAL_INFO("HttpClient::Internal[%d]::release()", fd());
     detachPollSet(lock);
     closeSocket(lock);
+    updateState(lock, State::Invalid);
 
     std::shared_ptr<HttpRequest> activeReq;
     std::deque<std::shared_ptr<HttpRequest>> requestsCopy;
@@ -244,8 +246,6 @@ struct HttpClient::Internal {
         req->notifyFailToSend();
       }
     }
-
-    state = State::Invalid;
   }
 };
 
@@ -451,16 +451,18 @@ HttpClient::HttpClient(PollSet* ps)
 HttpClient::~HttpClient()
 {
   int fd = 0;
+  int refs = 0;
   if (internal_) {
     Lock lock(internal_->process_guard, THIS_LOCATION);
     fd = internal_->fd();
     std::shared_ptr<Internal> copy;
     std::swap(internal_, copy);
     copy->release(lock);
+    refs = copy.use_count();
     // Explicitly unlock to prevent potential deadlock in destructor if Internal.
     lock.unlock();
   }
-  LOCAL_INFO("HttpClient::~HttpClient(%d)", fd);
+  LOCAL_INFO("HttpClient::~HttpClient(%d) refs=%d", fd, refs);
 }
 
 HttpClient::State HttpClient::getState() const
@@ -855,6 +857,10 @@ void HttpClient::Internal::handleWriteRequest(Lock& lock, int evtFlags, bool fal
     LOCAL_WARN("HttpClient[%s]::handleWriteRequest socket error in WriteRequest: %i", debugName().c_str(), err);
     handleDisconnect(lock);
     return;
+  }
+
+  if (!socket) {
+
   }
 
   if (fallThrough || (evtFlags & PollSet::EventOut)) {
