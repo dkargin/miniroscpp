@@ -25,6 +25,8 @@ namespace master {
 
 class AddressResolver;
 
+struct DiscoveryPacket;
+
 struct DiscoveryEvent {
   /// Address extracted from UDP socket.
   network::NetAddress senderAddress;
@@ -71,6 +73,8 @@ public:
   void setUdpBroadcasts(int port);
 
   void setDiscoveryCallback(DiscoveryEventCallback callback);
+
+  void fillDiscoveryPacket(DiscoveryPacket& packet);
 
 protected:
   struct Internal;

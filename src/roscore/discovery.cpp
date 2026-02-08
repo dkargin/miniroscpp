@@ -161,7 +161,7 @@ Error Discovery::Internal::initSockets(int port)
 
   int fd = socket.fd();
 
-  if (!pollSet->addSocket(fd, PollSet::EventIn | PollSet::EventError,
+  if (!pollSet->addSocket(fd, PollSet::EventIn,
     [this](int flags)
     {
       if (flags & PollSet::EventIn) {
@@ -231,6 +231,23 @@ Discovery::~Discovery()
     internal_->detachSockets();
 }
 
+void Discovery::fillDiscoveryPacket(DiscoveryPacket& packet)
+{
+  packet.op = 0;
+  packet.size = sizeof(packet);
+  packet.uuid = internal_->uuid;
+  packet.masterPort = internal_->rpcAddress.port();
+  packet.version = MINIROS_INTERNAL_API_VERSION;
+
+  // Set packet.addr from rpcAddress
+  if (internal_->rpcAddress.valid() && internal_->rpcAddress.rawAddress()) {
+    const sockaddr* rpcAddr = static_cast<const sockaddr*>(internal_->rpcAddress.rawAddress());
+    size_t addrSize = internal_->rpcAddress.rawAddressSize();
+    memcpy(&packet.addr, rpcAddr, addrSize);
+  }
+}
+
+
 Error Discovery::start(PollSet* pollSet, const UUID& uuid, const network::URL& rpcUrl)
 {
   if (!internal_) {
@@ -283,56 +300,8 @@ Error Discovery::doBroadcast()
   assert(internal_->broadcastPort);
 
   DiscoveryPacket packet;
-  packet.op = 0;
-  packet.size = sizeof(packet);
-  packet.uuid = internal_->uuid;
-  packet.masterPort = internal_->rpcAddress.port();
-  packet.version = MINIROS_INTERNAL_API_VERSION;
+  fillDiscoveryPacket(packet);
 
-  // Set packet.addr from rpcAddress
-  if (internal_->rpcAddress.valid() && internal_->rpcAddress.rawAddress()) {
-    const sockaddr* rpcAddr = static_cast<const sockaddr*>(internal_->rpcAddress.rawAddress());
-    size_t addrSize = internal_->rpcAddress.rawAddressSize();
-    memcpy(&packet.addr, rpcAddr, addrSize);
-  }
-
-  if (internal_->useAdapterBroadcasts) {
-    int interfaces = 0;
-    int skipped = 0;
-    internal_->resolver->iterateAdapters(
-      [&interfaces, &skipped, &packet, this](const network::NetAdapter* adapter)
-      {
-        if (adapter->isLoopback())
-          return;
-        if (!adapter->isValid())
-          return;
-        if (adapter->isIPv4() && adapter->broadcastAddress.valid()) {
-          const sockaddr* localAddr = static_cast<const sockaddr*>(adapter->address.rawAddress());
-          size_t addrSize = adapter->address.rawAddressSize();
-          memcpy(&packet.addr, localAddr, addrSize);
-
-          network::NetAddress brAddr = adapter->broadcastAddress;
-          Error err = brAddr.setPort(internal_->broadcastPort);
-          assert(err);
-
-          auto [written, error] = internal_->socket.send(&packet, sizeof(packet), &brAddr);
-          if (error != Error::Ok) {
-            MINIROS_WARN("Failed to broadcast to adapter \"%s\" addr=%s", adapter->name.c_str(), brAddr.str().c_str());
-          }
-          interfaces++;
-        } else {
-          skipped++;
-        }
-      });
-    if (interfaces == 0 && skipped > 0) {
-      MINIROS_DEBUG("No interface has valid broadcast address, skipped=%d", skipped);
-    } else {
-      MINIROS_DEBUG_NAMED("Discovery", "Broadcasted discovery packets to %d interfaces", interfaces);
-    }
-  } else {
-    // Single "broadest" broadcast.
-    internal_->socket.send(&packet, sizeof(packet), &internal_->broadcastAddr);
-  }
   if (internal_->multicastEnabled) {
     auto [written, error] = internal_->socket.send(&packet, sizeof(packet), &internal_->multicastGroup);
     if (error != Error::Ok) {

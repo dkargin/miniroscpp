@@ -266,6 +266,8 @@ int HttpClient::Internal::eventsForState(State s) const
       return PollSet::EventIn;
     case State::ProcessResponse:
       return 0;
+    case State::Disconnected:
+      return 0;
     default:
       return 0;
   }
@@ -715,6 +717,12 @@ int HttpClient::handleSocketEvents(const std::shared_ptr<Internal>& I, int evtFl
   int stateChanges = 0;
   bool loop = true;
   do {
+    if (state == State::Disconnected) {
+      // Just ignore all events in disconnected state.
+      // It is probably combination of error | SIGHUP events.
+      evtFlags = 0;
+      break;
+    }
     if (state == State::WaitReconnect) {
       // Expecting to be here on a timeout.
       I->handleReconnecting(I, lock, evtFlags);
