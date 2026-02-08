@@ -532,7 +532,14 @@ void init(const M_string& remappings, const std::string& name, uint32_t options)
 #endif
     check_ipv6_environment();
     network::init(remappings);
+
+    // Need to start
+    PollManagerPtr pm = PollManager::instance();
+    pm->start();
+
     auto rpcManager = RPCManager::instance();
+    rpcManager->setPollSet(&pm->getPollSet());
+
     g_master_link.reset(new MasterLink());
     bool local = options & init_options::LocalMaster;
     g_master_link->initLink(remappings, rpcManager, local);
