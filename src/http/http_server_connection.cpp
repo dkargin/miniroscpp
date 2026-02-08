@@ -227,7 +227,7 @@ void HttpServerConnection::handleReadRequest(Lock& lock, int& evtFlags, bool fal
       LOCAL_ERROR("Unexpected error %s", err.toString());
     }
   } else {
-    LOCAL_WARN("HttpServerConnection::handleReadRequest() unhandled events in ReadRequest: %o", evtFlags);
+    LOCAL_WARN("HttpServerConnection[%d]::handleReadRequest() unhandled events in ReadRequest: %o", debugFd_, evtFlags);
   }
 }
 
@@ -341,7 +341,7 @@ int HttpServerConnection::eventsForState(State state) const
     case State::ProcessRequest:
       return 0;
     case State::Disconnected:
-      return PollSet::ResultDropFD;
+      return 0;
     default:
       return 0;
   }
@@ -372,7 +372,7 @@ void HttpServerConnection::onAsyncRequestComplete(std::shared_ptr<HttpRequest> r
   
   // Check if connection is still in ProcessRequest state
   if (state_ != State::ProcessRequest) {
-    LOCAL_DEBUG("HttpServerConnection::onAsyncRequestComplete(%d) unexpected state for sending response %s", request->id(), state_.toString());
+    LOCAL_DEBUG("HttpServerConnection[%d]::onAsyncRequestComplete(%d) unexpected state for sending response %s", debugFd_, request->id(), state_.toString());
     return;
   }
 
@@ -391,7 +391,7 @@ void HttpServerConnection::updateState(Lock& lock, State newState)
 
   auto oldState = state_;
   state_ = newState;
-  LOCAL_INFO("HttpServerConnection::updateState from %s to %s", oldState.toString(), newState.toString());
+  LOCAL_INFO("HttpServerConnection[%d]::updateState from %s to %s", debugFd_, oldState.toString(), newState.toString());
 }
 
 void HttpServerConnection::prepareFaultResponse(Error error, http::HttpRequest& request)

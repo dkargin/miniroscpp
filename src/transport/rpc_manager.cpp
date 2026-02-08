@@ -248,7 +248,7 @@ Error RPCManager::start(const CallbackQueuePtr& cb, int port)
 
   std::string host = network::getHost();
   assert(!host.empty());
-  internal_->assignUrl(host, port);
+  internal_->assignUrl(host, internal_->http_server_->getPort());
 
   if (port == 0) {
     MINIROS_INFO("Started RPC manager at free port %d", internal_->url_.port);

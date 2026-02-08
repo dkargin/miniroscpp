@@ -12,8 +12,17 @@ namespace miniros {
 namespace internal {
 
 struct CodeLocation {
+  CodeLocation() = default;
   CodeLocation(const char *file, const char *method, int line) : m_file(file), m_method(method), m_line(line) {}
   CodeLocation(const CodeLocation& c) : m_file(c.m_file), m_line(c.m_line) {}
+
+  CodeLocation& operator = (const CodeLocation& other)
+  {
+    m_file = other.m_file;
+    m_line = other.m_line;
+    m_method = other.m_method;
+    return *this;
+  }
 
   static CodeLocation make(const char* file, int line)
   {
@@ -31,6 +40,11 @@ struct CodeLocation {
       result += std::string(m_method);
     }
     return result;
+  }
+
+  bool valid() const
+  {
+    return m_file != nullptr;
   }
 
   friend bool operator == (const CodeLocation& c1, const CodeLocation& c2)
@@ -57,9 +71,9 @@ struct CodeLocation {
   }
 
 protected:
-  const char*const m_file = nullptr;
-  const char*const m_method = nullptr;
-  const int m_line = 0;
+  const char* m_file = nullptr;
+  const char* m_method = nullptr;
+  int m_line = 0;
 };
 
 }

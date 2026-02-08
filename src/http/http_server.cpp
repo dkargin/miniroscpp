@@ -91,7 +91,6 @@ void HttpServer::Internal::closeConnection(Lock& lock, int fd, const std::string
   }
 }
 
-
 void HttpServer::setCloseConnectionHandler(CloseConnectionHandler&& handler)
 {
   internal_->onCloseConnection = std::move(handler);
@@ -174,7 +173,10 @@ Error HttpServer::stop()
 
   std::unique_lock lock(*internal_->lifetime);
 
+  int fd = 0;
   if (internal_->pollSet && internal_->socket_v4.valid()) {
+    fd = internal_->socket_v4.fd();
+    LOCAL_INFO("HttpServer[%d]::stop() - stopping listener socket", fd);
     if (!internal_->pollSet->delSocket(internal_->socket_v4.fd())) {
       return Error::InternalError;
     }
@@ -183,9 +185,9 @@ Error HttpServer::stop()
   internal_->socket_v4.close();
   while (!internal_->connections.empty()) {
     auto it = internal_->connections.begin();
+    LOCAL_INFO("HttpServer[%d]::stop() - closing connection %d", fd, it->first);
     internal_->closeConnection(lock, it->first, "HttpServer::stop()");
   }
-  MINIROS_DEBUG("HttpServer::stop() finished");
   return Error::Ok;
 }
 
@@ -234,6 +236,7 @@ void HttpServer::acceptClient(const std::shared_ptr<Lifetime<HttpServer>>& lifet
   std::shared_ptr<HttpServerConnection> connection(new HttpServerConnection(this, client, internal_->pollSet));
   internal_->connections[fd] = connection;
   auto internalCopy = internal_->lifetime;
+
   internal_->pollSet->addSocket(fd, PollSet::EventIn | PollSet::EventUpdate,
     [this, wconnection = std::weak_ptr(connection), fd, internalCopy](int flags)
     {
