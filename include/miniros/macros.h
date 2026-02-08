@@ -74,4 +74,4 @@
   #define MINIROS_DECL
 #endif
 
-#define NODISCARD [[nodiscard]]
+#define MINIROS_NODISCARD [[nodiscard]]

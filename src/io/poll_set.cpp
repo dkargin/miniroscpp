@@ -164,8 +164,8 @@ bool PollSet::addSocket(int fd, int events, const SocketUpdateFunc& update_func,
       return false;
     }
 
-    if (events != 0) {
-      add_socket_to_watcher(internal_->epfd_, fd, events);
+    if (events != 0 && !add_socket_to_watcher(internal_->epfd_, fd, events)) {
+      LOCAL_ERROR("PollSet::addSocket(%d) to add FD to epoll: %s", fd, strerror(errno));
     }
 
     internal_->sockets_changed_ = true;
@@ -187,30 +187,33 @@ bool PollSet::delSocket(int fd)
 
   std::scoped_lock<std::mutex> lock(internal_->socket_info_mutex_);
   auto it = internal_->socket_info_.find(fd);
-  if (it != internal_->socket_info_.end())
-  {
-    internal_->socket_info_.erase(it);
-
-    {
-      std::scoped_lock<std::mutex> lock2(internal_->just_deleted_mutex_);
-      internal_->just_deleted_.push_back(fd);
-    }
-
-    del_socket_from_watcher(internal_->epfd_, fd);
-
-    auto it2 = internal_->socket_timers_.find(fd);
-    if (it2 != internal_->socket_timers_.end())
-      internal_->socket_timers_.erase(it2);
-
-    internal_->sockets_changed_ = true;
-    signal();
-
-    LOCAL_INFO("PollSet::delSocket(%d)", fd);
-    return true;
+  if (it == internal_->socket_info_.end()) {
+    LOCAL_ERROR("PollSet: Tried to delete fd [%d] which is not being tracked", fd);
+    return false;
   }
-  LOCAL_WARN("PollSet: Tried to delete fd [%d] which is not being tracked", fd);
 
-  return false;
+  int events = it->second.events_;
+
+  internal_->socket_info_.erase(it);
+
+  {
+    std::scoped_lock<std::mutex> lock2(internal_->just_deleted_mutex_);
+    internal_->just_deleted_.push_back(fd);
+  }
+
+  if (events && !del_socket_from_watcher(internal_->epfd_, fd)) {
+    LOCAL_WARN("PollSet::delSocket(%d) remove fd from epoll: %s", fd, strerror(errno));
+  }
+
+  auto it2 = internal_->socket_timers_.find(fd);
+  if (it2 != internal_->socket_timers_.end())
+    internal_->socket_timers_.erase(it2);
+
+  internal_->sockets_changed_ = true;
+  signal();
+
+  LOCAL_INFO("PollSet::delSocket(%d)", fd);
+  return true;
 }
 
 
@@ -235,9 +238,13 @@ bool PollSet::addEvents(int sock, int events)
   // Removing from watcher if there are no requested events.
   // Adding back to watcher if we added new events.
   if (oldEvents == 0) {
-    add_socket_to_watcher(internal_->epfd_, sock, it->second.events_);
+    if (!add_socket_to_watcher(internal_->epfd_, sock, it->second.events_)) {
+      LOCAL_ERROR("PollSet::addEvents(%d) - failed to add FD to watcher: %s", sock, strerror(errno));
+    }
   } else {
-    set_events_on_socket(internal_->epfd_, sock, it->second.events_);
+    if (!set_events_on_socket(internal_->epfd_, sock, it->second.events_)) {
+      LOCAL_ERROR("PollSet::addEvents(%d) - failed update events in watcher: %s", sock, strerror(errno));
+    }
   }
 
   internal_->sockets_changed_ = true;
@@ -260,11 +267,17 @@ bool PollSet::delEvents(int sock, int events)
   it->second.events_ &= ~events;
 
   if (it->second.events_ == 0) {
-    LOCAL_DEBUG("PollSet::delEvents(%d - %d) removing socket with zero events", sock, events);
-    del_socket_from_watcher(internal_->epfd_, sock);
+    if (!del_socket_from_watcher(internal_->epfd_, sock)) {
+      LOCAL_WARN("PollSet::delEvents(%d - %d) - failed to remove FD with zero events: %s", sock, events, strerror(errno));
+    } else {
+      LOCAL_DEBUG("PollSet::delEvents(%d - %d) removed socket with zero events", sock, events);
+    }
   } else {
-    LOCAL_DEBUG("PollSet::delEvents(%d - %d) updating socket events", sock, events);
-    set_events_on_socket(internal_->epfd_, sock, it->second.events_);
+    if (!set_events_on_socket(internal_->epfd_, sock, it->second.events_)) {
+      LOCAL_WARN("PollSet::delEvents(%d - %d) error updating socket events: %s", sock, events, strerror(errno));
+    } else {
+      LOCAL_DEBUG("PollSet::delEvents(%d - %d) updating socket events", sock, events);
+    }
   }
 
   internal_->sockets_changed_ = true;

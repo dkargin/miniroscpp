@@ -220,7 +220,7 @@ public:
   /// Start RPC server.
   /// @param cb - callback queue for serving XMLRPC requests.
   /// @param port - TCP port to start XMLRPC server.
-  NODISCARD Error start(const std::shared_ptr<CallbackQueue>& cb, int port);
+  MINIROS_NODISCARD Error start(const std::shared_ptr<CallbackQueue>& cb, int port);
   void shutdown();
 
   bool isShuttingDown() const;

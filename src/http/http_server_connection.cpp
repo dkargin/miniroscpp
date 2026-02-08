@@ -391,7 +391,7 @@ void HttpServerConnection::updateState(Lock& lock, State newState)
 
   auto oldState = state_;
   state_ = newState;
-  LOCAL_INFO("HttpServerConnection[%d]::updateState from %s to %s", debugFd_, oldState.toString(), newState.toString());
+  LOCAL_DEBUG("HttpServerConnection[%d]::updateState from %s to %s", debugFd_, oldState.toString(), newState.toString());
 }
 
 void HttpServerConnection::prepareFaultResponse(Error error, http::HttpRequest& request)

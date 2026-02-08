@@ -84,10 +84,10 @@ namespace XmlRpc {
     /*virtual*/ ~XmlRpcValue() { invalidate(); }
 
     /// Creates array of specified size.
-    NODISCARD static XmlRpcValue Array(size_t size);
+    MINIROS_NODISCARD static XmlRpcValue Array(size_t size);
 
     /// Creates a dictionary object.
-    NODISCARD static XmlRpcValue Dict();
+    MINIROS_NODISCARD static XmlRpcValue Dict();
 
     //! Erase the current value
     void clear() { invalidate(); }

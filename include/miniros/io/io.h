@@ -179,9 +179,9 @@ MINIROS_DECL int create_signal_pair(signal_fd_t signal_pair[2]);
 
 MINIROS_DECL int create_socket_watcher();
 MINIROS_DECL void close_socket_watcher(int fd);
-MINIROS_DECL bool add_socket_to_watcher(int epfd, int fd, int events);
-MINIROS_DECL void del_socket_from_watcher(int epfd, int fd);
-MINIROS_DECL bool set_events_on_socket(int epfd, int fd, int events);
+MINIROS_NODISCARD MINIROS_DECL Error add_socket_to_watcher(int epfd, int fd, int events);
+MINIROS_NODISCARD MINIROS_DECL Error del_socket_from_watcher(int epfd, int fd);
+MINIROS_NODISCARD MINIROS_DECL Error set_events_on_socket(int epfd, int fd, int events);
 
 /*****************************************************************************
 ** Inlines - almost direct api replacements, should stay fast.

@@ -26,13 +26,13 @@ struct MINIROS_DECL XmlCodec {
   static std::string encode(const std::string_view& raw);
 
   /// Parses XMLRPC request.
-  NODISCARD static bool parseXmlRpcRequest(const std::string_view& data, std::string_view& method, Value& params);
+  MINIROS_NODISCARD static bool parseXmlRpcRequest(const std::string_view& data, std::string_view& method, Value& params);
 
   /// XMLRPC decoding
   /// @param value - reference to value container.
   /// @param data - raw XMLRPC data.
   /// @param offset - offset in XMLRPC data.
-  NODISCARD static bool parseXmlRpcValue(Value& value, const std::string_view& data, size_t& offset);
+  MINIROS_NODISCARD static bool parseXmlRpcValue(Value& value, const std::string_view& data, size_t& offset);
 
   /** @brief Validate an XML/RPC response
    *
@@ -42,7 +42,7 @@ struct MINIROS_DECL XmlCodec {
    *
    * @return true if validation succeeds, false otherwise.
    */
-  NODISCARD static bool validateXmlrpcResponse(const std::string& method, const Value &response, Value &payload);
+  MINIROS_NODISCARD static bool validateXmlrpcResponse(const std::string& method, const Value &response, Value &payload);
 
   static bool parseXmlRpcBool(Value& value, const std::string_view& data, size_t& offset);
   static bool parseXmlRpcInt(Value& value, const std::string_view& data, size_t& offset);
