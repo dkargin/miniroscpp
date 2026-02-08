@@ -33,6 +33,9 @@ CHECK_INCLUDE_FILES(ifaddrs.h HAVE_IFADDRS_H)
 # Not everybody has epoll (e.g., Windows, BSD, embedded arm-linux)
 CHECK_CXX_SYMBOL_EXISTS(epoll_wait "sys/epoll.h" HAVE_EPOLL)
 
+# Not everybody has poll (e.g., Windows, BSD, embedded arm-linux)
+CHECK_CXX_SYMBOL_EXISTS(poll "poll.h" HAVE_POLL)
+
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/internal_config.h.in" internal_config.h)
 
 include_directories(${CMAKE_CURRENT_BINARY_DIR})

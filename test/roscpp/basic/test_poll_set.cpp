@@ -178,7 +178,7 @@ public:
 #endif    
   }
 
-  ~Poller()
+  ~Poller() override
   {
     ::close(sockets_[0]);
     ::close(sockets_[1]);
@@ -197,7 +197,7 @@ public:
 
 protected:
 
-  virtual void SetUp()
+  void SetUp() override
   {
     if (create_socket_pair(sockets_) != 0)
     {
@@ -215,9 +215,7 @@ protected:
 
   PollSet poll_set_;
 
-  int sockets_[2];
-
-
+  int sockets_[2] = {MINIROS_INVALID_SOCKET, MINIROS_INVALID_SOCKET};
 };
 
 class SocketHelper
@@ -376,17 +374,21 @@ TEST_F(Poller, multiAddDel)
     sh.processEvents(events);
     return 0;
   }));
+  // Should return false if adding same socket twice.
   ASSERT_FALSE(poll_set_.addSocket(sh.socket_, 0, [&sh](int events) {
     sh.processEvents(events);
     return 0;
   }));
 
   ASSERT_TRUE(poll_set_.addEvents(sh.socket_, 0));
+  // Expecting false because sh.socket_+1 is not added to PollSet.
   ASSERT_FALSE(poll_set_.addEvents(sh.socket_ + 1, 0));
 
   ASSERT_TRUE(poll_set_.delEvents(sh.socket_, 0));
+  // Expecting false because sh.socket_+1 is not added to PollSet.
   ASSERT_FALSE(poll_set_.delEvents(sh.socket_ + 1, 0));
 
+  // Expecting false because sh.socket_+1 is not added to PollSet.
   ASSERT_FALSE(poll_set_.delSocket(sh.socket_ + 1));
   ASSERT_TRUE(poll_set_.delSocket(sh.socket_));
 }
@@ -433,7 +435,7 @@ TEST_F(Poller, DISABLED_addDelMultiThread)
     {
       Barrier barrier(thread_count + 1);
       std::vector<std::thread> tg;
-      for (int i = 0; i < thread_count/2; ++i)
+      for (int j = 0; j < thread_count/2; ++j)
       {
         tg.emplace_back(addThread, &poll_set_, &sh1, &barrier);
         tg.emplace_back(addThread, &poll_set_, &sh2, &barrier);
@@ -462,7 +464,7 @@ TEST_F(Poller, DISABLED_addDelMultiThread)
     {
       Barrier barrier(thread_count + 1);
       std::vector<std::thread> tg;
-      for (int i = 0; i < thread_count/2; ++i)
+      for (int j = 0; j < thread_count/2; ++j)
       {
         tg.emplace_back(delThread, &poll_set_, &sh1, &barrier);
         tg.emplace_back(delThread, &poll_set_, &sh2, &barrier);

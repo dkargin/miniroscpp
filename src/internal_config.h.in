@@ -4,7 +4,9 @@
 #cmakedefine HAVE_GLIBC_BACKTRACE
 
 #cmakedefine HAVE_IFADDRS_H
+
 #cmakedefine HAVE_EPOLL
+#cmakedefine HAVE_POLL
 
 #cmakedefine MINIROS_USE_LIBSYSTEMD
 #cmakedefine HAVE_LIBSYSTEMD

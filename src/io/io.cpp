@@ -218,6 +218,7 @@ Error set_events_on_socket(int epfd, int fd, int events)
 ** Service Robotics/Libssh Functions
 *****************************************************************************/
 
+#ifdef HAVE_POLL
 static Error poll_sockets_poll(int epfd, socket_pollfd* fds, nfds_t nfds, int timeout, std::vector<socket_pollfd>& events)
 {
   UNUSED(epfd);
@@ -256,6 +257,7 @@ static Error poll_sockets_poll(int epfd, socket_pollfd* fds, nfds_t nfds, int ti
   }
   return Error::Ok;
 }
+#endif
 
 /// Poller based on ancient `select`
 static Error poll_sockets_select(int epfd, socket_pollfd* fds, nfds_t nfds, int timeout, std::vector<socket_pollfd>& events)
@@ -432,17 +434,17 @@ static Error poll_sockets_epoll(int epfd, socket_pollfd* fds, nfds_t nfds, int t
 Error poll_sockets(int epfd, socket_pollfd* fds, nfds_t nfds, int timeout, std::vector<socket_pollfd>& events)
 {
   events.clear();
-#if defined(WIN32)
-  return poll_sockets_select(epfd, fds, nfds, timeout, events);
-#elif defined(HAVE_EPOLL)
+#if defined(HAVE_EPOLL)
   return poll_sockets_epoll(epfd, fds, nfds, timeout, events);
-#else
+#elif defined(HAVE_POLL)
   return poll_sockets_poll(epfd, fds, nfds, timeout, events);
+#else
+  return poll_sockets_select(epfd, fds, nfds, timeout, events);
 #endif // poll_sockets functions
-
   assert(false);
   return Error::NotImplemented;
 }
+
 /*****************************************************************************
 ** Socket Utilities
 *****************************************************************************/

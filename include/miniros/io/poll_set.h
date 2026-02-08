@@ -92,6 +92,8 @@ public:
    * \param update_func The function to call when a socket has events
    * \param object The (optional) object associated with this socket. Mainly
    * used to prevent the transport from being deleted while we're calling the update function
+   * \param loc - some code location to make debugging of PollSet internals easier.
+   * \returns true if new socket is added. It will return false if socket is invalid or already added.
    */
   bool addSocket(int sock, int events, const SocketUpdateFunc& update_func, const TrackedObject& object = TrackedObject(), const internal::CodeLocation& loc = {});
 
