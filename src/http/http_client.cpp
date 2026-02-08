@@ -670,7 +670,7 @@ Error HttpClient::Internal::connectImpl(const std::shared_ptr<Internal>& I, Lock
       if (ptr)
         return handleSocketEvents(ptr, event);
       return 0;
-    }, I);
+    }, I, THIS_LOCATION);
 
   updateState(lock, connected ? State::Idle : State::Connecting);
   return Error::Ok;

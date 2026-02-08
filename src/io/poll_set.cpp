@@ -42,6 +42,7 @@
 
 #include "miniros/io/poll_set.h"
 
+#include "internal/code_location.h"
 #include "internal/profiling.h"
 #include "miniros/io/io.h"
 
@@ -69,6 +70,7 @@ struct PollSet::Internal {
     int events_;
     bool updateEvents_;
     int timeLeftMs_ = -1;
+    internal::CodeLocation loc_;
   };
 
   std::map<int, SocketInfo> socket_info_;
@@ -122,7 +124,7 @@ PollSet::PollSet()
     // Really no idea how to recover from this kind of error.
     perror("PollSet::PollSet - create_signal_pair() failed");
   }
-  addSocket(internal_->signal_pipe_[0], POLLIN, [this](int events){return onLocalPipeEvents(events);});
+  addSocket(internal_->signal_pipe_[0], POLLIN, [this](int events){return onLocalPipeEvents(events);}, {}, THIS_LOCATION);
 }
 
 PollSet::~PollSet()
@@ -132,7 +134,7 @@ PollSet::~PollSet()
   internal_.reset();
 }
 
-bool PollSet::addSocket(int fd, int events, const SocketUpdateFunc& update_func, const TrackedObject& object)
+bool PollSet::addSocket(int fd, int events, const SocketUpdateFunc& update_func, const TrackedObject& object, const internal::CodeLocation& createLoc)
 {
   if (fd < 0)
     return false;
@@ -150,6 +152,7 @@ bool PollSet::addSocket(int fd, int events, const SocketUpdateFunc& update_func,
   info.events_ = events;
   info.object_ = object;
   info.func_ = update_func;
+  info.loc_ = createLoc;
 
   {
     std::scoped_lock<std::mutex> lock(internal_->socket_info_mutex_);
@@ -189,7 +192,7 @@ bool PollSet::delSocket(int fd)
     internal_->socket_info_.erase(it);
 
     {
-      std::scoped_lock<std::mutex> lock(internal_->just_deleted_mutex_);
+      std::scoped_lock<std::mutex> lock2(internal_->just_deleted_mutex_);
       internal_->just_deleted_.push_back(fd);
     }
 
@@ -202,10 +205,9 @@ bool PollSet::delSocket(int fd)
     internal_->sockets_changed_ = true;
     signal();
 
-    LOCAL_DEBUG("PollSet::delSocket(%d)", fd);
+    LOCAL_INFO("PollSet::delSocket(%d)", fd);
     return true;
   }
-
   LOCAL_WARN("PollSet: Tried to delete fd [%d] which is not being tracked", fd);
 
   return false;
@@ -251,15 +253,17 @@ bool PollSet::delEvents(int sock, int events)
   auto it = internal_->socket_info_.find(sock);
   if (it == internal_->socket_info_.end())
   {
-    LOCAL_DEBUG("PollSet: Tried to delete events [%d] to fd [%d] which does not exist in this pollset", events, sock);
+    LOCAL_WARN("PollSet: Tried to delete events [%d] to fd [%d] which does not exist in this pollset", events, sock);
     return false;
   }
 
   it->second.events_ &= ~events;
 
   if (it->second.events_ == 0) {
+    LOCAL_DEBUG("PollSet::delEvents(%d - %d) removing socket with zero events", sock, events);
     del_socket_from_watcher(internal_->epfd_, sock);
   } else {
+    LOCAL_DEBUG("PollSet::delEvents(%d - %d) updating socket events", sock, events);
     set_events_on_socket(internal_->epfd_, sock, it->second.events_);
   }
 
@@ -277,7 +281,7 @@ bool PollSet::setEvents(int sock, int events)
 
   if (it == internal_->socket_info_.end())
   {
-    LOCAL_DEBUG("PollSet: Tried to set events [%d] to fd [%d] which does not exist in this pollset", events, sock);
+    LOCAL_WARN("PollSet: Tried to set events [%d] to fd [%d] which does not exist in this pollset", events, sock);
     return false;
   }
 
@@ -288,12 +292,12 @@ bool PollSet::setEvents(int sock, int events)
   it->second.events_ = events;
   if (oldEvents == 0) {
     add_socket_to_watcher(internal_->epfd_, sock, it->second.events_);
-    LOCAL_INFO("PollSet::setEvents(%d, %s) added socket to watcher", sock, eventToString(events).c_str());
+    LOCAL_DEBUG("PollSet::setEvents(%d, %s) added socket to watcher", sock, eventToString(events).c_str());
   } else if (it->second.events_ == 0) {
-    LOCAL_INFO("PollSet::setEvents(%d, %s) deleted socket from watcher", sock, eventToString(events).c_str());
+    LOCAL_DEBUG("PollSet::setEvents(%d, %s) deleted socket from watcher", sock, eventToString(events).c_str());
     del_socket_from_watcher(internal_->epfd_, sock);
   } else {
-    LOCAL_INFO("PollSet::setEvents(%d, %s) updated events", sock, eventToString(events).c_str());
+    LOCAL_DEBUG("PollSet::setEvents(%d, %s) updated events", sock, eventToString(events).c_str());
     set_events_on_socket(internal_->epfd_, sock, it->second.events_);
   }
   internal_->sockets_changed_ = true;
@@ -309,7 +313,7 @@ bool PollSet::setTimerEvent(int sock, int timeoutMs)
 
   if (it == internal_->socket_info_.end())
   {
-    LOCAL_DEBUG("PollSet::setTimerEvent(%d) - fd does not exist", sock);
+    LOCAL_WARN("PollSet::setTimerEvent(%d) - fd does not exist", sock);
     return false;
   }
   internal_->socket_timers_[sock] = SteadyTime::now() + WallDuration(timeoutMs*0.001);
@@ -362,6 +366,10 @@ void PollSet::update(int poll_timeout)
     }
   }
 
+#ifdef VERY_DETAILED_LOG
+  std::stringstream ss;
+#endif
+
   for (const socket_pollfd& spfd: internal_->ofds_)
   {
     int fd = spfd.fd;
@@ -380,20 +388,28 @@ void PollSet::update(int poll_timeout)
     TrackedObject object = info.object_;
     const int events = info.events_;
 
-    bool hasEvents = events & revents
-            || revents & POLLERR
-            || revents & POLLHUP
-            || revents & POLLNVAL;
+#ifdef VERY_DETAILED_LOG
+    ss << std::endl;
+    ss << "fd=" << info.fd_ << " evt=" << revents << "/" << info.events_;
+    if (info.loc_.valid()) {
+      ss << " loc=" << info.loc_.str();
+    }
+#endif
+
+    constexpr int evtErrorsMask = POLLERR | POLLHUP | POLLNVAL;
+
+    bool hasEvents = (events & revents) || (revents & evtErrorsMask);
     if (!func) {
       continue;
     }
     if (!hasEvents) {
       continue;
     }
+
     // If these are registered events for this socket, OR the events are ERR/HUP/NVAL,
     // call through to the registered function
     bool skip = false;
-    if (revents & (POLLNVAL|POLLERR|POLLHUP))
+    if (revents & evtErrorsMask)
     {
       // If a socket was just closed and then the file descriptor immediately reused, we can
       // get in here with what we think is a valid socket (since it was just re-added to our set)
@@ -405,10 +421,17 @@ void PollSet::update(int poll_timeout)
       if (it != internal_->just_deleted_.end())
         skip = true;
     }
+
+#ifdef VERY_DETAILED_LOG
+    if (skip) {
+      ss << " skip";
+    }
+#endif
+
     if (skip)
       continue;
 
-    int ret = func(revents & (events|POLLERR|POLLHUP|POLLNVAL));
+    int ret = func(revents & (events | evtErrorsMask));
     if (ret & ResultDropFD) {
       delSocket(fd);
     }
@@ -426,18 +449,19 @@ void PollSet::update(int poll_timeout)
             LOCAL_ERROR("PollSet fd=%d failed to set events %d on socket", fd, it->second.events_);
           }
         }
-        LOCAL_INFO("PollSet fd=%d adjust events from %s to %s", fd, eventToString(info.events_).c_str(), eventToString(ret).c_str());
+        LOCAL_DEBUG("PollSet fd=%d adjust events from %s to %s", fd, eventToString(info.events_).c_str(), eventToString(ret).c_str());
       }
     }
   } // for socket event
 
   processTimers();
 
+#ifdef VERY_DETAILED_LOG
   SteadyTime updateDone = SteadyTime::now();
   auto dur = updateDone - updateStart;
-
-  LOCAL_INFO("PollSet processed %zu events in %fs, gap=%fs:%s", internal_->ofds_.size(), dur.toSec(), gap.toSec(), ss.str().c_str());
+  LOCAL_DEBUG("PollSet processed %zu events in %fs, gap=%fs:%s", internal_->ofds_.size(), dur.toSec(), gap.toSec(), ss.str().c_str());
   lastUpdateFinish = updateDone;
+#endif
 }
 
 void PollSet::processTimers()
