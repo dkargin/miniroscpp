@@ -116,8 +116,6 @@ extern ProfilingDomain g_profilingDomain;
 /// Get ID of current thread.
 int64_t currentThreadId();
 
-void logMemoryToProfilingTrace();
-
 void writeCurrentThreadNameInTrace(const std::string& name);
 
 } // namespace profiling

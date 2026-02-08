@@ -5,17 +5,21 @@
 #include <iomanip>
 #include <malloc.h>
 #include <thread>
-#include <unistd.h>
 
 #include <cstring>
 #include <fcntl.h>
 #include <iostream>
 #include <map>
-#include <sstream>
+#include "miniros/io/io.h"
 
 #include "miniros/internal/profiling.h"
 
 #include "static_write_buf.h"
+
+#ifdef _WIN32
+#define NOMINMAX
+#include <windows.h>
+#endif
 
 #ifdef PROFILE_NVTX_SUPPORT
 #include <nvtx3/nvToolsExt.h>
@@ -38,10 +42,29 @@ int64_t currentThreadId()
 
 static int64_t GetCurrentTimeNanos() {
   const int64_t kNanosPerSecond = 1000 * 1000 * 1000;
+#ifdef _WIN32
+  // Windows implementation using QueryPerformanceCounter
+  static LARGE_INTEGER frequency = {0};
+  if (frequency.QuadPart == 0) {
+    QueryPerformanceFrequency(&frequency);
+    if (frequency.QuadPart == 0) {
+      // This should not happen on Windows XP or later
+      // Set to a safe default (1 MHz) to avoid division by zero
+      frequency.QuadPart = 1000000;
+    }
+  }
+  
+  LARGE_INTEGER counter;
+  QueryPerformanceCounter(&counter);
+  // Convert to nanoseconds: (counter / frequency) * 1e9
+  // Use 64-bit arithmetic to avoid precision loss
+  return (counter.QuadPart * kNanosPerSecond) / frequency.QuadPart;
+#else
   struct timespec ts;
   clock_gettime(CLOCK_MONOTONIC, &ts);
   return (int64_t{ts.tv_sec} * kNanosPerSecond +
           int64_t{ts.tv_nsec});
+#endif
 }
 
 void RenderEvent(const TraceEvent& e, bool newLine, StaticWriteBuf& out) {
@@ -392,64 +415,6 @@ void mark([[maybe_unused]]const ProfilingDomain* domain, const char* object, con
 }
 
 ProfilingDomain g_profilingDomain("miniros");
-
-class MemoryUsageReader {
-public:
-  MemoryUsageReader() {
-    m_fd = open("/proc/self/status", O_RDONLY);
-  }
-
-  ~MemoryUsageReader() {
-    if (m_fd >= 0)
-      close(m_fd);
-  }
-
-  long getCurrentRssMB() {
-    if (m_fd < 0)
-      return 0;
-
-    lseek(m_fd, 0, SEEK_SET);
-    ssize_t bytesRead = read(m_fd, m_buffer, sizeof(m_buffer) - 1);
-    if (bytesRead <= 0)
-      return 0;
-
-    m_buffer[bytesRead] = '\0';
-    const char* target = "VmRSS:";
-    char* line = std::strstr(m_buffer, target);
-    if (!line)
-      return 0;
-
-    std::istringstream iss(line);
-    std::string key, unit;
-    long value = 0;
-    iss >> key >> value >> unit;
-
-    return value / 1024;  // from Kb to Mb
-  }
-
-private:
-  int m_fd = -1;
-  char m_buffer[4096] = {};
-};
-
-long getCurrentRssMB()
-{
-  static MemoryUsageReader reader;
-  return reader.getCurrentRssMB();
-}
-
-void logMemoryToProfilingTrace()
-{
-  long rss_mb = getCurrentRssMB();
-
-  TraceEvent evt;
-  evt.name = "rss_mb";
-  evt.phase = Phase::COUNTER;
-  evt.categories = "memory";
-  evt.args_int["value"] = rss_mb;
-
-  g_profilingDomain.writeEvent(evt);
-}
 
 void writeCurrentThreadNameInTrace(const std::string& name)
 {
