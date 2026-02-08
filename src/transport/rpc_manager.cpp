@@ -320,8 +320,15 @@ void RPCManager::shutdown()
 
 std::shared_ptr<http::HttpClient> RPCManager::getXMLRPCClient(const std::string &host, const int port, const std::string &path)
 {
-  if (!internal_ || !internal_->poll_set_)
+  assert(internal_);
+  if (!internal_)
     return nullptr;
+
+
+  if (!internal_->poll_set_) {
+    LOCAL_ERROR("Requesting XMLRPC Client without active PollSet");
+    return nullptr;
+  }
 
   // Construct URL key for the map
   network::URL url;

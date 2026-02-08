@@ -241,16 +241,8 @@ Error MasterLink::execute(const std::string& method, const RpcValue& request, Rp
 
   RPCManagerPtr manager = internal_->rpcManager.lock();
   if (!manager) {
-    return Error::NoMaster;
-  }
-
-  std::string master_host = getHost();
-  uint32_t master_port = getPort();
-
-  assert(manager);
-  if (!manager) {
     LOCAL_ERROR("[%s] - no manager", method.c_str());
-    return Error::InternalError;
+    return Error::NoMaster;
   }
 
   // Try to execute request without any network.
@@ -263,6 +255,9 @@ Error MasterLink::execute(const std::string& method, const RpcValue& request, Rp
     }
     return Error::Ok;
   }
+
+  std::string master_host = getHost();
+  uint32_t master_port = getPort();
 
   auto c = manager->getXMLRPCClient(master_host, master_port, "/RPC2");
   if (!c) {
