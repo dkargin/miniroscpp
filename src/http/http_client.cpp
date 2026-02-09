@@ -195,11 +195,10 @@ struct HttpClient::Internal {
     }
   }
 
-  void detachPollSet(Lock& lock)
+  void detachSocket(Lock& lock)
   {
     if (socket && poll_set) {
       poll_set->delSocket(socket->fd());
-      poll_set = nullptr;
     }
   }
 
@@ -219,7 +218,7 @@ struct HttpClient::Internal {
   void release(Lock& lock)
   {
     LOCAL_INFO("HttpClient::Internal[%d]::release()", fd());
-    detachPollSet(lock);
+    detachSocket(lock);
     closeSocket(lock);
     updateState(lock, State::Invalid);
 
@@ -257,7 +256,7 @@ int HttpClient::Internal::eventsForState(State s) const
     case State::Connecting:
       return PollSet::EventOut;
     case State::WaitReconnect:
-      return PollSet::EventTimer;
+      return 0;
     case State::Idle:
       return 0;
     case State::WriteRequest:
@@ -640,8 +639,7 @@ Error HttpClient::Internal::connectImpl(const std::shared_ptr<Internal>& I, Lock
   }
 
   if (socket && socket->valid()) {
-    // TODO: Could reuse existing socket.
-    closeSocket(lock);
+    detachSocket(lock);
   }
 
   socket.reset(new NetSocket());
