@@ -156,7 +156,7 @@ bool PollSet::addSocket(int fd, int events, const SocketUpdateFunc& update_func,
   {
     std::scoped_lock<std::mutex> lock(internal_->socket_info_mutex_);
 
-    bool b = internal_->socket_info_.insert(std::make_pair(fd, info)).second;
+    auto [existing, b] = internal_->socket_info_.insert(std::make_pair(fd, info));
     if (!b)
     {
       LOCAL_WARN("PollSet: Tried to add duplicate fd [%d]", fd);
@@ -452,7 +452,9 @@ void PollSet::update(int poll_timeout)
       continue;
 
     int ret = func(revents & (events | evtErrorsMask));
-    if (ret & ResultDropFD) {
+    bool shouldDrop = ret & ResultDropFD;
+    ret = ret & ~(PollSet::EventTimer | PollSet::ResultDropFD);
+    if (shouldDrop) {
       delSocket(fd);
     }
     else if (info.updateEvents_ && ret != info.events_) {
@@ -468,7 +470,7 @@ void PollSet::update(int poll_timeout)
           if (set_events_on_socket(internal_->epfd_, fd, ret)) {
             it->second.events_ = ret;
           } else {
-            LOCAL_ERROR("PollSet fd=%d failed to set events %d on socket", fd, it->second.events_);
+            LOCAL_ERROR("PollSet fd=%d failed to set events %d on socket: %s", fd, it->second.events_, strerror(errno));
           }
         }
         LOCAL_DEBUG("PollSet fd=%d adjust events from %s to %s", fd, eventToString(info.events_).c_str(), eventToString(ret).c_str());

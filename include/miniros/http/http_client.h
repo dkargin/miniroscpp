@@ -7,13 +7,10 @@
 
 #include <functional>
 #include <memory>
-#include <mutex>
 
 #include "miniros/http/http_tools.h"
 #include "miniros/http/http_request.h"
 #include "miniros/network/url.h"
-
-#include <condition_variable>
 
 namespace miniros {
 
