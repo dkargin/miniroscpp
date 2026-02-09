@@ -69,8 +69,9 @@ struct HttpClient::Internal {
 
   /// A queue of requests.
   std::deque<std::shared_ptr<HttpRequest>> requests;
+
   /// Mutex for storing requests
-  std::mutex requests_guard;
+  mutable std::mutex requests_guard;
 
   std::shared_ptr<HttpRequest> active_request;
 
@@ -173,27 +174,7 @@ struct HttpClient::Internal {
     return address.str() + std::string(" fd=") + std::to_string(fd());
   }
 
-  void updateState(Lock& lock, State newState)
-  {
-    if (newState == state)
-      return;
-
-    auto oldState = state;
-    state = newState;
-    cv.notify_all();
-
-    std::shared_ptr<HttpRequest> activeReq;
-    activeReq = active_request;
-    if (activeReq) {
-      LOCAL_DEBUG("HttpClient[%s]::updateState(%s) from %s at step=%d req=%d dt=%f", debugName().c_str(),
-        newState.toString(), oldState.toString(),
-        updateCounter.load(), activeReq->id(), activeReq->elapsed().toSec());
-    } else {
-      assert(!state.hasRequest());
-      LOCAL_DEBUG("HttpClient[%s]::updateState(%s) from %s at step=%d", debugName().c_str(),
-        newState.toString(), oldState.toString(), updateCounter.load());
-    }
-  }
+  void updateState(Lock& lock, State newState);
 
   void detachSocket(Lock& lock)
   {
@@ -215,38 +196,71 @@ struct HttpClient::Internal {
   bool pullNewTask(Lock& processLock);
 
   /// Completely release own state.
-  void release(Lock& lock)
+  void release(Lock& lock);
+
+  size_t getQueuedRequests() const
   {
-    LOCAL_INFO("HttpClient::Internal[%d]::release()", fd());
-    detachSocket(lock);
-    closeSocket(lock);
-    updateState(lock, State::Invalid);
-
-    std::shared_ptr<HttpRequest> activeReq;
-    std::deque<std::shared_ptr<HttpRequest>> requestsCopy;
-    {
-      std::unique_lock reqLock(requests_guard);
-      if (active_request) {
-        activeReq = active_request;
-        active_request.reset();
-      }
-      std::swap(requestsCopy, requests);
-    }
-
-    {
-      ScopedUnlock unlock(lock);
-      if (activeReq) {
-        activeReq->updateState(http::HttpRequest::State::Idle);
-        activeReq->notifyFailToSend();
-        activeReq.reset();
-      }
-      for (const auto& req: requestsCopy) {
-        req->updateState(http::HttpRequest::State::Idle);
-        req->notifyFailToSend();
-      }
-    }
+    std::unique_lock lock(requests_guard);
+    size_t num = requests.size();
+    if (active_request)
+      num++;
+    return num;
   }
 };
+
+void HttpClient::Internal::release(Lock& lock)
+{
+  LOCAL_INFO("HttpClient::Internal[%d]::release()", fd());
+  detachSocket(lock);
+  closeSocket(lock);
+  updateState(lock, State::Invalid);
+
+  std::shared_ptr<HttpRequest> activeReq;
+  std::deque<std::shared_ptr<HttpRequest>> requestsCopy;
+  {
+    std::unique_lock reqLock(requests_guard);
+    if (active_request) {
+      activeReq = active_request;
+      active_request.reset();
+    }
+    std::swap(requestsCopy, requests);
+  }
+
+  {
+    ScopedUnlock unlock(lock);
+    if (activeReq) {
+      activeReq->updateState(http::HttpRequest::State::Idle);
+      activeReq->notifyFailToSend();
+      activeReq.reset();
+    }
+    for (const auto& req: requestsCopy) {
+      req->updateState(http::HttpRequest::State::Idle);
+      req->notifyFailToSend();
+    }
+  }
+}
+
+void HttpClient::Internal::updateState(Lock& lock, State newState)
+{
+  if (newState == state)
+    return;
+
+  auto oldState = state;
+  state = newState;
+  cv.notify_all();
+
+  std::shared_ptr<HttpRequest> activeReq;
+  activeReq = active_request;
+  if (activeReq) {
+    LOCAL_DEBUG("HttpClient[%s]::updateState(%s) from %s at step=%d req=%d dt=%f", debugName().c_str(),
+      newState.toString(), oldState.toString(),
+      updateCounter.load(), activeReq->id(), activeReq->elapsed().toSec());
+  } else {
+    assert(!state.hasRequest());
+    LOCAL_DEBUG("HttpClient[%s]::updateState(%s) from %s at step=%d", debugName().c_str(),
+      newState.toString(), oldState.toString(), updateCounter.load());
+  }
+}
 
 int HttpClient::Internal::eventsForState(State s) const
 {
@@ -808,7 +822,6 @@ void HttpClient::Internal::handleReconnecting(const std::shared_ptr<Internal>& I
     MINIROS_DEBUG_NAMED("client", "HttpClient[%s]::handleReconnecting(%s) - connected", debugName().c_str(), PollSet::eventToString(events).c_str());
     connectImpl(I, lock, address);
   } else if (events & PollSet::EventError) {
-    //LOCAL_ERROR_NAMED("client", "HttpClient[%s]::handleReconnecting(%s) - failed to connect", debugName().c_str(), PollSet::eventToString(events).c_str());
   } else {
     LOCAL_ERROR("HttpClient[%s]::handleReconnecting(%s) - unhandled events", debugName().c_str(), PollSet::eventToString(events).c_str());
   }
@@ -823,7 +836,7 @@ void HttpClient::Internal::handleConnecting(Lock& lock, int evtFlags)
   // Assume socket is in "connecting" state
   assert(socket->isConnecting());
   if (evtFlags & PollSet::EventError) {
-    LOCAL_ERROR("HttpClient[%s]::handleEvents(state=Connecting, evt=%s) - failed to connect", debugName().c_str(), PollSet::eventToString(evtFlags).c_str());
+    LOCAL_ERROR("HttpClient[%s]::handleEvents(state=Connecting, evt=%s) - failed to connect, q=%zu", debugName().c_str(), PollSet::eventToString(evtFlags).c_str(), getQueuedRequests());
     handleDisconnect(lock);
     return;
   }
@@ -990,11 +1003,7 @@ size_t HttpClient::getQueuedRequests() const
 {
   if (!internal_)
     return 0;
-  std::unique_lock lock(internal_->requests_guard);
-  size_t num = internal_->requests.size();
-  if (internal_->active_request)
-    num++;
-  return num;
+  return internal_->getQueuedRequests();
 }
 
 }
