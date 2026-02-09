@@ -489,10 +489,9 @@ void initDefaultLogLevels(const M_string& remappings)
   // Setting up default log levels to some practical values.
   auto it = remappings.find("__miniros.debug");
   if (it != remappings.end() && it->second == "1") {
-    console::set_logger_level("miniros.http", console::Level::Debug);
+    console::set_logger_level("miniros.http", console::Level::Warn);
     console::set_logger_level("miniros.net", console::Level::Debug);
-    console::set_logger_level("miniros.http.client", console::Level::Debug);
-    console::set_logger_level("miniros.poll_set", miniros::console::Level::Debug);
+    console::set_logger_level("miniros.poll_set", miniros::console::Level::Warn);
     console::set_logger_level("miniros.RPCManager", miniros::console::Level::Debug);
     console::set_logger_level("miniros.master_link", miniros::console::Level::Debug);
     console::set_logger_level("miniros.subscription", miniros::console::Level::Debug);
@@ -500,6 +499,7 @@ void initDefaultLogLevels(const M_string& remappings)
     console::set_logger_level("miniros.http", console::Level::Error);
     console::set_logger_level("miniros.http.client", console::Level::Error);
     console::set_logger_level("miniros.net", console::Level::Fatal);
+    console::set_logger_level("poll_set.net", console::Level::Error);
   }
 }
 

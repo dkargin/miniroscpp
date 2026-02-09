@@ -7,6 +7,9 @@
 #include <cctype>
 #include <iomanip>
 
+// ROS log will write to the channel "miniros.http[.server]"
+#define MINIROS_PACKAGE_NAME "http"
+
 #include "miniros/http/http_request.h"
 
 #include "internal/scoped_locks.h"

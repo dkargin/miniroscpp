@@ -8,6 +8,8 @@
 #include <chrono>
 #include <memory>
 
+#define MINIROS_PACKAGE_NAME "http"
+
 #include "miniros/console.h"
 #include "miniros/network/socket.h"
 #include "miniros/http/http_client.h"
@@ -16,8 +18,6 @@
 #include "internal/scoped_locks.h"
 #include "io/poll_set.h"
 #include "network/net_adapter.h"
-
-#define MINIROS_PACKAGE_NAME "http"
 
 namespace miniros {
 namespace http {

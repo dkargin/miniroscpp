@@ -4,6 +4,9 @@
 
 #include <cassert>
 
+// ROS log will write to the channel "miniros.http[.server]"
+#define MINIROS_PACKAGE_NAME "http"
+
 #include "miniros/console.h"
 #include "miniros/http/http_server.h"
 #include "miniros/http/http_server_connection.h"
@@ -11,9 +14,6 @@
 #include "internal/scoped_locks.h"
 #include "miniros/io/poll_set.h"
 #include "xmlrpcpp/XmlRpcException.h"
-
-// ROS log will write to the channel "miniros.http[.server]"
-#define MINIROS_PACKAGE_NAME "http"
 
 namespace miniros {
 namespace http {

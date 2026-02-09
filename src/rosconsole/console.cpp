@@ -707,7 +707,7 @@ std::string formatToString(const char* fmt, ...)
   return std::string(buffer.get(), size);
 }
 
-#define INITIAL_BUFFER_SIZE 4096
+constexpr int INITIAL_BUFFER_SIZE = 4096;
 static std::mutex g_print_mutex;
 static std::shared_ptr<char[]> g_print_buffer(new char[INITIAL_BUFFER_SIZE]);
 static size_t g_print_buffer_size = INITIAL_BUFFER_SIZE;

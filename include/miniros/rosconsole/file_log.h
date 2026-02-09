@@ -32,14 +32,6 @@
 
 #include <miniros/console.h>
 
-// TODO: Implement
-#ifdef MINIROS_HAS_SANE_LOG
-#define MINIROS_LOG_DEBUG(...) MINIROS_DEBUG_NAMED("roscpp_internal", __VA_ARGS__)
-#define MINIROS_CONN_LOG_DEBUG(...) MINIROS_DEBUG_NAMED("roscpp_internal.connections", __VA_ARGS__)
-#else
-
-#endif
-
 namespace miniros
 {
 

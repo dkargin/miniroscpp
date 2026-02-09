@@ -38,17 +38,16 @@
 #include <mutex>
 #include <optional>
 
+#define MINIROS_PACKAGE_NAME "poll_set"
+
 #include "internal/at_exit.h"
-
-#include "miniros/io/poll_set.h"
-
-#include "internal/code_location.h"
 #include "internal/profiling.h"
+
 #include "miniros/io/io.h"
+#include "miniros/io/poll_set.h"
 
 #include "miniros/rosconsole/local_log.h"
 
-#define MINIROS_PACKAGE_NAME "poll_set"
 
 namespace miniros
 {

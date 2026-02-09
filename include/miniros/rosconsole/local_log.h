@@ -17,8 +17,10 @@ namespace internal {
 //! Utilities for XML parsing, encoding, and decoding and message handlers.
 class MINIROS_DECL InternalLog {
 public:
-  //! Dump messages somewhere
-  static void log(const console::LogLocation& loc, const char* channel, const char* fmt, ...) MINIROS_CONSOLE_PRINTF_ATTRIBUTE(3, 4);
+  //! Print message without using any network infrastructure.
+  static void print(const console::LogLocation& loc, const char* channel,
+    const char* file, int line, const char* function,
+    const char* fmt, ...) MINIROS_CONSOLE_PRINTF_ATTRIBUTE(6, 7);
 };
 
 }
@@ -33,7 +35,7 @@ public:
     \
     if (MINIROS_UNLIKELY(enabled)) \
     { \
-      ::miniros::internal::InternalLog::log(loc, (name), __VA_ARGS__); \
+      ::miniros::internal::InternalLog::print(loc, (name), __FILE__, __LINE__, __MINIROS_CONSOLE_FUNCTION__, __VA_ARGS__); \
     } \
   } while(0)
 
