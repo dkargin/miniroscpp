@@ -5,6 +5,9 @@
 #include <cassert>
 #include <mutex>
 
+// ROS log will write to the channel "miniros.http[.server]"
+#define MINIROS_PACKAGE_NAME "http"
+
 #include "miniros/network/socket.h"
 #include "miniros/io/poll_set.h"
 #include "miniros/internal/lifetime.h"
@@ -14,8 +17,6 @@
 #include "internal/scoped_locks.h"
 #include "miniros/http/http_server_connection.h"
 
-// ROS log will write to the channel "miniros.http[.server]"
-#define MINIROS_PACKAGE_NAME "http"
 
 namespace miniros {
 namespace http {

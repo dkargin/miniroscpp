@@ -129,18 +129,18 @@ void close_socket_watcher(int fd)
 /**
   EBADF  epfd or fd is not a valid file descriptor.
   EEXIST op was EPOLL_CTL_ADD, and the supplied file descriptor fd is already registered with this epoll instance.
-  EINVAL epfd is not an epoll file descriptor, or fd is the same as epfd, or the requested operation op is not supported by this interface.
-  EINVAL An invalid event type was specified along with EPOLLEXCLUSIVE in events.
-  EINVAL op was EPOLL_CTL_MOD and events included EPOLLEXCLUSIVE.
-  EINVAL op was EPOLL_CTL_MOD and the EPOLLEXCLUSIVE flag has previously been applied to this epfd, fd pair.
-  EINVAL EPOLLEXCLUSIVE was specified in event and fd refers to an epoll instance.
-  ELOOP  fd refers to an epoll instance and this EPOLL_CTL_ADD operation would result in a circular loop of epoll instances monitoring one another or a nesting depth of epoll instances greater than 5.
-  ENOENT op was EPOLL_CTL_MOD or EPOLL_CTL_DEL, and fd is not registered with this epoll instance.
-  ENOMEM There was insufficient memory to handle the requested op control operation.
-  ENOSPC The limit imposed by /proc/sys/fs/epoll/max_user_watches was encountered while trying to register (EPOLL_CTL_ADD) a new file descriptor on an epoll instance.  See epoll(7) for further details.
-  EPERM  The target file fd does not support epoll.  This error can occur if fd refers to, for example, a regular file or a directory.
+  EINVAL epfd is not an epoll file descriptor, or fd is the same as epfd, or the requested operation op is not supported
+  by this interface. EINVAL An invalid event type was specified along with EPOLLEXCLUSIVE in events. EINVAL op was
+  EPOLL_CTL_MOD and events included EPOLLEXCLUSIVE. EINVAL op was EPOLL_CTL_MOD and the EPOLLEXCLUSIVE flag has
+  previously been applied to this epfd, fd pair. EINVAL EPOLLEXCLUSIVE was specified in event and fd refers to an epoll
+  instance. ELOOP  fd refers to an epoll instance and this EPOLL_CTL_ADD operation would result in a circular loop of
+  epoll instances monitoring one another or a nesting depth of epoll instances greater than 5. ENOENT op was
+  EPOLL_CTL_MOD or EPOLL_CTL_DEL, and fd is not registered with this epoll instance. ENOMEM There was insufficient
+  memory to handle the requested op control operation. ENOSPC The limit imposed by /proc/sys/fs/epoll/max_user_watches
+  was encountered while trying to register (EPOLL_CTL_ADD) a new file descriptor on an epoll instance.  See epoll(7) for
+  further details. EPERM  The target file fd does not support epoll.  This error can occur if fd refers to, for example,
+  a regular file or a directory.
 */
-
 
 Error add_socket_to_watcher(int epfd, int fd, int events)
 {

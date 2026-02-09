@@ -32,7 +32,6 @@
 #include <set>
 
 #include "miniros/console.h"
-#define ROSCONSOLE_CONSOLE_IMPL_EXPORTS
 #include "console_impl.h"
 
 namespace miniros

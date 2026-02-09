@@ -25,11 +25,15 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "miniros/io/poll_manager.h"
-#include "miniros/common.h"
-
 #include <mutex>
 #include <signal.h>
+
+// ROS log will write to the channel "miniros.http[.server]"
+#define MINIROS_PACKAGE_NAME "poll_manager"
+
+#include "miniros/common.h"
+#include "miniros/io/poll_manager.h"
+#include "rosconsole/local_log.h"
 
 namespace miniros
 {
@@ -61,11 +65,9 @@ void PollManager::start()
 
 void PollManager::shutdown()
 {
-  // Logging system can dead here.
-#ifdef POLL_SERIOUS_DEBUG
-  std::cout << "PollManager shutdown" << std::endl;
-#endif
   if (shutting_down_) return;
+
+  LOCAL_DEBUG("PollManager::shutdown()");
 
   if (thread_.joinable() && thread_.get_id() != std::this_thread::get_id())
   {
@@ -73,13 +75,9 @@ void PollManager::shutdown()
     thread_.join();
     poll_watchers_.disconnectAll();
     running_ = false;
-#ifdef POLL_SERIOUS_DEBUG
-    std::cout << "PollManager shutdown complete" << std::endl;;
-#endif
+    LOCAL_DEBUG("PollManager::shutdown() - complete");
   } else {
-#ifdef POLL_SERIOUS_DEBUG
-    std::cout << "PollManager skipped from other thread" << std::endl;
-#endif
+    LOCAL_DEBUG("PollManager::shutdown() - skipped from other thread");
   }
 }
 
@@ -117,16 +115,14 @@ void PollManager::threadFunc()
     poll_set_.update(updatePeriodMS);
   }
 
-#ifdef POLL_SERIOUS_DEBUG
-  std::cout << "PollManager thread exit" << std::endl;
-#endif
+  LOCAL_DEBUG("PollManager::threadFunc() - exit");
 }
 
 void PollManager::addPollThreadWatcher(PollWatcher* watcher) {
-    assert(watcher);
-    if (watcher) {
-      this->poll_watchers_.attach(watcher);
-    }
+  MINIROS_ASSERT(watcher);
+  if (watcher) {
+    this->poll_watchers_.attach(watcher);
+  }
 }
 
 }

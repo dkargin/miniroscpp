@@ -16,7 +16,9 @@ int getVerbosity()
   return static_cast<int>(console::Level::Debug);
 }
 
-void InternalLog::log(const console::LogLocation& loc, const char* channel, const char* fmt, ...) {
+void InternalLog::print(const console::LogLocation& loc, const char* channel,
+  const char* file, int line, const char* function,
+  const char* fmt, ...) {
   va_list va;
   char buf[512] = {};
   va_start( va, fmt);
@@ -34,11 +36,7 @@ void InternalLog::log(const console::LogLocation& loc, const char* channel, cons
 
   buf[written] = 0;
 
-  if (loc.level_ == console::Level::Error || loc.level_ == console::Level::Warn) {
-    fprintf(stderr,"%s\n", buf);
-  } else {
-    fprintf(stdout,"%s\n", buf);
-  }
+  ::miniros::console::backend::print(0, loc.level_, buf, file, function, line);
 }
 }
 }
