@@ -124,7 +124,7 @@ void HttpParserFrame::resetParseState(bool request)
 
   m_keepAlive = true;
 
-  m_state = request ? ParseRequestHeader : ParseResponseHeader;
+  m_state = request ? ParseRequestHeaderMethod : ParseResponseHeader;
 }
 
 std::string_view HttpParserFrame::getTokenView(const std::string& data, const Token& token)
@@ -180,24 +180,79 @@ int HttpParserFrame::incrementalParse()
   const char* cp = start + m_currentPosition;
   const char* tokenStart = start + m_tokenStart;
 
+  auto switchToNewField = [&cp, &tokenStart, this]() {
+    cp += 2;
+    tokenStart = cp;
+    m_state = HttpParserFrame::ParseFieldName;
+  };
+
   while (cp < end && m_state != HttpParserFrame::ParseInvalid) {
-    if (m_state == HttpParserFrame::ParseRequestHeader) {
+    // Non-passthrough parser FSM.
+    // Current pointer 'cp' will be advanced in the end of cascade.
+    // Some states transitions will alter 'cp' differently and force 'continue'.
+    if (m_state == HttpParserFrame::ParseRequestHeaderMethod) {
       // Parsing request line: "GET /home.html HTTP/1.1"
-      if (strncmp(cp, "\r\n", 2) == 0) {
-        protocol.assign(tokenStart - start, cp - start);
-        cp += 2;
-        tokenStart = cp;
-        m_state = HttpParserFrame::ParseFieldName;
-        continue;
-      } if (requestMethodToken.empty() && *cp == ' ') {
+      if (*cp == ' ') {
         requestMethodToken.assign(tokenStart - start, cp - start);
         requestMethod = parseMethod(start, requestMethodToken);
         tokenStart = cp + 1;
-      } else if (requestPath.empty() && *cp == ' ') {
+        m_state = HttpParserFrame::ParseRequestHeaderPath;
+      }
+      else if (strncmp(cp, "\r\n", 2) == 0) {
+        // This is not expected transition. It should probably be an error.
+        requestMethodToken.assign(tokenStart - start, cp - start);
+        requestMethod = parseMethod(start, requestMethodToken);
+        switchToNewField();
+        continue;
+      }
+    }
+    else if (m_state == HttpParserFrame::ParseRequestHeaderPath) {
+      if (*cp == ' ' && tokenStart == cp) {
+        tokenStart = cp + 1;
+      }
+      else if (*cp == ' ') {
         requestPath.assign(tokenStart - start, cp - start);
         tokenStart = cp + 1;
-      } else {
-        // continue parsing.
+        m_state = HttpParserFrame::ParseRequestHeaderProtocol;
+      }
+      else if (*cp == '?') {
+        requestPath.assign(tokenStart - start, cp - start);
+        tokenStart = cp + 1;
+        m_state = HttpParserFrame::ParseRequestHeaderQuery;
+      }
+      else if (strncmp(cp, "\r\n", 2) == 0) {
+        // This is not expected transition. It should probably be an error.
+        requestPath.assign(tokenStart - start, cp - start);
+        switchToNewField();
+        continue;
+      }
+    }
+    else if (m_state == HttpParserFrame::ParseRequestHeaderQuery) {
+      if (*cp == ' ') {
+        requestQuery.assign(tokenStart - start, cp - start);
+        tokenStart = cp + 1;
+        m_state = HttpParserFrame::ParseRequestHeaderProtocol;
+      }
+      else if (*cp == '?') {
+        requestQuery.assign(tokenStart - start, cp - start);
+        tokenStart = cp + 1;
+      }
+      else if (strncmp(cp, "\r\n", 2) == 0) {
+        // This is not expected transition. It should probably be an error.
+        requestPath.assign(tokenStart - start, cp - start);
+        switchToNewField();
+        continue;
+      }
+    }
+    else if (m_state == HttpParserFrame::ParseRequestHeaderProtocol) {
+      if (*cp == ' ' && tokenStart == cp) {
+        tokenStart = cp + 1;
+      }
+      else if (strncmp(cp, "\r\n", 2) == 0) {
+        // This is not expected transition. It should probably be an error.
+        protocol.assign(tokenStart - start, cp - start);
+        switchToNewField();
+        continue;
       }
     }
     else if (m_state == HttpParserFrame::ParseResponseHeader) {

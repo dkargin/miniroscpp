@@ -44,7 +44,10 @@ struct MINIROS_DECL HttpParserFrame {
     /// Parser is in invalid state.
     ParseInvalid,
     /// Parsing request line.
-    ParseRequestHeader,
+    ParseRequestHeaderMethod,
+    ParseRequestHeaderPath,
+    ParseRequestHeaderQuery,
+    ParseRequestHeaderProtocol,
     /// Parsing response line.
     ParseResponseHeader,
     /// Parsing name of request field.
@@ -118,8 +121,11 @@ struct MINIROS_DECL HttpParserFrame {
   /// Request method: {GET, POST, PUT, ...}
   HttpMethod requestMethod = HttpMethod::Invalid;
 
-  /// Requested path
+  /// Requested path, without query.
   Token requestPath;
+
+  /// Request query as a single string.
+  Token requestQuery;
 
   /// Protocol name. Expect string like:
   ///   HTTP/1.1
