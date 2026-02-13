@@ -53,7 +53,7 @@ const char* HttpServerConnection::State::toString() const
 
 Error HttpServerConnection::doReadRequest(Lock& lock)
 {
-  if (http_frame_.state() == HttpParserFrame::ParseRequestHeader) {
+  if (http_frame_.state() == HttpParserFrame::ParseRequestHeaderMethod) {
     request_start_ = SteadyTime::now();
   }
   auto [transferred, readErr] = socket_->recv(http_frame_.data, nullptr);
