@@ -472,7 +472,7 @@ Error NetSocket::setReusePort(bool reuse)
   return Error::Ok;
 }
 
-Error NetSocket::joinMulticastGroup(const NetAddress& group)
+Error NetSocket::joinMulticastGroup(const NetAddress& group, bool loop)
 {
   if (!internal_)
     return Error::InternalError;
@@ -496,6 +496,13 @@ Error NetSocket::joinMulticastGroup(const NetAddress& group)
     if (setsockopt(fd, IPPROTO_IP, IP_ADD_MEMBERSHIP, (char*) &mreq, sizeof(mreq)) < 0) {
       const char* err = last_socket_error_string();
       MINIROS_ERROR_NAMED("socket", "NetSocket[%d]::joinMulticastGroup() failed to join multicast group \"%s\": %s", fd, group.str().c_str(), err);
+      return Error::SystemError;
+    }
+
+    int iLoop = loop ? 1 : 0;
+    if (setsockopt(fd, IPPROTO_IP, IP_MULTICAST_LOOP, (char*) &loop, sizeof(loop)) != 0) {
+      const char* err = last_socket_error_string();
+      MINIROS_ERROR_NAMED("socket", "NetSocket[%d]::joinMulticastGroup() failed to set loop to %d: %s", fd, iLoop, err);
     }
   } else {
     return Error::NotImplemented;

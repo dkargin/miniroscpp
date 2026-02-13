@@ -99,7 +99,7 @@ public:
 
   /// Join to multicast group on any interface.
   /// Only IP address is taken from `group`. Port value is ignored.
-  Error joinMulticastGroup(const NetAddress& group);
+  Error joinMulticastGroup(const NetAddress& group, bool loop);
 
   int fd() const;
 
