@@ -93,7 +93,7 @@ int main(int argc, const char ** argv) {
     ("dump_parameters", po::value<bool>()->default_value(false), "Dump all ROSParam values on every update")
     ("pidfile", po::value<std::string>(), "Path to a PID file")
     ("discovery", po::value<int>(), "Sets UDP port for master discovery.")
-    ("discoveryGroup", po::value<std::string>(), "Multicast address for master discovery")
+    ("discovery_group", po::value<std::string>(), "Multicast address for master discovery")
     ;
 
   po::variables_map vm;
@@ -177,8 +177,8 @@ int main(int argc, const char ** argv) {
     master.enableDiscoveryBroadcasts(discoveryPort);
   }
 
-  if (vm.count("discoveryGroup")) {
-    std::string discoveryGroup = vm["discoveryGroup"].as<std::string>();
+  if (vm.count("discovery_group")) {
+    std::string discoveryGroup = vm["discovery_group"].as<std::string>();
     Error err = master.setDiscoveryGroup(discoveryGroup);
     if (err != Error::Ok) {
       MINIROS_ERROR("Failed to set up address for discovery multicasts: %s", err.toString());

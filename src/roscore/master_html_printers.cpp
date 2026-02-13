@@ -6,6 +6,9 @@
 
 #include "miniros/network/host_info.h"
 #include "miniros/http/http_printers.h"
+#include "node_ref.h"
+
+#include <vector>
 
 namespace miniros {
 namespace master {
@@ -131,6 +134,31 @@ Error Master::Internal::renderNodeInfo(const std::string_view& name, std::string
   ss << "<p>" << print::HB(name) << std::endl;
   const std::string url = nodePtr->getUrl().str();
   ss << "URL: " << print::Url(url, url);
+
+  // Display flags
+  int flags = nodePtr->getNodeFlags();
+  ss << "<br/>Flags: ";
+  std::vector<std::string> flagNames;
+  if (flags & NodeRef::NODE_LOCAL) flagNames.push_back("LOCAL");
+  if (flags & NodeRef::NODE_FOREIGN) flagNames.push_back("FOREIGN");
+  if (flags & NodeRef::NODE_MINIROS) flagNames.push_back("MINIROS");
+  if (flags & NodeRef::NODE_MASTER) flagNames.push_back("MASTER");
+  if (flagNames.empty()) {
+    ss << "none";
+  } else {
+    for (size_t i = 0; i < flagNames.size(); ++i) {
+      if (i > 0) ss << ", ";
+      ss << flagNames[i];
+    }
+  }
+
+  // Add "pair" button if node has NODE_MASTER flag
+  if (flags & NodeRef::NODE_MASTER) {
+    std::string pairUrl = "/api2/multimaster/connect?node=" + std::string(name);
+    ss << "<br/><form method=\"GET\" action=\"" << pairUrl << "\">";
+    ss << "<button type=\"submit\">pair</button>";
+    ss << "</form>";
+  }
 
   ss << "</p>";
 

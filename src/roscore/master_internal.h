@@ -24,6 +24,7 @@ class NodeInfoEndpoint;
 class TopicInfoEndpoint;
 class PublishedTopicsEndpoint;
 class TopicTypesEndpoint;
+class MultimasterConnectEndpoint;
 
 struct Master::Internal {
   std::shared_ptr<RPCManager> rpcManager;
@@ -49,6 +50,9 @@ struct Master::Internal {
 
   /// Endpoint for accessing /api2/topic_types
   std::shared_ptr<TopicTypesEndpoint> httpTopicTypesEndpoint;
+
+  /// Endpoint for accessing /api2/multimaster/connect
+  std::shared_ptr<MultimasterConnectEndpoint> httpMultimasterConnectEndpoint;
 
   /// Discovery service for companion masters.
   std::unique_ptr<Discovery> discovery;

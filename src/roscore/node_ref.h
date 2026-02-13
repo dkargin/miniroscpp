@@ -163,6 +163,10 @@ public:
   /// It should be a combination of NodeFlags.
   void setNodeFlags(int flags);
 
+  /// Get local flags of node.
+  /// Returns a combination of NodeFlags.
+  int getNodeFlags() const;
+
   /// Check if node is suitable for RPC requests.
   bool needRequests() const;
 

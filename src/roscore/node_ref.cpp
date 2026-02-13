@@ -203,6 +203,12 @@ void NodeRef::setNodeFlags(int flags)
   m_flags |= flags & (NODE_LOCAL | NODE_MASTER | NODE_FOREIGN);
 }
 
+int NodeRef::getNodeFlags() const
+{
+  std::unique_lock lock(m_guard);
+  return m_flags;
+}
+
 std::string NodeRef::debugName() const
 {
   std::stringstream ss;

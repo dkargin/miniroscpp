@@ -149,8 +149,11 @@ Error Discovery::Internal::initSockets(int port)
   broadcastPort = port == 0 ? socket.port() : port;
 
   if (multicastGroup.valid()) {
-    multicastGroup.setPort(broadcastPort);
-    error = socket.joinMulticastGroup(multicastGroup);
+
+    if (multicastGroup.port() == 0)
+      multicastGroup.setPort(broadcastPort);
+
+    error = socket.joinMulticastGroup(multicastGroup, false);
     if (!error) {
       MINIROS_WARN("Discovery has failed to join multicast group \"%s\"", multicastGroup.str().c_str());
       multicastEnabled = false;
@@ -303,6 +306,11 @@ Error Discovery::doBroadcast()
   DiscoveryPacket packet;
   fillDiscoveryPacket(packet);
 
+  if (internal_->broadcastAddr.valid()) {
+    // Single "broadest" broadcast.
+    internal_->socket.send(&packet, sizeof(packet), &internal_->broadcastAddr);
+  }
+
   if (internal_->multicastEnabled) {
     auto [written, error] = internal_->socket.send(&packet, sizeof(packet), &internal_->multicastGroup);
     if (error != Error::Ok) {
@@ -329,7 +337,7 @@ Error Discovery::setMulticast(const std::string& group)
     // TODO: implement resubscription to multicast group.
     return Error::NotImplemented;
   }
-  internal_->multicastGroup = network::NetAddress::fromIp4String(group, 0);
+  internal_->multicastGroup = network::NetAddress::fromURL(group, 0);
   return Error::Ok;
 }
 

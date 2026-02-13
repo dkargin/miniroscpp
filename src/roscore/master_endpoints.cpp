@@ -8,12 +8,17 @@
 #include "http/http_filters.h"
 #include "http/http_request.h"
 #include "http/http_server.h"
+#include "miniros/http/http_printers.h"
 #include "miniros/internal/json_tools.h"
 #include "miniros/xmlrpcpp/XmlRpcValue.h"
 #include "requester_info.h"
 
+#include <sstream>
+
 namespace miniros {
 namespace master {
+
+using namespace http;
 
 Error MasterRootEndpoint::handle(const network::ClientInfo& clientInfo, std::shared_ptr<http::HttpRequest> request)
 {
@@ -120,6 +125,28 @@ Error TopicTypesEndpoint::handle(const network::ClientInfo& clientInfo, std::sha
   request->setResponseStatusOk();
   request->setResponseBody(oss.str(), "application/json");
 
+  return Error::Ok;
+}
+
+Error MultimasterConnectEndpoint::handle(const network::ClientInfo& clientInfo, std::shared_ptr<http::HttpRequest> request)
+{
+  if (!internal)
+    return Error::InternalError;
+
+  // Get node name from URL parameter
+  std::string nodeName = request->getParameter("node");
+
+  // Dummy implementation: just return success message
+  std::stringstream ss;
+  ss << "<!doctype html><html><title>Mini ROS master</title><body>";
+  ss << "<h1>Multimaster Connect</h1>";
+  ss << "<p>Node: " << nodeName << "</p>";
+  ss << "<p>Connection request received (dummy implementation)</p>";
+  ss << "<p>" << print::Url("/", "BACK") << "</p>";
+  ss << "</body></html>";
+
+  request->setResponseBody(ss.str(), "text/html");
+  request->setResponseStatusOk();
   return Error::Ok;
 }
 
