@@ -211,7 +211,7 @@ bool PollSet::delSocket(int fd)
   internal_->sockets_changed_ = true;
   signal();
 
-  LOCAL_INFO("PollSet::delSocket(%d)", fd);
+  LOCAL_DEBUG("PollSet::delSocket(%d)", fd);
   return true;
 }
 
