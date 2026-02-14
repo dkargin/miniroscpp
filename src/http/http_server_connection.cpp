@@ -13,6 +13,7 @@
 
 #include "internal/scoped_locks.h"
 #include "miniros/io/poll_set.h"
+#include "network/url.h"
 #include "xmlrpcpp/XmlRpcException.h"
 
 namespace miniros {
@@ -144,6 +145,11 @@ std::shared_ptr<HttpRequest> HttpServerConnection::makeRequestObject(Lock& lock)
 
   requestObject->setPath(std::string{http_frame_.getPath()});
   requestObject->setRequestBody(std::string{http_frame_.body()});
+
+  if (auto query = http_frame_.getQuery(); !query.empty()) {
+    requestObject->setQueryParameters(query);
+  }
+
   return requestObject;
 }
 
