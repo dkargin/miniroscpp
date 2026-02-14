@@ -16,7 +16,7 @@
 
 #include "internal/scoped_locks.h"
 #include "miniros/http/http_server_connection.h"
-
+#include "miniros/callback_queue.h"
 
 namespace miniros {
 namespace http {

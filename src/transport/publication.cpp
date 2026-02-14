@@ -30,7 +30,7 @@
 #include "miniros/transport/publication.h"
 #include "miniros/transport/subscriber_link.h"
 #include "miniros/transport/connection.h"
-#include "miniros/transport/callback_queue_interface.h"
+#include "miniros/callback_queue_interface.h"
 #include "miniros/single_subscriber_publisher.h"
 #include "miniros/serialization.h"
 

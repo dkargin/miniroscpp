@@ -34,7 +34,7 @@
  */
 
 #include <gtest/gtest.h>
-#include <miniros/io/callback_queue.h>
+#include <miniros/callback_queue.h>
 #include <miniros/console.h>
 #include <miniros/timer.h>
 

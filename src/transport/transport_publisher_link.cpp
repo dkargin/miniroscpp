@@ -39,7 +39,7 @@
 #include <miniros/platform.h>  // platform dependendant requirements
 
 #include "miniros/io/poll_manager.h"
-#include "miniros/io/callback_queue.h"
+#include "miniros/callback_queue.h"
 
 #include "miniros/transport/transport_publisher_link.h"
 #include "miniros/transport/subscription.h"
