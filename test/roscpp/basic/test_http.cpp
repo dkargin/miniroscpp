@@ -15,7 +15,7 @@
 #include "miniros/http/http_filters.h"
 
 #include "miniros/io/poll_manager.h"
-#include "miniros/io/callback_queue.h"
+#include "miniros/callback_queue.h"
 #include <atomic>
 #include <set>
 #include <mutex>

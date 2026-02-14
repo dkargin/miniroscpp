@@ -29,7 +29,7 @@
 #include "miniros/this_node.h"
 #include "miniros/service.h"
 
-#include "miniros/io/callback_queue.h"
+#include "miniros/callback_queue.h"
 
 #include "miniros/rostime.h"
 #include "miniros/timer.h"

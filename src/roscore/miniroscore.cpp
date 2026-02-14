@@ -11,7 +11,7 @@
 #include "master.h"
 #include "rosout.h"
 
-#include "miniros/io/callback_queue.h"
+#include "miniros/callback_queue.h"
 #include "miniros/io/io.h"
 
 #include "miniros/common.h"
