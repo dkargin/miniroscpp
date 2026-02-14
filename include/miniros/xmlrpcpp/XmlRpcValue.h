@@ -156,6 +156,17 @@ namespace XmlRpc {
     //! Return the type of the value stored. \see Type.
     Type const &getType() const { return _type; }
 
+    /// Check if value is an array.
+    bool isArray() const
+    {
+      return _type == TypeArray;
+    }
+
+    bool isString() const
+    {
+      return _type == TypeString;
+    }
+
     /// Check if value is a primitive type.
     bool isPrimitive() const;
 

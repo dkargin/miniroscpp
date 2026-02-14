@@ -4,6 +4,10 @@
 
 #include <cassert>
 #include <cstring>
+#include <cctype>
+#include <cstdlib>
+#include <iomanip>
+#include <sstream>
 
 #include "miniros/http/http_tools.h"
 #include "miniros/xmlrpcpp/XmlRpcValue.h"
@@ -413,6 +417,58 @@ void HttpResponseHeader::writeHeader(std::string& output, size_t bodySize) const
   }
 
   output += "\r\n";
+}
+
+// URL encode a string (percent encoding)
+std::string urlEncode(const std::string_view& str)
+{
+  std::ostringstream encoded;
+  encoded.fill('0');
+  encoded << std::hex;
+
+  for (unsigned char c : str) {
+    // Unreserved characters: ALPHA, DIGIT, '-', '.', '_', '~'
+    if (std::isalnum(c) || c == '-' || c == '.' || c == '_' || c == '~') {
+      encoded << c;
+    } else {
+      // Percent encode everything else
+      encoded << '%' << std::setw(2) << static_cast<int>(c);
+    }
+  }
+
+  return encoded.str();
+}
+
+// URL decode a string (percent decoding)
+std::string urlDecode(const std::string_view& str)
+{
+  std::string result;
+  result.reserve(str.size());
+
+  for (size_t i = 0; i < str.size(); ++i) {
+    if (str[i] == '%' && i + 2 < str.size()) {
+      // Try to decode percent-encoded character
+      // Need at least 3 characters: '%' and two hex digits
+      char hex[3] = {str[i + 1], str[i + 2], '\0'};
+      char* endptr = nullptr;
+      unsigned long value = std::strtoul(hex, &endptr, 16);
+      if (endptr == hex + 2 && value <= 255) {
+        // Valid hex sequence
+        result += static_cast<char>(value);
+        i += 2; // Skip the two hex digits
+        continue;
+      }
+      // If decoding failed, treat '%' as literal character
+    }
+    // Handle '+' as space (common in form data, though not strictly URL encoding)
+    if (str[i] == '+') {
+      result += ' ';
+    } else {
+      result += str[i];
+    }
+  }
+
+  return result;
 }
 
 } // namespace http

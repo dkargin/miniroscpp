@@ -75,6 +75,11 @@ public:
   /// Set URL parameter (query string parameter)
   void setUrlParameter(const std::string& name, const std::string& value);
 
+  /// Parse query string and assign parameters.
+  /// Query string format: "key1=value1&key2=value2"
+  /// Both keys and values are URL decoded automatically.
+  void setQueryParameters(const std::string_view& queryString);
+
   /// Get URL parameter value, or empty string if not found
   std::string getParameter(const std::string& name) const;
 

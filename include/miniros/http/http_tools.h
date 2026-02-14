@@ -166,6 +166,11 @@ struct MINIROS_DECL HttpParserFrame {
     return getTokenView(data, requestPath);
   }
 
+  std::string_view getQuery() const
+  {
+    return getTokenView(data, requestQuery);
+  }
+
   ParserState state() const
   {
     return m_state;
@@ -260,6 +265,14 @@ struct HttpResponseHeader {
 
 /// Checks if a string starts with a prefix.
 MINIROS_DECL bool startsWith(const std::string_view& str, const std::string_view& prefix);
+
+/// URL encode a string (percent encoding).
+/// Encodes all characters except unreserved characters (ALPHA, DIGIT, '-', '.', '_', '~').
+MINIROS_DECL std::string urlEncode(const std::string_view& str);
+
+/// URL decode a string (percent decoding).
+/// Decodes percent-encoded characters in the string.
+MINIROS_DECL std::string urlDecode(const std::string_view& str);
 
 } // namespace http
 
