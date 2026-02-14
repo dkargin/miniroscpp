@@ -10,12 +10,7 @@
 
 #include "miniros/network/url.h"
 
-namespace miniros {
-void PrintTo(const Error& obj, ::std::ostream* os) {
-  // Logic to print 'obj' to the output stream 'os'
-  *os << obj.toString();
-}
-}
+#include "gtest_printers.h"
 
 using namespace miniros;
 

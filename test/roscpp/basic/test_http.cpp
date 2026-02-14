@@ -4,6 +4,9 @@
 
 #include <thread>
 #include <chrono>
+#include <atomic>
+#include <set>
+#include <mutex>
 
 #include <gtest/gtest.h>
 
@@ -16,9 +19,8 @@
 
 #include "miniros/io/poll_manager.h"
 #include "miniros/callback_queue.h"
-#include <atomic>
-#include <set>
-#include <mutex>
+
+#include "gtest_printers.h"
 
 using namespace miniros;
 
