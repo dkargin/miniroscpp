@@ -210,7 +210,7 @@ struct HttpClient::Internal {
 
 void HttpClient::Internal::release(Lock& lock)
 {
-  LOCAL_INFO("HttpClient::Internal[%d]::release()", fd());
+  LOCAL_DEBUG("HttpClient::Internal[%d]::release()", fd());
   detachSocket(lock);
   closeSocket(lock);
   updateState(lock, State::Invalid);
@@ -475,7 +475,7 @@ HttpClient::~HttpClient()
     // Explicitly unlock to prevent potential deadlock in destructor if Internal.
     lock.unlock();
   }
-  LOCAL_INFO("HttpClient::~HttpClient(%d) refs=%d", fd, refs);
+  LOCAL_DEBUG("HttpClient::~HttpClient(%d) refs=%d", fd, refs);
 }
 
 HttpClient::State HttpClient::getState() const
