@@ -36,7 +36,7 @@
 #include <gtest/gtest.h>
 #include "miniros/transport/subscription_queue.h"
 #include "miniros/transport/message_deserializer.h"
-#include "miniros/transport/callback_queue_interface.h"
+#include "miniros/callback_queue_interface.h"
 #include "miniros/transport/subscription_callback_helper.h"
 #include "miniros/init.h"
 

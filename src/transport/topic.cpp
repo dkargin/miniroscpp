@@ -33,7 +33,7 @@
  */
 
 #include "miniros/topic.h"
-#include "miniros/io/callback_queue.h"
+#include "miniros/callback_queue.h"
 
 namespace miniros
 {

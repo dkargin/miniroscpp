@@ -21,6 +21,7 @@
 
 #include "miniros/http/endpoints/filesystem.h"
 #include "miniros/http/http_filters.h"
+#include "miniros/callback_queue.h"
 
 namespace miniros {
 

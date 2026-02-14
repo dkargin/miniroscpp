@@ -79,6 +79,7 @@ SET(rostime_SRC
     rostime/time.cpp)
 
 set(cpp_common_SRC
+    callback_queue.cpp
     debug.cpp
     errors.cpp
     header.cpp
@@ -209,7 +210,6 @@ set(transport_SRC
     http/http_server_connection.cpp
     http/http_tools.cpp
 
-    io/callback_queue.cpp
     io/poll_manager.cpp
     io/poll_set.cpp
     io/io.cpp

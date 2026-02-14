@@ -37,7 +37,7 @@
 #include "miniros/transport/service_publication.h"
 #include "miniros/transport/service_client_link.h"
 #include "miniros/transport/connection.h"
-#include "miniros/transport/callback_queue_interface.h"
+#include "miniros/callback_queue_interface.h"
 
 #include <generated/std_msgs/String.hxx>
 

@@ -45,7 +45,7 @@
 #include "miniros/this_node.h"
 #include "miniros/io/poll_manager.h"
 
-#include "miniros/transport/callback_queue_interface.h"
+#include "miniros/callback_queue_interface.h"
 #include "miniros/transport/connection.h"
 #include "miniros/transport/connection_manager.h"
 #include "miniros/transport/intraprocess_publisher_link.h"

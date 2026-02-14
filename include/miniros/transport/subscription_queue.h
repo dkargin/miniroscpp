@@ -31,7 +31,7 @@
 #include "miniros/internal/forwards.h"
 #include "miniros/common.h"
 #include "miniros/message_event.h"
-#include "callback_queue_interface.h"
+#include "miniros/callback_queue_interface.h"
 
 #include <memory>
 #include <mutex>

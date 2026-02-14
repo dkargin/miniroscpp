@@ -59,6 +59,8 @@
 #include "xmlrpcpp/XmlRpcException.h"
 #include "xmlrpcpp/XmlRpcServer.h"
 
+#include "miniros/callback_queue.h"
+
 using namespace XmlRpc;
 
 namespace miniros

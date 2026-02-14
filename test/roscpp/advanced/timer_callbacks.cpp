@@ -43,7 +43,7 @@
 #include <stdlib.h>
 
 #include "miniros/ros.h"
-#include "miniros/io/callback_queue.h"
+#include "miniros/callback_queue.h"
 #include <test_roscpp/TestArray.hxx>
 #include <test_roscpp/TestStringString.hxx>
 

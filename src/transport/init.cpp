@@ -40,7 +40,7 @@
 #include "miniros/names.h"
 #include "miniros/this_node.h"
 
-#include "miniros/io/callback_queue.h"
+#include "miniros/callback_queue.h"
 #include "miniros/io/poll_manager.h"
 
 #include "miniros/transport/connection_manager.h"
