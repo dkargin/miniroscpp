@@ -266,6 +266,33 @@ HttpRequest::State HttpRequest::state() const
   return state_;
 }
 
+const char* HttpRequest::State::toString() const
+{
+  switch (value) {
+    case Idle:
+      return "Idle";
+    case ClientQueued:
+      return "ClientQueued";
+    case ClientSending:
+      return "ClientSending";
+    case ClientWaitResponse:
+      return "ClientWaitResponse";
+    case ClientHasResponse:
+      return "ClientHasResponse";
+    case Done:
+      return "Done";
+    case ServerReceive:
+      return "ServerReceive";
+    case ServerHandleRequest:
+      return "ServerHandleRequest";
+    case ServerSendResponse:
+      return "ServerSendResponse";
+    default:
+      assert(false);
+  }
+  return "Unknown";
+}
+
 void HttpRequest::setRequestStart(const SteadyTime& time)
 {
   Lock lock(mutex_, THIS_LOCATION);
