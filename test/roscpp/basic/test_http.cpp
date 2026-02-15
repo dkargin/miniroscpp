@@ -46,7 +46,7 @@ public:
   {
     while (!done->load())
     {
-      queue->callAvailable(WallDuration(0.1));
+      queue->callAvailable(WallDuration(0.5));
     }
   }
 
@@ -171,6 +171,8 @@ TEST_F(HttpServerTest, SimpleGet)
     ASSERT_NE(responseBody.find("1"), std::string::npos);
     ASSERT_NE(responseBody.find("items"), std::string::npos);
   }
+  // Expecting that we are holding the last reference.
+  ASSERT_EQ(request.use_count(), 1);
 }
 
 // POST endpoint handler that processes JSON request and returns JSON response
@@ -253,6 +255,9 @@ TEST_F(HttpServerTest, PostWithJson)
     ASSERT_NE(responseBody.find("test_user"), std::string::npos);
     ASSERT_NE(responseBody.find("42"), std::string::npos);
   }
+
+  // Expecting that we are holding the last reference.
+  ASSERT_EQ(request.use_count(), 1);
 }
 
 // Endpoint handler that tracks which thread it runs in
@@ -329,7 +334,9 @@ TEST_F(HttpServerTest, GetWithCallbackQueue)
   ASSERT_EQ(enqErr, Error::Ok);
 
   // Wait for response (poll until status becomes HasResponse)
-  EXPECT_EQ(request->waitForResponse(WallDuration(responseTimeoutSec)), Error::Ok);
+  auto ret = request->waitForResponse(WallDuration(responseTimeoutSec));
+  LOCAL_INFO("waitForResponse returned %s", ret.toString());
+  EXPECT_EQ(ret, Error::Ok);
 
   // Verify we actually got a response
   ASSERT_EQ(request->state(), http::HttpRequest::State::Done);
@@ -344,6 +351,9 @@ TEST_F(HttpServerTest, GetWithCallbackQueue)
     ASSERT_NE(responseBody.find("0"), std::string::npos);
     ASSERT_NE(responseBody.find("items"), std::string::npos);
   }
+
+  // Expecting that we are holding the last reference.
+  ASSERT_EQ(request.use_count(), 1);
 
   // Send second request.
   Error err2 = client.enqueueRequest(request);
@@ -363,7 +373,8 @@ TEST_F(HttpServerTest, GetWithCallbackQueue)
     ASSERT_NE(responseBody.find("1"), std::string::npos);
     ASSERT_NE(responseBody.find("items"), std::string::npos);
   }
-
+  // Expecting that we are holding the last reference.
+  ASSERT_EQ(request.use_count(), 1);
 }
 
 TEST_F(HttpServerTest, MultipleRequestsWithCallbackQueue)
@@ -435,7 +446,9 @@ TEST_F(HttpServerTest, CallbackQueueThreadIsolation)
   ASSERT_EQ(enqErr, Error::Ok);
 
   // Wait for response
-  EXPECT_EQ(request->waitForResponse(WallDuration(responseTimeoutSec)), Error::Ok);
+  auto ret = request->waitForResponse(WallDuration(responseTimeoutSec));
+  LOCAL_INFO("waitForResponse returned %s", ret.toString());
+  EXPECT_EQ(ret, Error::Ok);
   ASSERT_EQ(request->state(), http::HttpRequest::State::Done);
 
   // Verify handler was called in callback thread (not in PollSet thread)
