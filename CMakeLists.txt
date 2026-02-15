@@ -102,7 +102,10 @@ endif()
 # This path is needed in tests for xmlrpc.
 set(XMLRPC_SRC_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/src/xmlrpc)
 
+set(THREADS_PREFER_PTHREAD_FLAG TRUE)
 find_package(Threads REQUIRED)
+
+message(STATUS "Using threads implementation from: \"${CMAKE_THREAD_LIBS_INIT}\"")
 
 add_subdirectory(external)
 add_subdirectory(src)
