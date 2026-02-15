@@ -388,12 +388,26 @@ Error HttpRequest::waitForState(State state, const WallDuration& duration) const
 
   if (state_ == state)
     return Error::Ok;
-  std::chrono::duration<double> d(duration.toSec());
-  if (!cv_.wait_for(lock, d, [this, state]() { return state_ == state; }))
-  {
-    return Error::Timeout;
+  if (duration.isZero()) {
+    cv_.wait(lock, [this, state]() {
+        LOCAL_DEBUG("HttpRequest::waitForState attempt for %s, current=%s", state.toString(), state_.toString());
+        return state_ == state;
+      });
+    if (state_ == state)
+      return Error::Ok;
+  } else {
+    std::chrono::duration<double> d(duration.toSec());
+
+    if (cv_.wait_for(lock, d, [this, state]() {
+        LOCAL_DEBUG("HttpRequest::waitForState attempt for %s, current=%s", state.toString(), state_.toString());
+        return state_ == state;
+      }))
+    {
+      return Error::Ok;
+    }
   }
-  return Error::Ok;
+  LOCAL_DEBUG("HttpRequest::waitForState timeout for %s, current=%s", state.toString(), state_.toString());
+  return Error::Timeout;
 }
 
 Error HttpRequest::waitForResponse(const WallDuration& duration) const
