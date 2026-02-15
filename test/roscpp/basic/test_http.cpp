@@ -98,6 +98,20 @@ public:
 constexpr double connectionTimeoutSec = 50;
 constexpr double responseTimeoutSec = 50;
 
+TEST(BasicSanity, WaitIsReal)
+{
+  http::HttpRequest emptyRequest;
+
+  auto start = SteadyTime::now();
+  WallDuration waitDuration{0.5};
+  emptyRequest.waitForResponse(waitDuration);
+  WallDuration elapsed = SteadyTime::now() - start;
+  /// Expecting it to actually wait.
+  ASSERT_GE(elapsed, waitDuration*0.5)
+      << "It seems condition_variable::wait_for does not properly wait." << std::endl
+      << " It can be caused by missing proper implementation for std threads " << std::endl;
+}
+
 TEST_F(HttpServerTest, ConnectNoServer)
 {
   http::HttpClient client(&poll_manager_.getPollSet());
