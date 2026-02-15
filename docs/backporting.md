@@ -86,13 +86,13 @@ BAG, Merged [Exposed record snapshot feature for command line](https://github.co
 
 [Fix Lost Wake Bug in ROSOutAppender](https://github.com/ros/ros_comm/pull/2033) - relevant, simple.
 
-[use fully qualified ceil() in condition_variable.h](https://github.com/ros/ros_comm/pull/2025) - probably relevant. When did internal condition_variable.h has arrived?
+[use fully qualified ceil() in condition_variable.h](https://github.com/ros/ros_comm/pull/2025) - not  relevant. Custom condition variables were dropped later in https://github.com/ros/ros_comm/pull/1878
 
-[Remove 'using namespace' from condition_variable.h](https://github.com/ros/ros_comm/pull/2020) - probably relevant
+[Remove 'using namespace' from condition_variable.h](https://github.com/ros/ros_comm/pull/2020) - not relevant. Custom conditino variables were dropped later in https://github.com/ros/ros_comm/pull/1878
 
-[Fix subscription busy wait melodic](https://github.com/ros/ros_comm/pull/2014) - relevant
+[Fix subscription busy wait melodic](https://github.com/ros/ros_comm/pull/2014) - not relevant. Current implementation already matches latest ros-one:obesse.
 
-[Use an internal implementation of boost::condition_variable with monotonic clock](https://github.com/ros/ros_comm/pull/2011) - do we really need this kind of CV?
+[Use an internal implementation of boost::condition_variable with monotonic clock](https://github.com/ros/ros_comm/pull/2011) - not relevant, reverted in https://github.com/ros/ros_comm/pull/1878
 
 [XmlRpcValue::\_doubleFormat should be used during write](https://github.com/ros/ros_comm/pull/2003) - relevant
 
@@ -100,15 +100,13 @@ BAG, Merged [Exposed record snapshot feature for command line](https://github.co
 
 [Changed is_async_connected to use epoll when available](https://github.com/ros/ros_comm/pull/1983) - very relevant
 
-[Added const versions of XmlRpcValue converting operators.](https://github.com/ros/ros_comm/pull/1978) - fixed in alternative way
+[Added const versions of XmlRpcValue converting operators.](https://github.com/ros/ros_comm/pull/1978) - fixed in alternative way.
 
 [[noetic] Fixing Windows build break.](https://github.com/ros/ros_comm/pull/1961/files) - probably fixed already
 
 [check if async socket connect is success or failure before read and write in TransportT](https://github.com/ros/ros_comm/pull/1954) - relevant
 
-
 [Fix a bug that using a destroyed connection object.](https://github.com/ros/ros_comm/pull/1950) - relevant.
-
 
 [Add latch param to throttle](https://github.com/ros/ros_comm/pull/1944) - do we have topic throttle?
 
@@ -137,7 +135,7 @@ BAG, Merged [Exposed record snapshot feature for command line](https://github.co
 
 [[rosbag] Catch exceptions by const ref.](https://github.com/ros/ros_comm/pull/1874) - probably need it.
 
-[Do not display error message if poll yields EINTR](https://github.com/ros/ros_comm/pull/1868) - probably relevant
+[Do not display error message if poll yields EINTR](https://github.com/ros/ros_comm/pull/1868) - fixed in different way. Poll implementation will return Error::Ok in case of EINTR.
 
 
 ## Dropped ##
