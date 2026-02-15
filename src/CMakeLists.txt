@@ -79,6 +79,7 @@ SET(rostime_SRC
     rostime/time.cpp)
 
 set(cpp_common_SRC
+    callback_queue.cpp
     debug.cpp
     errors.cpp
     header.cpp
@@ -209,7 +210,6 @@ set(transport_SRC
     http/http_server_connection.cpp
     http/http_tools.cpp
 
-    io/callback_queue.cpp
     io/poll_manager.cpp
     io/poll_set.cpp
     io/io.cpp
@@ -293,10 +293,11 @@ if (MINIROS_USE_SYSTEM_PROGRAM_OPTIONS)
     add_library(impl::program_options ALIAS Boost::program_options)
 endif ()
 
+set(ALL_SRC ${cpp_common_SRC} ${transport_SRC} ${master_SRC} ${rostime_SRC} ${XMLRPC_SRC})
 if (MINIROS_BUILD_SHARED_LIBS)
-  add_library(roscxx SHARED ${cpp_common_SRC} ${transport_SRC} ${master_SRC} ${rostime_SRC} ${XMLRPC_SRC})
+  add_library(roscxx SHARED ${ALL_SRC})
 else()
-  add_library(roscxx ${cpp_common_SRC} ${transport_SRC} ${master_SRC} ${rostime_SRC} ${XMLRPC_SRC})
+  add_library(roscxx ${ALL_SRC})
 endif()
 
 target_compile_options(roscxx PRIVATE ${MINIROS_COMPILE_OPTIONS})
@@ -313,8 +314,7 @@ endif()
 target_link_libraries(roscxx
   PRIVATE
     ${console_bridge_LIBRARIES} ${PKG_LIBS_LIBRARIES} ${PLATFORM_LIBS}
-  PUBLIC
-    ${CMAKE_THREAD_LIBS_INIT}
+  PUBLIC Threads::Threads
 )
 
 target_compile_definitions(roscxx PRIVATE rostime_EXPORTS miniros_EXPORTS)

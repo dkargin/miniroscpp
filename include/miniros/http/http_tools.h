@@ -44,7 +44,10 @@ struct MINIROS_DECL HttpParserFrame {
     /// Parser is in invalid state.
     ParseInvalid,
     /// Parsing request line.
-    ParseRequestHeader,
+    ParseRequestHeaderMethod,
+    ParseRequestHeaderPath,
+    ParseRequestHeaderQuery,
+    ParseRequestHeaderProtocol,
     /// Parsing response line.
     ParseResponseHeader,
     /// Parsing name of request field.
@@ -118,8 +121,11 @@ struct MINIROS_DECL HttpParserFrame {
   /// Request method: {GET, POST, PUT, ...}
   HttpMethod requestMethod = HttpMethod::Invalid;
 
-  /// Requested path
+  /// Requested path, without query.
   Token requestPath;
+
+  /// Request query as a single string.
+  Token requestQuery;
 
   /// Protocol name. Expect string like:
   ///   HTTP/1.1
@@ -158,6 +164,11 @@ struct MINIROS_DECL HttpParserFrame {
   std::string_view getPath() const
   {
     return getTokenView(data, requestPath);
+  }
+
+  std::string_view getQuery() const
+  {
+    return getTokenView(data, requestQuery);
   }
 
   ParserState state() const
@@ -254,6 +265,14 @@ struct HttpResponseHeader {
 
 /// Checks if a string starts with a prefix.
 MINIROS_DECL bool startsWith(const std::string_view& str, const std::string_view& prefix);
+
+/// URL encode a string (percent encoding).
+/// Encodes all characters except unreserved characters (ALPHA, DIGIT, '-', '.', '_', '~').
+MINIROS_DECL std::string urlEncode(const std::string_view& str);
+
+/// URL decode a string (percent decoding).
+/// Decodes percent-encoded characters in the string.
+MINIROS_DECL std::string urlDecode(const std::string_view& str);
 
 } // namespace http
 

@@ -210,7 +210,7 @@ struct HttpClient::Internal {
 
 void HttpClient::Internal::release(Lock& lock)
 {
-  LOCAL_INFO("HttpClient::Internal[%d]::release()", fd());
+  LOCAL_DEBUG("HttpClient::Internal[%d]::release()", fd());
   detachSocket(lock);
   closeSocket(lock);
   updateState(lock, State::Invalid);
@@ -438,18 +438,18 @@ Error HttpClient::Internal::readResponse()
     // If we haven't gotten the entire request yet, return (keep reading)
     if (response_http_frame.state() != HttpParserFrame::ParseComplete) {
       if (readErr == Error::EndOfFile) {
-        LOCAL_DEBUG("HttpClient[%s]::readRequest: EOF while reading request", debugName().c_str());
+        LOCAL_DEBUG("HttpClient[%s]::readResponse: EOF while reading request", debugName().c_str());
         response_http_frame.finishResponse();
         return Error::EndOfFile;
         // Either way we close the connection
       }
-      LOCAL_DEBUG("HttpClient[%s]::readRequest got only %d/%d bytes.", debugName().c_str(), response_http_frame.bodyLength(), response_http_frame.contentLength());
+      LOCAL_DEBUG("HttpClient[%s]::readResponse got only %d/%d bytes.", debugName().c_str(), response_http_frame.bodyLength(), response_http_frame.contentLength());
       return Error::WouldBlock;
     }
 
     assert(response_http_frame.state() == HttpParserFrame::ParseComplete);
     // Otherwise, parse and dispatch the request
-    LOCAL_DEBUG("HttpClient[%s]::readRequest read %d/%d bytes.", debugName().c_str(), response_http_frame.bodyLength(), response_http_frame.contentLength());
+    LOCAL_DEBUG("HttpClient[%s]::readResponse read %d/%d bytes.", debugName().c_str(), response_http_frame.bodyLength(), response_http_frame.contentLength());
   } else if (readErr == Error::WouldBlock) {
     return Error::WouldBlock;
   }
@@ -475,7 +475,7 @@ HttpClient::~HttpClient()
     // Explicitly unlock to prevent potential deadlock in destructor if Internal.
     lock.unlock();
   }
-  LOCAL_INFO("HttpClient::~HttpClient(%d) refs=%d", fd, refs);
+  LOCAL_DEBUG("HttpClient::~HttpClient(%d) refs=%d", fd, refs);
 }
 
 HttpClient::State HttpClient::getState() const
@@ -556,12 +556,14 @@ Error HttpClient::enqueueRequest(const std::shared_ptr<HttpRequest>& request)
   Lock lock2(internal_->process_guard, THIS_LOCATION);
   // If we're in Idle state and have a valid socket, trigger processing
   if (internal_->state == State::Idle && internal_->socket && internal_->socket->valid()) {
-    // Trigger pullNewTask by updating socket events
-    // The socket is already in PollSet, so we can trigger it by updating events
-    // For now, we'll let the next event cycle handle it, or we could use a callback
-    // The simplest approach is to let the existing event loop handle it
     if (internal_->pullNewTask(lock2)) {
+      // There is some probability that the task we pulled is not the same task we have enqueued.
+      // It can happen if several threads are enqueuing requests.
+      LOCAL_INFO("HttpClient[%s]::enqueueRequest %s and started processing", internal_->debugName().c_str(), request->debugName().c_str());
       internal_->updateState(lock2, State::WriteRequest);
+      // Process sending immediately.
+      internal_->handleWriteRequest(lock2, 0, true);
+
       if (!internal_->poll_set->setEvents(internal_->socket->fd(), internal_->eventsForState(internal_->state))) {
         LOCAL_ERROR("HttpClient(%d) Failed to update poll set to enable events to send request", internal_->fd());
       }
@@ -569,9 +571,7 @@ Error HttpClient::enqueueRequest(const std::shared_ptr<HttpRequest>& request)
     }
   }
 
-  if (immediate) {
-    LOCAL_INFO("HttpClient[%s]::enqueueRequest %s and started processing", internal_->debugName().c_str(), request->debugName().c_str());
-  } else {
+  if (!immediate) {
     LOCAL_INFO("HttpClient[%s]::enqueueRequest %s to queue", internal_->debugName().c_str(), request->debugName().c_str());
   }
 
@@ -868,10 +868,6 @@ void HttpClient::Internal::handleWriteRequest(Lock& lock, int evtFlags, bool fal
     LOCAL_WARN("HttpClient[%s]::handleWriteRequest socket error in WriteRequest: %i", debugName().c_str(), err);
     handleDisconnect(lock);
     return;
-  }
-
-  if (!socket) {
-
   }
 
   if (fallThrough || (evtFlags & PollSet::EventOut)) {

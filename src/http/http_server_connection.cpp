@@ -10,7 +10,7 @@
 #include "miniros/console.h"
 #include "miniros/http/http_server.h"
 #include "miniros/http/http_server_connection.h"
-
+#include "miniros/callback_queue.h"
 #include "internal/scoped_locks.h"
 #include "miniros/io/poll_set.h"
 #include "xmlrpcpp/XmlRpcException.h"
@@ -53,7 +53,7 @@ const char* HttpServerConnection::State::toString() const
 
 Error HttpServerConnection::doReadRequest(Lock& lock)
 {
-  if (http_frame_.state() == HttpParserFrame::ParseRequestHeader) {
+  if (http_frame_.state() == HttpParserFrame::ParseRequestHeaderMethod) {
     request_start_ = SteadyTime::now();
   }
   auto [transferred, readErr] = socket_->recv(http_frame_.data, nullptr);
@@ -144,6 +144,11 @@ std::shared_ptr<HttpRequest> HttpServerConnection::makeRequestObject(Lock& lock)
 
   requestObject->setPath(std::string{http_frame_.getPath()});
   requestObject->setRequestBody(std::string{http_frame_.body()});
+
+  if (auto query = http_frame_.getQuery(); !query.empty()) {
+    requestObject->setQueryParameters(query);
+  }
+
   return requestObject;
 }
 

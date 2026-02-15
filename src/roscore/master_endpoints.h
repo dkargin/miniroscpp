@@ -62,6 +62,15 @@ class MasterFaviconEndpoint : public http::EndpointHandler {
   Error handle(const network::ClientInfo& clientInfo, std::shared_ptr<http::HttpRequest> request) override;
 };
 
+class MultimasterConnectEndpoint : public http::EndpointHandler {
+public:
+  MultimasterConnectEndpoint(Master::Internal* internal) : internal(internal) {}
+
+  Error handle(const network::ClientInfo& clientInfo, std::shared_ptr<http::HttpRequest> request) override;
+
+  Master::Internal* internal = nullptr;
+};
+
 }
 }
 

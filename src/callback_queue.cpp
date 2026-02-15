@@ -36,7 +36,7 @@
 #include <functional>
 
 #include "miniros/internal/at_exit.h"
-#include "miniros/io/callback_queue.h"
+#include "miniros/callback_queue.h"
 #include "miniros/rosassert.h"
 
 namespace miniros
@@ -286,7 +286,7 @@ CallbackQueue::CallOneResult CallbackQueue::callOne(miniros::WallDuration timeou
   return res;
 }
 
-void CallbackQueue::callAvailable(miniros::WallDuration timeout)
+size_t CallbackQueue::callAvailable(miniros::WallDuration timeout)
 {
   setupTLS();
   TLS* tls = tls_.get();
@@ -296,7 +296,7 @@ void CallbackQueue::callAvailable(miniros::WallDuration timeout)
 
     if (!enabled_)
     {
-      return;
+      return 0;
     }
 
     if (callbacks_.empty())
@@ -308,7 +308,7 @@ void CallbackQueue::callAvailable(miniros::WallDuration timeout)
 
       if (callbacks_.empty() || !enabled_)
       {
-        return;
+        return 0;
       }
     }
 
@@ -339,6 +339,7 @@ void CallbackQueue::callAvailable(miniros::WallDuration timeout)
     std::scoped_lock<std::mutex> lock(mutex_);
     calling_ -= called;
   }
+  return called;
 }
 
 CallbackQueue::CallOneResult CallbackQueue::callOneCB(TLS* tls)

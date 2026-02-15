@@ -35,7 +35,7 @@
 #ifndef MINIROS_CALLBACK_QUEUE_H
 #define MINIROS_CALLBACK_QUEUE_H
 
-#include "miniros/transport/callback_queue_interface.h"
+#include "miniros/callback_queue_interface.h"
 #include "miniros/internal/thread_local_ptr.h"
 #include "miniros/rostime.h"
 #include "miniros/common.h"
@@ -104,7 +104,7 @@ public:
    * \param timeout The amount of time to wait for at least one callback to be available.  If there is already at least one callback available,
    * this parameter does nothing.
    */
-  void callAvailable(miniros::WallDuration timeout);
+  size_t callAvailable(miniros::WallDuration timeout);
 
   /**
    * \brief returns whether the queue is empty

@@ -21,6 +21,7 @@
 
 #include "miniros/http/endpoints/filesystem.h"
 #include "miniros/http/http_filters.h"
+#include "miniros/callback_queue.h"
 
 namespace miniros {
 
@@ -199,6 +200,7 @@ void Master::setupBindings(const std::shared_ptr<CallbackQueue>& cb)
     internal_->httpTopicInfoEndpoint.reset(new TopicInfoEndpoint(internal_.get()));
     internal_->httpPublishedTopicsEndpoint.reset(new PublishedTopicsEndpoint(internal_.get()));
     internal_->httpTopicTypesEndpoint.reset(new TopicTypesEndpoint(internal_.get()));
+    internal_->httpMultimasterConnectEndpoint.reset(new MultimasterConnectEndpoint(internal_.get()));
 
     server->registerEndpoint(std::make_unique<http::SimpleFilter>(http::HttpMethod::Get, "/"), internal_->httpRootEndpoint, cb);
     server->registerEndpoint(
@@ -210,6 +212,8 @@ void Master::setupBindings(const std::shared_ptr<CallbackQueue>& cb)
       internal_->httpPublishedTopicsEndpoint, cb);
     server->registerEndpoint(std::make_unique<http::SimpleFilter>(http::HttpMethod::Get, "/api2/topic_types"),
       internal_->httpTopicTypesEndpoint, cb);
+    server->registerEndpoint(std::make_unique<http::SimpleFilter>(http::HttpMethod::Get, "/api2/multimaster/connect"),
+      internal_->httpMultimasterConnectEndpoint, cb);
     server->registerEndpoint(std::make_unique<http::SimpleFilter>(http::HttpMethod::Get, "/favicon.ico"),
       std::make_shared<MasterFaviconEndpoint>(), cb);
 

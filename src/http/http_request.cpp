@@ -11,6 +11,7 @@
 #define MINIROS_PACKAGE_NAME "http"
 
 #include "miniros/http/http_request.h"
+#include "miniros/http/http_tools.h"
 
 #include "internal/scoped_locks.h"
 #include "miniros/rosconsole/local_log.h"
@@ -75,6 +76,42 @@ void HttpRequest::setUrlParameter(const std::string& name, const std::string& va
   url_parameters_[name] = value;
 }
 
+/// Parse query string and assign parameters
+void HttpRequest::setQueryParameters(const std::string_view& queryString)
+{
+  if (queryString.empty())
+    return;
+
+  size_t start = 0;
+  while (start < queryString.size()) {
+    // Find the next '&' or end of string
+    size_t end = queryString.find('&', start);
+    if (end == std::string::npos) {
+      end = queryString.size();
+    }
+
+    // Extract the key=value pair
+    auto pair = queryString.substr(start, end - start);
+    
+    // Find the '=' separator
+    size_t eqPos = pair.find('=');
+    if (eqPos != std::string::npos) {
+      // Extract key and value
+      auto key = pair.substr(0, eqPos);
+      auto value = pair.substr(eqPos + 1);
+      
+      // URL decode both key and value
+      url_parameters_[urlDecode(key)] = urlDecode(value);
+    } else if (!pair.empty()) {
+      // Key without value (treat as empty value)
+      url_parameters_[urlDecode(pair)] = "";
+    }
+
+    // Move to next pair (skip the '&')
+    start = end + 1;
+  }
+}
+
 /// Get URL parameter value, or empty string if not found
 std::string HttpRequest::getParameter(const std::string& name) const
 {
@@ -120,25 +157,6 @@ const std::string& HttpRequest::requestBody() const
   return request_body_;
 }
 
-// URL encode a string (percent encoding)
-static std::string urlEncode(const std::string& str)
-{
-  std::ostringstream encoded;
-  encoded.fill('0');
-  encoded << std::hex;
-
-  for (unsigned char c : str) {
-    // Unreserved characters: ALPHA, DIGIT, '-', '.', '_', '~'
-    if (std::isalnum(c) || c == '-' || c == '.' || c == '_' || c == '~') {
-      encoded << c;
-    } else {
-      // Percent encode everything else
-      encoded << '%' << std::setw(2) << static_cast<int>(c);
-    }
-  }
-
-  return encoded.str();
-}
 
 std::string HttpRequest::buildPathWithQuery() const
 {
@@ -248,6 +266,33 @@ HttpRequest::State HttpRequest::state() const
   return state_;
 }
 
+const char* HttpRequest::State::toString() const
+{
+  switch (value) {
+    case Idle:
+      return "Idle";
+    case ClientQueued:
+      return "ClientQueued";
+    case ClientSending:
+      return "ClientSending";
+    case ClientWaitResponse:
+      return "ClientWaitResponse";
+    case ClientHasResponse:
+      return "ClientHasResponse";
+    case Done:
+      return "Done";
+    case ServerReceive:
+      return "ServerReceive";
+    case ServerHandleRequest:
+      return "ServerHandleRequest";
+    case ServerSendResponse:
+      return "ServerSendResponse";
+    default:
+      assert(false);
+  }
+  return "Unknown";
+}
+
 void HttpRequest::setRequestStart(const SteadyTime& time)
 {
   Lock lock(mutex_, THIS_LOCATION);
@@ -343,26 +388,31 @@ Error HttpRequest::waitForState(State state, const WallDuration& duration) const
 
   if (state_ == state)
     return Error::Ok;
-  std::chrono::duration<double> d(duration.toSec());
-  if (!cv_.wait_for(lock, d, [this, state]() { return state_ == state; }))
-  {
-    return Error::Timeout;
+  if (duration.isZero()) {
+    cv_.wait(lock, [this, state]() {
+        LOCAL_DEBUG("HttpRequest::waitForState attempt for %s, current=%s", state.toString(), state_.toString());
+        return state_ == state;
+      });
+    if (state_ == state)
+      return Error::Ok;
+  } else {
+    std::chrono::duration<double> d(duration.toSec());
+
+    if (cv_.wait_for(lock, d, [this, state]() {
+        LOCAL_DEBUG("HttpRequest::waitForState attempt for %s, current=%s", state.toString(), state_.toString());
+        return state_ == state;
+      }))
+    {
+      return Error::Ok;
+    }
   }
-  return Error::Ok;
+  LOCAL_DEBUG("HttpRequest::waitForState timeout for %s, current=%s", state.toString(), state_.toString());
+  return Error::Timeout;
 }
 
 Error HttpRequest::waitForResponse(const WallDuration& duration) const
 {
-  Lock lock(mutex_, THIS_LOCATION);
-
-  if (state_ == State::Done)
-    return Error::Ok;
-  std::chrono::duration<double> d(duration.toSec());
-  if (!cv_.wait_for(lock, d, [this]() {return state_ == State::Done;}))
-  {
-    return Error::Timeout;
-  }
-  return Error::Ok;
+  return waitForState(State::Done, duration);
 }
 
 

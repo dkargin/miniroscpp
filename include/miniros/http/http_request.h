@@ -27,28 +27,43 @@ namespace http {
 class MINIROS_DECL HttpRequest {
 public:
   /// Represents high-level state of Http request object.
-  enum class State {
-    /// Waiting to be added to queue.
-    Idle,
+  struct MINIROS_DECL State {
+    enum State_t {
+      /// Waiting to be added to queue.
+      Idle,
 
-    /// Request is in queue and waiting to be sent.
-    ClientQueued,
-    /// Sending request. Large requests can be sent in several steps.
-    ClientSending,
-    /// Waiting for response from server.
-    ClientWaitResponse,
-    /// Got HTTP response but waiting for client to process it.
-    ClientHasResponse,
+      /// Request is in queue and waiting to be sent.
+      ClientQueued,
+      /// Sending request. Large requests can be sent in several steps.
+      ClientSending,
+      /// Waiting for response from server.
+      ClientWaitResponse,
+      /// Got HTTP response but waiting for client to process it.
+      ClientHasResponse,
 
-    /// Response is finished and removed from HttpClient processing.
-    Done,
+      /// Response is finished and removed from HttpClient processing.
+      Done,
 
-    /// Receiving request.
-    ServerReceive,
-    /// Request is received and parsed, but not processed.
-    ServerHandleRequest,
-    /// Sending back response data,
-    ServerSendResponse,
+      /// Receiving request.
+      ServerReceive,
+      /// Request is received and parsed, but not processed.
+      ServerHandleRequest,
+      /// Sending back response data,
+      ServerSendResponse,
+    };
+
+    State(State_t val) : value(val) {}
+
+    operator State_t() const
+    {
+      return value;
+    }
+
+    /// Convert state to string.
+    const char* toString() const;
+
+  protected:
+    State_t value;
   };
 
   HttpRequest();
@@ -74,6 +89,11 @@ public:
 
   /// Set URL parameter (query string parameter)
   void setUrlParameter(const std::string& name, const std::string& value);
+
+  /// Parse query string and assign parameters.
+  /// Query string format: "key1=value1&key2=value2"
+  /// Both keys and values are URL decoded automatically.
+  void setQueryParameters(const std::string_view& queryString);
 
   /// Get URL parameter value, or empty string if not found
   std::string getParameter(const std::string& name) const;

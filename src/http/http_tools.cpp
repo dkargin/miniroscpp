@@ -4,6 +4,10 @@
 
 #include <cassert>
 #include <cstring>
+#include <cctype>
+#include <cstdlib>
+#include <iomanip>
+#include <sstream>
 
 #include "miniros/http/http_tools.h"
 #include "miniros/xmlrpcpp/XmlRpcValue.h"
@@ -124,7 +128,7 @@ void HttpParserFrame::resetParseState(bool request)
 
   m_keepAlive = true;
 
-  m_state = request ? ParseRequestHeader : ParseResponseHeader;
+  m_state = request ? ParseRequestHeaderMethod : ParseResponseHeader;
 }
 
 std::string_view HttpParserFrame::getTokenView(const std::string& data, const Token& token)
@@ -180,24 +184,79 @@ int HttpParserFrame::incrementalParse()
   const char* cp = start + m_currentPosition;
   const char* tokenStart = start + m_tokenStart;
 
+  auto switchToNewField = [&cp, &tokenStart, this]() {
+    cp += 2;
+    tokenStart = cp;
+    m_state = HttpParserFrame::ParseFieldName;
+  };
+
   while (cp < end && m_state != HttpParserFrame::ParseInvalid) {
-    if (m_state == HttpParserFrame::ParseRequestHeader) {
+    // Non-passthrough parser FSM.
+    // Current pointer 'cp' will be advanced in the end of cascade.
+    // Some states transitions will alter 'cp' differently and force 'continue'.
+    if (m_state == HttpParserFrame::ParseRequestHeaderMethod) {
       // Parsing request line: "GET /home.html HTTP/1.1"
-      if (strncmp(cp, "\r\n", 2) == 0) {
-        protocol.assign(tokenStart - start, cp - start);
-        cp += 2;
-        tokenStart = cp;
-        m_state = HttpParserFrame::ParseFieldName;
-        continue;
-      } if (requestMethodToken.empty() && *cp == ' ') {
+      if (*cp == ' ') {
         requestMethodToken.assign(tokenStart - start, cp - start);
         requestMethod = parseMethod(start, requestMethodToken);
         tokenStart = cp + 1;
-      } else if (requestPath.empty() && *cp == ' ') {
+        m_state = HttpParserFrame::ParseRequestHeaderPath;
+      }
+      else if (strncmp(cp, "\r\n", 2) == 0) {
+        // This is not expected transition. It should probably be an error.
+        requestMethodToken.assign(tokenStart - start, cp - start);
+        requestMethod = parseMethod(start, requestMethodToken);
+        switchToNewField();
+        continue;
+      }
+    }
+    else if (m_state == HttpParserFrame::ParseRequestHeaderPath) {
+      if (*cp == ' ' && tokenStart == cp) {
+        tokenStart = cp + 1;
+      }
+      else if (*cp == ' ') {
         requestPath.assign(tokenStart - start, cp - start);
         tokenStart = cp + 1;
-      } else {
-        // continue parsing.
+        m_state = HttpParserFrame::ParseRequestHeaderProtocol;
+      }
+      else if (*cp == '?') {
+        requestPath.assign(tokenStart - start, cp - start);
+        tokenStart = cp + 1;
+        m_state = HttpParserFrame::ParseRequestHeaderQuery;
+      }
+      else if (strncmp(cp, "\r\n", 2) == 0) {
+        // This is not expected transition. It should probably be an error.
+        requestPath.assign(tokenStart - start, cp - start);
+        switchToNewField();
+        continue;
+      }
+    }
+    else if (m_state == HttpParserFrame::ParseRequestHeaderQuery) {
+      if (*cp == ' ') {
+        requestQuery.assign(tokenStart - start, cp - start);
+        tokenStart = cp + 1;
+        m_state = HttpParserFrame::ParseRequestHeaderProtocol;
+      }
+      else if (*cp == '?') {
+        requestQuery.assign(tokenStart - start, cp - start);
+        tokenStart = cp + 1;
+      }
+      else if (strncmp(cp, "\r\n", 2) == 0) {
+        // This is not expected transition. It should probably be an error.
+        requestPath.assign(tokenStart - start, cp - start);
+        switchToNewField();
+        continue;
+      }
+    }
+    else if (m_state == HttpParserFrame::ParseRequestHeaderProtocol) {
+      if (*cp == ' ' && tokenStart == cp) {
+        tokenStart = cp + 1;
+      }
+      else if (strncmp(cp, "\r\n", 2) == 0) {
+        // This is not expected transition. It should probably be an error.
+        protocol.assign(tokenStart - start, cp - start);
+        switchToNewField();
+        continue;
       }
     }
     else if (m_state == HttpParserFrame::ParseResponseHeader) {
@@ -358,6 +417,58 @@ void HttpResponseHeader::writeHeader(std::string& output, size_t bodySize) const
   }
 
   output += "\r\n";
+}
+
+// URL encode a string (percent encoding)
+std::string urlEncode(const std::string_view& str)
+{
+  std::ostringstream encoded;
+  encoded.fill('0');
+  encoded << std::hex;
+
+  for (unsigned char c : str) {
+    // Unreserved characters: ALPHA, DIGIT, '-', '.', '_', '~'
+    if (std::isalnum(c) || c == '-' || c == '.' || c == '_' || c == '~') {
+      encoded << c;
+    } else {
+      // Percent encode everything else
+      encoded << '%' << std::setw(2) << static_cast<int>(c);
+    }
+  }
+
+  return encoded.str();
+}
+
+// URL decode a string (percent decoding)
+std::string urlDecode(const std::string_view& str)
+{
+  std::string result;
+  result.reserve(str.size());
+
+  for (size_t i = 0; i < str.size(); ++i) {
+    if (str[i] == '%' && i + 2 < str.size()) {
+      // Try to decode percent-encoded character
+      // Need at least 3 characters: '%' and two hex digits
+      char hex[3] = {str[i + 1], str[i + 2], '\0'};
+      char* endptr = nullptr;
+      unsigned long value = std::strtoul(hex, &endptr, 16);
+      if (endptr == hex + 2 && value <= 255) {
+        // Valid hex sequence
+        result += static_cast<char>(value);
+        i += 2; // Skip the two hex digits
+        continue;
+      }
+      // If decoding failed, treat '%' as literal character
+    }
+    // Handle '+' as space (common in form data, though not strictly URL encoding)
+    if (str[i] == '+') {
+      result += ' ';
+    } else {
+      result += str[i];
+    }
+  }
+
+  return result;
 }
 
 } // namespace http
