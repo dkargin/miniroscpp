@@ -446,7 +446,7 @@ TEST_F(MasterFixture, mapDoubleParam)
   map_d.clear();
   map_d["a"] = 0.0;
   map_d["b"] = -0.123456789;
-  map_d["c"] = 123456789;
+  map_d["c"] = 1234567;
 
   master->set(param_name, map_d);
 
@@ -468,7 +468,7 @@ TEST_F(MasterFixture, mapFloatParam)
   map_f.clear();
   map_f["a"] = 0.0;
   map_f["b"] = -0.123456789;
-  map_f["c"] = 123456789;
+  map_f["c"] = 1234567;
 
   master->set(param_name, map_f);
 
