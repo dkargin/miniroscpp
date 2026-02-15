@@ -104,7 +104,7 @@ public:
    * \param timeout The amount of time to wait for at least one callback to be available.  If there is already at least one callback available,
    * this parameter does nothing.
    */
-  void callAvailable(miniros::WallDuration timeout);
+  size_t callAvailable(miniros::WallDuration timeout);
 
   /**
    * \brief returns whether the queue is empty
