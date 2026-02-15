@@ -398,16 +398,7 @@ Error HttpRequest::waitForState(State state, const WallDuration& duration) const
 
 Error HttpRequest::waitForResponse(const WallDuration& duration) const
 {
-  Lock lock(mutex_, THIS_LOCATION);
-
-  if (state_ == State::Done)
-    return Error::Ok;
-  std::chrono::duration<double> d(duration.toSec());
-  if (!cv_.wait_for(lock, d, [this]() {return state_ == State::Done;}))
-  {
-    return Error::Timeout;
-  }
-  return Error::Ok;
+  return waitForState(State::Done, duration);
 }
 
 
