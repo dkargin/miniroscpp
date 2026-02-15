@@ -438,18 +438,18 @@ Error HttpClient::Internal::readResponse()
     // If we haven't gotten the entire request yet, return (keep reading)
     if (response_http_frame.state() != HttpParserFrame::ParseComplete) {
       if (readErr == Error::EndOfFile) {
-        LOCAL_DEBUG("HttpClient[%s]::readRequest: EOF while reading request", debugName().c_str());
+        LOCAL_DEBUG("HttpClient[%s]::readResponse: EOF while reading request", debugName().c_str());
         response_http_frame.finishResponse();
         return Error::EndOfFile;
         // Either way we close the connection
       }
-      LOCAL_DEBUG("HttpClient[%s]::readRequest got only %d/%d bytes.", debugName().c_str(), response_http_frame.bodyLength(), response_http_frame.contentLength());
+      LOCAL_DEBUG("HttpClient[%s]::readResponse got only %d/%d bytes.", debugName().c_str(), response_http_frame.bodyLength(), response_http_frame.contentLength());
       return Error::WouldBlock;
     }
 
     assert(response_http_frame.state() == HttpParserFrame::ParseComplete);
     // Otherwise, parse and dispatch the request
-    LOCAL_DEBUG("HttpClient[%s]::readRequest read %d/%d bytes.", debugName().c_str(), response_http_frame.bodyLength(), response_http_frame.contentLength());
+    LOCAL_DEBUG("HttpClient[%s]::readResponse read %d/%d bytes.", debugName().c_str(), response_http_frame.bodyLength(), response_http_frame.contentLength());
   } else if (readErr == Error::WouldBlock) {
     return Error::WouldBlock;
   }
