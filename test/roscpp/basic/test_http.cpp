@@ -46,7 +46,7 @@ public:
   {
     while (!done->load())
     {
-      queue->callAvailable(WallDuration(0.5));
+      queue->callAvailable(WallDuration(50));
     }
   }
 
@@ -73,6 +73,7 @@ public:
 
     // Stop callback thread
     callback_thread_done_ = true;
+    callback_queue_.reset();
     callback_thread_.join();
   }
 };
