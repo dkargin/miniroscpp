@@ -311,13 +311,14 @@ else()
   set(PLATFORM_LIBS stdc++fs)
 endif()
 
-target_link_libraries(roscxx
-  PRIVATE
-    ${console_bridge_LIBRARIES} ${PKG_LIBS_LIBRARIES} ${PLATFORM_LIBS}
-  PUBLIC Threads::Threads
+target_link_libraries(roscxx PRIVATE
+    ${console_bridge_LIBRARIES} 
+    ${PKG_LIBS_LIBRARIES} 
+    ${PLATFORM_LIBS} 
+    Threads::Threads
 )
 
-target_compile_definitions(roscxx PRIVATE rostime_EXPORTS miniros_EXPORTS)
+target_compile_definitions(roscxx PRIVATE miniros_EXPORTS)
 
 target_include_directories(roscxx
 PRIVATE
