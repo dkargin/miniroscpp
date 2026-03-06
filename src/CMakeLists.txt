@@ -295,9 +295,12 @@ endif ()
 
 set(ALL_SRC ${cpp_common_SRC} ${transport_SRC} ${master_SRC} ${rostime_SRC} ${XMLRPC_SRC})
 if (MINIROS_BUILD_SHARED_LIBS)
+  add_library(roscxx_static STATIC ${ALL_SRC})
   add_library(roscxx SHARED ${ALL_SRC})
+  target_link_libraries(roscxx PRIVATE $<BUILD_INTERFACE:roscxx_static>)
 else()
   add_library(roscxx ${ALL_SRC})
+  add_library(roscxx_static ALIAS roscxx)
 endif()
 
 target_compile_options(roscxx PRIVATE ${MINIROS_COMPILE_OPTIONS})
@@ -318,12 +321,21 @@ target_link_libraries(roscxx PRIVATE
     Threads::Threads
 )
 
-target_compile_definitions(roscxx PRIVATE miniros_EXPORTS)
-
-target_include_directories(roscxx
+target_compile_definitions(roscxx_static PRIVATE miniros_EXPORTS)
+target_include_directories(roscxx_static
 PRIVATE
     ${MINIROS_INCLUDE_ROOT}/miniros
 PUBLIC
+    $<BUILD_INTERFACE:${MINIROS_INCLUDE_DIRS}>
+    $<BUILD_INTERFACE:${MINIROS_INCLUDE_ROOT}>
+    $<BUILD_INTERFACE:${MINIROS_INCLUDE_GENERATED_DIRS}>
+    $<INSTALL_INTERFACE:include/generated>  # <prefix>/include/mylib
+)
+
+target_include_directories(roscxx
+    PRIVATE
+    ${MINIROS_INCLUDE_ROOT}/miniros
+    PUBLIC
     $<BUILD_INTERFACE:${MINIROS_INCLUDE_DIRS}>
     $<BUILD_INTERFACE:${MINIROS_INCLUDE_ROOT}>
     $<BUILD_INTERFACE:${MINIROS_INCLUDE_GENERATED_DIRS}>
@@ -334,7 +346,16 @@ find_package(PkgConfig QUIET)
 
 add_executable(miniroscore roscore/miniroscore.cpp)
 
-target_link_libraries(miniroscore roscxx impl::program_options)
+set(MINIROSCORE_LIBS impl::program_options)
+if (MINIROS_PORTABLE_TOOLS)
+  list(APPEND MINIROSCORE_LIBS roscxx_static)
+else()
+  list(APPEND MINIROSCORE_LIBS roscxx)
+endif()
+# roscore can be used in development environment with multiple versions of miniros.
+# It is a bit safer to make miniroscore completely relocatable.
+target_link_libraries(miniroscore PRIVATE ${MINIROSCORE_LIBS})
+
 target_include_directories(miniroscore PRIVATE ${MINIROS_INCLUDE_ROOT} ${MINIROS_INCLUDE_GENERATED_DIRS})
 
 set(bag_storage_SRC
@@ -371,12 +392,23 @@ add_executable(minibag
     rosbag/recorder.cpp
     rosbag/time_translator.cpp
 )
-target_link_libraries(minibag bag_storage roscxx impl::program_options)
+
+set(MINIBAG_LIBS bag_storage impl::program_options)
+
+if (MINIROS_PORTABLE_TOOLS)
+  list(APPEND MINIBAG_LIBS roscxx_static)
+else()
+  list(APPEND MINIBAG_LIBS roscxx)
+endif()
+target_link_libraries(minibag PRIVATE ${MINIBAG_LIBS})
+
+
 target_include_directories(minibag PRIVATE ${MINIROS_INCLUDE_DIRS} ${MINIROS_INCLUDE_GENERATED_DIRS})
 
 set(MINIROS_LIBRARY roscxx PARENT_SCOPE)
 set(MINIROS_EXPORT
     roscxx
+    roscxx_static
     bag_storage
     ${rosbag_INTERNAL_LIBS}
     PARENT_SCOPE)
