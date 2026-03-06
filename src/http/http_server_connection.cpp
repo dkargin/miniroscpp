@@ -14,7 +14,6 @@
 #include "miniros/http/endpoint_collection.h"
 #include "miniros/http/http_server.h"
 #include "miniros/http/http_server_connection.h"
-
 #include "internal/lifetime.h"
 #include "miniros/io/poll_set.h"
 #include "xmlrpcpp/XmlRpcException.h"
@@ -197,6 +196,11 @@ std::shared_ptr<HttpRequest> HttpServerConnection::makeRequestObject(Lock& lock)
     requestObject->setQueryParameters(query);
   }
 
+  // Populate headers from HttpParserFrame
+  for (const auto& field : http_frame_.fields) {
+    requestObject->setHeader(field.name, field.value);
+  }
+
   return requestObject;
 }
 
@@ -251,6 +255,11 @@ bool HttpServerConnection::handleProcessRequest(Lock& lock)
   {
     ScopedUnlock unlock(lock);
     err = handler->handle(clientInfo, requestObject);
+  }
+
+  // Store handler reference for potential upgrade
+  if (err == Error::Ok && requestObject->responseHeader().statusCode == 101) {
+    requestObject->setHeader("X-Upgrade-Handler", "true");
   }
 
   doWriteResponse(lock, requestObject, err);
@@ -332,6 +341,74 @@ void HttpServerConnection::handleWriteResponse(Lock& lock, int& evtFlags, bool f
         return;
       }
       data_sent_ = 0;
+
+      // Check if this is a connection upgrade (status 101)
+      bool isUpgrade = false;
+      if (active_request && active_request->responseHeader().statusCode == 101) {
+        std::string upgradeFlag = active_request->getHeader("X-Upgrade-Handler");
+        if (upgradeFlag == "true") {
+          isUpgrade = true;
+        }
+      }
+
+      if (isUpgrade) {
+        // Connection upgrade: let the handler handle it
+        LOCAL_DEBUG("Connection upgrade complete, calling handler");
+        
+        if (!server_) {
+          LOCAL_ERROR("Connection upgrade: server is null");
+          updateState(lock, State::Disconnected);
+          return;
+        }
+
+        // Get the handler
+        auto [handler, cb] = server_->findEndpoint(http_frame_);
+        if (!handler) {
+          LOCAL_ERROR("Connection upgrade: handler not found");
+          updateState(lock, State::Disconnected);
+          return;
+        }
+
+        network::ClientInfo clientInfo;
+        clientInfo.fd = socket_->fd();
+        clientInfo.remoteAddress = socket_->peerAddress();
+
+        int fd = socket_->fd();
+
+        // Remove connection from server's connection map and poll set
+        if (poll_set_) {
+          ScopedUnlock unlock(lock);
+          poll_set_->delSocket(fd);
+        }
+
+        // Remove from server's connection map
+        /* TODO: Implement:
+         * 1. Remove this connection from PollSet and any references from server.
+         * 2. Give client free socket, detached from any PollSet.
+         */
+
+        if (server_) {
+          ScopedUnlock unlock(lock);
+          //server_->detachConnection(fd, "Connection upgrade");
+        }
+
+        // Call handler's upgradeComplete method
+        Error upgradeErr = Error::NotImplemented;
+        {
+          auto socket = socket_;
+          ScopedUnlock unlock(lock);
+          upgradeErr = handler->upgradeComplete(socket, clientInfo, active_request);
+        }
+        if (upgradeErr == Error::NotImplemented) {
+          LOCAL_ERROR("Connection upgrade: handler does not support upgrades");
+        } else if (!upgradeErr) {
+          LOCAL_ERROR("Connection upgrade: handler returned error %s", upgradeErr.toString());
+        }
+
+        // Don't continue with normal HTTP processing
+        updateState(lock, State::Disconnected);
+        return;
+      }
 
       http_frame_.finishRequest();
       updateState(lock, State::ReadRequest);
@@ -428,6 +505,19 @@ void HttpServerConnection::detachFromServer(bool close)
   if (close) {
     // TODO: ???
   }
+}
+
+std::shared_ptr<network::NetSocket> HttpServerConnection::extractSocketForUpgrade()
+{
+  Lock lock(guard_, THIS_LOCATION);
+  if (!socket_) {
+    LOCAL_ERROR("HttpServerConnection::extractSocketForUpgrade: socket is null");
+    return nullptr;
+  }
+  auto socket = socket_;
+  socket_.reset(); // Release ownership from connection
+  server_ = nullptr; // Detach from server
+  return socket;
 }
 
 void HttpServerConnection::onAsyncRequestComplete(std::shared_ptr<HttpRequest> request, Error err)

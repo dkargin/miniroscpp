@@ -378,6 +378,12 @@ void HttpRequest::setResponseStatusOk()
   response_header_.status = "OK";
 }
 
+void HttpRequest::setResponseHeader(const std::string& name, const std::string& value)
+{
+  Lock lock(mutex_, THIS_LOCATION);
+  response_header_.customHeaders[name] = value;
+}
+
 const HttpResponseHeader& HttpRequest::responseHeader() const
 {
   return response_header_;

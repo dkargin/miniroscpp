@@ -149,6 +149,9 @@ public:
   /// Set response status OK 200
   void setResponseStatusOk();
 
+  /// Set custom response header.
+  void setResponseHeader(const std::string& name, const std::string& value);
+
   /// Set response header from HttpFrame parser state.
   void setResponseHeader(const HttpParserFrame& frame);
 

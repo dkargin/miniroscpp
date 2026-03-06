@@ -28,3 +28,9 @@ target_include_directories(log_demo PRIVATE ${MINIROS_INCLUDE_GENERATED_DIRS})
 add_executable(bench_talker bench_talker.cpp)
 target_link_libraries(bench_talker roscxx)
 target_include_directories(bench_talker PRIVATE ${MINIROS_INCLUDE_GENERATED_DIRS})
+
+# WebSocket server example
+add_executable(websocket_server websocket_server.cpp)
+target_link_libraries(websocket_server roscxx)
+target_include_directories(websocket_server PRIVATE ${MINIROS_INCLUDE_GENERATED_DIRS})
+set_target_properties(websocket_server PROPERTIES FOLDER "Examples")

@@ -65,6 +65,9 @@ public:
 
   void setCloseConnectionHandler(CloseConnectionHandler&& handler);
 
+  /// Called by HTTP connection when it wants to completely detach from the server.
+  void detachConnection(const std::shared_ptr<HttpServerConnection>& conn);
+
 protected:
   friend class HttpServerConnection;
 

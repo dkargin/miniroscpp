@@ -243,6 +243,44 @@ TEST(net, parseBadResponse)
   EXPECT_EQ(httpFrame.state(), http::HttpParserFrame::ParseInvalid);
 }
 
+
+const char* websocketRequest =
+  "GET /ws HTTP/1.1\r\n"
+  "Host: localhost:8080\r\n"
+  "User-Agent: Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:147.0) Gecko/20100101 Firefox/147.0\r\n"
+  "Accept: */*\r\n"
+  "Accept-Language: en-US,en;q=0.9\r\n"
+  "Accept-Encoding: gzip, deflate, br, zstd\r\n"
+  "Sec-WebSocket-Version: 13\r\n"
+  "Origin: http://localhost:8080\r\n"
+  "Sec-WebSocket-Extensions: permessage-deflate\r\n"
+  "Sec-WebSocket-Key: HkVLePs4PGB3prbOi7XBlA==\r\n"
+  "Connection: Upgrade\r\n"
+  "Cookie: Clion-5575b32f=87634aca-88b1-42ae-a3c6-ddd10c93f222; Clion-5575b330=4ef8c40a-e099-4623-a0d2-f1bfd0fa3b32\r\n"
+  "Sec-Fetch-Dest: empty\r\n"
+  "Sec-Fetch-Mode: websocket\r\n"
+  "Sec-Fetch-Site: same-origin\r\n"
+  "Pragma: no-cache\r\n"
+  "Cache-Control: no-cache\r\n"
+  "Upgrade: websocket\r\n"
+  "\r\n";
+
+TEST(net, parseWebsocketRequest)
+{
+  http::HttpParserFrame httpFrame;
+
+  httpFrame.resetParseState(true);
+  std::string req(websocketRequest);
+  httpFrame.data.append(req);
+
+  int parsed = httpFrame.incrementalParse();
+
+  EXPECT_EQ(parsed, req.size());
+  EXPECT_EQ(httpFrame.state(), http::HttpParserFrame::ParseComplete);
+  EXPECT_EQ(httpFrame.requestMethod, http::HttpMethod::Get);
+  ASSERT_EQ(httpFrame.fields.size(), 17);
+}
+
 int main(int argc, char** argv)
 {
   testing::InitGoogleTest(&argc, argv);

@@ -10,9 +10,11 @@
 #include "miniros/network/socket.h"
 #include "miniros/http/http_tools.h"
 #include "miniros/http/http_request.h"
-
+#include "miniros/internal/lifetime.h"
 
 namespace miniros {
+
+class PollSet;
 
 namespace http {
 
@@ -24,6 +26,10 @@ class HttpServer;
 
 /// A Connection to HttpServer from Client.
 /// It handles parsing HTTP request from client, picking right endpoint handler and sending response back.
+/// Relations to server:
+///  - Responses are handled in different thread and server can be destroyed in the same time.
+///  - HttpServer provides collection of endpoints. This collection must exist until handleEvents is processed.
+///  - HttpServer keeps pointers to all HttpServerConnection instances.
 class HttpServerConnection : public std::enable_shared_from_this<HttpServerConnection> {
 public:
   HttpServerConnection(const std::shared_ptr<Lifetime<HttpServer>>& server,
@@ -75,6 +81,13 @@ public:
   /// Detach from server.
   /// Breaks link with Http server.
   void detachFromServer(bool close);
+
+  /// Extract socket for WebSocket upgrade.
+  /// This method should only be called during WebSocket upgrade.
+  /// It detaches the connection from the server and returns the socket.
+  /// After calling this, the HttpServerConnection should be discarded.
+  /// @returns the socket, or nullptr if extraction fails
+  std::shared_ptr<network::NetSocket> extractSocketForUpgrade();
 
   using Lock = TimeCheckLock<std::mutex>;
 
@@ -142,6 +155,7 @@ protected:
 
   PollSet* poll_set_ = nullptr;
 
+  /// Guard for internals.
   mutable std::mutex guard_;
 
   std::weak_ptr<const internal::EndpointCollection> endpoints_;

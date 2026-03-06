@@ -8,6 +8,7 @@
 #include <string>
 #include <string_view>
 #include <vector>
+#include <map>
 
 #include "miniros/common.h"
 
@@ -255,6 +256,9 @@ struct HttpResponseHeader {
 
   /// Type of the content.
   std::string contentType;
+
+  /// Additional custom headers (name -> value)
+  std::map<std::string, std::string> customHeaders;
 
   /// Reset contents of response.
   void reset();
