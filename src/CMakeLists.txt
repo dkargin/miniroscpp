@@ -47,7 +47,8 @@ elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
 elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
   # TODO
 elseif (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
-  # TODO
+  # Disable very irritating warning C4996: "The POSIX name for this item is deprecated. Instead, use the ISO C and C++ conformant name."
+  list(APPEND MINIROS_COMPILE_OPTIONS "/wd4996")
 endif()
 
 if (MINIROS_SANITIZE_MEMORY)
@@ -71,9 +72,7 @@ if (MINIROS_SANITIZE_THREADS)
 endif()
 
 
-#-fsanitize=thread
-
-SET(rostime_SRC
+set(rostime_SRC
     rostime/duration.cpp
     rostime/rate.cpp
     rostime/time.cpp)
@@ -294,17 +293,56 @@ if (MINIROS_USE_SYSTEM_PROGRAM_OPTIONS)
 endif ()
 
 set(ALL_SRC ${cpp_common_SRC} ${transport_SRC} ${master_SRC} ${rostime_SRC} ${XMLRPC_SRC})
-if (MINIROS_BUILD_SHARED_LIBS)
-  add_library(roscxx_static STATIC ${ALL_SRC})
+
+if (MINIROS_BUILD_SHARED)
   add_library(roscxx SHARED ${ALL_SRC})
-  target_link_libraries(roscxx PRIVATE $<BUILD_INTERFACE:roscxx_static>)
+  target_compile_options(roscxx PRIVATE ${MINIROS_COMPILE_OPTIONS})
+  # Adding dllexport for DLL
+  target_compile_definitions(roscxx PRIVATE miniros_EXPORTS)
+  target_link_options(roscxx PRIVATE ${MINIROS_LINK_OPTIONS})
+
+  target_include_directories(roscxx
+      PRIVATE
+      ${MINIROS_INCLUDE_ROOT}/miniros
+      PUBLIC
+      $<BUILD_INTERFACE:${MINIROS_INCLUDE_DIRS}>
+      $<BUILD_INTERFACE:${MINIROS_INCLUDE_ROOT}>
+      $<BUILD_INTERFACE:${MINIROS_INCLUDE_BUILD}/shared>
+      $<BUILD_INTERFACE:${MINIROS_INCLUDE_GENERATED_DIRS}>
+      $<INSTALL_INTERFACE:include/generated>  # <prefix>/include/mylib
+  )
+
+  add_library(roscxx_static STATIC ${ALL_SRC})
+  target_link_options(roscxx_static PRIVATE ${MINIROS_LINK_OPTIONS})
+  set_property(TARGET roscxx_static PROPERTY CXX_STANDARD 17)
+
+  target_include_directories(roscxx_static
+      PRIVATE
+      ${MINIROS_INCLUDE_ROOT}/miniros
+      PUBLIC
+      $<BUILD_INTERFACE:${MINIROS_INCLUDE_DIRS}>
+      $<BUILD_INTERFACE:${MINIROS_INCLUDE_ROOT}>
+      $<BUILD_INTERFACE:${MINIROS_INCLUDE_BUILD}/static>
+      $<BUILD_INTERFACE:${MINIROS_INCLUDE_GENERATED_DIRS}>
+      $<INSTALL_INTERFACE:include/generated>  # <prefix>/include/mylib
+  )
 else()
   add_library(roscxx ${ALL_SRC})
   add_library(roscxx_static ALIAS roscxx)
-endif()
+  target_compile_options(roscxx PRIVATE ${MINIROS_COMPILE_OPTIONS})
+  target_link_options(roscxx PRIVATE ${MINIROS_LINK_OPTIONS})
 
-target_compile_options(roscxx PRIVATE ${MINIROS_COMPILE_OPTIONS})
-target_link_options(roscxx PRIVATE ${MINIROS_LINK_OPTIONS})
+  target_include_directories(roscxx
+      PRIVATE
+      ${MINIROS_INCLUDE_ROOT}/miniros
+      PUBLIC
+      $<BUILD_INTERFACE:${MINIROS_INCLUDE_DIRS}>
+      $<BUILD_INTERFACE:${MINIROS_INCLUDE_ROOT}>
+      $<BUILD_INTERFACE:${MINIROS_INCLUDE_BUILD}/static>
+      $<BUILD_INTERFACE:${MINIROS_INCLUDE_GENERATED_DIRS}>
+      $<INSTALL_INTERFACE:include/generated>  # <prefix>/include/mylib
+  )
+endif()
 
 set_property(TARGET roscxx PROPERTY CXX_STANDARD 17)
 
@@ -319,27 +357,6 @@ target_link_libraries(roscxx PRIVATE
     ${PKG_LIBS_LIBRARIES} 
     ${PLATFORM_LIBS} 
     Threads::Threads
-)
-
-target_compile_definitions(roscxx_static PRIVATE miniros_EXPORTS)
-target_include_directories(roscxx_static
-PRIVATE
-    ${MINIROS_INCLUDE_ROOT}/miniros
-PUBLIC
-    $<BUILD_INTERFACE:${MINIROS_INCLUDE_DIRS}>
-    $<BUILD_INTERFACE:${MINIROS_INCLUDE_ROOT}>
-    $<BUILD_INTERFACE:${MINIROS_INCLUDE_GENERATED_DIRS}>
-    $<INSTALL_INTERFACE:include/generated>  # <prefix>/include/mylib
-)
-
-target_include_directories(roscxx
-    PRIVATE
-    ${MINIROS_INCLUDE_ROOT}/miniros
-    PUBLIC
-    $<BUILD_INTERFACE:${MINIROS_INCLUDE_DIRS}>
-    $<BUILD_INTERFACE:${MINIROS_INCLUDE_ROOT}>
-    $<BUILD_INTERFACE:${MINIROS_INCLUDE_GENERATED_DIRS}>
-    $<INSTALL_INTERFACE:include/generated>  # <prefix>/include/mylib
 )
 
 find_package(PkgConfig QUIET)
@@ -406,9 +423,24 @@ target_link_libraries(minibag PRIVATE ${MINIBAG_LIBS})
 target_include_directories(minibag PRIVATE ${MINIROS_INCLUDE_DIRS} ${MINIROS_INCLUDE_GENERATED_DIRS})
 
 set(MINIROS_LIBRARY roscxx PARENT_SCOPE)
+
 set(MINIROS_EXPORT
     roscxx
-    roscxx_static
     bag_storage
     ${rosbag_INTERNAL_LIBS}
     PARENT_SCOPE)
+
+if (MINIROS_BUILD_SHARED)
+  set(MINIROS_EXPORT
+      roscxx
+      roscxx_static
+      bag_storage
+      ${rosbag_INTERNAL_LIBS}
+      PARENT_SCOPE)
+else()
+  set(MINIROS_EXPORT
+      roscxx
+      bag_storage
+      ${rosbag_INTERNAL_LIBS}
+      PARENT_SCOPE)
+endif()

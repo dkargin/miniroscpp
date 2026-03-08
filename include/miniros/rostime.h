@@ -53,23 +53,17 @@
  ** Headers
  *********************************************************************/
 
-#include <miniros/platform.h>
 #include <iostream>
 #include <cmath>
-#include <limits>
+
 #include <miniros/exception.h>
+
 #include "duration.h"
 #include "macros.h"
 
 /*********************************************************************
  ** Cross Platform Headers
  *********************************************************************/
-
-#if defined(_WIN32)
-  #include <sys/timeb.h>
-#else
-  #include <sys/time.h>
-#endif
 
 /*
 namespace boost {
