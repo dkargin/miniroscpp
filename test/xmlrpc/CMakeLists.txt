@@ -29,6 +29,7 @@ target_link_libraries(test_ulimit test_fixtures)
 add_library(mock_socket STATIC mock_socket.cpp)
 target_link_libraries(mock_socket ${GTEST_LIBRARIES})
 set_target_properties(mock_socket PROPERTIES EXCLUDE_FROM_ALL TRUE)
+target_include_directories(mock_socket PRIVATE ${MINIROS_INCLUDE_BUILD}/static)
 
 # Some tests rely on replacing system calls (like write/read) by a mock versions.
 # But we must include actual sources to make this replacement happen.
@@ -92,6 +93,7 @@ if(NOT WIN32)
       "-Wl,--wrap=accept -Wl,--wrap=bind -Wl,--wrap=close -Wl,--wrap=connect -Wl,--wrap=getaddrinfo -Wl,--wrap=getsockname -Wl,--wrap=listen -Wl,--wrap=read -Wl,--wrap=setsockopt -Wl,--wrap=select -Wl,--wrap=socket -Wl,--wrap=write -Wl,--wrap=fcntl -Wl,--wrap=freeaddrinfo"
     )
     target_link_libraries(test_socket pthread)
+    target_include_directories(test_socket PRIVATE ${MINIROS_INCLUDE_BUILD}/shared)
   endif()
   target_link_libraries(test_socket ${GTEST_LIBRARIES})
   add_test(NAME test_socket COMMAND test_socket)

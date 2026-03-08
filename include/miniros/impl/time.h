@@ -38,6 +38,7 @@
 *********************************************************************/
 #include <iostream>
 #include <cmath>
+
 #include <limits>
 
 #include <miniros/platform.h>
@@ -47,12 +48,6 @@
 /*********************************************************************
 ** Cross Platform Headers
 *********************************************************************/
-
-#if defined(_WIN32)
-  #include <sys/timeb.h>
-#else
-  #include <sys/time.h>
-#endif
 
 namespace miniros
 {
@@ -74,7 +69,7 @@ namespace miniros
   template<class T, class D>
   T& TimeBase<T, D>::fromSec(double t) {
       int64_t sec64 = static_cast<int64_t>(floor(t));
-      if (sec64 < 0 || sec64 > std::numeric_limits<uint32_t>::max())
+      if (sec64 < 0 || sec64 > (std::numeric_limits<uint32_t>::max)())
         throw std::runtime_error("Time is out of dual 32-bit range");
       sec = static_cast<uint32_t>(sec64);
       nsec = static_cast<uint32_t>(std::round((t-sec) * 1e9));

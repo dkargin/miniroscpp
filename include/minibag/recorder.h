@@ -40,7 +40,6 @@
   #include <termios.h>
   #include <unistd.h>
 #endif
-#include <time.h>
 
 #include <queue>
 #include <string>

@@ -28,7 +28,7 @@ option(MINIROS_USE_SYSTEM_LZ4 "Use lz4 from system" OFF)
 option(MINIROS_USE_SYSTEM_PROGRAM_OPTIONS "Use boost::program_options instead of local implementation" OFF)
 option(MINIROS_BUILD_EXAMPLES "Build examples" ${MINIROS_ADDITIONAL_COMPONENTS})
 option(MINIROS_BUILD_TESTS "Build tests" ${MINIROS_ADDITIONAL_COMPONENTS})
-option(MINIROS_BUILD_SHARED_LIBS "Build shared version of miniros" ON)
+option(MINIROS_BUILD_SHARED "Build shared version of miniros" ON)
 option(MINIROS_ROSBAG_USE_GPGME_ENCRYPTION "Use GPGME encryption support" OFF)
 option(MINIROS_ROSBAG_USE_OPENSSL_ENCRYPTION "Use openssl encryption for rosbag" OFF)
 option(MINIROS_PATCH_RPATH "Update RPATH to use install paths" ON)
@@ -47,6 +47,7 @@ if (MINIROS_PATCH_RPATH)
 endif()
 
 set(MINIROS_INCLUDE_DIRS ${CMAKE_CURRENT_BINARY_DIR})
+set(MINIROS_INCLUDE_BUILD ${CMAKE_CURRENT_BINARY_DIR})
 
 set(CMAKE_DEBUG_POSTFIX d)
 
@@ -86,9 +87,14 @@ else()
   set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
 endif()
 
+# Generate external config for shared lib.
+set(MINIROS_BUILD_SHARED_LIBS ON)
+configure_file("${CMAKE_CURRENT_SOURCE_DIR}/include/miniros/config.h.in" "shared/miniros/config.h")
 
-# Generate external config
-configure_file("${CMAKE_CURRENT_SOURCE_DIR}/include/miniros/config.h.in" "miniros/config.h")
+# Generate external config for static lib.
+set(MINIROS_BUILD_SHARED_LIBS OFF)
+configure_file("${CMAKE_CURRENT_SOURCE_DIR}/include/miniros/config.h.in" "static/miniros/config.h")
+
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/scripts/miniroscore.service.in" miniroscore.service)
 
 # Processing external modules like bzip2 or lz4
@@ -157,9 +163,11 @@ else()
   install(DIRECTORY include/ DESTINATION include FILES_MATCHING PATTERN "*.h")
   install(DIRECTORY include/ DESTINATION include FILES_MATCHING PATTERN "*.hxx")
 
-  install(FILES
-    ${CMAKE_CURRENT_BINARY_DIR}/miniros/config.h 
-    DESTINATION include/miniros/)
+  if (MINIROS_BUILD_SHARED)
+    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/shared/miniros/config.h DESTINATION include/miniros)
+  else()
+    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/static/miniros/config.h DESTINATION include/miniros)
+  endif()
 
   # Installing generated headers for message types
   install(DIRECTORY include/generated DESTINATION include/${PROJECT_NAME} FILES_MATCHING PATTERN "*.hxx")
