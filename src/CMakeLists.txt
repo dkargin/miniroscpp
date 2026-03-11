@@ -90,6 +90,7 @@ set(cpp_common_SRC
     internal/xml_tools.cpp
     internal/profiling.cpp
     internal/static_write_buf.cpp
+    internal/watchdog.cpp
 
     b64/b64decode.cpp
     b64/b64encode.cpp
