@@ -19,6 +19,7 @@
 
 #include "miniros/io/poll_manager.h"
 #include "miniros/callback_queue.h"
+#include "miniros/internal/watchdog.h"
 
 #include "gtest_printers.h"
 
@@ -27,6 +28,8 @@ using namespace miniros;
 class HttpServerTest : public ::testing::Test {
 public:
   std::unique_ptr<http::HttpServer> server_;
+
+  std::unique_ptr<Watchdog> watchdog_;
 
   PollManager poll_manager_;
 
@@ -61,6 +64,8 @@ public:
     server_.reset(new http::HttpServer(ps));
     Error err = server_->start(0);
     ASSERT_EQ(err, Error::Ok);
+    watchdog_ = std::make_unique<Watchdog>(SIGQUIT);
+    watchdog_->watch(10000);
   }
 
   void TearDown() override
