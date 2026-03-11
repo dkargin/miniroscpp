@@ -12,6 +12,7 @@
 
 #ifndef WIN32
 #include <sys/uio.h>
+#include <sys/socket.h>
 #endif
 
 // ROS log will be written to "miniros.net[.socket]"
@@ -579,7 +580,11 @@ std::pair<size_t, Error> NetSocket::send(const void* rawData, size_t size, const
 
   while ( written < size && ! wouldBlock ) {
     int n = 0;
-    constexpr int flags = 0;
+    int flags = 0;
+#ifndef WIN32
+    flags |= MSG_NOSIGNAL;
+#endif
+    
     if (isDatagram() && address) {
       int port = address->port();
       if (!port) {
@@ -668,7 +673,11 @@ std::pair<size_t, Error> NetSocket::write2(
       if (ret != 0)
         error = true;
 #else
-      int n = writev(internal_->fd, out, blocks);
+      struct msghdr msg = {};
+      msg.msg_iov = out;
+      msg.msg_iovlen = blocks;
+      constexpr int flags = MSG_NOSIGNAL;
+      ssize_t n = sendmsg(internal_->fd, &msg, flags);
 #endif
       if (n > 0) {
         written += n;
