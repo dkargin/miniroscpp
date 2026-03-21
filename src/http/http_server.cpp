@@ -17,28 +17,18 @@
 #include "internal/scoped_locks.h"
 #include "miniros/http/http_server_connection.h"
 #include "miniros/callback_queue.h"
+#include "miniros/http/endpoint_collection.h"
 
 namespace miniros {
 namespace http {
-
-struct Binding {
-  std::unique_ptr<EndpointFilter> filter;
-  std::shared_ptr<EndpointHandler> endpoint;
-  CallbackQueuePtr callbackQueue;
-
-  Binding(std::unique_ptr<EndpointFilter>&& filter, const std::shared_ptr<EndpointHandler>& endpoint, const CallbackQueuePtr& cb)
-    : filter(std::move(filter)), endpoint(endpoint), callbackQueue(cb)
-  {}
-};
 
 struct HttpServer::Internal {
   using Lock = std::unique_lock<Lifetime<HttpServer>>;
 
   CloseConnectionHandler onCloseConnection;
-  /// A collection of endpoints.
-  std::vector<Binding> endpoints;
-  /// A mutex for endpoints.
-  std::mutex endpointsGuard;
+
+  /// Thread safe collection of endpoints.
+  std::shared_ptr<internal::EndpointCollection> endpoints;
 
   /// Active connections.
   std::map<int, std::shared_ptr<HttpServerConnection>> connections;
@@ -58,6 +48,7 @@ struct HttpServer::Internal {
   Internal(PollSet* ps) : pollSet(ps)
   {
     assert(pollSet);
+    endpoints = std::make_shared<internal::EndpointCollection>();
   }
 
   ~Internal()
@@ -207,6 +198,12 @@ PollSet* HttpServer::getPollSet() const
   return internal_ ? internal_->pollSet : nullptr;
 }
 
+std::shared_ptr<HttpServerConnection> HttpServer::makeConnection(const std::shared_ptr<network::NetSocket>& socket)
+{
+  return std::make_shared<HttpServerConnection>(this, socket, internal_->pollSet);
+}
+
+
 void HttpServer::acceptClient(const std::shared_ptr<Lifetime<HttpServer>>& lifetime, network::NetSocket* sock)
 {
   // This callback is called from PollSet thread.
@@ -219,22 +216,24 @@ void HttpServer::acceptClient(const std::shared_ptr<Lifetime<HttpServer>>& lifet
   if (!sock)
     return;
 
-  auto [client, err] = sock->accept();
+  auto [clientSock, err] = sock->accept();
 
-  if (!client) {
+  if (!clientSock) {
     MINIROS_ERROR("HttpServer::accept() - failed to accept client: %s", err.toString());
     return;
   }
 
-  int fd = client->fd();
-  MINIROS_DEBUG("HttpServer::accept() - accepting new client fd=%d", client->fd());
+  int fd = clientSock->fd();
+  MINIROS_DEBUG("HttpServer::accept() - accepting new client fd=%d", clientSock->fd());
 
-  client->setNonBlock();
-  client->setNoDelay(true);
+  clientSock->setNonBlock();
+  clientSock->setNoDelay(true);
 
   assert(internal_->pollSet);
 
-  std::shared_ptr<HttpServerConnection> connection(new HttpServerConnection(this, client, internal_->pollSet));
+  std::shared_ptr<HttpServerConnection> connection = makeConnection(clientSock);
+  connection->setEndpointCollection(internal_->endpoints);
+
   internal_->connections[fd] = connection;
   auto internalCopy = internal_->lifetime;
 
@@ -261,26 +260,18 @@ void HttpServer::acceptClient(const std::shared_ptr<Lifetime<HttpServer>>& lifet
 
 Error HttpServer::registerEndpoint(std::unique_ptr<EndpointFilter>&& filter, const std::shared_ptr<EndpointHandler>& handler, const CallbackQueuePtr& cb)
 {
-  if (!internal_)
+  if (!internal_ || !internal_->endpoints)
     return Error::InternalError;
 
-
-  std::unique_lock<std::mutex> lock(internal_->endpointsGuard);
-  internal_->endpoints.emplace_back(std::move(filter), handler, cb);
-  return Error::Ok;
+  return internal_->endpoints->registerEndpoint(std::move(filter), handler, cb);
 }
 
 std::pair<std::shared_ptr<EndpointHandler>, std::shared_ptr<CallbackQueue>> HttpServer::findEndpoint(const HttpParserFrame& frame)
 {
-  std::unique_lock<std::mutex> lock(internal_->endpointsGuard);
+  if (!internal_ || !internal_->endpoints)
+    return {};
 
-  for (const Binding& binding: internal_->endpoints) {
-    if (binding.filter->check(frame)) {
-      return {binding.endpoint, binding.callbackQueue};
-    }
-  }
-
-  return {};
+  return internal_->endpoints->findEndpoint(frame);
 }
 
 }

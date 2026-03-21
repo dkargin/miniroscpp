@@ -71,6 +71,10 @@ protected:
   /// Close connection and send all notifications.
   void closeConnection(int fd, const std::string& reason);
 
+  /// Creates HTTP connection.
+  /// This method is virtual to be able to override it in tests.
+  virtual std::shared_ptr<HttpServerConnection> makeConnection(const std::shared_ptr<network::NetSocket>& socket);
+
 protected:
   struct Internal;
   std::unique_ptr<Internal> internal_;

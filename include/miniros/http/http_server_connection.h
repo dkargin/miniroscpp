@@ -18,6 +18,10 @@ namespace miniros {
 
 namespace http {
 
+namespace internal {
+class EndpointCollection;
+}
+
 class HttpServer;
 
 /// A Connection to HttpServer from Client.
@@ -26,6 +30,8 @@ class HttpServerConnection : public std::enable_shared_from_this<HttpServerConne
 public:
   HttpServerConnection(HttpServer* server, std::shared_ptr<network::NetSocket> socket, PollSet* pollSet);
   ~HttpServerConnection();
+
+  void setEndpointCollection(const std::shared_ptr<internal::EndpointCollection>& endpoints);
 
   /// Handler for socket/poll events.
   /// @param evtFlags event flags from poll
@@ -131,6 +137,8 @@ protected:
   PollSet* poll_set_ = nullptr;
 
   mutable std::mutex guard_;
+
+  std::weak_ptr<const internal::EndpointCollection> endpoints_;
 };
 
 }

@@ -14,6 +14,7 @@
 #include "internal/scoped_locks.h"
 #include "miniros/io/poll_set.h"
 #include "xmlrpcpp/XmlRpcException.h"
+#include "miniros/http/endpoint_collection.h"
 
 namespace miniros {
 namespace http {
@@ -33,6 +34,12 @@ HttpServerConnection::~HttpServerConnection()
   std::unique_lock<std::mutex> lock(guard_);
   LOCAL_DEBUG("~HttpServerConnection(%d)", debugFd_);
 }
+
+void HttpServerConnection::setEndpointCollection(const std::shared_ptr<internal::EndpointCollection>& endpoints)
+{
+  endpoints_ = endpoints;
+}
+
 
 const char* HttpServerConnection::State::toString() const
 {
@@ -172,7 +179,14 @@ bool HttpServerConnection::handleProcessRequest(Lock& lock)
   clientInfo.remoteAddress = socket_->peerAddress();
   LOCAL_DEBUG("Handling HTTP request to path=\"%s\"", endpoint.c_str());
 
-  auto [handler, cb] = server_->findEndpoint(http_frame_);
+  auto endpoints = endpoints_.lock();
+  if (!endpoints) {
+    LOCAL_ERROR("No handler for endpoint \"%s\"", endpoint.c_str());
+    doWriteResponse(lock, requestObject, Error::FileNotFound);
+    return true;
+  }
+
+  auto [handler, cb] = endpoints->findEndpoint(http_frame_);
 
   if (!handler) {
     LOCAL_ERROR("No handler for endpoint \"%s\"", endpoint.c_str());
