@@ -7,20 +7,24 @@
 // ROS log will write to the channel "miniros.http[.server]"
 #define MINIROS_PACKAGE_NAME "http"
 
+#include "internal/scoped_locks.h"
+#include "io/io.h"
+#include "miniros/callback_queue.h"
 #include "miniros/console.h"
+#include "miniros/http/endpoint_collection.h"
 #include "miniros/http/http_server.h"
 #include "miniros/http/http_server_connection.h"
-#include "miniros/callback_queue.h"
-#include "internal/scoped_locks.h"
+
+#include "internal/lifetime.h"
 #include "miniros/io/poll_set.h"
 #include "xmlrpcpp/XmlRpcException.h"
-#include "miniros/http/endpoint_collection.h"
 
 namespace miniros {
 namespace http {
 
-HttpServerConnection::HttpServerConnection(HttpServer* server, std::shared_ptr<network::NetSocket> socket, PollSet* poll_set)
-  :server_(server), socket_(socket), poll_set_(poll_set)
+HttpServerConnection::HttpServerConnection(const std::shared_ptr<Lifetime<HttpServer>>& server_lifetime,
+  std::shared_ptr<network::NetSocket> socket)
+  :server_lifetime_(server_lifetime), socket_(socket)
 {
   http_frame_.finishRequest();
   assert(socket);
@@ -33,6 +37,12 @@ HttpServerConnection::~HttpServerConnection()
 {
   std::unique_lock<std::mutex> lock(guard_);
   LOCAL_DEBUG("~HttpServerConnection(%d)", debugFd_);
+
+  if (poll_set_) {
+    if (socket_) {
+      poll_set_->delSocket(socket_->fd());
+    }
+  }
 }
 
 void HttpServerConnection::setEndpointCollection(const std::shared_ptr<internal::EndpointCollection>& endpoints)
@@ -40,6 +50,24 @@ void HttpServerConnection::setEndpointCollection(const std::shared_ptr<internal:
   endpoints_ = endpoints;
 }
 
+void HttpServerConnection::attachPollSet(PollSet* poll_set)
+{
+  assert(!poll_set_);
+  assert(poll_set);
+  poll_set_ = poll_set;
+  poll_set_->addSocket(socket_->fd(), PollSet::EventIn | PollSet::EventUpdate,
+    [wconnection = weak_from_this()](int flags)
+    {
+      auto connection = wconnection.lock();
+      if (!connection)
+        return 0;
+      int newFlags = connection->handleEvents(flags);
+      if (!newFlags) {
+        //closeConnection(lock, fd, "EOF");
+      }
+      return newFlags;
+  }, {}, THIS_LOCATION);
+}
 
 const char* HttpServerConnection::State::toString() const
 {
@@ -89,6 +117,22 @@ Error HttpServerConnection::doReadRequest(Lock& lock)
   LOCAL_DEBUG("HttpServerConnection(peer=%s fd=%d)::readRequest read %d/%d bytes.", peer.c_str(), fd, http_frame_.bodyLength(), http_frame_.contentLength());
   updateState(lock, state_ = State::ProcessRequest);
   return Error::Ok;
+}
+
+int HttpServerConnection::fd() const
+{
+  return socket_ ? socket_->fd() : MINIROS_INVALID_SOCKET;
+}
+
+bool HttpServerConnection::isDetachedFromParent() const
+{
+  if (!server_lifetime_)
+    return true;
+
+  auto lock = server_lifetime_->getLock();
+  if (!server_lifetime_->valid(lock))
+    return true;
+  return false;
 }
 
 class HttpServerCallback : public CallbackInterface {
@@ -167,8 +211,7 @@ bool HttpServerConnection::handleProcessRequest(Lock& lock)
 
   std::string endpoint{http_frame_.getPath()};
 
-  // Execute request:
-  if (!server_) {
+  if (isDetachedFromParent()) {
     LOCAL_ERROR("HttpServerConnection::handleEvents connection fd=%d detached from server", socket_->fd());
     prepareFaultResponse(Error::InternalError, *requestObject);
     return false;
@@ -222,7 +265,6 @@ void HttpServerConnection::handleDisconnect(Lock& lock)
   updateState(lock, State::Disconnected);
 }
 
-
 void HttpServerConnection::handleReadRequest(Lock& lock, int& evtFlags, bool fallThrough)
 {
   if (!fallThrough && evtFlags & PollSet::EventError) {
@@ -250,7 +292,6 @@ void HttpServerConnection::handleReadRequest(Lock& lock, int& evtFlags, bool fal
   }
 }
 
-
 void HttpServerConnection::handleWriteResponse(Lock& lock, int& evtFlags, bool fallThrough)
 {
   if (!fallThrough && evtFlags & PollSet::EventError) {
@@ -269,7 +310,6 @@ void HttpServerConnection::handleWriteResponse(Lock& lock, int& evtFlags, bool f
       r = socket_->write2(
         response_header_buffer_.c_str(), response_header_buffer_.size(),
         responseBody.c_str(), responseBodySize, data_sent_);
-
     } else {
       const char* data = response_header_buffer_.c_str() + data_sent_;
       size_t toSend = response_header_buffer_.size() - data_sent_;
@@ -311,6 +351,9 @@ int HttpServerConnection::handleEvents(int evtFlags)
   Lock lock(guard_, THIS_LOCATION);
 
   const int startEvt = evtFlags;
+
+  // TODO: Disable it once most transport bugs are resolved.
+  LOCAL_DEBUG("HttpServerConnection[%d]::handleEvents(%s) in state %s", debugFd_, PollSet::eventToString(startEvt).c_str(), state_.toString());
 
   // Set to true if we transition multiple FSM states.
   bool stateFallback = false;
@@ -366,7 +409,7 @@ int HttpServerConnection::eventsForState(State state) const
   }
 }
 
-void HttpServerConnection::close()
+void HttpServerConnection::closeSocket()
 {
   socket_->close();
   socket_.reset();
@@ -379,10 +422,14 @@ void HttpServerConnection::resetResponse()
   data_sent_ = 0;
 }
 
-void HttpServerConnection::detach()
+void HttpServerConnection::detachFromServer(bool close)
 {
+  server_lifetime_ = {};
+
   Lock lock(guard_, THIS_LOCATION);
-  server_ = nullptr;
+  if (close) {
+    // TODO: ???
+  }
 }
 
 void HttpServerConnection::onAsyncRequestComplete(std::shared_ptr<HttpRequest> request, Error err)

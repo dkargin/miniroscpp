@@ -28,10 +28,13 @@ class HttpServer;
 /// It handles parsing HTTP request from client, picking right endpoint handler and sending response back.
 class HttpServerConnection : public std::enable_shared_from_this<HttpServerConnection> {
 public:
-  HttpServerConnection(HttpServer* server, std::shared_ptr<network::NetSocket> socket, PollSet* pollSet);
+  HttpServerConnection(const std::shared_ptr<Lifetime<HttpServer>>& server,
+    std::shared_ptr<network::NetSocket> socket);
   ~HttpServerConnection();
 
   void setEndpointCollection(const std::shared_ptr<internal::EndpointCollection>& endpoints);
+
+  void attachPollSet(PollSet* pollSet);
 
   /// Handler for socket/poll events.
   /// @param evtFlags event flags from poll
@@ -66,15 +69,15 @@ public:
 
   void resetResponse();
 
-  /// Close connection.
-  void close();
+  /// Get internal file descriptor/socket.
+  int fd() const;
 
   /// Fill in fault response.
   static void prepareFaultResponse(Error error, http::HttpRequest& request);
 
   /// Detach from server.
   /// Breaks link with Http server.
-  void detach();
+  void detachFromServer(bool close);
 
   using Lock = TimeCheckLock<std::mutex>;
 
@@ -85,6 +88,9 @@ public:
   void onAsyncRequestComplete(std::shared_ptr<HttpRequest> request, Error err);
 
   int eventsForState(State state) const;
+
+  /// Check if this connection is detached from HTTP server instance.
+  bool isDetachedFromParent() const;
 
 protected:
   /// Updates internal state.
@@ -114,9 +120,12 @@ protected:
   /// Start writing response to socket. It serializes response to buffers and switches state to WriteResponse.
   void doWriteResponse(Lock& lock, const std::shared_ptr<HttpRequest>& requestObject, Error error);
 
+  /// Close and drop socket.
+  void closeSocket();
+
   State state_ = State::ReadRequest;
 
-  HttpServer* server_;
+  std::shared_ptr<Lifetime<HttpServer>> server_lifetime_;
 
   HttpParserFrame http_frame_;
 

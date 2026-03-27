@@ -78,7 +78,7 @@ protected:
 
 }
 
-#define THIS_LOCATION internal::CodeLocation::make(__FILE__, __LINE__)
+#define THIS_LOCATION ::miniros::internal::CodeLocation::make(__FILE__, __LINE__)
 
 }
 #endif // MINIROS_CODE_LOCATION_H

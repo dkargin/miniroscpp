@@ -32,6 +32,20 @@ TEST(Address, ip4)
   EXPECT_EQ(address3.type(), NetAddress::AddressInvalid);
 }
 
+TEST(Address, invalidAddress)
+{
+  NetAddress address;
+  // Check completely invalid address.
+  Error err = addressFromString(NetAddress::AddressIPv4, "1235132525233421234_235^232147", 123456, address);
+  EXPECT_EQ(err, Error::InvalidValue);
+  ASSERT_FALSE(address.valid());
+
+  // Check some valid hostname with just an unknown IP.
+  Error err2 = addressFromString(NetAddress::AddressIPv4, "nice_but_not_known", 1234, address);
+  EXPECT_EQ(err2, Error::AddressIsUnknown);
+  EXPECT_FALSE(address.valid());
+}
+
 TEST(Address, ip6)
 {
   NetAddress address1 = NetAddress::fromIp6String("fe80::1ff:fe23:4567:890a", 10);
@@ -57,9 +71,13 @@ TEST(Adapters, SameNet)
   NetAdapter adapter;
 
   adapter.address = NetAddress::fromIp4String("192.168.1.10", 0);
+  ASSERT_EQ(adapter.address.type(), NetAddress::AddressIPv4);
   adapter.mask = NetAddress::fromIp4String("255.255.255.0", 0);
+  ASSERT_EQ(adapter.mask.type(), NetAddress::AddressIPv4);
 
   NetAddress address1 = NetAddress::fromIp4String("192.168.1.11", 13);
+  ASSERT_EQ(address1.type(), NetAddress::AddressIPv4);
+
   EXPECT_TRUE(adapter.matchNetAddress(address1));
 
   NetAddress address2 = NetAddress::fromIp4String("192.168.2.31", 13);

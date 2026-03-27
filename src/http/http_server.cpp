@@ -15,9 +15,10 @@
 #include "miniros/http/http_server.h"
 
 #include "internal/scoped_locks.h"
-#include "miniros/http/http_server_connection.h"
+#include "io/io.h"
 #include "miniros/callback_queue.h"
 #include "miniros/http/endpoint_collection.h"
+#include "miniros/http/http_server_connection.h"
 
 namespace miniros {
 namespace http {
@@ -31,7 +32,7 @@ struct HttpServer::Internal {
   std::shared_ptr<internal::EndpointCollection> endpoints;
 
   /// Active connections.
-  std::map<int, std::shared_ptr<HttpServerConnection>> connections;
+  std::set<std::shared_ptr<HttpServerConnection>> connections;
 
   /// Socket for accepting HTTP connections.
   network::NetSocket socket_v4;
@@ -39,16 +40,20 @@ struct HttpServer::Internal {
   /// IPv6 socket.
   network::NetSocket socket_v6;
 
+  /// Flag indicates that server is stopping and all incoming clients should be rejected.
+  volatile bool stoppingListeners = false;
+
   /// Poller to handle events.
   PollSet* pollSet;
 
   /// Global mutex.
-  std::shared_ptr<Lifetime<HttpServer>> lifetime = std::make_shared<Lifetime<HttpServer>>();
+  std::shared_ptr<Lifetime<HttpServer>> lifetime;
 
-  Internal(PollSet* ps) : pollSet(ps)
+  Internal(HttpServer* server, PollSet* ps) : pollSet(ps)
   {
     assert(pollSet);
     endpoints = std::make_shared<internal::EndpointCollection>();
+    lifetime = std::make_shared<Lifetime<HttpServer>>(server);
   }
 
   ~Internal()
@@ -56,30 +61,23 @@ struct HttpServer::Internal {
     MINIROS_DEBUG("HttpServer::~Internal()");
   }
 
-  void closeConnection(Lock& lock, int fd, const std::string& reason);
+  void closeConnection(Lock& lock, const std::shared_ptr<HttpServerConnection>& connection, const std::string& reason);
 };
 
-void HttpServer::Internal::closeConnection(Lock& lock, int fd, const std::string& reason)
+void HttpServer::Internal::closeConnection(Lock& lock, const std::shared_ptr<HttpServerConnection>& connection,
+  const std::string& reason)
 {
+  int fd = connection->fd();
   MINIROS_INFO("HttpServer::closeConnection() fd=%d: %s", fd, reason.c_str());
-  std::shared_ptr<HttpServerConnection> connection;
-  // TODO: Connection can close and unsubscribe itself.
-  // TODO: Still need to notify external users with onCloseConnection.
-  auto it = connections.find(fd);
-  if (it != connections.end()) {
-    if (pollSet) {
-      pollSet->delSocket(fd);
-    }
-    connection = it->second;
-    connection->detach();
-    connections.erase(fd);
-    connection->close();
 
-    if (onCloseConnection) {
-      auto handler = onCloseConnection;
-      ScopedUnlock unlock(lock);
-      handler(connection, reason);
-    }
+  auto it = connections.find(connection);
+  if (it == connections.end())
+    return;
+  connections.erase(connection);
+  if (onCloseConnection) {
+    auto handler = onCloseConnection;
+    ScopedUnlock unlock(lock);
+    handler(connection, reason);
   }
 }
 
@@ -88,19 +86,19 @@ void HttpServer::setCloseConnectionHandler(CloseConnectionHandler&& handler)
   internal_->onCloseConnection = std::move(handler);
 }
 
-void HttpServer::closeConnection(int fd, const std::string& reason)
+void HttpServer::onConnectionClosed(const std::shared_ptr<HttpServerConnection>& connection, const std::string& reason)
 {
   assert(internal_);
   if (!internal_)
     return;
   std::unique_lock lock(*internal_->lifetime);
-  internal_->closeConnection(lock, fd, reason);
+  internal_->closeConnection(lock, connection, reason);
 }
 
 HttpServer::HttpServer(PollSet* pollSet)
 {
   assert(pollSet);
-  internal_ = std::make_unique<Internal>(pollSet);
+  internal_ = std::make_unique<Internal>(this, pollSet);
 }
 
 HttpServer::~HttpServer()
@@ -111,8 +109,8 @@ HttpServer::~HttpServer()
     // 1. Close all connections.
     // 2. Detach all endpoints.
     stop();
-    std::unique_lock lock(*lifetime);
-    internal_->lifetime->alive = false;
+    auto lock = lifetime->getLock();
+    internal_->lifetime->reset(lock);
     internal_->pollSet = nullptr;
     internal_.reset();
   }
@@ -163,23 +161,31 @@ Error HttpServer::stop()
   if (!internal_)
     return Error::InternalError;
 
-  std::unique_lock lock(*internal_->lifetime);
+  std::set<std::shared_ptr<HttpServerConnection>> connectionsCopy;
+  int listenFd = MINIROS_INVALID_SOCKET;
 
-  int fd = 0;
-  if (internal_->pollSet && internal_->socket_v4.valid()) {
-    fd = internal_->socket_v4.fd();
-    LOCAL_INFO("HttpServer[%d]::stop() - stopping listener socket", fd);
-    if (!internal_->pollSet->delSocket(internal_->socket_v4.fd())) {
-      return Error::InternalError;
+  {
+    std::unique_lock lock(*internal_->lifetime);
+
+    if (internal_->pollSet && internal_->socket_v4.valid()) {
+      listenFd = internal_->socket_v4.fd();
+      LOCAL_INFO("HttpServer[%d]::stop() - stopping listener socket", listenFd);
+      if (!internal_->pollSet->delSocket(internal_->socket_v4.fd())) {
+        return Error::InternalError;
+      }
     }
+
+    internal_->socket_v4.close();
+
+    std::swap(connectionsCopy, internal_->connections);
   }
 
-  internal_->socket_v4.close();
-  while (!internal_->connections.empty()) {
-    auto it = internal_->connections.begin();
-    LOCAL_INFO("HttpServer[%d]::stop() - closing connection %d", fd, it->first);
-    internal_->closeConnection(lock, it->first, "HttpServer::stop()");
+  for (auto connection: connectionsCopy) {
+    int fd = connection->fd();
+    LOCAL_INFO("HttpServer[%d]::stop() - dropping connection %d", listenFd, fd);
+    connection->detachFromServer(true);
   }
+
   return Error::Ok;
 }
 
@@ -200,20 +206,24 @@ PollSet* HttpServer::getPollSet() const
 
 std::shared_ptr<HttpServerConnection> HttpServer::makeConnection(const std::shared_ptr<network::NetSocket>& socket)
 {
-  return std::make_shared<HttpServerConnection>(this, socket, internal_->pollSet);
+  return std::make_shared<HttpServerConnection>(internal_->lifetime, socket);
 }
-
 
 void HttpServer::acceptClient(const std::shared_ptr<Lifetime<HttpServer>>& lifetime, network::NetSocket* sock)
 {
+  if (!sock)
+    return;
+
   // This callback is called from PollSet thread.
-  std::unique_lock lock(*lifetime);
-  if (!lifetime->alive)
+  // Check if server instance is still alive and usable.
+  auto lock = lifetime->getLock();
+  if (!lifetime->valid(lock))
     return;
 
   if (!internal_)
     return;
-  if (!sock)
+
+  if (internal_->stoppingListeners)
     return;
 
   auto [clientSock, err] = sock->accept();
@@ -223,7 +233,6 @@ void HttpServer::acceptClient(const std::shared_ptr<Lifetime<HttpServer>>& lifet
     return;
   }
 
-  int fd = clientSock->fd();
   MINIROS_DEBUG("HttpServer::accept() - accepting new client fd=%d", clientSock->fd());
 
   clientSock->setNonBlock();
@@ -233,29 +242,9 @@ void HttpServer::acceptClient(const std::shared_ptr<Lifetime<HttpServer>>& lifet
 
   std::shared_ptr<HttpServerConnection> connection = makeConnection(clientSock);
   connection->setEndpointCollection(internal_->endpoints);
-
-  internal_->connections[fd] = connection;
-  auto internalCopy = internal_->lifetime;
-
-  internal_->pollSet->addSocket(fd, PollSet::EventIn | PollSet::EventUpdate,
-    [this, wconnection = std::weak_ptr(connection), fd, internalCopy](int flags)
-    {
-      // HttpServerConnection can probably be destroyed here.
-      std::unique_lock lock(*internalCopy);
-
-      auto connection = wconnection.lock();
-      if (!connection)
-        return 0;
-      int newFlags = connection->handleEvents(flags);
-      if (!internalCopy->alive) {
-        return 0;
-      }
-      /*
-      if (!newFlags) {
-        internal_->closeConnection(lock, fd, "EOF");
-      }*/
-      return newFlags;
-  }, internalCopy, THIS_LOCATION);
+  internal_->connections.insert(connection);
+  // Connection object will start receiving events from external thread.
+  connection->attachPollSet(internal_->pollSet);
 }
 
 Error HttpServer::registerEndpoint(std::unique_ptr<EndpointFilter>&& filter, const std::shared_ptr<EndpointHandler>& handler, const CallbackQueuePtr& cb)

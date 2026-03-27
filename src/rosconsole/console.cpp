@@ -838,6 +838,8 @@ void print(FilterBase* filter, void* logger_handle, Level level,
   g_printing_thread_id = std::thread::id();
 }
 
+// Collection of all log locations.
+// Every macro invocation MINIROS_LOG* registers inside this container.
 std::vector<LogLocation*> g_log_locations;
 std::mutex g_locations_mutex;
 

@@ -280,10 +280,6 @@ void RPCManager::shutdown()
   // kill the last few clients that were started in the shutdown process
   {
     std::scoped_lock<std::mutex> lock(internal_->clients_mutex_);
-    for (auto& [key, client]: internal_->clients_)
-    {
-      client->release();
-    }
     internal_->clients_.clear();
   }
 
@@ -357,7 +353,7 @@ std::shared_ptr<http::HttpClient> RPCManager::getXMLRPCClient(const std::string 
   auto client = std::make_shared<http::HttpClient>(internal_->poll_set_);
   int reconnectTimeoutMs = 500;
   client->setDisconnectHandler(
-    [wclient = std::weak_ptr(client), reconnectTimeoutMs](std::shared_ptr<network::NetSocket>& socket, http::HttpClient::State state)
+    [wclient = std::weak_ptr(client), reconnectTimeoutMs](std::shared_ptr<network::NetSocket>& socket, http::HttpClient::State state, Error err)
     {
       auto client = wclient.lock();
       if (client && client->getReconnectAttempts() < 10 && client->getQueuedRequests() > 0) {

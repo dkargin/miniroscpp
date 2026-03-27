@@ -267,7 +267,7 @@ Error Discovery::start(PollSet* pollSet, const UUID& uuid, const network::URL& r
   auto rpcAddr = network::NetAddress::fromURL(rpcUrl);
   if (!rpcAddr.valid()) {
     MINIROS_ERROR("Failed to get address for RPC URL=%s", rpcUrl.str().c_str());
-    return Error::InvalidAddress;
+    return Error::InvalidValue;
   }
   internal_->rpcAddress = rpcAddr;
   internal_->broadcastAddr = network::NetAddress::fromIp4String("255.255.255.255", internal_->broadcastPort);

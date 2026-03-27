@@ -48,6 +48,7 @@
 
 #include "miniros/rosconsole/local_log.h"
 
+#include <condition_variable>
 
 namespace miniros
 {
@@ -128,8 +129,24 @@ PollSet::PollSet()
 
 PollSet::~PollSet()
 {
+  if (internal_->signal_pipe_[0] != MINIROS_INVALID_SOCKET) {
+    delSocket(internal_->signal_pipe_[0]);
+  }
+
   close_signal_pair(internal_->signal_pipe_);
   close_socket_watcher(internal_->epfd_);
+
+  if (!internal_->socket_info_.empty()) {
+    LOCAL_ERROR("PollSet::~PollSet() discovered %zu dangling sockets", internal_->socket_info_.size());
+
+    for (const auto& [fd, info]: internal_->socket_info_) {
+      if (info.loc_.valid()) {
+        LOCAL_ERROR("\tfd=%d: %s", fd, info.loc_.str().c_str());
+      } else {
+        LOCAL_ERROR("\tfd=%d: unknown code location", fd);
+      }
+    }
+  }
   internal_.reset();
 }
 
@@ -178,7 +195,7 @@ bool PollSet::addSocket(int fd, int events, const SocketUpdateFunc& update_func,
 
 bool PollSet::delSocket(int fd)
 {
-  if(fd < 0)
+  if (fd < 0)
   {
     return false;
   }
@@ -458,6 +475,7 @@ void PollSet::update(int poll_timeout)
       delSocket(fd);
     }
     else if (info.updateEvents_ && ret != info.events_) {
+      // TODO: Reimplement it through setEvents(fd, ret);
       std::scoped_lock<std::mutex> lock(internal_->socket_info_mutex_);
       auto it = internal_->socket_info_.find(fd);
       if (it != internal_->socket_info_.end() && it->second.events_ != ret) {

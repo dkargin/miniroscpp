@@ -59,6 +59,10 @@ struct MINIROS_DECL Error {
     ResponsePostponed,
     /// Can not complete operation because of some resource is in use.
     ResourceInUse,
+    /// Connection is refused by server.
+    ConnectionRefused,
+    /// IP address of host is unknown.
+    AddressIsUnknown,
   };
 
   Error() :code(Ok)

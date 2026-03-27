@@ -16,7 +16,6 @@ const char* Error::toString() const {
       return "Invalid value";
     case Error::OutOfMemory:
       return "Out of memory";
-
     case Error::NotImplemented:
       return "Not implemented";
     case Error::NotSupported:
@@ -53,6 +52,10 @@ const char* Error::toString() const {
       return "ResponsePostponed";
     case Error::ResourceInUse:
       return "ResourceInUse";
+    case Error::ConnectionRefused:
+      return "Connection Refused";
+    case Error::AddressIsUnknown:
+      return "Address is unknown";
   }
   return "Unknown error";
 }
