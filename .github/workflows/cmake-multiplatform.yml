@@ -41,13 +41,16 @@ jobs:
       with:
         submodules: 'true'
     - name: Install dependencies
-      run: sudo apt-get install -y libgpgme-dev libssl-dev libgtest-dev
+      run: sudo apt-get install -y libgpgme-dev libssl-dev libgtest-dev gdb valgrind
     - name: Set reusable strings
       # Turn repeated input strings (such as the build output directory) into step outputs. These step outputs can be used throughout the workflow file.
       id: strings
       shell: bash
       run: |
         echo "build-output-dir=${{ github.workspace }}/build" >> "$GITHUB_OUTPUT"
+        ulimit -c unlimited         # Enable core dumps to be captured (must be in same run block)
+        cat /proc/sys/kernel/core_pattern
+        echo "$PWD/cores/corefile-%e-%p-%t" | sudo tee /proc/sys/kernel/core_pattern
 
     - name: Configure CMake
       # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
@@ -81,10 +84,18 @@ jobs:
       # Execute tests defined by the CMake configuration. Note that --build-config is needed because the default Windows generator is a multi-config generator (Visual Studio generator).
       # See https://cmake.org/cmake/help/latest/manual/ctest.1.html for more detail
       run: |
-        ulimit -c unlimited         # Enable core dumps to be captured (must be in same run block)
-        cat /proc/sys/kernel/core_pattern
-        echo "$PWD/cores/corefile-%e-%p-%t" | sudo tee /proc/sys/kernel/core_pattern
-        ctest --output-on-failure --test-dir test -V --timeout 100 -C ${{env.BUILD_TYPE}}
+        TOOL=gdb ctest --output-on-failure --test-dir test -V --timeout 100 -C ${{env.BUILD_TYPE}}
+        ls -alh .
+
+    - name: Test-memcheck
+      working-directory: ${{ steps.strings.outputs.build-output-dir }}
+      if: ${{ failure() }}  # Run only if something went wrong
+      env:
+        ROS_MASTER_URI: http://localhost:11311
+      # Execute tests defined by the CMake configuration. Note that --build-config is needed because the default Windows generator is a multi-config generator (Visual Studio generator).
+      # See https://cmake.org/cmake/help/latest/manual/ctest.1.html for more detail
+      run: |
+        TOOL=valgrind ctest --output-on-failure --test-dir test -V --timeout 100 -C ${{env.BUILD_TYPE}}
     - uses: actions/upload-artifact@v4
       if: ${{ failure() }}  # Run only if something went wrong
       with:

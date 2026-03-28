@@ -7,6 +7,8 @@ link_directories(${GTEST_LIBRARY_DIRS})
 add_test(NAME start-master COMMAND manage-master start)
 #add_test(NAME stop-master COMMAND manage-master stop)
 
+# Advanced tests depend on running rosmaster.
+# This function adds necessary dependencies.
 function(miniros_advanced_test TARGET_NAME)
   # These options are mapped to boolean flags
   set(bool_options WITH_MASTER DISABLED)
@@ -16,15 +18,12 @@ function(miniros_advanced_test TARGET_NAME)
   set(optional_libs gtest_main)
   target_link_libraries(${TARGET_NAME} roscxx ${GTEST_LIBRARIES})
 
-  if (NOT ${CMAKE_CURRENT_FUNCTION}_DISABLED)
+  if (${CMAKE_CURRENT_FUNCTION}_DISABLED)
     # Test is disabled. It is either not ported properly from rostest or does not suite CTest environment
-    add_test(NAME ${TARGET_NAME} COMMAND ${TARGET_NAME})
+  else()
+    add_test(NAME ${TARGET_NAME} COMMAND ${TEST_LAUNCHER} $<TARGET_FILE:${TARGET_NAME}>)
     if (${CMAKE_CURRENT_FUNCTION}_WITH_MASTER)
       # Test needs master to operate
-      # Fixtures are still not working
-      #set_tests_properties(start-master PROPERTIES FIXTURES_SETUP ${TARGET_NAME})
-      #set_tests_properties(stop-master PROPERTIES FIXTURES_CLEANUP ${TARGET_NAME})
-      #message(STATUS "Test ${TARGET_NAME} will require rosmaster")
       list(APPEND TESTS_WITH_MASTER ${TARGET_NAME})
       set(TESTS_WITH_MASTER ${TESTS_WITH_MASTER} PARENT_SCOPE)
     endif()

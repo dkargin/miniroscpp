@@ -12,6 +12,8 @@ add_dependencies(manage-master miniroscore)
 
 set(TESTS_WITH_MASTER "" CACHE INTERNAL "Tests with rosmaster")
 
+set(TEST_LAUNCHER ${CMAKE_CURRENT_SOURCE_DIR}/launch_test.sh)
+
 function(miniros_add_test TARGET_NAME)
 	# These options are mapped to boolean flags
 	set(bool_options WITH_MASTER DISABLED)
@@ -21,9 +23,12 @@ function(miniros_add_test TARGET_NAME)
 	set(optional_libs gtest_main)
 	target_link_libraries(${TARGET_NAME} roscxx ${GTEST_LIBRARIES})
 
-	if (NOT ${CMAKE_CURRENT_FUNCTION}_DISABLED)
+	if (${CMAKE_CURRENT_FUNCTION}_DISABLED)
 		# Test is disabled. It is either not ported properly from rostest or does not suite CTest environment
-		add_test(NAME ${TARGET_NAME} COMMAND ${TARGET_NAME})
+	else()
+		# Running test through helper script.
+		# It helps catching call stacks on remote CI machine.
+		add_test(NAME ${TARGET_NAME} COMMAND ${TEST_LAUNCHER} $<TARGET_FILE:${TARGET_NAME}>)
 		if (${CMAKE_CURRENT_FUNCTION}_WITH_MASTER)
 			# Test needs master to operate
 			# Fixtures are still not working
