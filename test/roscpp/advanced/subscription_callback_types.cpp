@@ -189,6 +189,7 @@ int main(int argc, char **argv)
 {
   testing::InitGoogleTest(&argc, argv);
 
+  miniros::handleCrashes();
   miniros::init( argc, argv, "subscription_callback_types" );
   miniros::NodeHandle nh;
 
