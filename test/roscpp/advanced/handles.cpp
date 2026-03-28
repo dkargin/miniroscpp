@@ -629,6 +629,8 @@ TEST(RoscppHandles, nodeHandleShutdown)
 int main(int argc, char** argv)
 {
   testing::InitGoogleTest(&argc, argv);
+
+  miniros::handleCrashes();
   miniros::init(argc, argv, "test_handles");
 
   return RUN_ALL_TESTS();
