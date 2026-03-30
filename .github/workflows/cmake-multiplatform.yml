@@ -84,8 +84,10 @@ jobs:
       # Execute tests defined by the CMake configuration. Note that --build-config is needed because the default Windows generator is a multi-config generator (Visual Studio generator).
       # See https://cmake.org/cmake/help/latest/manual/ctest.1.html for more detail
       run: |
+        ./bin/manage-master start
         TOOL=gdb ctest --output-on-failure --test-dir test -V --timeout 100 -C ${{env.BUILD_TYPE}}
         ls -alh .
+        ./bin/manage-master stop
 
     - name: Test-memcheck
       working-directory: ${{ steps.strings.outputs.build-output-dir }}
@@ -95,7 +97,9 @@ jobs:
       # Execute tests defined by the CMake configuration. Note that --build-config is needed because the default Windows generator is a multi-config generator (Visual Studio generator).
       # See https://cmake.org/cmake/help/latest/manual/ctest.1.html for more detail
       run: |
+        ./bin/manage-master start
         TOOL=valgrind ctest --output-on-failure --test-dir test -V --timeout 100 -C ${{env.BUILD_TYPE}}
+        ./bin/manage-master stop
     - uses: actions/upload-artifact@v4
       if: ${{ failure() }}  # Run only if something went wrong
       with:
