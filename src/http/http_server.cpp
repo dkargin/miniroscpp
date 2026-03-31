@@ -78,7 +78,7 @@ struct HttpServer::Internal {
 Error HttpServer::Internal::start(network::NetSocket& socket, network::NetAddress::Type addrType, int port)
 {
   std::unique_lock lock(*lifetime);
-  if (Error err = socket.tcpListen(port, network::NetAddress::AddressIPv4, 100); !err) {
+  if (Error err = socket.tcpListen(port, addrType, 100); !err) {
     return err;
   }
 
@@ -228,27 +228,37 @@ Error HttpServer::stop()
     return Error::InternalError;
 
   std::set<std::shared_ptr<HttpServerConnection>> connectionsCopy;
-  int listenFd = MINIROS_INVALID_SOCKET;
 
   {
     std::unique_lock lock(*internal_->lifetime);
 
-    if (internal_->pollSet && internal_->socket_v4.valid()) {
-      listenFd = internal_->socket_v4.fd();
-      LOCAL_INFO("HttpServer[%d]::stop() - stopping listener socket", listenFd);
-      if (!internal_->pollSet->delSocket(internal_->socket_v4.fd())) {
-        return Error::InternalError;
+    if (internal_->pollSet) {
+      if (internal_->socket_v4.valid()) {
+        int fd = internal_->socket_v4.fd();
+        LOCAL_INFO("HttpServer::stop() - stopping ipv4 listener socket %d", fd);
+        if (!internal_->pollSet->delSocket(fd)) {
+          LOCAL_WARN("HttpServer::stop() - failed to detach ipv4 socket from PollSet");
+        }
+      }
+
+      if (internal_->socket_v6.valid()) {
+        int fd = internal_->socket_v6.fd();
+        LOCAL_INFO("HttpServer::stop() - stopping ipv6 listener socket %d", fd);
+        if (!internal_->pollSet->delSocket(fd)) {
+          LOCAL_WARN("HttpServer::stop() - failed to detach ipv6 socket from PollSet");
+        }
       }
     }
 
     internal_->socket_v4.close();
+    internal_->socket_v6.close();
 
     std::swap(connectionsCopy, internal_->connections);
   }
 
   for (auto connection: connectionsCopy) {
     int fd = connection->fd();
-    LOCAL_INFO("HttpServer[%d]::stop() - dropping connection %d", listenFd, fd);
+    LOCAL_INFO("HttpServer[]::stop() - dropping connection %d", fd);
     connection->detachFromServer(true);
   }
 

@@ -35,7 +35,7 @@ public:
   /// Start server on specific port.
   Error start(int port);
 
-  /// Start IPv6 server on sepecific port.
+  /// Start IPv6 server on specific port.
   Error start6(int port);
 
   /// Stop all sockets.
