@@ -57,6 +57,9 @@
 
 #include "internal_config.h"
 
+#include <mutex>
+#include <thread>
+
 #ifdef HAVE_GLIBC_BACKTRACE
 #include <execinfo.h>  // For backtrace()
 #endif
@@ -92,6 +95,9 @@ void disableAllSignalsInThisThread()
 #endif
 }
 
+std::map<std::thread::id, std::string> g_nice_thread_names;
+std::mutex g_nice_thread_mutex;
+
 // Following advice at https://stackoverflow.com/questions/10121560/stdthread-naming-your-thread
 void setThreadName(const char* threadName) {
 #if defined(_WIN32)
@@ -103,6 +109,20 @@ void setThreadName(const char* threadName) {
   pthread_setname_np(handle, threadName);
 #endif
   profiling::writeCurrentThreadNameInTrace(threadName);
+  std::unique_lock lock(g_nice_thread_mutex);
+  g_nice_thread_names[std::this_thread::get_id()] = threadName;
+}
+
+std::string getThreadName()
+{
+  std::unique_lock lock(g_nice_thread_mutex);
+  auto id = std::this_thread::get_id();
+  if (auto it = g_nice_thread_names.find(id); it != g_nice_thread_names.end()) {
+    return it->second;
+  }
+  std::stringstream ss;
+  ss << id;
+  return ss.str();
 }
 
 #ifdef MINIROS_USE_LIBSYSTEMD

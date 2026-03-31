@@ -41,7 +41,12 @@ namespace miniros
 {
 
 MINIROS_DECL void disableAllSignalsInThisThread();
+
+/// Set debug-friendly thread name.
 MINIROS_DECL void setThreadName(const char* name);
+
+/// Get debug-friendly thread name.
+MINIROS_DECL std::string getThreadName();
 
 /// Notify system that node has successfully started.
 MINIROS_DECL Error notifyNodeStarted();

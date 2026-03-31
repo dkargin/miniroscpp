@@ -35,6 +35,8 @@
 /* Author: Ryan Luna, Ioan Sucan */
 
 #include "miniros/console.h"
+
+#include "common.h"
 #include "console_impl.h"
 #include "miniros/platform.h"
 #include "miniros/rostime.h"
@@ -407,6 +409,15 @@ struct ThreadToken : public Token
   }
 };
 
+struct NiceThreadToken : public Token
+{
+  virtual std::string getString(void*, console::Level, const char*, const char*, const char*, int)
+  {
+    return getThreadName();
+  }
+};
+
+
 struct LoggerToken : public Token
 {
   virtual std::string getString(void* logger_handle, console::Level level, const char* str, const char* file, const char* function, int line)
@@ -485,6 +496,10 @@ TokenPtr createTokenFromType(const std::string& type)
   else if (type == "thread")
   {
     return TokenPtr(std::make_shared<ThreadToken>());
+  }
+  else if (type == "nthread")
+  {
+    return TokenPtr(std::make_shared<NiceThreadToken>());
   }
   else if (type == "logger")
   {
