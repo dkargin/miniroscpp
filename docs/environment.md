@@ -14,7 +14,7 @@ Here is the list of different envorinment variables, which can influence behavio
 
 **HOME** - the last choice for picking ROS log folder.
 
-**ROSCONSOLE_FORMAT**
+**ROSCONSOLE_FORMAT** - specifies format for logging messages. More details can be found at [logging.md](logging.md)
 
 **ROSCONSOLE_STDOUT_LINE_BUFFERED** - forces buffering of stdout writer. Takes values 0 or 1.
 

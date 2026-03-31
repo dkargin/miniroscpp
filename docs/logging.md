@@ -4,6 +4,16 @@ All miniros modules are logging to `miniros.` channel. `MINIROS_PACKAGE_NAME` ma
 By default `MINIROS_PACKAGE_NAME=unknown_package` will be used. Regular ROS was providing this macro from its CMake scripts.
 Since miniros minimizes usage of external compile options, this macro should be set manually.
 
+Format for logging messages can be overidden by environment variable `ROSCONSOLE_FORMAT`. It is initialized by `[${severity}] [${time}]: ${message}` by default.
+There are following tokens:
+ - message - contains generated message.
+ - severity - log/channel severity.
+ - time - time of log in rostime domain. 
+ - walltime - time of message in system clock domain. It is CLOCK_MONOTONIC time.
+ - file - file from which message is originating. Corresponds to place where MINIROS_LOG is invoked.
+ - function - name of function.
+ - thread - invoking thread. Corresponds to std::thread::id().
+ 
 ## Setting default log levels ## 
 
 Function `miniros::console::set_logger_level(channel, level)` can be used to set initial log levels.
@@ -40,3 +50,4 @@ Some part of internal logging is done through local log to prevent potential rec
  - http::HttpServerConnection
  - http::HttpClient
  - http::HttpRequest
+
