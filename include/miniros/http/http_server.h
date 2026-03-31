@@ -35,6 +35,9 @@ public:
   /// Start server on specific port.
   Error start(int port);
 
+  /// Start IPv6 server on sepecific port.
+  Error start6(int port);
+
   /// Stop all sockets.
   Error stop();
 
@@ -64,10 +67,6 @@ public:
 
 protected:
   friend class HttpServerConnection;
-  /// Accept client and add it to event processing.
-  /// For internal usage only.
-  /// @param sock - listening socket.
-  void acceptClient(const std::shared_ptr<Lifetime<HttpServer>>& lifetime, network::NetSocket* sock);
 
   /// It is called by HttpServerConnection when it is closed by any reason.
   void onConnectionClosed(const std::shared_ptr<HttpServerConnection>& connection, const std::string& reason);

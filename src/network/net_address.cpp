@@ -479,10 +479,35 @@ int NetAddress::port() const
   return 0;
 }
 
-
 std::string NetAddress::str() const
 {
   std::stringstream ss;
+  ss << address;
+  int p = port();
+  if (p) {
+    ss << ":" << p;
+  }
+  return ss.str();
+}
+
+std::string NetAddress::lstr() const
+{
+  std::stringstream ss;
+  switch (type_) {
+    case Type::AddressIPv4:
+      ss << "ip4:";
+      break;
+    case Type::AddressIPv6:
+      ss << "ip6:";
+      break;
+    case Type::AddressUnspecified:
+      ss << "un:";
+      break;
+    case Type::AddressInvalid:
+      ss << "invalid:";
+    default:
+      break;
+  }
   ss << address;
   int p = port();
   if (p) {

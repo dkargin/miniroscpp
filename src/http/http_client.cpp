@@ -181,10 +181,10 @@ struct HttpClient::Internal {
   ///    - Idle if no requests.
   void handleProcessResponse(Lock& lock);
 
-  /// Get name for debug otput
+  /// Get name for debug output.
   std::string debugName() const
   {
-    return address.str() + std::string(" fd=") + std::to_string(fd());
+    return address.lstr() + std::string(" fd=") + std::to_string(fd());
   }
 
   void updateState(Lock& lock, State newState);

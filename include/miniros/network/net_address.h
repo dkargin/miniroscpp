@@ -63,6 +63,9 @@ public:
   /// Generate string representation of an address.
   std::string str() const;
 
+  /// Generate longer string representation of an address.
+  std::string lstr() const;
+
   /// Check type of provided address in a string form.
   static Type checkAddressType(const std::string& address);
 
