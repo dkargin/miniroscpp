@@ -71,6 +71,8 @@ struct HttpClient::Internal {
   int idleTimeoutMs = 0;
   int reconnectAttempts = 0;
 
+  /// Some internal ID of HTTP client.
+  /// It is used for writing more distinguishable debugName() in logs.
   int id = 0;
   /// A queue of requests.
   std::deque<std::shared_ptr<HttpRequest>> requests;
@@ -89,7 +91,8 @@ struct HttpClient::Internal {
   int remotePort = 0;
 
   /// Internal state.
-  State state = State::Invalid;
+  /// State was stored as a struct originally, but storing it as an atomic proved to be problematic.
+  std::atomic<State::State_t> state{State::Invalid};
 
   /// Number of bytes sent from current part (header or body).
   size_t data_sent = 0;
@@ -112,6 +115,8 @@ struct HttpClient::Internal {
   /// Mutex for processing socket state.
   std::mutex process_guard;
 
+  /// Counter for update cycles. It is incremented every time handleSocketEvents is called.
+  /// It helps debugging multiple FSM transitions.
   std::atomic_int updateCounter = 0;
 
   /// True if owning HttpClient is still alive.
@@ -142,7 +147,7 @@ struct HttpClient::Internal {
   }
 
   /// Get socket events for specified state.
-  int eventsForState(State state) const;
+  int eventsForState(State::State_t state) const;
 
   /// Does actual connection.
   /// @param I - reference to self/Internal. Used to keep instance alive.
@@ -265,12 +270,15 @@ void HttpClient::Internal::release(Lock& lock)
 
 void HttpClient::Internal::updateState(Lock& lock, State newState)
 {
-  if (newState == state)
-    return;
+  State oldState{State::Invalid};
+  {
+    if (newState == state)
+      return;
 
-  auto oldState = state;
-  state = newState;
-  cv.notify_all();
+    oldState = state.load();
+    state = newState;
+    cv.notify_all();
+  }
 
   std::shared_ptr<HttpRequest> activeReq;
   activeReq = active_request;
@@ -279,13 +287,13 @@ void HttpClient::Internal::updateState(Lock& lock, State newState)
       newState.toString(), oldState.toString(),
       updateCounter.load(), activeReq->id(), activeReq->elapsed().toSec());
   } else {
-    assert(!state.hasRequest());
+    assert(!State(state).hasRequest());
     LOCAL_DEBUG("HttpClient[%s]::updateState(%s) from %s at step=%d", debugName().c_str(),
       newState.toString(), oldState.toString(), updateCounter.load());
   }
 }
 
-int HttpClient::Internal::eventsForState(State s) const
+int HttpClient::Internal::eventsForState(State::State_t s) const
 {
   switch (s) {
     case State::Invalid:
@@ -351,7 +359,7 @@ bool HttpClient::Internal::pullNewTask(Lock& processLock)
 
 void HttpClient::Internal::handleDisconnect(Lock& lock, Error disconnectError)
 {
-  State stateCopy = state;
+  State stateCopy = state.load();
 
   if (socket && socket->valid()) {
     poll_set->setEvents(fd(), 0);
@@ -430,7 +438,7 @@ void HttpClient::setIdleTimeoutHandler(int timeoutMs, TimeoutHandler&& handler)
   internal_->idleTimeoutMs = timeoutMs;
 
   // If we're currently in Idle state and have a valid socket, set the timer
-  if (internal_->state == State::Idle && internal_->socket && internal_->poll_set && timeoutMs > 0) {
+  if (internal_->state.load() == State::Idle && internal_->socket && internal_->poll_set && timeoutMs > 0) {
     internal_->poll_set->setTimerEvent(internal_->socket->fd(), timeoutMs);
     LOCAL_INFO("HttpClient[%s]::setIdleTimeoutHandler: Set idle timeout timer to %d ms", internal_->debugName().c_str(), timeoutMs);
   }
@@ -540,13 +548,12 @@ HttpClient::State HttpClient::getState() const
 {
   if (!internal_)
     return State::Invalid;
-  Lock lock(internal_->process_guard, THIS_LOCATION);
-  return internal_->state;
+  return internal_->state.load();
 }
 
 bool HttpClient::isActive() const
 {
-  State s = getState();
+  State s = internal_->state.load();
   if (s == State::Invalid || s == State::Idle)
     return false;
   return true;
@@ -613,7 +620,7 @@ Error HttpClient::enqueueRequest(const std::shared_ptr<HttpRequest>& request)
 
   Lock lock2(internal_->process_guard, THIS_LOCATION);
   // If we're in Idle state and have a valid socket, trigger processing
-  if (internal_->state == State::Idle && internal_->socket && internal_->socket->valid()) {
+  if (internal_->state.load() == State::Idle && internal_->socket && internal_->socket->valid()) {
     if (internal_->pullNewTask(lock2)) {
       // There is some probability that the task we pulled is not the same task we have enqueued.
       // It can happen if several threads are enqueuing requests.
@@ -787,7 +794,7 @@ Error HttpClient::waitConnected(const WallDuration& duration)
   if (!internal_->socket || !internal_->socket->valid())
     return Error::InvalidHandle;
 
-  std::unique_lock lock(internal_->process_guard);
+  Lock lock(internal_->process_guard, THIS_LOCATION, 0.02);
   if (internal_->cv.wait_for(lock, std::chrono::duration<double>(duration.toSec()),
     [this]() {
       switch (internal_->state) {
@@ -815,15 +822,16 @@ int HttpClient::handleSocketEvents(const std::shared_ptr<Internal>& I, int evtFl
 
   // TODO: Disable it once most transport bugs are resolved.
   LOCAL_DEBUG("HttpClient[%s]::handleSocketEvents(%s) in state %s", I->debugName().c_str(),
-    PollSet::eventToString(evtFlags).c_str(), I->state.toString());
+    PollSet::eventToString(evtFlags).c_str(), State(I->state).toString());
 
   MINIROS_PROFILE_SCOPE2("HttpClient", "handleSocketEvents");
 
-  Lock lock(I->process_guard, THIS_LOCATION);
+  Lock lock(I->process_guard, THIS_LOCATION, 0.02);
   /// Keep a copy of itself.
   ++I->updateCounter;
-  State& state = I->state;
-  State initialState = state;
+
+  auto& state = I->state;
+  State initialState = state.load();
 
   // The following states are expected to fall through.
   // Each "handle" method can update internal state.
@@ -873,7 +881,7 @@ int HttpClient::handleSocketEvents(const std::shared_ptr<Internal>& I, int evtFl
         if (I->onIdleTimeout && I->socket) {
           auto callback = I->onIdleTimeout;
           auto socket = I->socket;
-          State stateCopy = state;
+          State stateCopy = state.load();
           ScopedUnlock unlock(lock);
           callback(socket, stateCopy);
         }
@@ -914,7 +922,7 @@ int HttpClient::handleSocketEvents(const std::shared_ptr<Internal>& I, int evtFl
     // Nothing to do here.
   } else if (stateChanges == 0 && state != State::Invalid) {
     std::string evt = PollSet::eventToString(evtFlags);
-    LOCAL_WARN("HttpClient unhandled events: %s in state %s", evt.c_str(), state.toString());
+    LOCAL_WARN("HttpClient unhandled events: %s in state %s", evt.c_str(), State(state).toString());
   }
 
   if (state == State::Idle && initialState != State::Idle && I->idleTimeoutMs > 0) {

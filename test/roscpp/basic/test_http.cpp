@@ -65,7 +65,7 @@ public:
     Error err = server_->start(0);
     ASSERT_EQ(err, Error::Ok);
     watchdog_ = std::make_unique<Watchdog>(SIGQUIT);
-    //watchdog_->watch(10000);
+    watchdog_->watch(50000);
   }
 
   void TearDown() override
