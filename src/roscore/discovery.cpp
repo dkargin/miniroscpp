@@ -211,13 +211,17 @@ void Discovery::Internal::onSocketEvent(network::NetSocket& s, int role, int eve
     return;
   }
 
+  if (packet.uuid == uuid) {
+    // This is our own packet.
+    return;
+  }
+
   discoveryEvent.uuid = packet.uuid;
   discoveryEvent.version = packet.version;
   discoveryEvent.masterUri.scheme = "http://";
   discoveryEvent.masterUri.port = packet.masterPort;
   discoveryEvent.masterUri.host = masterAddr.address;
 
-  MINIROS_INFO("Got broadcast from %s", discoveryEvent.masterUri.host.c_str());
   if (callback) {
     callback(discoveryEvent);
   }

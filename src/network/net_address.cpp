@@ -261,7 +261,6 @@ Error addressFromString(NetAddress::Type type, const std::string& address, int p
     }
   }
 
-  // Free the addrinfo structure
   freeaddrinfo(res);
   return assigned ? Error::Ok : Error::InvalidValue;
 }

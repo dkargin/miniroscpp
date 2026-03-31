@@ -38,6 +38,7 @@ struct NetSocket::Internal {
   /// Close socket and reset all data.
   void close()
   {
+    LOCAL_DEBUG("Socket[%d]::close()", fd);
     if (own && fd != MINIROS_INVALID_SOCKET) {
       close_socket(fd);
     }
@@ -193,6 +194,8 @@ Error NetSocket::tcpSocket(NetAddress::Type type)
         disconnect();
         return Error::Ok;
       }
+      // Reuse current socket.
+      return Error::Ok;
     } else {
       // Different type. It must be closed.
       close();
@@ -233,6 +236,11 @@ Error NetSocket::tcpListen(int port, NetAddress::Type type, int maxQueuedClients
     return err;
   }
 
+  if (isIpv6()) {
+    int opt = 1;
+    setsockopt(internal_->fd, IPPROTO_IPV6, IPV6_V6ONLY, (char *)&opt, sizeof(opt));
+  }
+
   if (Error err = bind(port); !err) {
     MINIROS_ERROR_NAMED("socket", "NetSocket[%d]::tcpListen() - error binding to port %d: %s", internal_->fd, port, err.toString());
     close();
@@ -267,8 +275,12 @@ Error NetSocket::tcpConnect(const NetAddress& address, bool nonblock)
     setNonBlock();
   }
 
-  if (::connect(internal_->fd, rawAddr, addrLen) != 0) {
+  int fd = internal_->fd;
+  assert(fd != MINIROS_INVALID_SOCKET);
+
+  if (::connect(fd, rawAddr, addrLen) != 0) {
     int err = last_socket_error();
+    const char* errStr = last_socket_error_string();
 
     if (err == EINPROGRESS && internal_->nonblock) {
       // This is expected error and connection attempt will be retried later.
@@ -276,16 +288,16 @@ Error NetSocket::tcpConnect(const NetAddress& address, bool nonblock)
       internal_->state = State::Connecting;
       return Error::WouldBlock;
     }
-    // Close socket on error
-    close();
 
     // Map timeout error if applicable
     if (err == ETIMEDOUT) {
       return Error::Timeout;
     }
 
-    const char* errStr = last_socket_error_string();
-    MINIROS_ERROR_NAMED("socket", "NetSocket[%d]::tcpConnect() error while connecting TCP socket to %s: %s", internal_->fd, address.str().c_str(), errStr);
+    MINIROS_ERROR_NAMED("socket", "NetSocket[%d]::tcpConnect() error while connecting TCP socket to %s: %s", fd, address.str().c_str(), errStr);
+
+    // Close socket on error
+    close();
 
     return Error::SystemError;
   }
@@ -380,7 +392,7 @@ Error NetSocket::setNonBlock()
 
   int result = set_non_blocking(internal_->fd);
   if ( result != 0 ) {
-    MINIROS_ERROR_NAMED("socket", "NetSocket[%d]::setNonBlock() failed with error [%d]", internal_->fd, result);
+    LOCAL_ERROR("NetSocket[%d]::setNonBlock() failed with error [%d]", internal_->fd, result);
     return Error::SystemError;
   }
   internal_->nonblock = true;
@@ -803,7 +815,7 @@ void NetSocket::disconnect()
 #else
     int flags = SHUT_RDWR;
 #endif
-    shutdown(internal_->fd, flags);
+    ::shutdown(internal_->fd, flags);
     internal_->state = State::Initial;
   }
 }

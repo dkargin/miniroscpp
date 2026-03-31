@@ -245,6 +245,14 @@ Error RPCManager::start(const CallbackQueuePtr& cb, int port)
   internal_->http_server_->registerEndpoint(std::make_unique<http::SimpleFilter>(http::HttpMethod::Post, "/RPC2"), xmlrpc_enpoint, cb);
 
   if (Error err = internal_->http_server_->start(port); !err) {
+    MINIROS_ERROR("Failed to start ipv4 RPC server");
+    internal_->http_server_->stop();
+    return err;
+  }
+
+  if (Error err = internal_->http_server_->start6(port); !err) {
+    MINIROS_ERROR("Failed to start ipv6 RPC server");
+    internal_->http_server_->stop();
     return err;
   }
 
@@ -353,11 +361,16 @@ std::shared_ptr<http::HttpClient> RPCManager::getXMLRPCClient(const std::string 
   auto client = std::make_shared<http::HttpClient>(internal_->poll_set_);
   int reconnectTimeoutMs = 500;
   client->setDisconnectHandler(
-    [wclient = std::weak_ptr(client), reconnectTimeoutMs](std::shared_ptr<network::NetSocket>& socket, http::HttpClient::State state, Error err)
+    [wclient = std::weak_ptr(client), reconnectTimeoutMs](std::shared_ptr<network::NetSocket>& socket, http::HttpClient::State state, Error disconnectErr)
     {
       auto client = wclient.lock();
-      if (client && client->getReconnectAttempts() < 10 && client->getQueuedRequests() > 0) {
-        client->reconnect(reconnectTimeoutMs);
+      if (client && client->getQueuedRequests() > 0) {
+        if (Error err = client->reconnect(reconnectTimeoutMs); !err) {
+          LOCAL_ERROR("RPCManager:: failed to initiate reconnect for cached client: %s", err.toString());
+        }
+      } else {
+        // Nothing to do here. These clients are used by MasterLink::execute.
+        // Its logic will deal with timeouts during connection attempts.
       }
     });
   client->setIdleTimeoutHandler(internal_->clientIdleTimeoutMs,
@@ -388,8 +401,7 @@ void RPCManager::releaseXMLRPCClient(std::shared_ptr<http::HttpClient> c)
 {
   if (!internal_)
     return;
-  // TODO: Put client on timeout.
-  // In case of "idle" state it should disconnect itself and remove it from RPC manager.
+
   std::scoped_lock<std::mutex> lock(internal_->clients_mutex_);
   auto rootUrl = c->getRootURL("http://");
   
@@ -412,8 +424,12 @@ void RPCManager::releaseXMLRPCClient(std::shared_ptr<http::HttpClient> c)
   }
 
   if (it != internal_->clients_.end()) {
-    MINIROS_INFO("RPCManager::releaseXMLRPCClient dropping stale client to %s fd=%d", rootUrl.str().c_str(), c->fd());
-    internal_->clients_.erase(it);
+    http::HttpClient::State state = c->getState();
+    if (state != http::HttpClient::State::Idle) {
+      // State::Idle = reuse, other states = delete.
+      MINIROS_INFO("RPCManager::releaseXMLRPCClient dropping stale client to %s fd=%d", rootUrl.str().c_str(), c->fd());
+      internal_->clients_.erase(it);
+    }
   }
 }
 

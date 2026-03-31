@@ -592,6 +592,9 @@ std::string PollSet::eventToString(int event)
 #ifdef POLLRDHUP
   EVT_FLAG(POLLRDHUP, "Rdh");
 #endif
+
+  // Custom timer event flag.
+  EVT_FLAG(EventTimer, 'T');
   if (event != 0) {
     result += "_";
     result += std::to_string(event);
