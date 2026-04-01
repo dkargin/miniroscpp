@@ -575,7 +575,7 @@ int main(int argc, char** argv)
 {
   testing::InitGoogleTest(&argc, argv);
   miniros::handleCrashes();
-
+  miniros::setThreadName("main");
   miniros::console::set_logger_level("destructor", console::Level::Debug);
   miniros::console::set_logger_level("miniros.http", console::Level::Debug);
   miniros::console::set_logger_level("miniros.poll_set", console::Level::Debug);

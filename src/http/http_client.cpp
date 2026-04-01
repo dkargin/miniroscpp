@@ -8,6 +8,7 @@
 #include <chrono>
 #include <memory>
 
+/// This log channel maps to miniros.http
 #define MINIROS_PACKAGE_NAME "http"
 
 #include "miniros/console.h"
@@ -302,6 +303,8 @@ int HttpClient::Internal::eventsForState(State::State_t s) const
       return PollSet::EventOut;
     case State::WaitReconnect:
       return 0;
+    case State::WaitingAddress:
+      return 0;
     case State::Idle:
       return 0;
     case State::WriteRequest:
@@ -315,6 +318,7 @@ int HttpClient::Internal::eventsForState(State::State_t s) const
     default:
       return 0;
   }
+  LOCAL_ERROR("HttpClient::eventsForState(%s) - unhandled state", State(s).toString());
   return 0;
 }
 
@@ -630,9 +634,11 @@ Error HttpClient::enqueueRequest(const std::shared_ptr<HttpRequest>& request)
       internal_->handleWriteRequest(lock2, 0, true);
 
       if (!internal_->poll_set->setEvents(internal_->socket->fd(), internal_->eventsForState(internal_->state))) {
-        LOCAL_ERROR("HttpClient(%d) Failed to update poll set to enable events to send request", internal_->fd());
+        LOCAL_ERROR("HttpClient(%s)::enqueueRequest failed to update poll set to enable events to send request", internal_->debugName().c_str());
       }
       immediate = true;
+    } else {
+      LOCAL_ERROR("HttpClient(%s)::enqueueRequest failed to update poll set to enable events to send request", internal_->debugName().c_str());
     }
   }
 
@@ -742,10 +748,9 @@ Error HttpClient::Internal::connectImpl(const std::shared_ptr<Internal>& I, Lock
     socket.reset(new NetSocket());
   }
 
-  LOCAL_WARN("HttpClient[%s]::connectImpl initiating connection to %s:%d", debugName().c_str(), address.address.c_str(), address.port());
-
-  socket->setKeepAlive(true);
   Error err = socket->tcpConnect(newAddress, true);
+
+  LOCAL_WARN("HttpClient[%s]::connectImpl initiating connection to %s:%d", debugName().c_str(), address.address.c_str(), address.port());
 
   // Store host and port for:
   // 1. Reconnect.
@@ -762,7 +767,7 @@ Error HttpClient::Internal::connectImpl(const std::shared_ptr<Internal>& I, Lock
     LOCAL_WARN("HttpClient[%s]::connect failed to initialize connection to %s:%d", debugName().c_str(), address.address.c_str(), address.port());
     return err;
   }
-
+  socket->setKeepAlive(true);
   updateState(lock, connected ? State::Idle : State::Connecting);
 
   bool ret = initSocketEvents(I, lock);
@@ -777,9 +782,9 @@ bool HttpClient::Internal::initSocketEvents(const std::shared_ptr<Internal>& I, 
   poll_registered = poll_set->addSocket(socket->fd(), events,
     [wptr = std::weak_ptr(I)](int event)
       {
-        auto ptr = wptr.lock();
-        if (ptr)
+        if (auto ptr = wptr.lock())
           return handleSocketEvents(ptr, event);
+        LOCAL_WARN("HttpClient::handleSocketEvents() - call for destroyed client instance");
         return 0;
       }, {}, THIS_LOCATION);
   return poll_registered;
@@ -817,16 +822,18 @@ Error HttpClient::waitConnected(const WallDuration& duration)
 
 int HttpClient::handleSocketEvents(const std::shared_ptr<Internal>& I, int evtFlags)
 {
-  if (!I)
+  if (!I) {
+    LOCAL_ERROR("HttpClient::handleSocketEvents() - invalid pointer to internal");
     return 0;
-
-  // TODO: Disable it once most transport bugs are resolved.
-  LOCAL_DEBUG("HttpClient[%s]::handleSocketEvents(%s) in state %s", I->debugName().c_str(),
-    PollSet::eventToString(evtFlags).c_str(), State(I->state).toString());
+  }
 
   MINIROS_PROFILE_SCOPE2("HttpClient", "handleSocketEvents");
 
   Lock lock(I->process_guard, THIS_LOCATION, 0.02);
+
+  LOCAL_DEBUG("HttpClient[%s]::handleSocketEvents(%s) in state %s", I->debugName().c_str(),
+    PollSet::eventToString(evtFlags).c_str(), State(I->state).toString());
+
   /// Keep a copy of itself.
   ++I->updateCounter;
 
@@ -929,7 +936,10 @@ int HttpClient::handleSocketEvents(const std::shared_ptr<Internal>& I, int evtFl
     I->poll_set->setTimerEvent(I->socket->fd(), I->idleTimeoutMs);
   }
 
-  return I->eventsForState(I->state);
+  int newEvt = I->eventsForState(state);
+  LOCAL_DEBUG("HttpClient::handleSocketEvents() exit in state %s new evt=%s", State(state).toString(),
+    PollSet::eventToString(newEvt).c_str());
+  return newEvt;
 }
 
 void HttpClient::Internal::handleWaitAddress(const std::shared_ptr<Internal>& I, Lock& lock, int events)
