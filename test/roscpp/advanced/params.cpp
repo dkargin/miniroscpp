@@ -582,6 +582,12 @@ TEST(Params, getParamCachedSetParamLoop) {
 int main(int argc, char** argv)
 {
   testing::InitGoogleTest(&argc, argv);
+  miniros::handleCrashes();
+  miniros::console::set_logger_level("destructor", console::Level::Debug);
+  miniros::console::set_logger_level("miniros.http", console::Level::Debug);
+  miniros::console::set_logger_level("poll_set", console::Level::Debug);
+  miniros::console::set_logger_level("net", console::Level::Debug);
+
   miniros::init(argc, argv, "params");
 
   // These parameters were set by a rostest/roslaunch.
