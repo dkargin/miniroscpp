@@ -593,10 +593,23 @@ int main(int argc, char** argv)
   // These parameters were set by a rostest/roslaunch.
   // We set these manually to mimic behaviour of original test without roslaunch.
   auto master = miniros::getMasterLink();
-  master->set("string", "test");
-  master->set("int", 10);
-  master->set("double", 10.5);
-  master->set("bool", false);
+  if (!master->set("string", "test"))
+    return EXIT_FAILURE;
+  if (!master->set("int", 10))
+    return EXIT_FAILURE;
+  if (!master->set("double", 10.5))
+    return EXIT_FAILURE;
+  if (!master->set("bool", false))
+    return EXIT_FAILURE;
+
+  // Clean up parameters left from previous test run.
+  master->del("test_set_param_setThenGetStringCached");
+  master->del("test_set_param_setThenGetStringCachedNodeHandle");
+  master->del("test_set_param_setThenGetStringCached2");
+  master->del("/a/b/c/d/e/f/s_c");
+  master->del("/a/b/c/d/e/f/s_b");
+  master->del("/s_b");
+  master->del("/s_c");
 
   miniros::NodeHandle nh;
 
