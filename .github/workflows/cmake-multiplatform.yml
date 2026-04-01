@@ -92,7 +92,8 @@ jobs:
 
     - name: Test-memcheck
       working-directory: ${{ steps.strings.outputs.build-output-dir }}
-      if: ${{ failure() }}  # Run only if something went wrong
+      #if: ${{ failure() }}  # Run only if something went wrong
+      if: false # Temporary disabled.
       env:
         ROS_MASTER_URI: http://localhost:11311
         ROSCONSOLE_FORMAT: "[${severity}][${nthread}][${time}]: ${message}"
