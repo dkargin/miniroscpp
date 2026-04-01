@@ -578,8 +578,8 @@ int main(int argc, char** argv)
 
   miniros::console::set_logger_level("destructor", console::Level::Debug);
   miniros::console::set_logger_level("miniros.http", console::Level::Debug);
-  miniros::console::set_logger_level("poll_set", console::Level::Debug);
-  miniros::console::set_logger_level("net", console::Level::Debug);
+  miniros::console::set_logger_level("miniros.poll_set", console::Level::Debug);
+  miniros::console::set_logger_level("miniros.net", console::Level::Debug);
 
   return RUN_ALL_TESTS();
 }
