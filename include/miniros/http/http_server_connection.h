@@ -11,8 +11,6 @@
 #include "miniros/http/http_tools.h"
 #include "miniros/http/http_request.h"
 
-#include "miniros/steady_timer.h"
-
 
 namespace miniros {
 
@@ -38,8 +36,7 @@ public:
 
   /// Handler for socket/poll events.
   /// @param evtFlags event flags from poll
-  /// @returns new event mask
-  int handleEvents(int evtFlags);
+  void handleEvents(int evtFlags);
 
   struct MINIROS_DECL State {
     enum State_t {

@@ -404,7 +404,6 @@ void HttpClient::Internal::handleDisconnect(Lock& lock, Error disconnectError)
   } else {
     LOCAL_INFO("HttpClient[%s]::handleDisconnect() - connection is closed from state %s, err=%s, no callback", debugName().c_str(), stateCopy.toString(), disconnectError.toString());
   }
-
 }
 
 void HttpClient::setDisconnectHandler(DisconnectHandler&& handler)
@@ -778,13 +777,15 @@ Error HttpClient::Internal::connectImpl(const std::shared_ptr<Internal>& I, Lock
 
 bool HttpClient::Internal::initSocketEvents(const std::shared_ptr<Internal>& I, Lock& /*lock*/)
 {
-  const int events = eventsForState(state) | PollSet::EventUpdate;
+  const int events = eventsForState(state);
   poll_registered = poll_set->addSocket(socket->fd(), events,
     [wptr = std::weak_ptr(I)](int event)
       {
-        if (auto ptr = wptr.lock())
-          return handleSocketEvents(ptr, event);
-        LOCAL_WARN("HttpClient::handleSocketEvents() - call for destroyed client instance");
+        if (auto ptr = wptr.lock()) {
+          handleSocketEvents(ptr, event);
+          return 0;
+        }
+        LOCAL_WARN("HttpClient[?]::handleSocketEvents() - call for destroyed client instance");
         return 0;
       }, {}, THIS_LOCATION);
   return poll_registered;
@@ -820,11 +821,10 @@ Error HttpClient::waitConnected(const WallDuration& duration)
   return Error::Timeout;
 }
 
-int HttpClient::handleSocketEvents(const std::shared_ptr<Internal>& I, int evtFlags)
+void HttpClient::handleSocketEvents(const std::shared_ptr<Internal>& I, int evtFlags)
 {
   if (!I) {
     LOCAL_ERROR("HttpClient::handleSocketEvents() - invalid pointer to internal");
-    return 0;
   }
 
   MINIROS_PROFILE_SCOPE2("HttpClient", "handleSocketEvents");
@@ -932,14 +932,19 @@ int HttpClient::handleSocketEvents(const std::shared_ptr<Internal>& I, int evtFl
     LOCAL_WARN("HttpClient unhandled events: %s in state %s", evt.c_str(), State(state).toString());
   }
 
-  if (state == State::Idle && initialState != State::Idle && I->idleTimeoutMs > 0) {
-    I->poll_set->setTimerEvent(I->socket->fd(), I->idleTimeoutMs);
-  }
+  // Update event flags.
+  // Socket can be destroyed in disconnect handler.
+  if (I->socket && I->socket->valid()) {
+    int fd = I->socket->fd();
+    if (state == State::Idle && initialState != State::Idle && I->idleTimeoutMs > 0) {
+      I->poll_set->setTimerEvent(fd, I->idleTimeoutMs);
+    }
 
-  int newEvt = I->eventsForState(state);
-  LOCAL_DEBUG("HttpClient::handleSocketEvents() exit in state %s new evt=%s", State(state).toString(),
-    PollSet::eventToString(newEvt).c_str());
-  return newEvt;
+    int newEvt = I->eventsForState(state);
+    LOCAL_DEBUG("HttpClient::handleSocketEvents() exit in state %s new evt=%s", State(state).toString(),
+      PollSet::eventToString(newEvt).c_str());
+    I->poll_set->setEvents(fd, newEvt);
+  }
 }
 
 void HttpClient::Internal::handleWaitAddress(const std::shared_ptr<Internal>& I, Lock& lock, int events)

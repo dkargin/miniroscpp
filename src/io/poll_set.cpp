@@ -384,8 +384,6 @@ void PollSet::signal()
   }
 }
 
-#define VERY_DETAILED_LOG
-
 void PollSet::update(int poll_timeout)
 {
   MINIROS_PROFILE_SCOPE2("PollSet", "update");

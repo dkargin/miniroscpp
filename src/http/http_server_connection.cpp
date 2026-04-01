@@ -55,17 +55,14 @@ void HttpServerConnection::attachPollSet(PollSet* poll_set)
   assert(!poll_set_);
   assert(poll_set);
   poll_set_ = poll_set;
-  poll_set_->addSocket(socket_->fd(), PollSet::EventIn | PollSet::EventUpdate,
+  poll_set_->addSocket(socket_->fd(), PollSet::EventIn,
     [wconnection = weak_from_this()](int flags)
     {
       auto connection = wconnection.lock();
       if (!connection)
         return 0;
-      int newFlags = connection->handleEvents(flags);
-      if (!newFlags) {
-        //closeConnection(lock, fd, "EOF");
-      }
-      return newFlags;
+      connection->handleEvents(flags);
+      return 0;
   }, {}, THIS_LOCATION);
 }
 
@@ -346,7 +343,7 @@ void HttpServerConnection::handleWriteResponse(Lock& lock, int& evtFlags, bool f
   }
 }
 
-int HttpServerConnection::handleEvents(int evtFlags)
+void HttpServerConnection::handleEvents(int evtFlags)
 {
   Lock lock(guard_, THIS_LOCATION);
 
@@ -377,7 +374,8 @@ int HttpServerConnection::handleEvents(int evtFlags)
       PollSet::eventToString(evtFlags).c_str(),
       state_.toString());
   }
-  return eventsForState(state_);
+
+  poll_set_->setEvents(fd(), eventsForState(state_));
 }
 
 void HttpServerConnection::doWriteResponse(Lock& lock, const std::shared_ptr<HttpRequest>& req, Error error)

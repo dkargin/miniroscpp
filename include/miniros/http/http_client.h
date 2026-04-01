@@ -166,7 +166,7 @@ protected:
   struct Internal;
 
   /// Handle socket events from PollSet.
-  static int handleSocketEvents(const std::shared_ptr<Internal>& I, int events);
+  static void handleSocketEvents(const std::shared_ptr<Internal>& I, int events);
 
   /// Close and release internal data.
   /// It will:

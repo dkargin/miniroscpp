@@ -59,7 +59,6 @@ public:
   PollSet();
   ~PollSet();
 
-
   /// Use this flag to subscribe to "input" events. They are equal to POLLIN.
   static const int EventIn;
   /// Use this flag to get notified when output is possible. It is equal to POLLOUT.
@@ -69,11 +68,14 @@ public:
 
   /// Low precision timer event.
   static constexpr int EventTimer = 1<<29;
+
   /// Add this evt flag to update event flags by return value from SocketUpdateFunc.
+  /// NOTE: This mechanic is dangerous and leads to racing conditions in a big components.
   static constexpr int EventUpdate = 1 << 30;
 
   /// Drop FD from poll set.
   /// It can be returned by event handler.
+  /// NOTE: This mechanic is dangerous and leads to racing conditions in a big components.
   static const int ResultDropFD = 1 << 24;
 
   /// Object to be kept back during active callback.
@@ -81,7 +83,6 @@ public:
 
   typedef std::function<int (int)> SocketUpdateFunc;
 
-  typedef std::function<void (int)> SocketUpdateVoidFunc;
   /**
    * \brief Add a socket.
    *
