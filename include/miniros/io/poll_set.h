@@ -52,6 +52,13 @@ namespace miniros
  *
  * Warning: PollSet must not use rosconsole in any way. This class is used too early
  * and used for all socket interactions, including rosconsole.
+ *
+ * There are two mutually exclusive strategies for updating events on sockets: direct set/add/delEvents and EventUpdate from callback.
+ * 1. Direct set/add/delEvents. It should be used when PollSet thread can not be the only thread to update event flags, like HttpClient.
+ *    Most of changes to event flags are done from event handler from polling thread. But occasional calls to enqueue(Request) from
+ *    different thread require mutex to lock both event flags and internal state of HttpClient.
+ * 2. EventUpdate method: event handler returns new set of event flags. This method can be used only if changes to event flags
+ *    can happen only from event handler. This method was used mostly by objects in XmlRpc.
  */
 class MINIROS_DECL PollSet
 {
