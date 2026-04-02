@@ -21,10 +21,13 @@ class MINIROS_DECL NetAddress {
 public:
   enum Type {
     AddressInvalid,
-    AddressIPv4,
-    AddressIPv6,
     /// Unspecified address type. Used for creating NetAddress address from arbitrary hostname.
     AddressUnspecified,
+
+    AddressIPv4,
+    AddressIPv6,
+
+    // AddressUnix.
   };
 
   /// String representation of network address.
@@ -59,6 +62,9 @@ public:
 
   /// Generate string representation of an address.
   std::string str() const;
+
+  /// Generate longer string representation of an address.
+  std::string lstr() const;
 
   /// Check type of provided address in a string form.
   static Type checkAddressType(const std::string& address);
@@ -138,6 +144,9 @@ MINIROS_DECL Error readRemoteAddress(int sockfd, NetAddress& address);
 
 /// Fill in broadcast address with specific port.
 MINIROS_DECL Error fillBroadcastAddress(NetAddress& address, int port, NetAddress::Type type);
+
+/// Make network address from string.
+MINIROS_DECL Error addressFromString(NetAddress::Type type, const std::string& address, int port, NetAddress& result);
 
 /// Information about connection to client.
 struct MINIROS_DECL ClientInfo {

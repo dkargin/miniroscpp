@@ -24,7 +24,13 @@ struct ClientInfo;
 
 namespace http {
 
-/// Persistent HTTP connection.
+/// Persistent connection to remote HTTP server .
+///
+/// Reconnection policy:
+/// HttpClient does not reconnect automatically in case of errors. Instead, it switches to disconnected state and calls
+/// user-provided DisconnectHandler handler. User can choose to call `HttpClient::reconnect` to initiate reconnect after
+/// some specified timeout. Reconnection will go to the same address, specified in HttpClient::connect. All this actions
+/// will be done in PollSet polling thread.
 class MINIROS_DECL HttpClient {
 public:
   using NetSocket = network::NetSocket;
@@ -36,6 +42,8 @@ public:
     enum State_t {
       /// No socket or connection available.
       Invalid,
+      /// Waiting for proper IP address to connect.
+      WaitingAddress,
       /// Connecting to server or on timeout.
       /// Client has some valid socket, valid destination address, but connection is not established.
       /// User can start adding requests to client. They will be processed right after connection is established.
@@ -92,14 +100,6 @@ public:
   ///  - Internal error if internal_ is empty.
   Error dropRequest(const std::shared_ptr<HttpRequest>& request);
 
-  /// Close and release internal data.
-  /// It will:
-  ///  - detach from PollSet
-  ///  - close socket
-  ///  - drop all connections
-  /// It will leave client in Invalid unusable state.
-  void release();
-
   /// Detach from socket.
   std::shared_ptr<network::NetSocket> detach();
 
@@ -114,8 +114,9 @@ public:
   /// Get number of queued requests, including active one.
   size_t getQueuedRequests() const;
 
-  /// Called when TCP connection is broken.
-  using DisconnectHandler = std::function<void (std::shared_ptr<NetSocket>& socket, State state)>;
+  /// DisconnectHandler is called by PollSet thread when TCP connection is broken or some serious error happens.
+  /// User can call `HttpClient::reconnect` to initiate reconnect.
+  using DisconnectHandler = std::function<void (std::shared_ptr<NetSocket>& socket, State state, Error error)>;
 
   /// Sets callback for disconnect event.
   /// Handler will be called when disconnect will happen. It can be during async connection, or any other active state.
@@ -165,7 +166,15 @@ protected:
   struct Internal;
 
   /// Handle socket events from PollSet.
-  static int handleSocketEvents(const std::shared_ptr<Internal>& I, int events);
+  static void handleSocketEvents(const std::shared_ptr<Internal>& I, int events);
+
+  /// Close and release internal data.
+  /// It will:
+  ///  - detach from PollSet
+  ///  - close socket
+  ///  - drop all connections
+  /// It will leave client in Invalid unusable state.
+  void release();
 
 private:
   /// Shared pointer is used to resolve racing condition with handleEvent callback from other thread.

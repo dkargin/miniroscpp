@@ -35,6 +35,25 @@ public:
     UDPv6
   };
 
+  /// Some high level state of a socket.
+  enum class State {
+    /// Socket is in invalid state. No fd is assigned.
+    Invalid,
+    /// Socket is just created.
+    /// UDP sockets are staying in this state forever.
+    Initial,
+    /// Socket is in listening state.
+    /// Corresponds to TCP listening socket.
+    Listening,
+    /// TCP socket is connecting somewhere.
+    Connecting,
+
+    Connected,
+
+    /// Adopted external file descriptor without knowing its actual state.
+    Unknown,
+  };
+
   /// Creates object without any bound socket.
   NetSocket();
 
@@ -42,7 +61,7 @@ public:
   /// @param fd - socket file descriptor
   /// @param type - socket type.
   /// @param own - should socket completely own descriptor and close it in destructor.
-  NetSocket(int fd, Type type, bool own);
+  NetSocket(int fd, Type type, bool own, State state = State::Unknown);
 
   virtual ~NetSocket();
 
@@ -71,11 +90,16 @@ public:
 
   Error setKeepAlive(bool keepAlive);
 
+  /// Initialize TCP socket.
+  Error tcpSocket(NetAddress::Type type);
+
   /// Allocate tcp port and start listening.
+  /// It can potentially change file descriptor.
   Error tcpListen(int port, NetAddress::Type type, int maxQueuedClients=100);
 
   /// Connect to specified TCP address.
   /// Previous connection will be immediately closed.
+  /// It can potentially change internal file descriptor.
   /// @param address - destination address
   /// @param nonblock - connect in nonblock mode. Actual state should be processed by PollSet.
   /// @returns possible errors:
@@ -88,7 +112,6 @@ public:
   /// Enter listening mode.
   /// Socket must be already created.
   Error listen(int maxQueuedClients);
-
 
   /// Initialize UDP ipv4 socket.
   /// @param ip6 - should create ipv6 socket.
@@ -110,6 +133,7 @@ public:
   bool valid() const;
 
   /// Close and reset socket.
+  /// Socket will return to `State::Invalid`.
   void close();
 
   /// Check if socket is in datagram mode.
@@ -126,6 +150,9 @@ public:
 
   /// Check if socket is connecting to remote host.
   bool isConnecting() const;
+
+  /// Check if socket is already in connected state.
+  bool isConnected() const;
 
   /// Check if connection is complete and clear connecting flag.
   /// @returns:
@@ -163,6 +190,10 @@ public:
   /// Get system error from socket.
   /// It can be used to extract error when poll/epoll returned POLLERR event.
   int getSysError() const;
+
+  /// Terminate active connection.
+  /// Socket will return to Initial state, preserving current fd.
+  void disconnect();
 
 protected:
   struct Internal;

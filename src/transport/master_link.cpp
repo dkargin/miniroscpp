@@ -36,6 +36,7 @@
 
 #include "http/http_client.h"
 #include "http/xmlrpc_request.h"
+#include "internal/at_exit.h"
 #include "internal/profiling.h"
 #include "internal/xml_tools.h"
 #include "miniros/names.h"
@@ -264,6 +265,9 @@ Error MasterLink::execute(const std::string& method, const RpcValue& request, Rp
     LOCAL_ERROR("[%s] - failed make connection to host=\"%s:%d\"", method.c_str(), master_host.c_str(), master_port);
     return Error::InvalidURI;
   }
+  AtExit atExit([c, manager]() {
+    manager->releaseXMLRPCClient(c);
+  });
   // TODO: Use local PollSet to spin events. It will prevent some potential deadlocks
   // and help with standalone operation of MasterLink without fully initialized RPC manager.
   bool printed = false;
@@ -277,7 +281,7 @@ Error MasterLink::execute(const std::string& method, const RpcValue& request, Rp
   auto req = http::makeRequest("/RPC2", method);
   req->setParamArray(request);
   std::string reqName = req->debugName();
-  req->onCompleteRaw = [state, c, reqName](Error err, const RpcValue& rawResponse, bool ok_) {
+  req->onCompleteRaw = [state, reqName](Error err, const RpcValue& rawResponse, bool ok_) {
     if (state.use_count() == 1) {
       LOCAL_WARN("MasterLink::execute - unexpected response for request %s after %fs", reqName.c_str(), state->elapsed().toSec());
     } else {

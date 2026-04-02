@@ -27,13 +27,10 @@ struct NetSocket::Internal {
   /// Do we own the FD and close it on exit.
   bool own = false;
 
-  /// Socket is listening for connections.
-  bool listening = false;
-
   /// Checked if socket is in non-blocking mode.
   bool nonblock = false;
 
-  bool connecting = true;
+  State state = State::Invalid;
 
   /// Address of connected endpoint.
   NetAddress peer_address;
@@ -41,12 +38,12 @@ struct NetSocket::Internal {
   /// Close socket and reset all data.
   void close()
   {
+    LOCAL_DEBUG("Socket[%d]::close()", fd);
     if (own && fd != MINIROS_INVALID_SOCKET) {
       close_socket(fd);
     }
     own = false;
-    listening = false;
-    connecting = false;
+    state = State::Invalid;
     fd = MINIROS_INVALID_SOCKET;
     peer_address.reset();
   }
@@ -57,12 +54,13 @@ NetSocket::NetSocket()
   internal_.reset(new Internal());
 }
 
-NetSocket::NetSocket(int fd, Type type, bool own)
+NetSocket::NetSocket(int fd, Type type, bool own, State state)
 {
   internal_.reset(new Internal());
   internal_->fd = fd;
   internal_->own = own;
   internal_->type = type;
+  internal_->state = state;
   if (fd) {
     MINIROS_DEBUG_NAMED("socket", "NetSocket(%d)", fd);
   }
@@ -75,6 +73,7 @@ NetSocket::~NetSocket()
 
 void NetSocket::close()
 {
+  disconnect();
   internal_->close();
 }
 
@@ -83,7 +82,7 @@ Error NetSocket::listen(int maxQueuedClients)
   if (!valid())
     return Error::InvalidValue;
   if (::listen(internal_->fd, maxQueuedClients) == 0) {
-    internal_->listening = true;
+    internal_->state = State::Listening;
     return Error::Ok;
   }
 
@@ -179,10 +178,30 @@ int NetSocket::fd() const
   return internal_ ? internal_->fd : MINIROS_INVALID_SOCKET;
 }
 
-Error NetSocket::tcpListen(int port, NetAddress::Type type, int maxQueuedClients)
+Error NetSocket::tcpSocket(NetAddress::Type type)
 {
-  if (valid())
-    close();
+  Type sockType = Type::Invalid;
+  if (type == NetAddress::AddressIPv4)
+    sockType = Type::TCP;
+  else if (type == NetAddress::AddressIPv6)
+    sockType = Type::TCPv6;
+
+  // Socket is already created. Try to reuse it.
+  if (valid()) {
+    // Same type - directly reuse it.
+    if (sockType == internal_->type) {
+      if (internal_->state != State::Initial) {
+        disconnect();
+        return Error::Ok;
+      }
+      // Reuse current socket.
+      return Error::Ok;
+    } else {
+      // Different type. It must be closed.
+      close();
+    }
+  }
+
   int addrType = 0;
   if (type == NetAddress::AddressIPv6)
     addrType = AF_INET6;
@@ -199,24 +218,37 @@ Error NetSocket::tcpListen(int port, NetAddress::Type type, int maxQueuedClients
   }
   internal_->fd = fd;
   internal_->own = true;
-
-  if (type == NetAddress::AddressIPv4)
-    internal_->type = Type::TCP;
-  else if (type == NetAddress::AddressIPv6)
-    internal_->type = Type::TCPv6;
+  internal_->type = sockType;
+  internal_->state = State::Initial;
 
   if (Error err = setReuseAddr(); !err) {
     close();
     return err;
   }
+  return Error::Ok;
+}
 
-  if (Error err = bind(port); !err) {
-    MINIROS_ERROR_NAMED("socket", "NetSocket[%d]::tcpListen() - error binding to port %d: %s", fd, port, err.toString());
+Error NetSocket::tcpListen(int port, NetAddress::Type type, int maxQueuedClients)
+{
+  if (Error err = tcpSocket(type); !err) {
+    MINIROS_ERROR_NAMED("socket", "NetSocket[%d]::tcpListen() - error creating TCP socket: %s", internal_->fd, err.toString());
     close();
     return err;
   }
+
+  if (isIpv6()) {
+    int opt = 1;
+    setsockopt(internal_->fd, IPPROTO_IPV6, IPV6_V6ONLY, (char *)&opt, sizeof(opt));
+  }
+
+  if (Error err = bind(port); !err) {
+    MINIROS_ERROR_NAMED("socket", "NetSocket[%d]::tcpListen() - error binding to port %d: %s", internal_->fd, port, err.toString());
+    close();
+    return err;
+  }
+
   if (Error err = listen(maxQueuedClients); !err) {
-    MINIROS_ERROR_NAMED("socket", "NetSocket[%d]::tcpListen() - error while entering listening mode: %s", fd, err.toString());
+    MINIROS_ERROR_NAMED("socket", "NetSocket[%d]::tcpListen() - error while entering listening mode: %s", internal_->fd, err.toString());
     close();
     return err;
   }
@@ -225,38 +257,15 @@ Error NetSocket::tcpListen(int port, NetAddress::Type type, int maxQueuedClients
 
 Error NetSocket::tcpConnect(const NetAddress& address, bool nonblock)
 {
-  if (valid()) {
-    close();
-  }
-
   if (!address.valid()) {
     return Error::InvalidAddress;
   }
 
-  // Determine address family based on address type
-  int domain = 0;
-  Type socketType = Type::Invalid;
-  if (address.type() == NetAddress::AddressIPv6) {
-    domain = AF_INET6;
-    socketType = Type::TCPv6;
-  } else if (address.type() == NetAddress::AddressIPv4) {
-    domain = AF_INET;
-    socketType = Type::TCP;
-  } else {
-    return Error::InvalidValue;
+  if (Error err = tcpSocket(address.type()); !err) {
+    MINIROS_ERROR_NAMED("socket", "NetSocket[%d]::tcpListen() - error creating TCP socket: %s", internal_->fd, err.toString());
+    close();
+    return err;
   }
-
-  // Create TCP socket
-  int fd = socket(domain, SOCK_STREAM, IPPROTO_TCP);
-  if (fd < 0) {
-    const char* err = last_socket_error_string();
-    MINIROS_ERROR_NAMED("socket", "NetSocket::tcpConnect(%s) Error while trying to create TCP socket: %s", address.str().c_str(), err);
-    return Error::SystemError;
-  }
-
-  internal_->fd = fd;
-  internal_->type = socketType;
-  internal_->own = true;
 
   // Connect to peer address
   const sockaddr* rawAddr = static_cast<const sockaddr*>(address.rawAddress());
@@ -266,25 +275,29 @@ Error NetSocket::tcpConnect(const NetAddress& address, bool nonblock)
     setNonBlock();
   }
 
-  if (::connect(internal_->fd, rawAddr, addrLen) != 0) {
+  int fd = internal_->fd;
+  assert(fd != MINIROS_INVALID_SOCKET);
+
+  if (::connect(fd, rawAddr, addrLen) != 0) {
     int err = last_socket_error();
+    const char* errStr = last_socket_error_string();
 
     if (err == EINPROGRESS && internal_->nonblock) {
       // This is expected error and connection attempt will be retried later.
       // This socket should be added to PollSet to get notification when connection is ready.
-      internal_->connecting = true;
+      internal_->state = State::Connecting;
       return Error::WouldBlock;
     }
-    // Close socket on error
-    close();
 
     // Map timeout error if applicable
     if (err == ETIMEDOUT) {
       return Error::Timeout;
     }
 
-    const char* errStr = last_socket_error_string();
-    MINIROS_ERROR_NAMED("socket", "NetSocket[%d]::tcpConnect() error while connecting TCP socket to %s: %s", internal_->fd, address.str().c_str(), errStr);
+    MINIROS_ERROR_NAMED("socket", "NetSocket[%d]::tcpConnect() error while connecting TCP socket to %s: %s", fd, address.str().c_str(), errStr);
+
+    // Close socket on error
+    close();
 
     return Error::SystemError;
   }
@@ -358,7 +371,7 @@ std::pair<std::shared_ptr<NetSocket>, Error> NetSocket::accept()
     return {{}, Error::SystemError};
   }
 
-  std::shared_ptr<NetSocket> sock(new NetSocket(fd, internal_->type, true));
+  std::shared_ptr<NetSocket> sock(new NetSocket(fd, internal_->type, true, State::Connected));
   NetAddress address;
   fillAddress(&addr, address);
   sock->internal_->peer_address = address;
@@ -379,7 +392,7 @@ Error NetSocket::setNonBlock()
 
   int result = set_non_blocking(internal_->fd);
   if ( result != 0 ) {
-    MINIROS_ERROR_NAMED("socket", "NetSocket[%d]::setNonBlock() failed with error [%d]", internal_->fd, result);
+    LOCAL_ERROR("NetSocket[%d]::setNonBlock() failed with error [%d]", internal_->fd, result);
     return Error::SystemError;
   }
   internal_->nonblock = true;
@@ -747,7 +760,7 @@ Error NetSocket::checkConnected()
     return Error::InternalError;
   }
 
-  if (!internal_->connecting)
+  if (internal_->state != State::Connecting)
     return Error::Ok;
 
   int err = 0;
@@ -755,7 +768,7 @@ Error NetSocket::checkConnected()
   if (getsockopt(internal_->fd, SOL_SOCKET, SO_ERROR, (char*)&err, &error_code_len) == 0) {
     if (err == 0) {
       // Connection successful
-      internal_->connecting = false;
+      internal_->state = State::Connected;
       return Error::Ok;
     }
 
@@ -781,8 +794,30 @@ Error NetSocket::checkConnected()
 bool NetSocket::isConnecting() const
 {
   if (internal_)
-    return internal_->connecting;
+    return internal_->state == State::Connecting;
   return false;
+}
+
+bool NetSocket::isConnected() const
+{
+  if (internal_)
+    return internal_->state == State::Connected;
+  return false;
+}
+
+void NetSocket::disconnect()
+{
+  if (!internal_)
+    return;
+  if (internal_->state == State::Connecting || internal_->state == State::Connected || internal_->state == State::Unknown) {
+#ifdef WIN32
+    int flags = SD_BOTH;
+#else
+    int flags = SHUT_RDWR;
+#endif
+    ::shutdown(internal_->fd, flags);
+    internal_->state = State::Initial;
+  }
 }
 
 }

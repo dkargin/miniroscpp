@@ -103,7 +103,7 @@ void Watchdog::threadFunc()
         }
         else
         {
-          MINIROS_DEBUG_NAMED("watchdog", "Watchdog timeout expired, raised signal %d", signal_);
+          MINIROS_ERROR_NAMED("watchdog", "Watchdog timeout expired, raised signal %d", signal_);
         }
 #else
         MINIROS_WARN_NAMED("watchdog", "Watchdog timeout expired, but signal raising is not supported on Windows");

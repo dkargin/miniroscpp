@@ -233,7 +233,7 @@ std::shared_ptr<http::HttpClient> NodeRef::makeClient(PollSet* ps)
   std::weak_ptr<NodeRef> wnode = weak_from_this();
   std::weak_ptr<http::HttpClient> wclient;
   client->setDisconnectHandler(
-    [wnode, wclient](std::shared_ptr<network::NetSocket> socket, http::HttpClient::State state)
+    [wnode, wclient](std::shared_ptr<network::NetSocket> socket, http::HttpClient::State state, Error err)
     {
       if (auto node = wnode.lock()) {
         node->handleDisconnect(wclient);
@@ -325,10 +325,7 @@ void NodeRef::handleDisconnect(const std::weak_ptr<http::HttpClient>& wclient)
 
 void NodeRef::deactivateConnectionUnsafe()
 {
-  if (m_client) {
-    m_client->release();
-    m_client.reset();
-  }
+  m_client.reset();
   m_reqGetPid.reset();
   m_reqShutdown.reset();
   m_activeRequests.clear();

@@ -48,6 +48,7 @@
 
 #include "miniros/rosconsole/local_log.h"
 
+#include <condition_variable>
 
 namespace miniros
 {
@@ -128,8 +129,24 @@ PollSet::PollSet()
 
 PollSet::~PollSet()
 {
+  if (internal_->signal_pipe_[0] != MINIROS_INVALID_SOCKET) {
+    delSocket(internal_->signal_pipe_[0]);
+  }
+
   close_signal_pair(internal_->signal_pipe_);
   close_socket_watcher(internal_->epfd_);
+
+  if (!internal_->socket_info_.empty()) {
+    LOCAL_ERROR("PollSet::~PollSet() discovered %zu dangling sockets", internal_->socket_info_.size());
+
+    for (const auto& [fd, info]: internal_->socket_info_) {
+      if (info.loc_.valid()) {
+        LOCAL_ERROR("\tfd=%d: %s", fd, info.loc_.str().c_str());
+      } else {
+        LOCAL_ERROR("\tfd=%d: unknown code location", fd);
+      }
+    }
+  }
   internal_.reset();
 }
 
@@ -169,7 +186,11 @@ bool PollSet::addSocket(int fd, int events, const SocketUpdateFunc& update_func,
 
     internal_->sockets_changed_ = true;
   }
-  LOCAL_DEBUG("PollSet::addSocket(%d) evt=%s", fd, eventToString(events).c_str());
+  if (info.updateEvents_) {
+    LOCAL_DEBUG("PollSet::addSocket(%d) evt=%s with dynamic adjust", fd, eventToString(events).c_str());
+  } else {
+    LOCAL_DEBUG("PollSet::addSocket(%d) evt=%s", fd, eventToString(events).c_str());
+  }
 
   signal();
 
@@ -178,7 +199,7 @@ bool PollSet::addSocket(int fd, int events, const SocketUpdateFunc& update_func,
 
 bool PollSet::delSocket(int fd)
 {
-  if(fd < 0)
+  if (fd < 0)
   {
     return false;
   }
@@ -237,11 +258,19 @@ bool PollSet::addEvents(int sock, int events)
   // Adding back to watcher if we added new events.
   if (oldEvents == 0) {
     if (!add_socket_to_watcher(internal_->epfd_, sock, it->second.events_)) {
-      LOCAL_ERROR("PollSet::addEvents(%d) - failed to add FD to watcher: %s", sock, strerror(errno));
+      LOCAL_ERROR("PollSet::addEvents(%d, %s) - failed to add FD to watcher: %s", sock,
+        eventToString(events).c_str(), strerror(errno));
+    } else {
+      LOCAL_INFO("PollSet::addEvents(%d, %s) - set events", sock,
+        eventToString(events).c_str());
     }
   } else {
     if (!set_events_on_socket(internal_->epfd_, sock, it->second.events_)) {
-      LOCAL_ERROR("PollSet::addEvents(%d) - failed update events in watcher: %s", sock, strerror(errno));
+      LOCAL_ERROR("PollSet::addEvents(%d, %s) - failed update events in watcher: %s", sock,
+        eventToString(events).c_str(), strerror(errno));
+    } else {
+      LOCAL_INFO("PollSet::addEvents(%d, %s) - added events", sock,
+        eventToString(events).c_str());
     }
   }
 
@@ -292,7 +321,7 @@ bool PollSet::setEvents(int sock, int events)
 
   if (it == internal_->socket_info_.end())
   {
-    LOCAL_WARN("PollSet: Tried to set events [%d] to fd [%d] which does not exist in this pollset", events, sock);
+    LOCAL_ERROR("PollSet::setEvents(%d, %s) - fd is not registered", sock, eventToString(events).c_str());
     return false;
   }
 
@@ -303,22 +332,22 @@ bool PollSet::setEvents(int sock, int events)
   it->second.events_ = events;
   if (oldEvents == 0) {
     if (!add_socket_to_watcher(internal_->epfd_, sock, it->second.events_)) {
-      LOCAL_ERROR("PollSet::setEvents(%d, %d) failed to add socket to watcher: %s", sock, events, strerror(errno));
+      LOCAL_ERROR("PollSet::setEvents(%d, %s) failed to add socket to watcher: %s", sock, eventToString(events).c_str(), strerror(errno));
       return false;
     }
-    LOCAL_DEBUG("PollSet::setEvents(%d, %d) added socket to watcher", sock, events);
+    LOCAL_DEBUG("PollSet::setEvents(%d, %s) added socket to watcher", sock, eventToString(events).c_str());
   } else if (it->second.events_ == 0) {
     if (!del_socket_from_watcher(internal_->epfd_, sock)) {
-      LOCAL_WARN("PollSet::setEvents(%d, %d) failed to delete socket from watcher: %s", sock, events, strerror(errno));
+      LOCAL_WARN("PollSet::setEvents(%d, %s) failed to delete socket from watcher: %s", sock, eventToString(events).c_str(), strerror(errno));
       return false;
     }
-    LOCAL_DEBUG("PollSet::setEvents(%d, %d) deleted socket from watcher", sock, events);
+    LOCAL_DEBUG("PollSet::setEvents(%d, %s) deleted socket from watcher", sock, eventToString(events).c_str());
   } else {
     if (!set_events_on_socket(internal_->epfd_, sock, it->second.events_)) {
-      LOCAL_WARN("PollSet::setEvents(%d, %d) failed deleted socket from watcher: %s", sock, events, strerror(errno));
+      LOCAL_WARN("PollSet::setEvents(%d, %s) failed deleted socket from watcher: %s", sock, eventToString(events).c_str(), strerror(errno));
       return false;
     }
-    LOCAL_DEBUG("PollSet::setEvents(%d, %d) updated events", sock, events);
+    LOCAL_DEBUG("PollSet::setEvents(%d, %s) updated events", sock, eventToString(events).c_str());
   }
   internal_->sockets_changed_ = true;
   signal();
@@ -354,7 +383,6 @@ void PollSet::signal()
     }
   }
 }
-
 
 void PollSet::update(int poll_timeout)
 {
@@ -458,6 +486,7 @@ void PollSet::update(int poll_timeout)
       delSocket(fd);
     }
     else if (info.updateEvents_ && ret != info.events_) {
+      // TODO: Reimplement it through setEvents(fd, ret);
       std::scoped_lock<std::mutex> lock(internal_->socket_info_mutex_);
       auto it = internal_->socket_info_.find(fd);
       if (it != internal_->socket_info_.end() && it->second.events_ != ret) {
@@ -465,15 +494,13 @@ void PollSet::update(int poll_timeout)
           if (!del_socket_from_watcher(internal_->epfd_, fd)) {
             LOCAL_WARN("PollSet fd=%d failed to remove from watcher", fd);
           }
-          it->second.events_ = ret;
         } else {
-          if (set_events_on_socket(internal_->epfd_, fd, ret)) {
-            it->second.events_ = ret;
-          } else {
+          if (!set_events_on_socket(internal_->epfd_, fd, ret)) {
             LOCAL_ERROR("PollSet fd=%d failed to set events %d on socket: %s", fd, it->second.events_, strerror(errno));
           }
         }
-        LOCAL_DEBUG("PollSet fd=%d adjust events from %s to %s", fd, eventToString(info.events_).c_str(), eventToString(ret).c_str());
+        LOCAL_DEBUG("PollSet fd=%d adjust events by callback from %s to %s", fd, eventToString(info.events_).c_str(), eventToString(ret).c_str());
+        it->second.events_ = ret;
       }
     }
   } // for socket event
@@ -558,6 +585,9 @@ int PollSet::onLocalPipeEvents(int events)
 
 std::string PollSet::eventToString(int event)
 {
+  if (event == 0) {
+    return "nil";
+  }
   std::string result;
 #define EVT_FLAG(flag, ch) if (event & flag) { result += ch; event &= ~flag; }
   EVT_FLAG(POLLIN, 'I');
@@ -574,6 +604,9 @@ std::string PollSet::eventToString(int event)
 #ifdef POLLRDHUP
   EVT_FLAG(POLLRDHUP, "Rdh");
 #endif
+
+  // Custom timer event flag.
+  EVT_FLAG(EventTimer, 'T');
   if (event != 0) {
     result += "_";
     result += std::to_string(event);

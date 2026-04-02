@@ -10,6 +10,7 @@
 
 #include "miniros/network/net_address.h"
 #include "miniros/network/url.h"
+#include "rosconsole/local_log.h"
 
 namespace miniros {
 namespace network {
@@ -24,6 +25,7 @@ NetAddress::NetAddress(NetAddress&& other) noexcept
   std::swap(rawAddress_, other.rawAddress_);
   std::swap(rawAddressSize_, other.rawAddressSize_);
   std::swap(address, other.address);
+  std::swap(unspecified, other.unspecified);
 
   type_ = other.type_;
 }
@@ -42,15 +44,11 @@ size_t getAddressSize(const NetAddress::Type type)
 
 NetAddress::NetAddress(const NetAddress& other)
 {
-  if (other.rawAddress_ && (other.type_ == Type::AddressIPv4 || other.type_ == Type::AddressIPv6)) {
-    size_t size = getAddressSize(other.type_);
-    sockaddr_in* addr = static_cast<sockaddr_in*>(malloc(size));
-    rawAddress_ = addr;
-    memcpy(rawAddress_, other.rawAddress_, getAddressSize(other.type_));
-    type_ = other.type_;
-  } else {
-    type_ = Type::AddressInvalid;
+  if (other.rawAddress_ && other.rawAddressSize_ > 0) {
+    rawAddress_ = malloc(other.rawAddressSize_);
+    memcpy(rawAddress_, other.rawAddress_, other.rawAddressSize_);
   }
+  type_ = other.type_;
   address = other.address;
   unspecified = other.unspecified;
   rawAddressSize_ = other.rawAddressSize_;
@@ -65,16 +63,14 @@ NetAddress& NetAddress::operator=(const NetAddress& other)
 {
   if (this == &other)
     return *this;
+
   reset();
 
-  if (other.rawAddress_ && (other.type_ == Type::AddressIPv4 || other.type_ == Type::AddressIPv6)) {
-    sockaddr_in* addr = static_cast<sockaddr_in*>(malloc(sizeof(sockaddr_in)));
-    rawAddress_ = addr;
-    memcpy(rawAddress_, other.rawAddress_, getAddressSize(other.type_));
-    type_ = other.type_;
-  } else {
-    type_ = Type::AddressInvalid;
+  if (other.rawAddress_ && other.rawAddressSize_ > 0) {
+    rawAddress_ = malloc(other.rawAddressSize_);
+    memcpy(rawAddress_, other.rawAddress_, other.rawAddressSize_);
   }
+  type_ = other.type_;
   address = other.address;
   unspecified = other.unspecified;
   rawAddressSize_ = other.rawAddressSize_;
@@ -101,9 +97,12 @@ bool NetAddress::isUnspecified() const
   return unspecified;
 }
 
-NetAddress NetAddress::fromString(Type type, const std::string& address, int port)
+Error addressFromString(NetAddress::Type type, const std::string& address, int port, NetAddress& result)
 {
-  NetAddress result;
+  // Port 0 is specifically allowed.
+  if (address.empty() || port < 0 || port > 65535) {
+    return Error::InvalidValue;
+  }
 
   // First, try to parse as IP address directly
   if (type == NetAddress::AddressIPv4) {
@@ -113,8 +112,9 @@ NetAddress NetAddress::fromString(Type type, const std::string& address, int por
       addr.sin_port = htons(port);
       result.assignRawAddress(type, &addr, sizeof(addr));
       result.address = address;
-      return result;
+      return Error::Ok;
     }
+    // Fallback to DNS resolver.
   } else if (type == NetAddress::AddressIPv6) {
     sockaddr_in6 addr{};
     addr.sin6_family = AF_INET6;
@@ -122,35 +122,37 @@ NetAddress NetAddress::fromString(Type type, const std::string& address, int por
     if (inet_pton(AF_INET6, address.c_str(), &addr.sin6_addr) == 1) {
       result.assignRawAddress(type, &addr, sizeof(addr));
       result.address = address;
-      return result;
+      return Error::Ok;
     }
+    // Fallback to DNS resolver.
   } else if (type == NetAddress::AddressUnspecified) {
     // Try IPv6 first, then IPv4
     sockaddr_in6 addr6{};
     addr6.sin6_family = AF_INET6;
     addr6.sin6_port = htons(port);
     if (inet_pton(AF_INET6, address.c_str(), &addr6.sin6_addr) == 1) {
-      result.assignRawAddress(AddressIPv6, &addr6, sizeof(addr6));
+      result.assignRawAddress(NetAddress::AddressIPv6, &addr6, sizeof(addr6));
       result.address = address;
-      return result;
+      return Error::Ok;
     }
     sockaddr_in addr4{};
     addr4.sin_family = AF_INET;
     if (inet_pton(AF_INET, address.c_str(), &addr4.sin_addr) == 1) {
       addr4.sin_port = htons(port);
-      result.assignRawAddress(AddressIPv4, &addr4, sizeof(addr4));
+      result.assignRawAddress(NetAddress::AddressIPv4, &addr4, sizeof(addr4));
       result.address = address;
-      return result;
+      return Error::Ok;
     }
+    // Fallback to DNS resolver.
   } else {
     // Invalid type
-    return result;
+    return Error::InvalidValue;
   }
 
   // If IP parsing failed, try DNS resolution
   struct addrinfo hints{};
   struct addrinfo* res = nullptr;
-  
+
   // Set up hints based on type preference
   if (type == NetAddress::AddressIPv4) {
     hints.ai_family = AF_INET;
@@ -163,40 +165,74 @@ NetAddress NetAddress::fromString(Type type, const std::string& address, int por
   hints.ai_socktype = SOCK_STREAM;
   hints.ai_flags = AI_ADDRCONFIG;
 
-  // Convert port to string for getaddrinfo
   std::string portStr = std::to_string(port);
-  
+
   int err = getaddrinfo(address.c_str(), portStr.c_str(), &hints, &res);
   if (err != 0) {
-    // DNS resolution failed
-    return result;
+    // Errors and descriptions are taken from `man getaddrinfo`.
+    switch (err) {
+#if defined(EAI_SYSTEM)
+      case EAI_SYSTEM: {
+        const char* sysError = strerror(errno);
+        LOCAL_DEBUG("addressFromString(%s) - failed: %s", address.c_str(), sysError);
+        return Error::SystemError;
+      }
+#endif
+      case EAI_MEMORY:
+        return Error::OutOfMemory;
+#if defined(EAI_ADDRFAMILY)
+      case EAI_ADDRFAMILY:
+#endif
+      case EAI_BADFLAGS:
+      case EAI_FAMILY:
+      case EAI_SERVICE:
+      case EAI_SOCKTYPE:
+        // Invalid call parameters or unsupported combination.
+      case EAI_NONAME:
+        // Invalid host name (or unknown host/service).
+        return Error::InvalidValue;
+      case EAI_AGAIN:
+#ifndef WIN32
+      // This constant is defined as an alias on Win32 and will not compile.
+      case EAI_NODATA:
+#endif
+      case EAI_FAIL:
+        // Name can be valid but is not resolvable right now.
+        return Error::AddressIsUnknown;
+      default:
+        break;
+    }
+    return Error::SystemError;
   }
 
   // Try to find a matching address
   // For AddressUnspecified, prefer IPv6 first, then IPv4
+  bool assigned = false;
   if (type == NetAddress::AddressUnspecified) {
     // First pass: look for IPv6 addresses
     for (struct addrinfo* rp = res; rp != nullptr; rp = rp->ai_next) {
       if (rp->ai_family == AF_INET6) {
         const sockaddr_in6* addr6 = reinterpret_cast<const sockaddr_in6*>(rp->ai_addr);
-        result.assignRawAddress(AddressIPv6, rp->ai_addr, rp->ai_addrlen);
+        result.assignRawAddress(NetAddress::AddressIPv6, rp->ai_addr, rp->ai_addrlen);
         char ipBuffer[INET6_ADDRSTRLEN];
         if (inet_ntop(AF_INET6, &addr6->sin6_addr, ipBuffer, sizeof(ipBuffer))) {
           result.address = ipBuffer;
         }
+        assigned = true;
         freeaddrinfo(res);
-        return result;
+        return Error::Ok;
       }
     }
     // Second pass: look for IPv4 addresses if no IPv6 found
     for (struct addrinfo* rp = res; rp != nullptr; rp = rp->ai_next) {
       if (rp->ai_family == AF_INET) {
         const sockaddr_in* addr4 = reinterpret_cast<const sockaddr_in*>(rp->ai_addr);
-        result.assignRawAddress(AddressIPv4, rp->ai_addr, rp->ai_addrlen);
+        result.assignRawAddress(NetAddress::AddressIPv4, rp->ai_addr, rp->ai_addrlen);
         char ipBuffer[INET_ADDRSTRLEN];
         if (inet_ntop(AF_INET, &addr4->sin_addr, ipBuffer, sizeof(ipBuffer))) {
           result.address = ipBuffer;
         }
+        assigned = true;
         break;
       }
     }
@@ -205,26 +241,35 @@ NetAddress NetAddress::fromString(Type type, const std::string& address, int por
     for (struct addrinfo* rp = res; rp != nullptr; rp = rp->ai_next) {
       if (rp->ai_family == AF_INET && type == NetAddress::AddressIPv4) {
         const sockaddr_in* addr4 = reinterpret_cast<const sockaddr_in*>(rp->ai_addr);
-        result.assignRawAddress(AddressIPv4, rp->ai_addr, rp->ai_addrlen);
+        result.assignRawAddress(NetAddress::AddressIPv4, rp->ai_addr, rp->ai_addrlen);
         char ipBuffer[INET_ADDRSTRLEN];
         if (inet_ntop(AF_INET, &addr4->sin_addr, ipBuffer, sizeof(ipBuffer))) {
           result.address = ipBuffer;
         }
+        assigned = true;
         break;
       } else if (rp->ai_family == AF_INET6 && type == NetAddress::AddressIPv6) {
         const sockaddr_in6* addr6 = reinterpret_cast<const sockaddr_in6*>(rp->ai_addr);
-        result.assignRawAddress(AddressIPv6, rp->ai_addr, rp->ai_addrlen);
+        result.assignRawAddress(NetAddress::AddressIPv6, rp->ai_addr, rp->ai_addrlen);
         char ipBuffer[INET6_ADDRSTRLEN];
         if (inet_ntop(AF_INET6, &addr6->sin6_addr, ipBuffer, sizeof(ipBuffer))) {
           result.address = ipBuffer;
         }
+        assigned = true;
         break;
       }
     }
   }
 
-  // Free the addrinfo structure
   freeaddrinfo(res);
+  return assigned ? Error::Ok : Error::InvalidValue;
+}
+
+
+NetAddress NetAddress::fromString(Type type, const std::string& address, int port)
+{
+  NetAddress result;
+  Error err = addressFromString(type, address, port, result);
   return result;
 }
 
@@ -433,10 +478,35 @@ int NetAddress::port() const
   return 0;
 }
 
-
 std::string NetAddress::str() const
 {
   std::stringstream ss;
+  ss << address;
+  int p = port();
+  if (p) {
+    ss << ":" << p;
+  }
+  return ss.str();
+}
+
+std::string NetAddress::lstr() const
+{
+  std::stringstream ss;
+  switch (type_) {
+    case Type::AddressIPv4:
+      ss << "ip4:";
+      break;
+    case Type::AddressIPv6:
+      ss << "ip6:";
+      break;
+    case Type::AddressUnspecified:
+      ss << "un:";
+      break;
+    case Type::AddressInvalid:
+      ss << "invalid:";
+    default:
+      break;
+  }
   ss << address;
   int p = port();
   if (p) {

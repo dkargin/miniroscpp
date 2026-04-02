@@ -15,7 +15,7 @@ namespace miniros {
 
 class PollSet;
 class CallbackQueue;
-template <class T> struct Lifetime;
+template <class T> class Lifetime;
 
 namespace network {
 class NetSocket;
@@ -30,10 +30,13 @@ class HttpServerConnection;
 class HttpServer {
 public:
   HttpServer(PollSet* pollSet);
-  ~HttpServer();
+  virtual ~HttpServer();
 
   /// Start server on specific port.
   Error start(int port);
+
+  /// Start IPv6 server on specific port.
+  Error start6(int port);
 
   /// Stop all sockets.
   Error stop();
@@ -63,13 +66,14 @@ public:
   void setCloseConnectionHandler(CloseConnectionHandler&& handler);
 
 protected:
-  /// Accept client and add it to event processing.
-  /// For internal usage only.
-  /// @param sock - listening socket.
-  void acceptClient(const std::shared_ptr<Lifetime<HttpServer>>& lifetime, network::NetSocket* sock);
+  friend class HttpServerConnection;
 
-  /// Close connection and send all notifications.
-  void closeConnection(int fd, const std::string& reason);
+  /// It is called by HttpServerConnection when it is closed by any reason.
+  void onConnectionClosed(const std::shared_ptr<HttpServerConnection>& connection, const std::string& reason);
+
+  /// Creates HTTP connection.
+  /// This method is virtual to be able to override it in tests.
+  virtual std::shared_ptr<HttpServerConnection> makeConnection(const std::shared_ptr<network::NetSocket>& socket);
 
 protected:
   struct Internal;

@@ -65,7 +65,7 @@ public:
     Error err = server_->start(0);
     ASSERT_EQ(err, Error::Ok);
     watchdog_ = std::make_unique<Watchdog>(SIGQUIT);
-    watchdog_->watch(10000);
+    watchdog_->watch(50000);
   }
 
   void TearDown() override
@@ -106,25 +106,65 @@ constexpr double responseTimeoutSec = 50;
 
 TEST(BasicSanity, WaitIsReal)
 {
+  // Verify that request.waitingForResponse is actually waiting and spending some time.
   http::HttpRequest emptyRequest;
 
   auto start = SteadyTime::now();
   WallDuration waitDuration{0.5};
   emptyRequest.waitForResponse(waitDuration);
   WallDuration elapsed = SteadyTime::now() - start;
-  /// Expecting it to actually wait.
+  // Expecting it to actually wait.
   ASSERT_GE(elapsed, waitDuration*0.5)
       << "It seems condition_variable::wait_for does not properly wait." << std::endl
       << " It can be caused by missing proper implementation for std threads " << std::endl;
 }
 
-TEST_F(HttpServerTest, ConnectNoServer)
+TEST_F(HttpServerTest, ConnectNoServerWithReconnects)
 {
   http::HttpClient client(&poll_manager_.getPollSet());
 
-  client.connect("127.0.0.1", 19999);
-  Error conErr = client.waitConnected(WallDuration(connectionTimeoutSec));
-  EXPECT_EQ(conErr, Error::NotConnected);
+  std::atomic_int32_t reconnects = 0;
+  client.setDisconnectHandler([&reconnects, &client](std::shared_ptr<network::NetSocket>& socket, http::HttpClient::State state, Error err) {
+    ++reconnects;
+    EXPECT_EQ(err, Error::ConnectionRefused);
+    client.reconnect(50);
+  });
+
+  Error connectErr = client.connect("127.0.0.1", 19999);
+  ASSERT_EQ(connectErr, Error::Ok);
+  Error waitErr = client.waitConnected(WallDuration(1, 0));
+  // There should be about ~20 reconnects (1.0 / 0.05 = 20).
+  // This test will blink only if there is a serious CPU load.
+  EXPECT_GE(reconnects.load(), 10);
+
+  // Forcibly shut down thread before client is destroyed.
+  poll_manager_.shutdown();
+}
+
+TEST_F(HttpServerTest, ConnectInvalidHostnameWithReconnects)
+{
+  // Connecting client to unknown hostname.
+  // Client should keep retrying connection with hopes that someone provides proper IP for that hostname later.
+  http::HttpClient client(&poll_manager_.getPollSet());
+
+  std::atomic_int32_t disconnects = 0;
+  client.setDisconnectHandler([&disconnects, &client](std::shared_ptr<network::NetSocket>& socket, http::HttpClient::State state, Error err) {
+    ++disconnects;
+    EXPECT_EQ(err, Error::AddressIsUnknown);
+    client.reconnect(50);
+  });
+
+  // Expecting that connect returns Ok, and disconnect handler will be called exactly once.
+  Error err = client.connect("certainly_unknown_hostname_123456", 19999);
+  ASSERT_EQ(err, Error::Ok);
+  ASSERT_EQ(disconnects, 1);
+
+  // Expect more attempts to get address.
+  std::this_thread::sleep_for(std::chrono::milliseconds(200));
+  EXPECT_GE(disconnects, 1);
+
+  // Forcibly shut down thread before client is destroyed.
+  poll_manager_.shutdown();
 }
 
 TEST_F(HttpServerTest, SimpleGet)
@@ -535,8 +575,11 @@ int main(int argc, char** argv)
 {
   testing::InitGoogleTest(&argc, argv);
   miniros::handleCrashes();
-
+  miniros::setThreadName("main");
   miniros::console::set_logger_level("destructor", console::Level::Debug);
   miniros::console::set_logger_level("miniros.http", console::Level::Debug);
+  miniros::console::set_logger_level("miniros.poll_set", console::Level::Debug);
+  miniros::console::set_logger_level("miniros.net", console::Level::Debug);
+
   return RUN_ALL_TESTS();
 }

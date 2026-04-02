@@ -4,7 +4,7 @@ include_directories(${MINIROS_GENERATED_INCLUDE_DIRS})
 
 link_directories(${GTEST_LIBRARY_DIRS})
 
-add_test(NAME start-master COMMAND manage-master start)
+#add_test(NAME start-master COMMAND manage-master start)
 #add_test(NAME stop-master COMMAND manage-master stop)
 
 # Advanced tests depend on running rosmaster.
@@ -203,8 +203,8 @@ miniros_add_test(${TEST_GROUP}-publisher_rate SOURCES publisher_rate.cpp WITH_MA
 miniros_add_test(${TEST_GROUP}-subscriber SOURCES subscriber.cpp WITH_MASTER DISABLED)
 #add_dependencies(${TEST_GROUP}-subscriber ${std_msgs_EXPORTED_TARGETS})
 
-
-set_tests_properties(start-master PROPERTIES FIXTURES_REQUIRED "stop-master ${TESTS_WITH_MASTER}")
+# Master is started and stopped by github script
+#set_tests_properties(start-master PROPERTIES FIXTURES_REQUIRED "stop-master ${TESTS_WITH_MASTER}")
 #set_tests_properties(stop-master PROPERTIES FIXTURES_CLEANUP "${TESTS_WITH_MASTER}")
 
 message(STATUS "Advanced tests with master: ${TESTS_WITH_MASTER}")

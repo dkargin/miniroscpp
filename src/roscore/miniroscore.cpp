@@ -56,6 +56,7 @@ public:
     std::ofstream out(file);
     if (!out.is_open()) {
       std::cerr << "Failed to open PID file \"" << file << "\"" << std::endl;
+      return false;
     }
     out << getpid();
     out.close();

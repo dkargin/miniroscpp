@@ -10,6 +10,7 @@
 #include "miniros/xmlrpcpp/XmlRpcValue.h"
 
 #include "miniros/console.h"
+#include "rosconsole/local_log.h"
 
 namespace miniros {
 namespace xml {
@@ -495,26 +496,23 @@ bool XmlCodec::validateXmlrpcResponse(const std::string& method, const Value &re
 {
   if (response.getType() != Value::TypeArray)
   {
-    MINIROS_DEBUG("XML-RPC call [%s] didn't return an array",
-        method.c_str());
+    //LOCAL_DEBUG("XML-RPC call [%s] didn't return an array", method.c_str());
     return false;
   }
   if (response.size() != 2 && response.size() != 3)
   {
-    MINIROS_DEBUG("XML-RPC call [%s] didn't return a 2 or 3-element array",
-        method.c_str());
+    //LOCAL_DEBUG("XML-RPC call [%s] didn't return a 2 or 3-element array", method.c_str());
     return false;
   }
   if (response[0].getType() != Value::TypeInt)
   {
-    MINIROS_DEBUG("XML-RPC call [%s] didn't return a int as the 1st element",
-        method.c_str());
+    //LOCAL_DEBUG("XML-RPC call [%s] didn't return an int as the 1st element", method.c_str());
     return false;
   }
   int status_code = response[0];
   if (response[1].getType() != Value::TypeString)
   {
-    MINIROS_DEBUG("XML-RPC call [%s] didn't return a string as the 2nd element", method.c_str());
+    //LOCAL_DEBUG("XML-RPC call [%s] didn't return a string as the 2nd element", method.c_str());
     return false;
   }
   std::string status_string = response[1];

@@ -211,13 +211,17 @@ void Discovery::Internal::onSocketEvent(network::NetSocket& s, int role, int eve
     return;
   }
 
+  if (packet.uuid == uuid) {
+    // This is our own packet.
+    return;
+  }
+
   discoveryEvent.uuid = packet.uuid;
   discoveryEvent.version = packet.version;
   discoveryEvent.masterUri.scheme = "http://";
   discoveryEvent.masterUri.port = packet.masterPort;
   discoveryEvent.masterUri.host = masterAddr.address;
 
-  MINIROS_INFO("Got broadcast from %s", discoveryEvent.masterUri.host.c_str());
   if (callback) {
     callback(discoveryEvent);
   }
@@ -267,7 +271,7 @@ Error Discovery::start(PollSet* pollSet, const UUID& uuid, const network::URL& r
   auto rpcAddr = network::NetAddress::fromURL(rpcUrl);
   if (!rpcAddr.valid()) {
     MINIROS_ERROR("Failed to get address for RPC URL=%s", rpcUrl.str().c_str());
-    return Error::InvalidAddress;
+    return Error::InvalidValue;
   }
   internal_->rpcAddress = rpcAddr;
   internal_->broadcastAddr = network::NetAddress::fromIp4String("255.255.255.255", internal_->broadcastPort);
