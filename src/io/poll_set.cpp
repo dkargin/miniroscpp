@@ -397,18 +397,17 @@ bool PollSet::Internal::signal()
 
   std::lock_guard<std::mutex> lock(signal_mutex_, std::adopt_lock);
   int fd = MINIROS_INVALID_SOCKET;
-  if (write_signal(signal_pipe_[1], &fd, sizeof(fd)) < 0)
+  if (write_signal(signal_pipe_[1], (const char*)&fd, sizeof(fd)) < 0)
   {
     // do nothing... this prevents warnings on gcc 4.3
   }
   return true;
 }
 
-
 void PollSet::Internal::signalFd(int fd)
 {
   std::lock_guard<std::mutex> lock(signal_mutex_);
-  if (write_signal(signal_pipe_[1], &fd, sizeof(fd)) < 0)
+  if (write_signal(signal_pipe_[1], (const char*)&fd, sizeof(fd)) < 0)
   {
     // do nothing... this prevents warnings on gcc 4.3
   }
@@ -553,7 +552,7 @@ void PollSet::update(int poll_timeout)
     // Handle manual signals to specific fd.
     if (internal_->isInternalSignalFd(fd) && (revents & POLLIN)) {
       int eventFd = MINIROS_INVALID_SOCKET;
-      while(read_signal(internal_->signal_pipe_[0], &eventFd, sizeof(eventFd)) > 0)
+      while(read_signal(internal_->signal_pipe_[0], (char*)&eventFd, sizeof(eventFd)) > 0)
       {
         if (eventFd != MINIROS_INVALID_SOCKET) {
           notifiedFd.push_back(eventFd);
