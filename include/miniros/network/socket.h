@@ -169,6 +169,13 @@ public:
   ///
   /// @param s - output buffer.
   /// @param address - address of sender. Can be nullptr
+  /// @returns a tuple with number of bytes actually sent and error code.
+  /// Expected error codes:
+  ///  - InternalError
+  ///  - InvalidHandle - fd is invalid.
+  ///  - EndOfFile - connection is closed.
+  ///  - WouldBlock - next read operation will block. Try again later.
+  ///  - SystemError - some other system error.
   virtual std::pair<size_t, Error> recv(WriteBuf& s, NetAddress* address);
 
   /// Send data into a socket.

@@ -369,6 +369,8 @@ void HttpClient::Internal::handleDisconnect(Lock& lock, Error disconnectError)
     poll_set->setEvents(fd(), 0);
   }
 
+  // TODO: change state only if callback has not changed state anyhow.
+  updateState(lock, State::Disconnected);
   // Push active request back to queue.
   if (active_request) {
     std::unique_lock reqLock(requests_guard);
@@ -749,12 +751,12 @@ Error HttpClient::Internal::connectImpl(const std::shared_ptr<Internal>& I, Lock
 
   Error err = socket->tcpConnect(newAddress, true);
 
-  LOCAL_WARN("HttpClient[%s]::connectImpl initiating connection to %s:%d", debugName().c_str(), address.address.c_str(), address.port());
-
   // Store host and port for:
   // 1. Reconnect.
   // 2. Help building requests.
   address = newAddress;
+
+  LOCAL_INFO("HttpClient[%s]::connectImpl initiating connection to %s:%d", debugName().c_str(), address.address.c_str(), address.port());
 
   bool connected = false;
   if (err == Error::WouldBlock) {

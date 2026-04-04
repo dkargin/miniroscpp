@@ -73,6 +73,9 @@ public:
   /// Equal to POLLERR.
   static const int EventError;
 
+  /// Software signal to specific FD.
+  static constexpr int EventSoftSignal = 1<<28;
+
   /// Low precision timer event.
   static constexpr int EventTimer = 1<<29;
 
@@ -168,6 +171,11 @@ public:
    */
   void signal();
 
+  /**
+   * \brief Send signal to specific FD.
+   */
+  void signalFd(int fd);
+
   static std::string eventToString(int event);
 
 private:
@@ -176,12 +184,8 @@ private:
    */
   void createNativePollset();
 
-  /**
-   * \brief Called when events have been triggered on our signal pipe
-   */
-  int onLocalPipeEvents(int events);
-
   void processTimers();
+
 
   struct Internal;
   std::unique_ptr<Internal> internal_;

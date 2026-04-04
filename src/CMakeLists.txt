@@ -91,6 +91,7 @@ set(cpp_common_SRC
     internal/profiling.cpp
     internal/static_write_buf.cpp
     internal/watchdog.cpp
+    internal/sha1.cpp
 
     b64/b64decode.cpp
     b64/b64encode.cpp
@@ -201,9 +202,12 @@ set(transport_SRC
     http/http_client.cpp
     http/http_request.cpp
     http/xmlrpc_request.cpp
+    http/http_endpoint.cpp
+    http/websocket.cpp
 
     http/endpoints/xmlrpc.cpp
     http/endpoints/filesystem.cpp
+    http/endpoints/websocket.cpp
 
     http/http_filters.cpp
     http/http_server.cpp

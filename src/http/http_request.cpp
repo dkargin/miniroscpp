@@ -357,6 +357,18 @@ void HttpRequest::setResponseBody(const char* data, size_t size)
   response_body_.assign(data, size);
 }
 
+bool HttpRequest::isUpgradeResponse() const
+{
+  Lock lock(mutex_, THIS_LOCATION);
+  auto it = headers_.find("Upgrade");
+  if (it != headers_.end())
+    return true;
+
+  if (response_header_.statusCode != 101)
+    return false;
+  return false;
+}
+
 void HttpRequest::resetResponse()
 {
   Lock lock(mutex_, THIS_LOCATION);
@@ -376,6 +388,12 @@ void HttpRequest::setResponseStatusOk()
   Lock lock(mutex_, THIS_LOCATION);
   response_header_.statusCode = 200;
   response_header_.status = "OK";
+}
+
+void HttpRequest::setResponseHeader(const std::string& name, const std::string& value)
+{
+  Lock lock(mutex_, THIS_LOCATION);
+  response_header_.customHeaders[name] = value;
 }
 
 const HttpResponseHeader& HttpRequest::responseHeader() const

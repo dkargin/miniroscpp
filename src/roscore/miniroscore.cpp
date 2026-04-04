@@ -146,7 +146,8 @@ int main(int argc, const char ** argv) {
 
   std::shared_ptr<RPCManager> masterRpcManager = RPCManager::instance();
 
-  miniros::console::set_logger_level("*", console::Level::Debug);
+  miniros::console::set_logger_level("miniros.http", console::Level::Info);
+  
   miniros_console_bridge::setLogLevel(miniros_console_bridge::CONSOLE_BRIDGE_LOG_DEBUG);
 
   MINIROS_INFO("Creating Master object");

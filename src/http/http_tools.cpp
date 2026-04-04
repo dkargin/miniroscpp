@@ -331,6 +331,11 @@ int HttpParserFrame::incrementalParse()
           } else if (strncasecmp(tokenStart, "close", 5) == 0) {
             m_keepAlive = false;
           }
+          /// Unspecialized field
+          Field field;
+          field.name = std::string(namePtr, m_fieldName.size());
+          field.value = std::string(tokenStart, cp - tokenStart);
+          fields.push_back(std::move(field));
         } else if (strncasecmp(namePtr, "Content-Type", 12) == 0) {
           contentType.assign(tokenStart - start, cp - start);
         } else {
@@ -387,6 +392,7 @@ void HttpResponseHeader::reset()
   contentType.clear();
   server.clear();
   status.clear();
+  customHeaders.clear();
 }
 
 void HttpResponseHeader::writeHeader(std::string& output, size_t bodySize) const
@@ -409,6 +415,14 @@ void HttpResponseHeader::writeHeader(std::string& output, size_t bodySize) const
   output += "Content-Type: ";
   output += contentType;
   output += "\r\n";
+
+  // Write custom headers
+  for (const auto& [name, value] : customHeaders) {
+    output += name;
+    output += ": ";
+    output += value;
+    output += "\r\n";
+  }
 
   if (bodySize > 0) {
     output += "Content-Length: ";

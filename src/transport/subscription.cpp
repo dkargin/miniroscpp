@@ -462,7 +462,7 @@ bool Subscription::negotiateConnection(const RPCManagerPtr& rpcManager, const st
   // Initiate the negotiation.  We'll come back and check on it later.
   if (!c->enqueueRequest(req))
   {
-    MINIROS_ERROR("Failed to contact publisher [%s:%d] for topic [%s]", url.host.c_str(), url.port, name_.c_str());
+    MINIROS_ERROR("Subscription[%s]::negotiateConnection() Failed to contact publisher [%s:%d]", name_.c_str(), url.host.c_str(), url.port);
     if (udp_transport)
     {
       udp_transport->close();
@@ -470,7 +470,8 @@ bool Subscription::negotiateConnection(const RPCManagerPtr& rpcManager, const st
     return false;
   }
 
-  MINIROS_INFO("Began asynchronous xmlrpc connection to [%s:%d] fd=%d", url.host.c_str(), url.port, c->fd());
+  MINIROS_INFO("Subscription[%s]::negotiateConnection() began connection to [%s:%d] fd=%d", name_.c_str(),
+    url.host.c_str(), url.port, c->fd());
   // Put this connection on the list that we'll look at later.
   {
     std::scoped_lock<std::mutex> pending_connections_lock(pending_connections_mutex_);

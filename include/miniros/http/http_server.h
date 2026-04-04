@@ -27,7 +27,7 @@ namespace http {
 class HttpServerConnection;
 
 /// HttpServer serves XMLRPC MasterApi, SlaveApi and additional HTTP endpoints from user.
-class HttpServer {
+class MINIROS_DECL HttpServer {
 public:
   HttpServer(PollSet* pollSet);
   virtual ~HttpServer();
@@ -65,11 +65,15 @@ public:
 
   void setCloseConnectionHandler(CloseConnectionHandler&& handler);
 
+  /// Get number of connections.
+  size_t getConnectionsCount() const;
+
 protected:
   friend class HttpServerConnection;
 
   /// It is called by HttpServerConnection when it is closed by any reason.
-  void onConnectionClosed(const std::shared_ptr<HttpServerConnection>& connection, const std::string& reason);
+  void onConnectionClosed(std::unique_lock<std::mutex>& /*lock*/,
+    const std::shared_ptr<HttpServerConnection>& connection, bool upgrade, const std::string& reason);
 
   /// Creates HTTP connection.
   /// This method is virtual to be able to override it in tests.

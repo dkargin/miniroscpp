@@ -13,6 +13,7 @@ namespace miniros {
 
 namespace network {
   struct ClientInfo;
+  class NetSocket;
 }
 namespace http {
 
@@ -24,13 +25,13 @@ class HttpRequest;
 /// Base class for endpoint filters.
 class EndpointFilter {
 public:
-  virtual ~EndpointFilter() {}
+  virtual MINIROS_DECL ~EndpointFilter() {}
   virtual bool check(const HttpParserFrame& frame) const = 0;
 };
 
 class EndpointHandler {
 public:
-  virtual ~EndpointHandler() {}
+  virtual MINIROS_DECL ~EndpointHandler() {}
 
   /// Handle request and return pointer to response object.
   /// Response will be immediately serialized to output buffer in the same thread.
@@ -40,6 +41,16 @@ public:
   ///   Error::Ok - request is immediately handled and response can be sent back.
   ///   Error::Postponed - request will be processed later.
   virtual Error handle(const network::ClientInfo& clientInfo, std::shared_ptr<HttpRequest> request) = 0;
+
+  /// Handle completion of connection upgrade (e.g., WebSocket upgrade).
+  /// Called after the upgrade response has been sent to the client.
+  /// @param connection - socket from upgraded Http connection.
+  /// @param clientInfo - connection information
+  /// @param request - the original request that triggered the upgrade
+  /// @returns:
+  ///   Error::Ok - upgrade was handled successfully
+  ///   Error::NotImplemented - default implementation, upgrade not supported
+  virtual MINIROS_DECL Error  upgradeComplete(const std::shared_ptr<network::NetSocket>& connection, const network::ClientInfo& clientInfo, const std::shared_ptr<HttpRequest>& request);
 };
 
 }

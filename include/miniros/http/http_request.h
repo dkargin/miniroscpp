@@ -149,6 +149,9 @@ public:
   /// Set response status OK 200
   void setResponseStatusOk();
 
+  /// Set custom response header.
+  void setResponseHeader(const std::string& name, const std::string& value);
+
   /// Set response header from HttpFrame parser state.
   void setResponseHeader(const HttpParserFrame& frame);
 
@@ -161,6 +164,9 @@ public:
 
   /// Wait for specific status.
   Error waitForState(State state, const WallDuration& duration) const;
+
+  /// Check response is confirmation of upgrade request.
+  bool isUpgradeResponse() const;
 
   /// Reset response-related data.
   void resetResponse();

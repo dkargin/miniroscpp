@@ -427,7 +427,7 @@ void RPCManager::releaseXMLRPCClient(std::shared_ptr<http::HttpClient> c)
     http::HttpClient::State state = c->getState();
     if (state != http::HttpClient::State::Idle) {
       // State::Idle = reuse, other states = delete.
-      MINIROS_INFO("RPCManager::releaseXMLRPCClient dropping stale client to %s fd=%d", rootUrl.str().c_str(), c->fd());
+      MINIROS_DEBUG("RPCManager::releaseXMLRPCClient dropping stale client to %s fd=%d", rootUrl.str().c_str(), c->fd());
       internal_->clients_.erase(it);
     }
   }

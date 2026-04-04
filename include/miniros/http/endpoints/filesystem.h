@@ -14,7 +14,7 @@ namespace miniros {
 namespace http {
 
 /// This endpoint serves static content from filesystem.
-class FilesystemEndpoint : public EndpointHandler {
+class MINIROS_DECL FilesystemEndpoint : public EndpointHandler {
 public:
   /// @param uriRoot - URL prefix path.
   /// @param fsPath - path to root folder at filesystem.
