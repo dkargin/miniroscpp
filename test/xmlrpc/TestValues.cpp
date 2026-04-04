@@ -404,12 +404,12 @@ TEST(XmlRpc, base64) {
   EXPECT_EQ(d[0], 1);
   EXPECT_EQ(d[1], 2);
 
-  EXPECT_EQ("<value><base64>AQI=\n</base64></value>", bin.toXml());
+  EXPECT_EQ("<value><base64>AQI=</base64></value>", bin.toXml());
 
   // Test stream operator.
   std::stringstream ss;
   ss << bin;
-  EXPECT_EQ("AQI=\n", ss.str());
+  EXPECT_EQ("AQI=", ss.str());
 
   // Constructor from XML
   XmlRpcValue bin2 = parse("<value><base64>AQI=</base64></value>");

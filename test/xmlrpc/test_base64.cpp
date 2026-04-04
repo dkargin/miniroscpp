@@ -71,9 +71,9 @@ TEST_P(Base64Test, Decode) {
 }
 
 INSTANTIATE_TEST_SUITE_P(MultilineTest, Base64Test, ::testing::Values(
-        Base64TestData({0}, "AA==\n"),
-        Base64TestData({1, 2}, "AQI=\n"),
-        Base64TestData({1, 2, 3}, "AQID\n"),
+        Base64TestData({0}, "AA=="),
+        Base64TestData({1, 2}, "AQI="),
+        Base64TestData({1, 2, 3}, "AQID"),
         Base64TestData(
             // clang-format off
             {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18,
@@ -101,7 +101,7 @@ INSTANTIATE_TEST_SUITE_P(MultilineTest, Base64Test, ::testing::Values(
             "FiY2RlZmdoaWpr\nbG1ub3BxcnN0dXZ3eHl6e3x9fn+AgYKDhIWGh4iJiouMjY6PkJ"
             "GSk5SVlpeYmZqbnJ2en6Ch\noqOkpaanqKmqq6ytrq+wsbKztLW2t7i5uru8vb6/wM"
             "HCw8TFxsfIycrLzM3Oz9DR0tPU1dbX\n2Nna29zd3t/g4eLj5OXm5+jp6uvs7e7v8P"
-            "Hy8/T19vf4+fr7/P3+/w==\n")));
+            "Hy8/T19vf4+fr7/P3+/w==")));
 
 class Base64ErrorData {
 public:
