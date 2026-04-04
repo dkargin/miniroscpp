@@ -165,6 +165,9 @@ public:
   /// Wait for specific status.
   Error waitForState(State state, const WallDuration& duration) const;
 
+  /// Check response is confirmation of upgrade request.
+  bool isUpgradeResponse() const;
+
   /// Reset response-related data.
   void resetResponse();
 

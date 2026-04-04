@@ -369,6 +369,8 @@ void HttpClient::Internal::handleDisconnect(Lock& lock, Error disconnectError)
     poll_set->setEvents(fd(), 0);
   }
 
+  // TODO: change state only if callback has not changed state anyhow.
+  updateState(lock, State::Disconnected);
   // Push active request back to queue.
   if (active_request) {
     std::unique_lock reqLock(requests_guard);

@@ -32,6 +32,9 @@ class HttpServer;
 ///  - HttpServer keeps pointers to all HttpServerConnection instances.
 class HttpServerConnection : public std::enable_shared_from_this<HttpServerConnection> {
 public:
+  using Lock = TimeCheckLock<std::mutex>;
+
+
   HttpServerConnection(const std::shared_ptr<Lifetime<HttpServer>>& server,
     std::shared_ptr<network::NetSocket> socket);
   ~HttpServerConnection();
@@ -40,16 +43,12 @@ public:
 
   void attachPollSet(PollSet* pollSet);
 
-  /// Handler for socket/poll events.
-  /// @param evtFlags event flags from poll
-  void handleEvents(int evtFlags);
-
   struct MINIROS_DECL State {
     enum State_t {
       /// Reading HTTP request from client.
       ReadRequest,
-      /// Processing request (finding handler, executing it).
-      ProcessRequest,
+      /// Waiting for response from some background handler.
+      WaitResponse,
       /// Writing HTTP response to client.
       WriteResponse,
       /// Connection is closing/exiting.
@@ -78,10 +77,6 @@ public:
   /// Fill in fault response.
   static void prepareFaultResponse(Error error, http::HttpRequest& request);
 
-  /// Detach from server.
-  /// Breaks link with Http server.
-  void detachFromServer(bool close);
-
   /// Extract socket for WebSocket upgrade.
   /// This method should only be called during WebSocket upgrade.
   /// It detaches the connection from the server and returns the socket.
@@ -89,46 +84,88 @@ public:
   /// @returns the socket, or nullptr if extraction fails
   std::shared_ptr<network::NetSocket> extractSocketForUpgrade();
 
-  using Lock = TimeCheckLock<std::mutex>;
-
   /// Allocate new request object or reuse some existing object from the pool.
   std::shared_ptr<HttpRequest> makeRequestObject(Lock& lock);
 
   /// It is called from CallbackQueue thread when response is ready.
-  void onAsyncRequestComplete(std::shared_ptr<HttpRequest> request, Error err);
+  void onAsyncRequestComplete(const std::shared_ptr<HttpRequest>& request, Error err);
 
   int eventsForState(State state) const;
+
+  /// It is called by HttpServer instance when it decides to drop connections.
+  void detachByServer();
 
   /// Check if this connection is detached from HTTP server instance.
   bool isDetachedFromParent() const;
 
 protected:
+
+  void detachPollSet(Lock& lock);
+
   /// Updates internal state.
   void updateState(Lock& lock, State newState);
 
   /// Incremental reading of request.
   Error doReadRequest(Lock& lock);
 
+  struct MINIROS_NODISCARD EventReport {
+    enum Command {
+      Invalid,
+      /// Proceed to next state.
+      Continue,
+      /// Repeat same state.
+      Repeat,
+      /// Response will be generated in background thread.
+      BackgroundResponse,
+      /// Need to process disconnect event and detach self from server.
+      Disconnect,
+      /// Need to drop ownership of socket and detach self from server.
+      Upgrade,
+    };
+
+    Command cmd = Invalid;
+
+    /// Number of bytes received in handler.
+    size_t bytesWritten = 0;
+
+    /// Leftover event flags.
+    int evtFlags = 0;
+
+    /// Message for handleDisconnect.
+    std::string disconnectMsg;
+  };
+
+  /// Handler for socket/poll events.
+  /// @param lock - acquired lock to internal state.
+  /// @param evtFlags event flags from poll.
+  EventReport handleSocketEvents(Lock& lock, int evtFlags);
+
   /// Handles State::ReadRequest.
   /// Expected transitions:
   ///  - ProcessRequest if got full HTTP request.
   ///  - Disconnected if error on socket.
-  void handleReadRequest(Lock& lock, int& evtFlags, bool fallThrough);
+  EventReport handleReadRequest(Lock& lock, int evtFlags);
 
-  /// Handle State::ProcessRequest.
+  /// Handle State::WaitResponse.
+  /// Connection waits until someone sends notification to socket that request is ready.
   /// Expected transitions:
   ///  - WriteResponse if got response immediately
-  ///  - stay in ProcessRequest if response is sent to callback queue.
-  bool handleProcessRequest(Lock& lock);
+  ///  - stay in WaitResponse if there were no changes.
+  EventReport handleWaitResponse(Lock& lock, int evtFlags);
 
   /// Handle State::WriteResponse.
-  void handleWriteResponse(Lock& lock, int& evtFlags, bool fallThrough);
+  /// Object stays in this state until all response is sent.
+  EventReport handleWriteResponse(Lock& lock, int evtFlags);
 
-  /// Process disconnect event.
-  void handleDisconnect(Lock& lock);
+  /// Detach from HttpServer.
+  /// This function should be called without lock on `guard_`
+  void detachFromServer(const std::shared_ptr<Lifetime<HttpServer>>& lifetime, bool upgrade, const std::string& reason);
+
+  /// Update event flags for socket fd in PollSet according to current state.
+  void updateEventsForSocket(Lock& lock);
 
   /// Start writing response to socket. It serializes response to buffers and switches state to WriteResponse.
-  void doWriteResponse(Lock& lock, const std::shared_ptr<HttpRequest>& requestObject, Error error);
+  void doSerializeResponse(Lock& lock, const std::shared_ptr<HttpRequest>& requestObject, Error error);
 
   /// Close and drop socket.
   void closeSocket();
@@ -139,7 +176,7 @@ protected:
 
   HttpParserFrame http_frame_;
 
-  std::shared_ptr<HttpRequest> active_request;
+  std::shared_ptr<HttpRequest> active_request_;
 
   /// Intermediate storage for HttpResponseHeader.
   std::string response_header_buffer_;

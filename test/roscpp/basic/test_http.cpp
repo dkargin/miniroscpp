@@ -170,6 +170,7 @@ TEST_F(HttpServerTest, ConnectInvalidHostnameWithReconnects)
 TEST_F(HttpServerTest, SimpleGet)
 {
   // Test sends two GET requests using the same request object.
+  // Also tests whether connection to server is properly closed and removed when client is destroyed.
 
   // Register the /data endpoint
   auto dataHandler = std::make_shared<DataEndpointHandler>();
@@ -178,59 +179,66 @@ TEST_F(HttpServerTest, SimpleGet)
     dataHandler, {});
   ASSERT_EQ(regErr, Error::Ok);
 
-  // Create HTTP client
-  http::HttpClient client(&poll_manager_.getPollSet());
-
   int port = getServerPort();
-  Error conErr = client.connect("127.0.0.1", port);
-  MINIROS_INFO("Started connection");
-  ASSERT_TRUE(conErr == Error::Ok || conErr == Error::Timeout);
-  ASSERT_EQ(client.waitConnected(WallDuration(connectionTimeoutSec)), Error::Ok);
 
-  MINIROS_INFO("Test connected to local server");
-
-  // Create and configure GET request to /data
-  auto request = std::make_shared<http::HttpRequest>(http::HttpMethod::Get, "/data");
-
-  // Enqueue the request
-  Error enqErr = client.enqueueRequest(request);
-  ASSERT_EQ(enqErr, Error::Ok);
-
-  // Wait for response (poll until status becomes HasResponse)
-  EXPECT_EQ(request->waitForResponse(WallDuration(responseTimeoutSec)), Error::Ok);
-
-  // Verify we actually got a response
-  ASSERT_EQ(request->state(), http::HttpRequest::State::Done);
+  // Create HTTP client
   {
-    const auto& responseHeader = request->responseHeader();
-    EXPECT_EQ(responseHeader.statusCode, 200);
-    EXPECT_EQ(responseHeader.contentType, "application/json");
-    // Verify response body contains JSON
-    const std::string& responseBody = request->responseBody();
-    ASSERT_FALSE(responseBody.empty());
-    ASSERT_NE(responseBody.find("counter"), std::string::npos);
-    ASSERT_NE(responseBody.find("0"), std::string::npos);
-    ASSERT_NE(responseBody.find("items"), std::string::npos);
+    http::HttpClient client(&poll_manager_.getPollSet());
+
+    Error conErr = client.connect("127.0.0.1", port);
+    MINIROS_INFO("Started connection");
+    ASSERT_TRUE(conErr == Error::Ok || conErr == Error::Timeout);
+    ASSERT_EQ(client.waitConnected(WallDuration(connectionTimeoutSec)), Error::Ok);
+
+    MINIROS_INFO("Test connected to local server");
+
+    // Create and configure GET request to /data
+    auto request = std::make_shared<http::HttpRequest>(http::HttpMethod::Get, "/data");
+
+    // Enqueue the request
+    Error enqErr = client.enqueueRequest(request);
+    ASSERT_EQ(enqErr, Error::Ok);
+
+    // Wait for response (poll until status becomes HasResponse)
+    EXPECT_EQ(request->waitForResponse(WallDuration(responseTimeoutSec)), Error::Ok);
+
+    // Verify we actually got a response
+    ASSERT_EQ(request->state(), http::HttpRequest::State::Done);
+    {
+      const auto& responseHeader = request->responseHeader();
+      EXPECT_EQ(responseHeader.statusCode, 200);
+      EXPECT_EQ(responseHeader.contentType, "application/json");
+      // Verify response body contains JSON
+      const std::string& responseBody = request->responseBody();
+      ASSERT_FALSE(responseBody.empty());
+      ASSERT_NE(responseBody.find("counter"), std::string::npos);
+      ASSERT_NE(responseBody.find("0"), std::string::npos);
+      ASSERT_NE(responseBody.find("items"), std::string::npos);
+    }
+
+    // Send second request.
+    Error err2 = client.enqueueRequest(request);
+    ASSERT_EQ(err2, Error::Ok);
+
+    EXPECT_EQ(request->waitForResponse(WallDuration(responseTimeoutSec)), Error::Ok);
+    // Verify we actually got a response
+    ASSERT_EQ(request->state(), http::HttpRequest::State::Done);
+    {
+      const auto& responseHeader = request->responseHeader();
+      EXPECT_EQ(responseHeader.statusCode, 200);
+      EXPECT_EQ(responseHeader.contentType, "application/json");
+      // Verify response body contains JSON
+      const std::string& responseBody = request->responseBody();
+      ASSERT_FALSE(responseBody.empty());
+      ASSERT_NE(responseBody.find("counter"), std::string::npos);
+      ASSERT_NE(responseBody.find("1"), std::string::npos);
+      ASSERT_NE(responseBody.find("items"), std::string::npos);
+    }
   }
 
-  // Send second request.
-  Error err2 = client.enqueueRequest(request);
-  ASSERT_EQ(err2, Error::Ok);
-
-  EXPECT_EQ(request->waitForResponse(WallDuration(responseTimeoutSec)), Error::Ok);
-  // Verify we actually got a response
-  ASSERT_EQ(request->state(), http::HttpRequest::State::Done);
-  {
-    const auto& responseHeader = request->responseHeader();
-    EXPECT_EQ(responseHeader.statusCode, 200);
-    EXPECT_EQ(responseHeader.contentType, "application/json");
-    // Verify response body contains JSON
-    const std::string& responseBody = request->responseBody();
-    ASSERT_FALSE(responseBody.empty());
-    ASSERT_NE(responseBody.find("counter"), std::string::npos);
-    ASSERT_NE(responseBody.find("1"), std::string::npos);
-    ASSERT_NE(responseBody.find("items"), std::string::npos);
-  }
+  // Wait a little bit until all connections are destroyed.
+  std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  EXPECT_EQ(server_->getConnectionsCount(), 0);
 }
 
 // POST endpoint handler that processes JSON request and returns JSON response
@@ -575,7 +583,6 @@ int main(int argc, char** argv)
 {
   testing::InitGoogleTest(&argc, argv);
   miniros::handleCrashes();
-  miniros::setThreadName("main");
   miniros::console::set_logger_level("destructor", console::Level::Debug);
   miniros::console::set_logger_level("miniros.http", console::Level::Debug);
   miniros::console::set_logger_level("miniros.poll_set", console::Level::Debug);

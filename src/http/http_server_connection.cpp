@@ -34,19 +34,27 @@ HttpServerConnection::HttpServerConnection(const std::shared_ptr<Lifetime<HttpSe
 
 HttpServerConnection::~HttpServerConnection()
 {
-  std::unique_lock<std::mutex> lock(guard_);
+  Lock lock(guard_, THIS_LOCATION);
   LOCAL_DEBUG("~HttpServerConnection(%d)", debugFd_);
-
-  if (poll_set_) {
-    if (socket_) {
-      poll_set_->delSocket(socket_->fd());
-    }
-  }
+  detachPollSet(lock);
 }
 
 void HttpServerConnection::setEndpointCollection(const std::shared_ptr<internal::EndpointCollection>& endpoints)
 {
   endpoints_ = endpoints;
+}
+
+void HttpServerConnection::detachPollSet(Lock& lock)
+{
+  if (poll_set_) {
+    PollSet* ps = poll_set_;
+    poll_set_ = nullptr;
+
+    if (socket_ && socket_->valid()) {
+      ScopedUnlock unlock(lock);
+      ps->delSocket(socket_->fd());
+    }
+  }
 }
 
 void HttpServerConnection::attachPollSet(PollSet* poll_set)
@@ -57,10 +65,27 @@ void HttpServerConnection::attachPollSet(PollSet* poll_set)
   poll_set_->addSocket(socket_->fd(), PollSet::EventIn,
     [wconnection = weak_from_this()](int flags)
     {
-      auto connection = wconnection.lock();
-      if (!connection)
+      auto self = wconnection.lock();
+      if (!self)
         return 0;
-      connection->handleEvents(flags);
+      std::shared_ptr<Lifetime<HttpServer>> server_lifetime;
+      EventReport report;
+      {
+        Lock lock(self->guard_, THIS_LOCATION);
+        report = self->handleSocketEvents(lock, flags);
+        if (report.cmd == EventReport::Disconnect || report.cmd == EventReport::Upgrade) {
+          // Gather all objects to detach self without keeping lock to `guard_` mutex.
+          // It resolves issues with lock order, reported by helgrind.
+          server_lifetime = self->server_lifetime_;
+          self->detachPollSet(lock);
+        }
+        self->updateEventsForSocket(lock);
+      }
+
+      if (report.cmd == EventReport::Disconnect || report.cmd == EventReport::Upgrade) {
+        bool upgrade = (report.cmd == EventReport::Upgrade);
+        self->detachFromServer(server_lifetime, upgrade, report.disconnectMsg);
+      }
       return 0;
   }, {}, THIS_LOCATION);
 }
@@ -70,8 +95,8 @@ const char* HttpServerConnection::State::toString() const
   switch (value) {
     case ReadRequest:
       return "ReadRequest";
-    case ProcessRequest:
-      return "ProcessRequest";
+    case WaitResponse:
+      return "WaitResponse";
     case WriteResponse:
       return "WriteResponse";
     case Disconnected:
@@ -105,13 +130,10 @@ Error HttpServerConnection::doReadRequest(Lock& lock)
       // Either way we close the connection
     }
     LOCAL_DEBUG("HttpServerConnection(peer=%s fd=%d)::readRequest got only %d/%d bytes.", peer.c_str(), fd, http_frame_.bodyLength(), http_frame_.contentLength());
-    return Error::Ok;
+    return readErr;
   }
 
   assert(http_frame_.state() == HttpParserFrame::ParseComplete);
-  // Otherwise, parse and dispatch the request
-  LOCAL_DEBUG("HttpServerConnection(peer=%s fd=%d)::readRequest read %d/%d bytes.", peer.c_str(), fd, http_frame_.bodyLength(), http_frame_.contentLength());
-  updateState(lock, state_ = State::ProcessRequest);
   return Error::Ok;
 }
 
@@ -183,12 +205,31 @@ public:
   std::weak_ptr<HttpServerConnection> connection;
 };
 
+void HttpServerConnection::detachByServer()
+{
+  Lock lock(guard_, THIS_LOCATION);
+  server_lifetime_ = {};
+
+  if (poll_set_ && socket_ && socket_->valid()) {
+    poll_set_->signalFd(socket_->fd());
+  }
+}
+
+void HttpServerConnection::detachFromServer(const std::shared_ptr<Lifetime<HttpServer>>& lifetime, bool upgrade, const std::string& reason)
+{
+  if (!lifetime)
+    return;
+  auto lock2 = lifetime->getLock();
+  if (lifetime->valid(lock2)) {
+    HttpServer* server = lifetime->ptr();
+    server->onConnectionClosed(lock2, shared_from_this(), upgrade, reason);
+  }
+}
+
 std::shared_ptr<HttpRequest> HttpServerConnection::makeRequestObject(Lock& lock)
 {
   auto requestObject = std::make_shared<HttpRequest>();
   requestObject->resetResponse();
-  requestObject->updateState(HttpRequest::State::ServerHandleRequest);
-
   requestObject->setPath(std::string{http_frame_.getPath()});
   requestObject->setRequestBody(std::string{http_frame_.body()});
 
@@ -204,112 +245,133 @@ std::shared_ptr<HttpRequest> HttpServerConnection::makeRequestObject(Lock& lock)
   return requestObject;
 }
 
-bool HttpServerConnection::handleProcessRequest(Lock& lock)
+HttpServerConnection::EventReport HttpServerConnection::handleReadRequest(Lock& lock, int evtFlags)
 {
-  resetResponse();
+  EventReport report;
+  report.cmd = EventReport::Continue;
 
-  auto requestObject = makeRequestObject(lock);
-
-  std::string endpoint{http_frame_.getPath()};
-
-  if (isDetachedFromParent()) {
-    LOCAL_ERROR("HttpServerConnection::handleEvents connection fd=%d detached from server", socket_->fd());
-    prepareFaultResponse(Error::InternalError, *requestObject);
-    return false;
+  if (evtFlags & PollSet::EventError) {
+    report.cmd = EventReport::Disconnect;
+    report.disconnectMsg = "POLLERR in ReadRequest";
+    report.evtFlags = 0;
+    return report;
   }
 
-  network::ClientInfo clientInfo;
-  clientInfo.fd = socket_->fd();
-  clientInfo.remoteAddress = socket_->peerAddress();
-  LOCAL_DEBUG("Handling HTTP request to path=\"%s\"", endpoint.c_str());
-
-  auto endpoints = endpoints_.lock();
-  if (!endpoints) {
-    LOCAL_ERROR("No handler for endpoint \"%s\"", endpoint.c_str());
-    doWriteResponse(lock, requestObject, Error::FileNotFound);
-    return true;
-  }
-
-  auto [handler, cb] = endpoints->findEndpoint(http_frame_);
-
-  if (!handler) {
-    LOCAL_ERROR("No handler for endpoint \"%s\"", endpoint.c_str());
-    doWriteResponse(lock, requestObject, Error::FileNotFound);
-    return true;
-  }
-
-  if (cb) {
-    // Send request to CallbackQueue for processing in different thread
-    auto callback = std::make_shared<HttpServerCallback>();
-    callback->handler = handler;
-    callback->request = requestObject;
-    callback->clientInfo = clientInfo;
-    callback->connection = weak_from_this();
-    cb->addCallback(callback, reinterpret_cast<uint64_t>(requestObject.get()));
-    // Return 0 - no events to wait for. Callback will trigger EventOut when done.
-    return false;
-  }
-
-  // Process request immediately in current thread
-  Error err = Error::Ok;
-  {
-    ScopedUnlock unlock(lock);
-    err = handler->handle(clientInfo, requestObject);
-  }
-
-  // Store handler reference for potential upgrade
-  if (err == Error::Ok && requestObject->responseHeader().statusCode == 101) {
-    requestObject->setHeader("X-Upgrade-Handler", "true");
-  }
-
-  doWriteResponse(lock, requestObject, err);
-  return true;
-}
-
-void HttpServerConnection::handleDisconnect(Lock& lock)
-{
-  updateState(lock, State::Disconnected);
-}
-
-void HttpServerConnection::handleReadRequest(Lock& lock, int& evtFlags, bool fallThrough)
-{
-  if (!fallThrough && evtFlags & PollSet::EventError) {
-    handleDisconnect(lock);
-    evtFlags = 0;
-  }
-
-  if (evtFlags & PollSet::EventIn || fallThrough) {
+  if (evtFlags & PollSet::EventIn) {
+    // It can switch state to State::ProcessRequest;
     Error err = doReadRequest(lock);
 
-    evtFlags &= (~PollSet::EventIn);
+    // Clean up "read" flag.
+    report.evtFlags = evtFlags & (~PollSet::EventIn);
 
-    // What to do with EOF?
-
-    if (err == Error::Ok) {
-      // Remain in the same ReadRequest state.
+    if (err == Error::WouldBlock) {
+      report.cmd = EventReport::Repeat;
+      return report;
     }
-    else if (err == Error::EndOfFile) {
-      handleDisconnect(lock);
-    } else {
+    if (err == Error::EndOfFile) {
+      report.cmd = EventReport::Disconnect;
+      report.disconnectMsg = "closed by EOF";
+      return report;
+    } if (err != Error::Ok) {
       LOCAL_ERROR("Unexpected error %s", err.toString());
+      report.cmd = EventReport::Disconnect;
+      report.disconnectMsg = std::string("closed by unexpected error: ") + err.toString();
+      return report;
     }
-  } else {
-    LOCAL_WARN("HttpServerConnection[%d]::handleReadRequest() unhandled events in ReadRequest: %o", debugFd_, evtFlags);
+
+    // Here we have full request.
+
+    resetResponse();
+    auto requestObject = makeRequestObject(lock);
+    active_request_ = requestObject;
+    std::string path{http_frame_.getPath()};
+
+    network::ClientInfo clientInfo;
+    clientInfo.fd = socket_->fd();
+    clientInfo.remoteAddress = socket_->peerAddress();
+    LOCAL_DEBUG("Handling HTTP request to path=\"%s\"", path.c_str());
+
+    auto endpoints = endpoints_.lock();
+    if (!endpoints) {
+      LOCAL_ERROR("No handler for endpoint \"%s\"", path.c_str());
+      doSerializeResponse(lock, requestObject, Error::FileNotFound);
+      report.cmd = EventReport::Continue;
+      return report;
+    }
+
+    auto [handler, cb] = endpoints->findEndpoint(http_frame_);
+    if (!handler) {
+      LOCAL_ERROR("No handler for endpoint \"%s\"", path.c_str());
+      doSerializeResponse(lock, requestObject, Error::FileNotFound);
+      report.cmd = EventReport::Continue;
+      return report;
+    }
+
+    if (cb) {
+      // Send request to CallbackQueue for processing in different thread
+      auto callback = std::make_shared<HttpServerCallback>();
+      callback->handler = handler;
+      callback->request = requestObject;
+      callback->clientInfo = clientInfo;
+      callback->connection = weak_from_this();
+      cb->addCallback(callback, reinterpret_cast<uint64_t>(requestObject.get()));
+      // Return 0 - no events to wait for. Callback will trigger EventOut when done.
+      report.cmd = EventReport::BackgroundResponse;
+      return report;
+    }
+
+    // Process request immediately in current thread
+    {
+      ScopedUnlock unlock(lock);
+      handler->handle(clientInfo, requestObject);
+    }
+
+    doSerializeResponse(lock, requestObject, Error::Ok);
+    report.cmd = EventReport::Continue;
+    // Got full request.
+    return report;
   }
+
+  LOCAL_WARN("HttpServerConnection[%d]::handleReadRequest() unhandled events in ReadRequest: %o", debugFd_, evtFlags);
+  return report;
 }
 
-void HttpServerConnection::handleWriteResponse(Lock& lock, int& evtFlags, bool fallThrough)
+HttpServerConnection::EventReport HttpServerConnection::handleWaitResponse(Lock& lock, int evtFlags)
 {
-  if (!fallThrough && evtFlags & PollSet::EventError) {
-    handleDisconnect(lock);
-    evtFlags = 0;
+  EventReport report;
+
+  if (evtFlags & PollSet::EventSoftSignal) {
+    report.evtFlags = evtFlags & (~PollSet::EventSoftSignal);
+    report.cmd = EventReport::Continue;
+  } else {
+    report.cmd = EventReport::Repeat;
   }
-  else if (evtFlags & PollSet::EventOut || fallThrough) {
-    evtFlags &= (~PollSet::EventOut);
+  // Shift responsibility for errors in this state to next state.
+
+  doSerializeResponse(lock, active_request_, Error::Ok);
+  return report;
+}
+
+HttpServerConnection::EventReport HttpServerConnection::handleWriteResponse(Lock& lock, int evtFlags)
+{
+  EventReport report;
+  report.cmd = EventReport::Continue;
+
+  if (evtFlags & PollSet::EventError) {
+    report.cmd = EventReport::Disconnect;
+    report.disconnectMsg = "POLLERR in WriteResponse";
+    evtFlags = 0;
+    return report;
+  }
+
+  if (evtFlags & PollSet::EventOut) {
+    assert(active_request_);
+    assert(response_header_buffer_.size());
+
+    report.evtFlags = evtFlags & (~PollSet::EventOut);
 
     std::pair<size_t, Error> r;
-
-    const std::string& responseBody = active_request->responseBody();
+    const std::string& responseBody = active_request_->responseBody();
     size_t responseBodySize = responseBody.size();
 
     if (responseBodySize > 0) {
@@ -332,72 +394,54 @@ void HttpServerConnection::handleWriteResponse(Lock& lock, int& evtFlags, bool f
         static_cast<int>(written), static_cast<int>(totalSize), dur);
     }
 
-    if (err == Error::WouldBlock)
-      return;
+    report.bytesWritten = written;
+
+    if (err == Error::WouldBlock) {
+      report.cmd = EventReport::Repeat;
+      return report;
+    }
 
     if (err == Error::Ok) {
       if (data_sent_ < totalSize) {
-        // Failed to write all data, so we need to yield to spinner.
-        return;
+        // Failed to write all data, so we need to yield to spinner and try later.
+        return report;
       }
       data_sent_ = 0;
 
-      // Check if this is a connection upgrade (status 101)
-      bool isUpgrade = false;
-      if (active_request && active_request->responseHeader().statusCode == 101) {
-        std::string upgradeFlag = active_request->getHeader("X-Upgrade-Handler");
-        if (upgradeFlag == "true") {
-          isUpgrade = true;
-        }
-      }
-
-      if (isUpgrade) {
+      if (active_request_ && active_request_->isUpgradeResponse()) {
         // Connection upgrade: let the handler handle it
         LOCAL_DEBUG("Connection upgrade complete, calling handler");
-        
-        if (!server_) {
-          LOCAL_ERROR("Connection upgrade: server is null");
-          updateState(lock, State::Disconnected);
-          return;
+
+        auto endpoints = endpoints_.lock();
+
+        if (!endpoints) {
+          LOCAL_ERROR("Connection upgrade: endpoints are lost");
+          report.cmd = EventReport::Disconnect;
+          report.disconnectMsg = "endpoints are lost";
+          return report;
         }
 
         // Get the handler
-        auto [handler, cb] = server_->findEndpoint(http_frame_);
+        auto [handler, cb] = endpoints->findEndpoint(http_frame_);
         if (!handler) {
           LOCAL_ERROR("Connection upgrade: handler not found");
-          updateState(lock, State::Disconnected);
-          return;
+          report.cmd = EventReport::Disconnect;
+          report.disconnectMsg = "http endpoint for \"" + std::string(http_frame_.getPath()) + "\"is not found";
+          return report;
         }
 
         network::ClientInfo clientInfo;
         clientInfo.fd = socket_->fd();
         clientInfo.remoteAddress = socket_->peerAddress();
 
-        int fd = socket_->fd();
-
-        // Remove connection from server's connection map and poll set
-        if (poll_set_) {
-          ScopedUnlock unlock(lock);
-          poll_set_->delSocket(fd);
-        }
-
-        // Remove from server's connection map
-        /* TODO: Implement:
-         * 1. Remove this connection from PollSet and any references from server.
-         * 2. Give client free socket, detached from any PollSet.
-         */
-
-        if (server_) {
-          ScopedUnlock unlock(lock);
-          //server_->detachConnection(fd, "Connection upgrade");
-        }
-
         // Call handler's upgradeComplete method
         Error upgradeErr = Error::NotImplemented;
         {
           auto socket = socket_;
+          detachPollSet(lock);
+          socket_ = nullptr;
           ScopedUnlock unlock(lock);
-          upgradeErr = handler->upgradeComplete(socket, clientInfo, active_request);
+          upgradeErr = handler->upgradeComplete(socket, clientInfo, active_request_);
         }
         if (upgradeErr == Error::NotImplemented) {
           LOCAL_ERROR("Connection upgrade: handler does not support upgrades");
@@ -406,43 +450,82 @@ void HttpServerConnection::handleWriteResponse(Lock& lock, int& evtFlags, bool f
         }
 
         // Don't continue with normal HTTP processing
-        updateState(lock, State::Disconnected);
-        return;
+        report.cmd = EventReport::Upgrade;
+        return report;
       }
 
       http_frame_.finishRequest();
-      updateState(lock, State::ReadRequest);
+      report.cmd = EventReport::Continue;
       double dur = (SteadyTime::now() - request_start_).toSec() * 1000;
       LOCAL_DEBUG("Served HTTP response in %fms", dur);
     } else {
       LOCAL_ERROR("HttpServerConnection writeResponse error: %s", err.toString());
     }
   }
+  return report;
 }
 
-void HttpServerConnection::handleEvents(int evtFlags)
+HttpServerConnection::EventReport HttpServerConnection::handleSocketEvents(Lock& lock, int evtFlags)
 {
-  Lock lock(guard_, THIS_LOCATION);
-
   const int startEvt = evtFlags;
 
-  // TODO: Disable it once most transport bugs are resolved.
   LOCAL_DEBUG("HttpServerConnection[%d]::handleEvents(%s) in state %s", debugFd_, PollSet::eventToString(startEvt).c_str(), state_.toString());
 
-  // Set to true if we transition multiple FSM states.
-  bool stateFallback = false;
-  if (state_ == State::ReadRequest) {
-    handleReadRequest(lock, evtFlags, stateFallback);
-    evtFlags = 0;
+  // PollSet::EventSoftSignal is sent either when server is dropping all of its connections,
+  // or notification from some thread that response is ready.
+  if (evtFlags & PollSet::EventSoftSignal) {
+    if (!server_lifetime_) {
+      EventReport report;
+      report.cmd = EventReport::Disconnect;
+      report.disconnectMsg = "Detached from HttpServer";
+      report.evtFlags = 0;
+      return report;
+    }
   }
 
-  if (state_ == State::ProcessRequest) {
-    stateFallback = handleProcessRequest(lock);
+  // Set to true if we transition multiple FSM states.
+  if (state_ == State::ReadRequest) {
+    EventReport report = handleReadRequest(lock, evtFlags);
+    assert(report.cmd != EventReport::Invalid);
+    evtFlags = report.evtFlags;
+    if (report.cmd == EventReport::Disconnect) {
+      updateState(lock, State::Disconnected);
+      return report;
+    } else if (report.cmd == EventReport::Continue) {
+      updateState(lock, State::WriteResponse);
+      evtFlags |= PollSet::EventOut;
+    } else if (report.cmd == EventReport::BackgroundResponse) {
+      updateState(lock, State::WaitResponse);
+      // Yield to poller and wait for EventSoftSignal.
+      return {};
+    }
+  }
+
+  if (state_ == State::WaitResponse) {
+    EventReport report = handleWaitResponse(lock, evtFlags);
+    assert(report.cmd != EventReport::Invalid);
+    evtFlags = report.evtFlags;
+    if (report.cmd == EventReport::Continue) {
+      updateState(lock, State::WriteResponse);
+      evtFlags |= PollSet::EventOut;
+    }
   }
 
   if (state_ == State::WriteResponse) {
-    handleWriteResponse(lock, evtFlags, stateFallback);
-    evtFlags = 0;
+    EventReport report = handleWriteResponse(lock, evtFlags);
+    assert(report.cmd != EventReport::Invalid);
+    evtFlags = report.evtFlags;
+
+    if (report.cmd == EventReport::Disconnect || report.cmd == EventReport::Upgrade) {
+      updateState(lock, State::Disconnected);
+      return report;
+    }
+
+    if (report.cmd == EventReport::Continue) {
+      updateState(lock, State::ReadRequest);
+    }
+    // We could instantly try to read next data right now and make a loop here.
+    // But we are lazy and try to read next time.
   }
 
   if (evtFlags != 0) {
@@ -452,20 +535,27 @@ void HttpServerConnection::handleEvents(int evtFlags)
       state_.toString());
   }
 
-  poll_set_->setEvents(fd(), eventsForState(state_));
+  return {};
 }
 
-void HttpServerConnection::doWriteResponse(Lock& lock, const std::shared_ptr<HttpRequest>& req, Error error)
+void HttpServerConnection::updateEventsForSocket(Lock& /*lock*/)
+{
+  if (!poll_set_)
+    return;
+  if (socket_ && socket_->valid()) {
+    poll_set_->setEvents(socket_->fd(), eventsForState(state_));
+  }
+}
+
+void HttpServerConnection::doSerializeResponse(Lock& lock, const std::shared_ptr<HttpRequest>& req, Error error)
 {
   // Prepare fault response if handler returned error
   if (!error) {
     prepareFaultResponse(error, *req);
   }
   const HttpResponseHeader& responseHeader = req->responseHeader();
-  req->updateState(HttpRequest::State::ServerSendResponse);
-  active_request = req;
+  active_request_ = req;
   responseHeader.writeHeader(response_header_buffer_, req->responseBody().size());
-  updateState(lock, State::WriteResponse);
 }
 
 int HttpServerConnection::eventsForState(State state) const
@@ -475,8 +565,8 @@ int HttpServerConnection::eventsForState(State state) const
       return PollSet::EventOut;
     case State::ReadRequest:
       return PollSet::EventIn;
-    case State::ProcessRequest:
-      return 0;
+    case State::WaitResponse:
+      return PollSet::EventSoftSignal;
     case State::Disconnected:
       return 0;
     default:
@@ -493,49 +583,41 @@ void HttpServerConnection::closeSocket()
 void HttpServerConnection::resetResponse()
 {
   response_header_buffer_.resize(0);
-  active_request.reset();
+  active_request_.reset();
   data_sent_ = 0;
-}
-
-void HttpServerConnection::detachFromServer(bool close)
-{
-  server_lifetime_ = {};
-
-  Lock lock(guard_, THIS_LOCATION);
-  if (close) {
-    // TODO: ???
-  }
 }
 
 std::shared_ptr<network::NetSocket> HttpServerConnection::extractSocketForUpgrade()
 {
   Lock lock(guard_, THIS_LOCATION);
+  server_lifetime_.reset();
+
   if (!socket_) {
     LOCAL_ERROR("HttpServerConnection::extractSocketForUpgrade: socket is null");
     return nullptr;
   }
+
   auto socket = socket_;
-  socket_.reset(); // Release ownership from connection
-  server_ = nullptr; // Detach from server
+  socket_.reset();
   return socket;
 }
 
-void HttpServerConnection::onAsyncRequestComplete(std::shared_ptr<HttpRequest> request, Error err)
+void HttpServerConnection::onAsyncRequestComplete(const std::shared_ptr<HttpRequest>& request, Error err)
 {
   Lock lock(guard_, THIS_LOCATION);
   
   // Check if connection is still in ProcessRequest state
-  if (state_ != State::ProcessRequest) {
+  if (state_ != State::WaitResponse) {
     LOCAL_DEBUG("HttpServerConnection[%d]::onAsyncRequestComplete(%d) unexpected state for sending response %s", debugFd_, request->id(), state_.toString());
     return;
   }
 
-  // Prepare response
-  doWriteResponse(lock, request, err);
-
-  assert(socket_);
-  int fd = socket_->fd();
-  poll_set_->addEvents(fd, PollSet::EventOut);
+  if (poll_set_ && socket_ && socket_->valid()) {
+    poll_set_->signalFd(socket_->fd());
+  } else {
+    // TODO: Close self.
+    LOCAL_ERROR("HttpServerConnection[%d]::onAsyncRequestComplete(%d) socket is lost in state %s", debugFd_, request->id(), state_.toString());
+  }
 }
 
 void HttpServerConnection::updateState(Lock& lock, State newState)

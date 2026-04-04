@@ -64,7 +64,7 @@ struct HttpServer::Internal {
     MINIROS_DEBUG("HttpServer::~Internal()");
   }
 
-  void onConnectionClosed(Lock& lock, const std::shared_ptr<HttpServerConnection>& connection, const std::string& reason);
+  void onConnectionClosed(Lock& lock, const std::shared_ptr<HttpServerConnection>& connection, bool upgrade, const std::string& reason);
 
   Error start(network::NetSocket& socket, network::NetAddress::Type addrType, int port);
 
@@ -153,7 +153,7 @@ void HttpServer::Internal::acceptClient(Lock& /*lock*/, network::NetSocket* sock
 }
 
 void HttpServer::Internal::onConnectionClosed(Lock& lock, const std::shared_ptr<HttpServerConnection>& connection,
-  const std::string& reason)
+  bool upgrade, const std::string& reason)
 {
   int fd = connection->fd();
   MINIROS_INFO("HttpServer::onConnectionClosed() fd=%d: %s", fd, reason.c_str());
@@ -174,13 +174,13 @@ void HttpServer::setCloseConnectionHandler(CloseConnectionHandler&& handler)
   internal_->onCloseConnection = std::move(handler);
 }
 
-void HttpServer::onConnectionClosed(const std::shared_ptr<HttpServerConnection>& connection, const std::string& reason)
+void HttpServer::onConnectionClosed(std::unique_lock<std::mutex>& lock,
+  const std::shared_ptr<HttpServerConnection>& connection, bool upgrade, const std::string& reason)
 {
   assert(internal_);
   if (!internal_)
     return;
-  auto lock = internal_->lifetime->getLock();
-  internal_->onConnectionClosed(lock, connection, reason);
+  internal_->onConnectionClosed(lock, connection, upgrade, reason);
 }
 
 HttpServer::HttpServer(PollSet* pollSet)
@@ -229,6 +229,7 @@ Error HttpServer::stop()
 
   std::set<std::shared_ptr<HttpServerConnection>> connectionsCopy;
 
+
   {
     std::unique_lock lock(*internal_->lifetime);
 
@@ -259,7 +260,7 @@ Error HttpServer::stop()
   for (auto connection: connectionsCopy) {
     int fd = connection->fd();
     LOCAL_INFO("HttpServer[]::stop() - dropping connection %d", fd);
-    connection->detachFromServer(true);
+    connection->detachByServer();
   }
 
   return Error::Ok;
@@ -300,6 +301,16 @@ std::pair<std::shared_ptr<EndpointHandler>, std::shared_ptr<CallbackQueue>> Http
 
   return internal_->endpoints->findEndpoint(frame);
 }
+
+size_t HttpServer::getConnectionsCount() const
+{
+  if (!internal_)
+    return 0;
+
+  auto lock = internal_->lifetime->getLock();
+  return internal_->connections.size();
+}
+
 
 }
 }
