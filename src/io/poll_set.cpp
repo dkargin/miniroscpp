@@ -337,7 +337,6 @@ bool PollSet::setEvents(int sock, int events)
   std::scoped_lock<std::mutex> lock(internal_->socket_info_mutex_);
 
   auto it = internal_->socket_info_.find(sock);
-
   if (it == internal_->socket_info_.end())
   {
     LOCAL_ERROR("PollSet::setEvents(%d, %s) - fd is not registered", sock, eventToString(events).c_str());
@@ -347,8 +346,12 @@ bool PollSet::setEvents(int sock, int events)
   if (it->second.events_ == events)
     return true;
 
+  int mask = POLLIN | POLLOUT | POLLERR;
+  events = events & mask;
+
   int oldEvents = it->second.events_;
   it->second.events_ = events;
+  
   if (oldEvents == 0) {
     if (!add_socket_to_watcher(internal_->epfd_, sock, it->second.events_)) {
       LOCAL_ERROR("PollSet::setEvents(%d, %s) failed to add socket to watcher: %s", sock, eventToString(events).c_str(), strerror(errno));
@@ -363,7 +366,7 @@ bool PollSet::setEvents(int sock, int events)
     LOCAL_DEBUG("PollSet::setEvents(%d, %s) deleted socket from watcher", sock, eventToString(events).c_str());
   } else {
     if (!set_events_on_socket(internal_->epfd_, sock, it->second.events_)) {
-      LOCAL_WARN("PollSet::setEvents(%d, %s) failed deleted socket from watcher: %s", sock, eventToString(events).c_str(), strerror(errno));
+      LOCAL_WARN("PollSet::setEvents(%d, %s) failed to update events: %s", sock, eventToString(events).c_str(), strerror(errno));
       return false;
     }
     LOCAL_DEBUG("PollSet::setEvents(%d, %s) updated events", sock, eventToString(events).c_str());

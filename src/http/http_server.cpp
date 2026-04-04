@@ -156,11 +156,14 @@ void HttpServer::Internal::onConnectionClosed(Lock& lock, const std::shared_ptr<
   bool upgrade, const std::string& reason)
 {
   int fd = connection->fd();
-  MINIROS_INFO("HttpServer::onConnectionClosed() fd=%d: %s", fd, reason.c_str());
 
   auto it = connections.find(connection);
-  if (it == connections.end())
+  if (it == connections.end()) {
+    MINIROS_WARN("HttpServer::onConnectionClosed() fd=%d: %s - unknown connection", fd, reason.c_str());
     return;
+  }
+
+  MINIROS_DEBUG("HttpServer::onConnectionClosed() fd=%d: %s", fd, reason.c_str());
   connections.erase(connection);
   if (onCloseConnection) {
     auto handler = onCloseConnection;

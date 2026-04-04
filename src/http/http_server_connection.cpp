@@ -76,15 +76,17 @@ void HttpServerConnection::attachPollSet(PollSet* poll_set)
         if (report.cmd == EventReport::Disconnect || report.cmd == EventReport::Upgrade) {
           // Gather all objects to detach self without keeping lock to `guard_` mutex.
           // It resolves issues with lock order, reported by helgrind.
-          server_lifetime = self->server_lifetime_;
+          std::swap(server_lifetime, self->server_lifetime_);
           self->detachPollSet(lock);
         }
         self->updateEventsForSocket(lock);
       }
 
+      int numRefs = self.use_count();
       if (report.cmd == EventReport::Disconnect || report.cmd == EventReport::Upgrade) {
         bool upgrade = (report.cmd == EventReport::Upgrade);
         self->detachFromServer(server_lifetime, upgrade, report.disconnectMsg);
+        numRefs = self.use_count();
       }
       return 0;
   }, {}, THIS_LOCATION);
@@ -566,7 +568,7 @@ int HttpServerConnection::eventsForState(State state) const
     case State::ReadRequest:
       return PollSet::EventIn;
     case State::WaitResponse:
-      return PollSet::EventSoftSignal;
+      return 0; //< PollSet::EventSoftSignal are implicit events, no need to subscribe to them.
     case State::Disconnected:
       return 0;
     default:

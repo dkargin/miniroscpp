@@ -74,7 +74,7 @@ public:
   static const int EventError;
 
   /// Software signal to specific FD.
-  static constexpr int EventSoftSignal = 1<<29;
+  static constexpr int EventSoftSignal = 1<<28;
 
   /// Low precision timer event.
   static constexpr int EventTimer = 1<<29;
