@@ -25,13 +25,13 @@ class HttpRequest;
 /// Base class for endpoint filters.
 class EndpointFilter {
 public:
-  virtual ~EndpointFilter() {}
+  virtual MINIROS_DECL ~EndpointFilter() {}
   virtual bool check(const HttpParserFrame& frame) const = 0;
 };
 
 class EndpointHandler {
 public:
-  virtual ~EndpointHandler() {}
+  virtual MINIROS_DECL ~EndpointHandler() {}
 
   /// Handle request and return pointer to response object.
   /// Response will be immediately serialized to output buffer in the same thread.
@@ -50,7 +50,7 @@ public:
   /// @returns:
   ///   Error::Ok - upgrade was handled successfully
   ///   Error::NotImplemented - default implementation, upgrade not supported
-  virtual Error upgradeComplete(const std::shared_ptr<network::NetSocket>& connection, const network::ClientInfo& clientInfo, const std::shared_ptr<HttpRequest>& request);
+  virtual MINIROS_DECL Error  upgradeComplete(const std::shared_ptr<network::NetSocket>& connection, const network::ClientInfo& clientInfo, const std::shared_ptr<HttpRequest>& request);
 };
 
 }

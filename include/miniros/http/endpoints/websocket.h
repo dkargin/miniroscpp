@@ -5,10 +5,11 @@
 #ifndef MINIROS_HTTP_ENDPOINTS_WEBSOCKET_H
 #define MINIROS_HTTP_ENDPOINTS_WEBSOCKET_H
 
-#include "miniros/http/http_endpoint.h"
-#include "miniros/http/websocket.h"
 #include <functional>
 #include <memory>
+
+#include "miniros/http/http_endpoint.h"
+#include "miniros/http/websocket.h"
 
 namespace miniros {
 namespace network {
@@ -19,7 +20,7 @@ namespace http {
 
 /// Handler for WebSocket upgrade requests.
 /// Validates WebSocket handshake and creates WebSocket object upon successful upgrade.
-class WebSocketHandler : public EndpointHandler {
+class MINIROS_DECL WebSocketHandler : public EndpointHandler {
 public:
   /// Callback type for when a WebSocket connection is established.
   /// @param ws - the WebSocket object that was created

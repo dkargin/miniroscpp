@@ -27,7 +27,7 @@ namespace http {
 class HttpServerConnection;
 
 /// HttpServer serves XMLRPC MasterApi, SlaveApi and additional HTTP endpoints from user.
-class HttpServer {
+class MINIROS_DECL HttpServer {
 public:
   HttpServer(PollSet* pollSet);
   virtual ~HttpServer();

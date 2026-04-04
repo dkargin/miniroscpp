@@ -25,7 +25,7 @@ namespace http {
 /// WebSocket connection object.
 /// Manages a WebSocket connection after handshake is complete.
 /// Handles frame encoding/decoding, message sending/receiving, and event management.
-class WebSocket {
+class MINIROS_DECL WebSocket {
 public:
   /// Callback type for when a message is received.
   /// @param message - the received message

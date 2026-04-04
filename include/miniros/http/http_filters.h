@@ -15,7 +15,7 @@ namespace miniros {
 namespace http {
 
 /// Simple filter for exact match for path and method.
-class SimpleFilter : public EndpointFilter {
+class MINIROS_DECL SimpleFilter : public EndpointFilter {
 public:
   enum class CheckType {
     Exact,
@@ -33,7 +33,7 @@ protected:
 };
 
 /// Filter based on regular expression.
-class RegexFilter : public EndpointFilter {
+class MINIROS_DECL RegexFilter : public EndpointFilter {
 public:
   RegexFilter(const std::regex& regex, HttpMethod method);
 
@@ -50,7 +50,7 @@ protected:
 /// @param trailingSlash - should add trailing slash to output path.
 ///  "/node/ws1/node1" returns "/ws1/node1".
 ///  "/node" returns an empty string.
-std::string_view getNameFromUrlPath(const std::string_view& path,
+MINIROS_DECL std::string_view getNameFromUrlPath(const std::string_view& path,
   const std::string_view& prefix, bool trailingSlash);
 
 }
