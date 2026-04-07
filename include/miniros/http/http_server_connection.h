@@ -1,6 +1,7 @@
 //
 // Created by dkargin on 7/23/25.
 //
+// This is an internal header
 
 #ifndef MINIROS_HTTP_SERVER_CONNECTION_H
 #define MINIROS_HTTP_SERVER_CONNECTION_H
@@ -10,7 +11,8 @@
 #include "miniros/network/socket.h"
 #include "miniros/http/http_tools.h"
 #include "miniros/http/http_request.h"
-#include "miniros/internal/lifetime.h"
+
+#include "miniros/internal/threading.h"
 
 namespace miniros {
 

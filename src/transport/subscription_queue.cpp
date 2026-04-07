@@ -120,7 +120,7 @@ CallbackInterface::CallResult SubscriptionQueue::call()
   Item i;
 
   {
-    std::scoped_lock<std::mutex> lock(queue_mutex_);
+    std::scoped_lock<std::mutex> lock2(queue_mutex_);
 
     if (queue_.empty())
     {

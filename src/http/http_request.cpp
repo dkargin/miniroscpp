@@ -13,7 +13,7 @@
 #include "miniros/http/http_request.h"
 #include "miniros/http/http_tools.h"
 
-#include "internal/scoped_locks.h"
+#include "internal/threading.h"
 #include "miniros/rosconsole/local_log.h"
 
 #include <atomic>

@@ -122,10 +122,10 @@ struct MINIROS_DECL Path {
   std::string name() const;
 
   /// Get a name from position [i, end]
-  std::string right(int i) const;
+  std::string right(size_t i) const;
 
   /// Get a path [0, i)
-  std::string left(int i) const;
+  std::string left(size_t i) const;
 
   /// Returns a string with a full original path.
   const std::string& fullPath() const;

@@ -7,14 +7,13 @@
 // ROS log will write to the channel "miniros.http[.server]"
 #define MINIROS_PACKAGE_NAME "http"
 
-#include "internal/scoped_locks.h"
+#include "internal/threading.h"
 #include "io/io.h"
 #include "miniros/callback_queue.h"
 #include "miniros/console.h"
 #include "miniros/http/endpoint_collection.h"
 #include "miniros/http/http_server.h"
 #include "miniros/http/http_server_connection.h"
-#include "internal/lifetime.h"
 #include "miniros/io/poll_set.h"
 #include "xmlrpcpp/XmlRpcException.h"
 

@@ -192,7 +192,7 @@ void Discovery::Internal::onSocketEvent(network::NetSocket& s, int role, int eve
     return;
   }
   if (numBytes < sizeof(DiscoveryPacket)) {
-    MINIROS_ERROR("Unexpected size of incoming discovery packet: %zu", numBytes);
+    MINIROS_ERROR("Unexpected size of incoming discovery packet: %d", static_cast<int>(numBytes));
     return;
   }
 

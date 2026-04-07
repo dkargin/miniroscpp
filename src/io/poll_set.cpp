@@ -37,18 +37,19 @@
 #include <map>
 #include <mutex>
 #include <optional>
+#include <condition_variable>
 
 #define MINIROS_PACKAGE_NAME "poll_set"
 
 #include "internal/at_exit.h"
 #include "internal/profiling.h"
+#include "internal/threading.h"
 
 #include "miniros/io/io.h"
 #include "miniros/io/poll_set.h"
 
 #include "miniros/rosconsole/local_log.h"
 
-#include <condition_variable>
 
 namespace miniros
 {
@@ -73,23 +74,20 @@ struct PollSet::Internal {
     internal::CodeLocation loc_;
   };
 
-  std::map<int, SocketInfo> socket_info_;
-  std::map<int, SteadyTime> socket_timers_;
+  std::map<int, SocketInfo> socket_info_ GUARDED_BY(socket_info_mutex_);
+  std::map<int, SteadyTime> socket_timers_ GUARDED_BY(socket_info_mutex_);
   mutable std::mutex socket_info_mutex_;
   bool sockets_changed_ = false;
 
   std::mutex just_deleted_mutex_;
-  std::vector<int> just_deleted_;
+  std::vector<int> just_deleted_ GUARDED_BY(just_deleted_mutex_);
 
   std::vector<socket_pollfd> ufds_;
 
-  /// Storage for results from poll.
-  std::vector<socket_pollfd> ofds_;
-
-
   /// Channel for sending notifications inside Poll loop.
   mutable std::mutex signal_mutex_;
-  signal_fd_t signal_pipe_[2] = {MINIROS_INVALID_SOCKET, MINIROS_INVALID_SOCKET};
+
+  signal_fd_t signal_pipe_[2] GUARDED_BY(signal_mutex_) = {MINIROS_INVALID_SOCKET, MINIROS_INVALID_SOCKET};
 
   int epfd_;
 
@@ -102,7 +100,7 @@ struct PollSet::Internal {
   /// Check if specified fd is related to internal signaling.
   bool isInternalSignalFd(int fd) const
   {
-    std::unique_lock lock(signal_mutex_);
+    std::scoped_lock lock(signal_mutex_);
     return signal_pipe_[0] != MINIROS_INVALID_SOCKET && fd == signal_pipe_[0];
   }
 
@@ -126,31 +124,33 @@ struct PollSet::Internal {
   bool signal();
 
   /// Send signal to specific fd.
-  void signalFd(int fd);
+  bool signalFd(int fd);
 };
 
-PollSet::PollSet()
+PollSet::PollSet(bool useSoftSignals)
 {
   internal_.reset(new Internal());
 
-  if ( create_signal_pair(internal_->signal_pipe_) != 0 ) {
-    // Really no idea how to recover from this kind of error.
-    perror("PollSet::PollSet - create_signal_pair() failed");
+  if (useSoftSignals) {
+    if ( create_signal_pair(internal_->signal_pipe_) != 0 ) {
+      // Really no idea how to recover from this kind of error.
+      perror("PollSet::PollSet - create_signal_pair() failed");
+    }
+    addSocket(internal_->signal_pipe_[0], POLLIN, {}, {}, THIS_LOCATION);
   }
-  addSocket(internal_->signal_pipe_[0], POLLIN, {}, {}, THIS_LOCATION);
 }
 
 PollSet::~PollSet()
 {
   if (internal_->signal_pipe_[0] != MINIROS_INVALID_SOCKET) {
     delSocket(internal_->signal_pipe_[0]);
+    close_signal_pair(internal_->signal_pipe_);
   }
 
-  close_signal_pair(internal_->signal_pipe_);
   close_socket_watcher(internal_->epfd_);
 
   if (!internal_->socket_info_.empty()) {
-    LOCAL_ERROR("PollSet::~PollSet() discovered %zu dangling sockets", internal_->socket_info_.size());
+    LOCAL_ERROR("PollSet::~PollSet() discovered %d dangling sockets", static_cast<int>(internal_->socket_info_.size()));
 
     for (const auto& [fd, info]: internal_->socket_info_) {
       if (info.loc_.valid()) {
@@ -205,7 +205,7 @@ bool PollSet::addSocket(int fd, int events, const SocketUpdateFunc& update_func,
     LOCAL_DEBUG("PollSet::addSocket(%d) evt=%s", fd, eventToString(events).c_str());
   }
 
-  signal();
+  (void)signal();
 
   return true;
 }
@@ -258,6 +258,9 @@ bool PollSet::delSocket(int fd)
 
 bool PollSet::addEvents(int sock, int events)
 {
+  constexpr int mask = POLLIN | POLLOUT | POLLERR;
+  events = events & mask;
+
   std::scoped_lock<std::mutex> lock(internal_->socket_info_mutex_);
 
   auto it = internal_->socket_info_.find(sock);
@@ -294,7 +297,7 @@ bool PollSet::addEvents(int sock, int events)
   }
 
   internal_->sockets_changed_ = true;
-  signal();
+  (void)signal();
 
   return true;
 }
@@ -327,13 +330,16 @@ bool PollSet::delEvents(int sock, int events)
   }
 
   internal_->sockets_changed_ = true;
-  signal();
+  (void)signal();
 
   return true;
 }
 
 bool PollSet::setEvents(int sock, int events)
 {
+  constexpr int mask = POLLIN | POLLOUT | POLLERR;
+  events = events & mask;
+
   std::scoped_lock<std::mutex> lock(internal_->socket_info_mutex_);
 
   auto it = internal_->socket_info_.find(sock);
@@ -345,9 +351,6 @@ bool PollSet::setEvents(int sock, int events)
 
   if (it->second.events_ == events)
     return true;
-
-  int mask = POLLIN | POLLOUT | POLLERR;
-  events = events & mask;
 
   int oldEvents = it->second.events_;
   it->second.events_ = events;
@@ -372,7 +375,7 @@ bool PollSet::setEvents(int sock, int events)
     LOCAL_DEBUG("PollSet::setEvents(%d, %s) updated events", sock, eventToString(events).c_str());
   }
   internal_->sockets_changed_ = true;
-  signal();
+  (void)signal();
 
   return true;
 }
@@ -388,7 +391,7 @@ bool PollSet::setTimerEvent(int sock, int timeoutMs)
     return false;
   }
   internal_->socket_timers_[sock] = SteadyTime::now() + WallDuration(timeoutMs*0.001);
-  signal();
+  (void)signal();
   LOCAL_DEBUG("PollSet::setTimerEvent(%d) timeout=%d", sock, timeoutMs);
   return true;
 }
@@ -399,6 +402,8 @@ bool PollSet::Internal::signal()
     return false;
 
   std::lock_guard<std::mutex> lock(signal_mutex_, std::adopt_lock);
+  if (signal_pipe_[1] == MINIROS_INVALID_SOCKET)
+    return false;
   int fd = MINIROS_INVALID_SOCKET;
   if (write_signal(signal_pipe_[1], (const char*)&fd, sizeof(fd)) < 0)
   {
@@ -407,27 +412,30 @@ bool PollSet::Internal::signal()
   return true;
 }
 
-void PollSet::Internal::signalFd(int fd)
+bool PollSet::Internal::signalFd(int fd)
 {
   std::lock_guard<std::mutex> lock(signal_mutex_);
+  if (signal_pipe_[1] == MINIROS_INVALID_SOCKET)
+    return false;
   if (write_signal(signal_pipe_[1], (const char*)&fd, sizeof(fd)) < 0)
   {
     // do nothing... this prevents warnings on gcc 4.3
   }
+  return true;
 }
 
-void PollSet::signal()
+bool PollSet::signal() const
 {
   if (!internal_)
-    return;
-  internal_->signal();
+    return false;
+  return internal_->signal();
 }
 
-void PollSet::signalFd(int fd)
+bool PollSet::signalFd(int fd) const
 {
   if (!internal_)
-    return;
-  internal_->signalFd(fd);
+    return false;
+  return internal_->signalFd(fd);
 }
 
 void PollSet::Internal::processEvent(int fd, int revents, const SocketInfo& info, std::stringstream& ss)
@@ -521,6 +529,9 @@ void PollSet::update(int poll_timeout)
     internal_->just_deleted_.clear();
   });
 
+  /// Storage for results from poll.
+  std::vector<socket_pollfd> ofds;
+
   // This function does not lock socket info for most of the time.
   // So it should be expected that configuration of sockets and events can change.
   // delSocket also can be called during poll and its processing.
@@ -528,7 +539,7 @@ void PollSet::update(int poll_timeout)
   const nfds_t numFd = static_cast<nfds_t>(internal_->ufds_.size());
   {
     MINIROS_PROFILE_SCOPE("poll");
-    Error err = poll_sockets(internal_->epfd_, &internal_->ufds_.front(), numFd, poll_timeout, internal_->ofds_);
+    Error err = poll_sockets(internal_->epfd_, &internal_->ufds_.front(), numFd, poll_timeout, ofds);
     if (!err)
     {
       LOCAL_ERROR("PollSet::update() poll_sockets failed with error %s", err.toString());
@@ -540,7 +551,7 @@ void PollSet::update(int poll_timeout)
 
   std::vector<int> notifiedFd;
 
-  for (const socket_pollfd& spfd: internal_->ofds_)
+  for (const socket_pollfd& spfd: ofds)
   {
     int fd = spfd.fd;
     int revents = spfd.revents;

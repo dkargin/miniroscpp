@@ -245,7 +245,7 @@ void Master::update()
 
   auto graveyard = internal_->regManager.checkDeadNodes();
   if (!graveyard.empty()) {
-    MINIROS_INFO("Dropping parameter subscriptions from %zu nodes", graveyard.size());
+    MINIROS_INFO("Dropping parameter subscriptions from %d nodes", static_cast<int>(graveyard.size()));
     for (auto node: graveyard) {
       internal_->parameterStorage.dropSubscriptions(node);
     }

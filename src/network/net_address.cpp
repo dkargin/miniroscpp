@@ -37,6 +37,8 @@ size_t getAddressSize(const NetAddress::Type type)
       return sizeof (sockaddr_in);
     case NetAddress::Type::AddressIPv6:
       return sizeof (sockaddr_in6);
+    case NetAddress::AddressInvalid:
+    case NetAddress::AddressUnspecified:
     default:
       return 0;
   }
@@ -317,6 +319,8 @@ Error NetAddress::setPort(int port)
     case Type::AddressIPv6:
       static_cast<sockaddr_in6*>(rawAddress_)->sin6_port = htons(port);
       break;
+    case NetAddress::AddressInvalid:
+    case NetAddress::AddressUnspecified:
     default:
       break;
   }

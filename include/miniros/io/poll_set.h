@@ -63,7 +63,7 @@ namespace miniros
 class MINIROS_DECL PollSet
 {
 public:
-  PollSet();
+  PollSet(bool useSoftSignals = true);
   ~PollSet();
 
   /// Use this flag to subscribe to "input" events. They are equal to POLLIN.
@@ -169,12 +169,12 @@ public:
    * \brief Signal our poll() call to finish if it's blocked waiting (see the poll_timeout
    * option for update()).
    */
-  void signal();
+  bool signal() const;
 
   /**
    * \brief Send signal to specific FD.
    */
-  void signalFd(int fd);
+  bool signalFd(int fd) const;
 
   static std::string eventToString(int event);
 

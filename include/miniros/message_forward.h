@@ -37,14 +37,13 @@ namespace std
 {
 template<typename T> class allocator;
 }
-#else
-#include <memory>
-#endif
-
 namespace std
 {
 template<typename T> class shared_ptr;
 }
+#else
+#include <memory>
+#endif
 
 /**
  * \brief Forward-declare a message, including Ptr and ConstPtr types, with an allocator

@@ -10,15 +10,13 @@
 
 #include "miniros/network/socket.h"
 #include "miniros/io/poll_set.h"
-#include "miniros/internal/lifetime.h"
-
+#include "miniros/internal/threading.h"
 #include "miniros/http/http_server.h"
 
-#include "internal/scoped_locks.h"
-#include "io/io.h"
 #include "miniros/callback_queue.h"
 #include "miniros/http/endpoint_collection.h"
 #include "miniros/http/http_server_connection.h"
+
 
 namespace miniros {
 namespace http {

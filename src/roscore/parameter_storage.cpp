@@ -115,7 +115,7 @@ std::string ParameterStorage::searchParam(const std::string& ns, const std::stri
   names::Path nsPath;
   nsPath.fromString(ns);
 
-  for (int i = 0; i < nsPath.size() ; i++) {
+  for (size_t i = 0; i < nsPath.size() ; i++) {
     std::string left = nsPath.left(i);
     std::string searchKey = left + key_ns;
     if (hasParam("", searchKey)) {

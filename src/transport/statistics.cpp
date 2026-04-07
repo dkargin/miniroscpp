@@ -109,7 +109,8 @@ void StatisticsLogger::callback(const std::shared_ptr<M_string>& connection_head
     }
     catch (miniros::serialization::StreamOverrunException& e)
     {
-      MINIROS_DEBUG("Error during header extraction for statistics (topic=%s, message_length=%li)", topic.c_str(), m.num_bytes - (m.message_start - m.buf.get()));
+      long int messageLen = m.num_bytes - (m.message_start - m.buf.get());
+      MINIROS_DEBUG("Error during header extraction for statistics (topic=%s, message_length=%li)", topic.c_str(), messageLen);
       hasHeader_ = false;
     }
   }
