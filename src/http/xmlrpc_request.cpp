@@ -4,7 +4,7 @@
 
 #include "miniros/http/xmlrpc_request.h"
 
-#include "internal/scoped_locks.h"
+#include "internal/threading.h"
 #include "miniros/internal/xml_tools.h"
 #include "miniros/xmlrpcpp/XmlRpcUtil.h"
 

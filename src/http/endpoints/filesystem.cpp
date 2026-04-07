@@ -43,7 +43,7 @@ Error FilesystemEndpoint::handle(const network::ClientInfo& clientInfo, std::sha
   std::filesystem::path fullRootPath = std::filesystem::absolute(root_path_);
   /// Check if we are still within `root_path_`
   if (!isSubpath(fsPath, fullRootPath)) {
-    MINIROS_WARN("Client tried to access path \"%s\" out of prefix path", fsPath.c_str());
+    MINIROS_WARN("Client tried to access path \"%s\" out of prefix path", fsPath.u8string().c_str());
     return Error::FileNotFound;
   }
 

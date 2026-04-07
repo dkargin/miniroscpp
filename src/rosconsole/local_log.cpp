@@ -30,7 +30,7 @@ void InternalLog::print(const console::LogLocation& loc, const char* channel,
 
   // vsnprintf can return value longer than initial buffer.
   // This value corresponds to actual length of the line.
-  if (written > sizeof(buf)) {
+  if (static_cast<size_t>(written) > sizeof(buf)) {
     written = sizeof(buf) - 1;
   }
 

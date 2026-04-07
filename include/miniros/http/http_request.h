@@ -5,7 +5,7 @@
 #ifndef MINIROS_HTTP_REQUEST_H
 #define MINIROS_HTTP_REQUEST_H
 
-#include "miniros/internal/scoped_locks.h"
+#include "miniros/internal/threading.h"
 
 #include <condition_variable>
 #include <map>

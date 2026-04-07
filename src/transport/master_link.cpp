@@ -39,6 +39,7 @@
 #include "internal/at_exit.h"
 #include "internal/profiling.h"
 #include "internal/xml_tools.h"
+#include "io/poll_manager.h"
 #include "miniros/names.h"
 #include "miniros/this_node.h"
 #include "miniros/transport/rpc_manager.h"
@@ -181,7 +182,7 @@ bool MasterLink::getTopics(std::vector<TopicInfo>& topics) const
   }
 
   topics.clear();
-  for (size_t i = 0; i < payload.size(); i++) {
+  for (int i = 0; i < payload.size(); i++) {
     topics.push_back(TopicInfo(std::string(payload[i][0]), std::string(payload[i][1])));
   }
 
@@ -237,6 +238,12 @@ Error MasterLink::execute(const std::string& method, const RpcValue& request, Rp
 {
   if (!internal_)
     return Error::InternalError;
+
+  auto& pollManager = PollManager::instance();
+  if (pollManager->threadId() == std::this_thread::get_id()) {
+    MINIROS_ERROR("calling MasterLink::execute from PollManager thread will fail to execute");
+  }
+
   std::string name = "execute(" + method  + ")";
   MINIROS_PROFILE_SCOPE2("MasterLink", name.c_str());
 

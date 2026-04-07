@@ -323,11 +323,11 @@ std::string Path::str(size_t i) const
   return std::string(v.data(), v.size());
 }
 
-std::string Path::right(int i) const
+std::string Path::right(size_t i) const
 {
   if (i > size())
     return "";
-  if (i == 0)
+  if (i <= 0)
     return "";
 
   size_t pos = size() - i;
@@ -341,7 +341,7 @@ std::string Path::right(int i) const
   return s;
 }
 
-std::string Path::left(int i) const
+std::string Path::left(size_t i) const
 {
   if (i >= size())
     return m_fullPath;
@@ -375,7 +375,7 @@ bool Path::startsWith(const Path& other) const
     return false;
   if (other.size() > size())
     return false;
-  for (int i = 0; i < other.size(); i++) {
+  for (size_t i = 0; i < other.size(); i++) {
     if (view(i) != other.view(i))
       return false;
   }

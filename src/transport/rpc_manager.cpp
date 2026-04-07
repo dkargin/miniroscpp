@@ -612,9 +612,9 @@ Error RPCManager::executeLocalRPC(const std::string& method, const RpcValue& req
   return Error::Ok;
 }
 
-bool RPCManager::isLocalRPC(const std::string& host, int port) const
+bool RPCManager::isLocalRPC(const std::string& /*host*/, int port) const
 {
-  return getServerPort() == port;
+  return port > 0 && static_cast<int>(getServerPort()) == port;
 }
 
 const network::URL& RPCManager::getServerUrl() const

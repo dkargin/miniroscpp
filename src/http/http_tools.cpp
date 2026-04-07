@@ -91,7 +91,7 @@ void HttpParserFrame::finish(bool request)
     size_t currentLength = m_bodyPosition;
     if (m_contentLength >= 0)
       currentLength += m_contentLength;
-    if (m_contentLength  == data.size()) {
+    if (static_cast<size_t>(m_contentLength)  == data.size()) {
       data.clear();
     } else {
       // Truncate all data related to current request
@@ -359,7 +359,7 @@ int HttpParserFrame::incrementalParse()
   if (m_state == HttpParserFrame::ParseBody) {
     if (m_contentLength >= 0) {
       // Need body and got all the data.
-      if (m_bodyPosition + m_contentLength <= data.length()) {
+      if (static_cast<size_t>(m_bodyPosition + m_contentLength) <= data.length()) {
         m_state = HttpParserFrame::ParseComplete;
         m_bodyEnd = m_bodyPosition + m_contentLength;
         cp = start + m_bodyEnd;

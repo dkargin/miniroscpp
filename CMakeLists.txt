@@ -34,6 +34,7 @@ option(MINIROS_ROSBAG_USE_OPENSSL_ENCRYPTION "Use openssl encryption for rosbag"
 option(MINIROS_PATCH_RPATH "Update RPATH to use install paths" ON)
 option(MINIROS_SANITIZE_MEMORY "Use ASan to find memory errors" OFF)
 option(MINIROS_SANITIZE_THREADS "Use TSan to find potential data races" OFF)
+option(MINIROS_THREAD_SAFETY_ANALYSIS  "Use static thread checking from clang" OFF)
 option(MINIROS_PORTABLE_TOOLS "Make miniroscore and minibag portable. Forces linking to static library" OFF)
 
 if (CMAKE_SYSTEM_NAME STREQUAL "Linux")

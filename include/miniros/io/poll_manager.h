@@ -64,6 +64,11 @@ public:
   void start();
   void shutdown();
 
+  std::thread::id threadId() const
+  {
+    return thread_.get_id();
+  }
+
 private:
   void threadFunc();
 

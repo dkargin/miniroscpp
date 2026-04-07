@@ -40,10 +40,15 @@ configure_file("${CMAKE_CURRENT_SOURCE_DIR}/internal_config.h.in" internal_confi
 
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
+set(COMMON_WARNINGS "-Werror=format" "-Werror=format-extra-args" "-Wsign-compare")
 if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-  list(APPEND MINIROS_COMPIE_OPTIONS "-Wall" "-Wextra" "-Werror=switch-enum" "-Werror=format" "-Werror=format-extra-args")
+  list(APPEND MINIROS_COMPILE_OPTIONS ${COMMON_WARNINGS})
+  if (MINIROS_THREAD_SAFETY_ANALYSIS)
+    list(APPEND MINIROS_COMPILE_OPTIONS "-Wthread-safety" "-stdlib=libc++" "-D_LIBCPP_ENABLE_THREAD_SAFETY_ANNOTATIONS")
+    list(APPEND MINIROS_LINK_OPTIONS "-stdlib=libc++" "-lc++abi")
+  endif()
 elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-  list(APPEND MINIROS_COMPIE_OPTIONS "-Wall" "-Wextra" "-Werror=switch-enum" "-Werror=format" "-Werror=format-extra-args")
+  list(APPEND MINIROS_COMPILE_OPTIONS ${COMMON_WARNINGS})
 elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
   # TODO
 elseif (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
@@ -53,24 +58,23 @@ endif()
 
 if (MINIROS_SANITIZE_MEMORY)
   if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-    list(APPEND MINIROS_COMPIE_OPTIONS "-fsanitize=address")
+    list(APPEND MINIROS_COMPILE_OPTIONS "-fsanitize=address")
     list(APPEND MINIROS_LINK_OPTIONS "-fsanitize=address" "-fsanitize=undefined")
   elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    list(APPEND MINIROS_COMPIE_OPTIONS "-fsanitize=address")
+    list(APPEND MINIROS_COMPILE_OPTIONS "-fsanitize=address")
     list(APPEND MINIROS_LINK_OPTIONS "-fsanitize=address" "-fsanitize=undefined")
   endif()
 endif ()
 
 if (MINIROS_SANITIZE_THREADS)
   if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-    list(APPEND MINIROS_COMPIE_OPTIONS "-fsanitize=thread")
+    list(APPEND MINIROS_COMPILE_OPTIONS "-fsanitize=thread")
     list(APPEND MINIROS_LINK_OPTIONS "-fsanitize=thread")
   elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    list(APPEND MINIROS_COMPIE_OPTIONS "-fsanitize=thread")
+    list(APPEND MINIROS_COMPILE_OPTIONS "-fsanitize=thread")
     list(APPEND MINIROS_LINK_OPTIONS "-fsanitize=thread")
   endif()
 endif()
-
 
 set(rostime_SRC
     rostime/duration.cpp

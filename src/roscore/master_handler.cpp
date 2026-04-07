@@ -38,7 +38,7 @@ void MasterHandler::notifyTopicSubscribers(const std::string& topic, const std::
   for (std::shared_ptr<NodeRef> sub: subscribers) {
     if (sub) {
       int j = 0;
-      for (int i = 0; i < publishers.size(); i++) {
+      for (size_t i = 0; i < publishers.size(); i++) {
         if (publishers[i]) {
           network::URL url = m_resolver->resolveAddressFor(publishers[i], sub);
           l[j++] = url.str();
