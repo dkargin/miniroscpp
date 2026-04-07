@@ -170,6 +170,7 @@ Error addressFromString(NetAddress::Type type, const std::string& address, int p
   std::string portStr = std::to_string(port);
 
   int err = getaddrinfo(address.c_str(), portStr.c_str(), &hints, &res);
+
   if (err != 0) {
     // Errors and descriptions are taken from `man getaddrinfo`.
     switch (err) {
@@ -207,31 +208,33 @@ Error addressFromString(NetAddress::Type type, const std::string& address, int p
     return Error::SystemError;
   }
 
+  std::unique_ptr<addrinfo, void (*)(addrinfo*)> wrapAddr(res, &freeaddrinfo);
+
   // Try to find a matching address
-  // For AddressUnspecified, prefer IPv6 first, then IPv4
+  // For AddressUnspecified, prefer IPv4 first, then IPv6. It follows behaviour of old ROS1, 
+  // which works mostly with IPv6.
   bool assigned = false;
   if (type == NetAddress::AddressUnspecified) {
-    // First pass: look for IPv6 addresses
-    for (struct addrinfo* rp = res; rp != nullptr; rp = rp->ai_next) {
-      if (rp->ai_family == AF_INET6) {
-        const sockaddr_in6* addr6 = reinterpret_cast<const sockaddr_in6*>(rp->ai_addr);
-        result.assignRawAddress(NetAddress::AddressIPv6, rp->ai_addr, rp->ai_addrlen);
-        char ipBuffer[INET6_ADDRSTRLEN];
-        if (inet_ntop(AF_INET6, &addr6->sin6_addr, ipBuffer, sizeof(ipBuffer))) {
-          result.address = ipBuffer;
-        }
-        assigned = true;
-        freeaddrinfo(res);
-        return Error::Ok;
-      }
-    }
-    // Second pass: look for IPv4 addresses if no IPv6 found
-    for (struct addrinfo* rp = res; rp != nullptr; rp = rp->ai_next) {
+    // First pass: look for IPv4 addresses.
+    for (struct addrinfo* rp = res; !assigned && rp != nullptr; rp = rp->ai_next) {
       if (rp->ai_family == AF_INET) {
         const sockaddr_in* addr4 = reinterpret_cast<const sockaddr_in*>(rp->ai_addr);
         result.assignRawAddress(NetAddress::AddressIPv4, rp->ai_addr, rp->ai_addrlen);
         char ipBuffer[INET_ADDRSTRLEN];
         if (inet_ntop(AF_INET, &addr4->sin_addr, ipBuffer, sizeof(ipBuffer))) {
+          result.address = ipBuffer;
+        }
+        assigned = true;
+        break;
+      }
+    }
+    // Second pass: look for IPv6 addresses if no IPv4 address found.
+    for (struct addrinfo* rp = res; !assigned && rp != nullptr; rp = rp->ai_next) {
+      if (rp->ai_family == AF_INET6) {
+        const sockaddr_in6* addr6 = reinterpret_cast<const sockaddr_in6*>(rp->ai_addr);
+        result.assignRawAddress(NetAddress::AddressIPv6, rp->ai_addr, rp->ai_addrlen);
+        char ipBuffer[INET6_ADDRSTRLEN];
+        if (inet_ntop(AF_INET6, &addr6->sin6_addr, ipBuffer, sizeof(ipBuffer))) {
           result.address = ipBuffer;
         }
         assigned = true;
@@ -263,7 +266,6 @@ Error addressFromString(NetAddress::Type type, const std::string& address, int p
     }
   }
 
-  freeaddrinfo(res);
   return assigned ? Error::Ok : Error::InvalidValue;
 }
 
