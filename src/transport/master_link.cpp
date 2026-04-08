@@ -330,7 +330,7 @@ Error MasterLink::execute(const std::string& method, const RpcValue& request, Rp
       waitDuration = SteadyTime::now() - waitStart;
     }
 
-    noShutdown = !miniros::isShuttingDown() && !manager->isShuttingDown();
+    noShutdown = !manager->isShuttingDown();
 
     auto s = req->state();
     if (s == http::HttpRequest::State::ClientQueued && noShutdown) {
