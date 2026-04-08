@@ -91,7 +91,6 @@ void PollManager::threadFunc()
 
   while (!shutting_down_)
   {
-
     {
       std::scoped_lock<PollWatchers> lock(poll_watchers_);
       auto it = poll_watchers_.begin();
@@ -106,9 +105,6 @@ void PollManager::threadFunc()
     {
       break;
     }
-
-    // While it breaks abstraction, it reduces number of mutexes and threading challenges.
-    checkForShutdown();
 
     constexpr int updatePeriodMS = 50;
 

@@ -59,6 +59,7 @@
 
 // Needed to set IPv6 flag inside XmlRpcSocket.
 #include "internal/profiling.h"
+#include "rosconsole/local_log.h"
 #include "xmlrpcpp/XmlRpcSocket.h"
 
 #include <miniros/console.h>
@@ -94,7 +95,6 @@ void init(const M_string& remappings);
 
 CallbackQueuePtr g_global_queue;
 std::atomic<ROSOutAppender*> g_rosout_appender = nullptr;
-static CallbackQueuePtr g_internal_callback_queue;
 
 static bool g_initialized = false;
 static bool g_started = false;
@@ -104,11 +104,43 @@ static std::atomic_bool g_ok = false;
 static uint32_t g_init_options = 0;
 static std::atomic_bool g_shutdown_requested = false;
 static std::atomic_bool g_shutting_down = false;
-static std::recursive_mutex g_shutting_down_mutex;
-static std::thread g_internal_queue_thread;
-static MasterLinkPtr g_master_link;
 
-void shutdownLocked(std::unique_lock<std::recursive_mutex>& lock);
+/// Executor deals with shutdown sequence from background thread.
+class InternalCallbackKeeper : public CallbackInterface {
+public:
+  ~InternalCallbackKeeper() override
+  {
+    stop();
+  }
+
+  CallResult call() override;
+
+  /// Start internal thread for processing callback queue.
+  void start();
+
+  /// Stop internal thread for processing callback queue.
+  bool stop();
+
+  void requestShutdown();
+
+  CallbackQueuePtr getInternalCallbackQueue();
+
+  void shutdownLocked(std::unique_lock<std::recursive_mutex>& lock);
+
+  std::recursive_mutex shutting_down_mutex_;
+
+protected:
+  /// Thread function for callback queue.
+  void threadFunc();
+
+  std::thread internal_queue_thread_;
+  CallbackQueuePtr internal_callback_queue_;
+  std::atomic_bool stop_internal_queue_ = false;
+};
+
+static std::shared_ptr<InternalCallbackKeeper> g_shutdown_keeper = std::make_shared<InternalCallbackKeeper>();
+
+static MasterLinkPtr g_master_link;
 
 bool isInitialized()
 {
@@ -120,35 +152,9 @@ bool isShuttingDown()
   return g_shutting_down;
 }
 
-void checkForShutdown()
-{
-  if (g_shutdown_requested)
-  {
-    // Since this gets run from within a mutex inside PollManager, we need to prevent ourselves from deadlocking with
-    // another thread that's already in the middle of shutdown()
-
-    std::unique_lock<std::recursive_mutex> lock(g_shutting_down_mutex, std::defer_lock);
-
-    while (!lock.try_lock() && !g_shutting_down)
-    {
-      miniros::WallDuration(0.001).sleep();
-    }
-
-    if (!g_shutting_down)
-    {
-      shutdownLocked(lock);
-      MINIROS_INFO("Shutdown procedure is complete");
-    } else {
-      MINIROS_WARN("Shutdown procedure was missed");
-    }
-
-    g_shutdown_requested = false;
-  }
-}
-
 void requestShutdown()
 {
-  g_shutdown_requested = true;
+  g_shutdown_keeper->requestShutdown();
 }
 
 void atexitCallback()
@@ -266,12 +272,7 @@ void clockCallback(const rosgraph_msgs::Clock::ConstPtr& msg)
 
 CallbackQueuePtr getInternalCallbackQueue()
 {
-  if (!g_internal_callback_queue)
-  {
-    g_internal_callback_queue.reset(new CallbackQueue);
-  }
-
-  return g_internal_callback_queue;
+  return g_shutdown_keeper->getInternalCallbackQueue();
 }
 
 void basicSigintHandler(int sig)
@@ -280,17 +281,6 @@ void basicSigintHandler(int sig)
 
   MINIROS_DEBUG("Got SIGINT. Initiating shutdown");
   miniros::requestShutdown();
-}
-
-void internalCallbackQueueThreadFunc(CallbackQueuePtr queue)
-{
-  setThreadName("ROS::internalCallbackQueue");
-  disableAllSignalsInThisThread();
-
-  while (!g_shutting_down)
-  {
-    queue->callAvailable(WallDuration(0.1));
-  }
 }
 
 bool isStarted()
@@ -442,7 +432,7 @@ Error start()
 
   if (g_shutting_down) goto end;
 
-  g_internal_queue_thread = std::thread(internalCallbackQueueThreadFunc, internalCallbackQueue);
+  g_shutdown_keeper->start();
   getGlobalCallbackQueue()->enable();
 
   MINIROS_DEBUG("Started node [%s], pid [%d], bound on [%s], xmlrpc port [%d], tcpros port [%d], using [%s] time",
@@ -456,7 +446,7 @@ end:
   // If we received a shutdown request while initializing, wait until we've shutdown to continue
   if (g_shutting_down)
   {
-    std::scoped_lock<std::recursive_mutex> lock(g_shutting_down_mutex);
+    std::scoped_lock<std::recursive_mutex> lock(g_shutdown_keeper->shutting_down_mutex_);
   }
 
   auto start_total = SteadyTime::now() - time_start;
@@ -654,7 +644,7 @@ bool ok()
   return g_ok.load(std::memory_order_relaxed);
 }
 
-void shutdownLocked(std::unique_lock<std::recursive_mutex>& lock)
+void InternalCallbackKeeper::shutdownLocked(std::unique_lock<std::recursive_mutex>& lock)
 {
   MINIROS_DEBUG("Running shutdown procedure");
   g_shutting_down = true;
@@ -666,12 +656,6 @@ void shutdownLocked(std::unique_lock<std::recursive_mutex>& lock)
     g_global_queue->clear();
   }
 
-  if (g_internal_queue_thread.get_id() != std::this_thread::get_id())
-  {
-    if (g_internal_queue_thread.joinable())
-      g_internal_queue_thread.join();
-  }
-
   //miniros::console::deregister_appender(g_rosout_appender);
   if (auto rosout_appender = g_rosout_appender.exchange(nullptr)) {
     delete rosout_appender;
@@ -681,10 +665,12 @@ void shutdownLocked(std::unique_lock<std::recursive_mutex>& lock)
   {
     TopicManager::instance()->shutdown();
     ServiceManager::instance()->shutdown();
-    PollManager::instance()->shutdown();
     ConnectionManager::instance()->shutdown();
     RPCManager::instance()->shutdown();
+    PollManager::instance()->shutdown();
   }
+
+  stop();
 
   g_started = false;
   g_ok = false;
@@ -693,11 +679,88 @@ void shutdownLocked(std::unique_lock<std::recursive_mutex>& lock)
 
 void shutdown()
 {
-  std::unique_lock<std::recursive_mutex> lock(g_shutting_down_mutex);
+  std::unique_lock<std::recursive_mutex> lock(g_shutdown_keeper->shutting_down_mutex_);
   if (g_shutting_down) {
     return;
   }
-  shutdownLocked(lock);
+  g_shutdown_keeper->shutdownLocked(lock);
+}
+
+void InternalCallbackKeeper::start()
+{
+  assert(!internal_queue_thread_.joinable());
+  internal_queue_thread_ = std::thread(&InternalCallbackKeeper::threadFunc, this);
+}
+
+bool InternalCallbackKeeper::stop()
+{
+  stop_internal_queue_ = true;
+
+  if (internal_queue_thread_.get_id() == std::this_thread::get_id())
+    return false;
+
+  if (internal_queue_thread_.joinable()) {
+    internal_queue_thread_.join();
+  }
+  return true;
+}
+
+
+void InternalCallbackKeeper::requestShutdown()
+{
+  g_shutdown_requested = true;
+  assert(internal_callback_queue_);
+  internal_callback_queue_->addCallback(g_shutdown_keeper, reinterpret_cast<uint64_t>(g_shutdown_keeper.get()));
+}
+
+CallbackQueuePtr InternalCallbackKeeper::getInternalCallbackQueue()
+{
+  if (!internal_callback_queue_)
+  {
+    internal_callback_queue_.reset(new CallbackQueue);
+  }
+
+  return internal_callback_queue_;
+}
+
+void InternalCallbackKeeper::threadFunc()
+{
+  setThreadName("CallbackQueue");
+  disableAllSignalsInThisThread();
+  assert(internal_callback_queue_);
+
+  while (!stop_internal_queue_ && internal_callback_queue_)
+  {
+    internal_callback_queue_->callAvailable(WallDuration(0.1));
+  }
+}
+
+
+CallbackInterface::CallResult InternalCallbackKeeper::call()
+{
+  if (g_shutdown_requested)
+  {
+    // Since this gets run from within a mutex inside PollManager, we need to prevent ourselves from deadlocking with
+    // another thread that's already in the middle of shutdown()
+
+    std::unique_lock<std::recursive_mutex> lock(shutting_down_mutex_, std::defer_lock);
+
+    while (!lock.try_lock() && !g_shutting_down)
+    {
+      miniros::WallDuration(0.001).sleep();
+    }
+
+    if (!g_shutting_down)
+    {
+      shutdownLocked(lock);
+      MINIROS_INFO("Shutdown procedure is complete");
+    } else {
+      MINIROS_WARN("Shutdown procedure was missed");
+    }
+
+    g_shutdown_requested = false;
+  }
+  return CallResult::Success;
 }
 
 MasterLinkPtr getMasterLink()
