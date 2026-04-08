@@ -56,6 +56,8 @@ const char* Error::toString() const {
       return "Connection Refused";
     case Error::AddressIsUnknown:
       return "Address is unknown";
+    case Error::PermissionDenied:
+      return "Permission denied";
   }
   return "Unknown error";
 }
