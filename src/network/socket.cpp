@@ -212,8 +212,15 @@ Error NetSocket::tcpSocket(NetAddress::Type type)
   }
   int fd = socket(addrType, SOCK_STREAM, IPPROTO_TCP);
   if (fd < 0) {
-    const char* err = last_socket_error_string();
-    MINIROS_ERROR_NAMED("socket", "NetSocket::tcpListen() - error while trying to create listening socket: %s", err);
+    int err = errno;
+    if (err == EAFNOSUPPORT || err == EPROTONOSUPPORT)
+      return Error::NotSupported;
+    if (err == ENOMEM)
+      return Error::OutOfMemory;
+    if (err == EACCES)
+      return Error::PermissionDenied;
+    const char* errMsg = last_socket_error_string();
+    MINIROS_ERROR_NAMED("socket", "NetSocket::tcpListen() - error while trying to create listening socket: %s", errMsg);
     return Error::SystemError;
   }
   internal_->fd = fd;

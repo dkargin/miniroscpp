@@ -245,15 +245,19 @@ Error RPCManager::start(const CallbackQueuePtr& cb, int port)
   internal_->http_server_->registerEndpoint(std::make_unique<http::SimpleFilter>(http::HttpMethod::Post, "/RPC2"), xmlrpc_enpoint, cb);
 
   if (Error err = internal_->http_server_->start(port); !err) {
-    MINIROS_ERROR("Failed to start ipv4 RPC server");
+    MINIROS_ERROR("Failed to start ipv4 RPC server: %s", err.toString());
     internal_->http_server_->stop();
     return err;
   }
 
   if (Error err = internal_->http_server_->start6(port); !err) {
-    MINIROS_ERROR("Failed to start ipv6 RPC server");
-    internal_->http_server_->stop();
-    return err;
+    if (err == Error::NotSupported) {
+      MINIROS_WARN("Failed to start ipv6 RPC server - IPv6 is not supported.");
+    } else  {
+      MINIROS_ERROR("Failed to start ipv6 RPC server: %s", err.toString());
+      internal_->http_server_->stop();
+      return err;
+    }
   }
 
   std::string host = network::getHost();

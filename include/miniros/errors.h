@@ -63,6 +63,8 @@ struct MINIROS_DECL Error {
     ConnectionRefused,
     /// IP address of host is unknown.
     AddressIsUnknown,
+    /// Permission denied during some OS action.
+    PermissionDenied,
   };
 
   Error() :code(Ok)
