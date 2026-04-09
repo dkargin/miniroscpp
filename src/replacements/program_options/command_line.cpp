@@ -193,8 +193,7 @@ std::vector<option> command_line_parser::run_impl()
             // This option may grab some more tokens.
             // We only allow to grab tokens that are not already
             // recognized as key options.
-
-            int can_take_more = max_tokens - static_cast<int>(opt.value.size());
+            unsigned can_take_more = max_tokens - static_cast<unsigned>(opt.value.size());
             unsigned j = i+1;
             for (; can_take_more && j < result.size(); --can_take_more, ++j)
             {
@@ -202,9 +201,9 @@ std::vector<option> command_line_parser::run_impl()
                 if (!opt2.string_key.empty())
                     break;
 
-                if (opt2.position_key == INT_MAX)
+                if (opt2.position_key == -1)
                 {
-                    // We use INT_MAX to mark positional options that
+                    // We use -1 ~~INT_MAX~~ to mark positional options that
                     // were found after the '--' terminator and therefore
                     // should stay positional forever.
                     break;
