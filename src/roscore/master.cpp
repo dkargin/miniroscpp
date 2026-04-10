@@ -243,7 +243,7 @@ void Master::update()
     nr->sendShutdown(msg);
   }
 
-  auto graveyard = internal_->regManager.checkDeadNodes();
+  auto graveyard = internal_->regManager.checkNodesForRemoval();
   if (!graveyard.empty()) {
     MINIROS_INFO("Dropping parameter subscriptions from %d nodes", static_cast<int>(graveyard.size()));
     for (auto node: graveyard) {

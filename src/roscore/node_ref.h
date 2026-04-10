@@ -101,7 +101,7 @@ public:
   void clear();
 
   /// Check if there are any registrations.
-  bool is_empty() const;
+  bool isEmpty() const;
 
   /// Add registration.
   bool add(Registrations::Type type_, const std::string& key);

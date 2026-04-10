@@ -60,7 +60,7 @@ NodeRef::State NodeRef::getState() const
   return m_state;
 }
 
-bool NodeRef::is_empty() const
+bool NodeRef::isEmpty() const
 {
   std::unique_lock lock(m_guard);
   /// m_paramSubscriptions are not checked here, since node is not guaranteed to properly unsubscribe from all its
