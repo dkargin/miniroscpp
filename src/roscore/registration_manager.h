@@ -120,7 +120,7 @@ public:
 
   std::vector<std::vector<std::string>> getPublishedTopics(const std::string& prefix) const;
 
-  std::vector<NodeRefPtr> checkDeadNodes();
+  std::vector<NodeRefPtr> checkNodesForRemoval();
 
   void lock() const;
   void unlock() const;
@@ -138,7 +138,7 @@ protected:
   std::shared_ptr<NodeRef> getNodeByAPIUnsafe(const std::string& nodeApi) const;
 
   /// Unregister node and all references to it.
-  void unregisterNode(const std::string& nodeName);
+  bool unregisterNode(const std::shared_ptr<NodeRef>& node);
 
 protected:
   mutable std::mutex m_guard;

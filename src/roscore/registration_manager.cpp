@@ -123,25 +123,25 @@ ReturnStruct RegistrationManager::unregisterObject(Registrations& r, const std::
     }
   }
 
-  if (node_ref && node_ref->is_empty()) {
-    unregisterNode(nodeName);
-  }
   return ret;
 }
 
-void RegistrationManager::unregisterNode(const std::string& nodeName)
+bool RegistrationManager::unregisterNode(const std::shared_ptr<NodeRef>& node)
 {
-  MINIROS_INFO("RegistrationManager::unregisterNode(%s)", nodeName.c_str());
+  assert(node);
+  if (!node)
+    return false;
+  MINIROS_INFO("RegistrationManager::unregisterNode(%s)", node->id().c_str());
   std::scoped_lock<std::mutex> lock(m_guard);
 
-  auto it = m_nodes.find(nodeName);
+  auto it = m_nodes.find(node->id());
   if (it == m_nodes.end())
-    return;
-  if (!it->second->is_empty())
-    return;
-
-  std::shared_ptr<NodeRef> node_ref = it->second;
+    return false;
+  if (!it->second->isEmpty())
+    return false;
+  assert(it->second == node);
   m_nodes.erase(it);
+  return true;
 }
 
 std::shared_ptr<NodeRef> RegistrationManager::register_service(const std::string& service, const std::string& caller_id,
@@ -237,7 +237,7 @@ std::set<std::shared_ptr<NodeRef>> RegistrationManager::pullShutdownNodes()
   return result;
 }
 
-std::vector<NodeRefPtr> RegistrationManager::checkDeadNodes()
+std::vector<NodeRefPtr> RegistrationManager::checkNodesForRemoval()
 {
   std::vector<NodeRefPtr> graveyard;
   {
@@ -245,7 +245,7 @@ std::vector<NodeRefPtr> RegistrationManager::checkDeadNodes()
 
     for (auto& [key, node]: m_nodes) {
       assert(node);
-      if (node && node->getState() == NodeRef::State::Dead) {
+      if (node->getState() == NodeRef::State::Dead || node->isEmpty()) {
         graveyard.push_back(node);
       }
     }
@@ -254,6 +254,7 @@ std::vector<NodeRefPtr> RegistrationManager::checkDeadNodes()
   // Drop registrations for dead nodes.
   for (auto& node: graveyard) {
     dropRegistrations(*node);
+    unregisterNode(node);
   }
   return graveyard;
 }
