@@ -410,7 +410,7 @@ target_include_directories(bag_storage PRIVATE ${MINIROS_INCLUDE_ROOT} ${rosbag_
 target_compile_definitions(bag_storage PRIVATE rosbag_EXPORTS rosbag_storage_EXPORTS roslz4_EXPORTS)
 
 set_property(TARGET bag_storage PROPERTY CXX_STANDARD 17)
-target_link_libraries(bag_storage PRIVATE ${ENCRYPT_LIBRARIES} ${rosbag_INTERNAL_LIBS} PUBLIC ${rosbag_EXTERNAL_LIBS} roscxx)
+target_link_libraries(bag_storage PRIVATE ${ENCRYPT_LIBRARIES} ${rosbag_INTERNAL_LIBS} ${rosbag_EXTERNAL_LIBS} PUBLIC roscxx)
 
 add_executable(minibag
     rosbag/main.cpp
