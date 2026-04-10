@@ -400,7 +400,7 @@ set(bag_storage_SRC
     ${ENCRYPT_SOURCE}
 )
 
-if (MINIROS_BUILD_SHARED_LIBS)
+if (MINIROS_BUILD_SHARED)
   add_library(bag_storage SHARED ${bag_storage_SRC})
 else ()
   add_library(bag_storage ${bag_storage_SRC})
@@ -410,7 +410,7 @@ target_include_directories(bag_storage PRIVATE ${MINIROS_INCLUDE_ROOT} ${rosbag_
 target_compile_definitions(bag_storage PRIVATE rosbag_EXPORTS rosbag_storage_EXPORTS roslz4_EXPORTS)
 
 set_property(TARGET bag_storage PROPERTY CXX_STANDARD 17)
-target_link_libraries(bag_storage PRIVATE ${ENCRYPT_LIBRARIES} ${rosbag_INTERNAL_LIBS} ${rosbag_EXTERNAL_LIBS} roscxx)
+target_link_libraries(bag_storage PRIVATE ${ENCRYPT_LIBRARIES} ${rosbag_INTERNAL_LIBS} PUBLIC ${rosbag_EXTERNAL_LIBS} roscxx)
 
 add_executable(minibag
     rosbag/main.cpp
