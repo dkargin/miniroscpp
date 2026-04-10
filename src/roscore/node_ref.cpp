@@ -63,8 +63,10 @@ NodeRef::State NodeRef::getState() const
 bool NodeRef::is_empty() const
 {
   std::unique_lock lock(m_guard);
-  return m_paramSubscriptions.empty() && m_topicSubscriptions.empty() &&
-         m_topicPublications.empty() && m_services.empty();
+  /// m_paramSubscriptions are not checked here, since node is not guaranteed to properly unsubscribe from all its
+  /// parameters on exit.
+  return m_topicSubscriptions.empty() &&
+         m_topicPublications.empty() && m_services.empty() /* && m_paramSubscriptions.empty() */;
 }
 
 bool NodeRef::add(Registrations::Type type_, const std::string& key)
