@@ -5,6 +5,7 @@ After=network.target
 [Service]
 Type=notify
 Environment=ROS_MASTER_URI=http://localhost:11311
+Environment=ROSCONSOLE_FORMAT="[${severity}][${nthread}][${time}]: ${message}"
 ExecStart=@CMAKE_INSTALL_PREFIX@/bin/miniroscore --dir=/var/run/miniroscore
 TimeoutSec=5
 Slice=miniros-low.slice
