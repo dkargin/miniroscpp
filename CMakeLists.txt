@@ -96,7 +96,7 @@ configure_file("${CMAKE_CURRENT_SOURCE_DIR}/include/miniros/config.h.in" "shared
 set(MINIROS_BUILD_SHARED_LIBS OFF)
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/include/miniros/config.h.in" "static/miniros/config.h")
 
-configure_file("${CMAKE_CURRENT_SOURCE_DIR}/scripts/miniroscore.service.in" miniroscore.service)
+configure_file("${CMAKE_CURRENT_SOURCE_DIR}/scripts/miniroscore.service.in" miniroscore.service @ONLY)
 
 # Processing external modules like bzip2 or lz4
 set(EXTERNAL_INCLUDE "")
