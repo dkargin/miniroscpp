@@ -269,7 +269,7 @@ Error MasterLink::execute(const std::string& method, const RpcValue& request, Rp
 
   auto c = manager->getXMLRPCClient(master_host, master_port, "/RPC2");
   if (!c) {
-    LOCAL_ERROR("[%s] - failed make connection to host=\"%s:%d\"", method.c_str(), master_host.c_str(), master_port);
+    LOCAL_ERROR("MasterLink::execute[%s] - failed make connection to host=\"%s:%d\"", method.c_str(), master_host.c_str(), master_port);
     return Error::InvalidURI;
   }
   AtExit atExit([c, manager]() {

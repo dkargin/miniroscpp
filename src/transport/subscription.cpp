@@ -439,7 +439,7 @@ bool Subscription::negotiateConnection(const RPCManagerPtr& rpcManager, const st
   network::URL url;
   if (!url.fromString(xmlrpc_uri, false))
   {
-    MINIROS_ERROR("Bad xml-rpc URI: [%s]", xmlrpc_uri.c_str());
+    MINIROS_ERROR("Subscription[%s]::negotiateConnection(%s): bad xml-rpc URI", name_.c_str(), xmlrpc_uri.c_str());
     return false;
   }
 
@@ -448,6 +448,10 @@ bool Subscription::negotiateConnection(const RPCManagerPtr& rpcManager, const st
   PendingConnectionPtr conn = std::make_shared<PendingConnection>(udp_transport, shared_from_this(), xmlrpc_uri);
 
   auto c = rpcManager->getXMLRPCClient(url.host, url.port, "/");
+  if (!c) {
+    MINIROS_ERROR("Subscription[%s]::negotiateConnection(%s) - failed to get HttpClient", name_.c_str(), xmlrpc_uri.c_str());
+    return false;
+  }
   auto req = http::makeRequest("/", "requestTopic");
   req->setParamArray(params);
 
