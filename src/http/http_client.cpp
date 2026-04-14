@@ -83,14 +83,18 @@ struct HttpClient::Internal {
   /// Mutex for storing requests
   mutable std::mutex requests_guard;
 
+  struct Address {
+    /// Remote address.
+    /// It is set during `connect` call and reused in reconnects.
+    network::NetAddress resolved;
+    /// Host and port as specified by `HttpClient::connect`.
+    /// Unlike `address`, this may remain unresolved hostname.
+    std::string host;
+    int port = 0;
+  };
 
-  /// Remote address.
-  /// It is set during `connect` call and reused in reconnects.
-  network::NetAddress address;
-  /// Host and port as specified by `HttpClient::connect`.
-  /// Unlike `address`, this may remain unresolved hostname.
-  std::string remoteHost;
-  int remotePort = 0;
+  Address address GUARDED_BY(address_guard);
+  mutable std::mutex address_guard;
 
   /// Internal state.
   /// State was stored as a struct originally, but storing it as an atomic proved to be problematic.
@@ -198,7 +202,8 @@ struct HttpClient::Internal {
   /// Get name for debug output.
   std::string debugName() const
   {
-    return std::to_string(id) + "@" + address.lstr() + std::string(" fd=") + std::to_string(fd());
+    std::scoped_lock addrLock(address_guard);
+    return std::to_string(id) + "@" + address.resolved.lstr() + std::string(" fd=") + std::to_string(fd());
   }
 
   void updateState(Lock& lock, State newState) REQUIRES(process_guard);
@@ -351,9 +356,12 @@ bool HttpClient::Internal::pullNewTask(Lock& processLock)
 
   // Build request header from HttpRequest (host/port managed by HttpClient).
   // Use configured host/port from connect() to preserve original host name.
-  const std::string& requestHost = remoteHost.empty() ? address.address : remoteHost;
-  const int requestPort = remotePort > 0 ? remotePort : address.port();
-  request_header_buffer = active_request->buildHeader(requestHost, requestPort);
+  {
+    std::scoped_lock lock3(address_guard);
+    assert(!address.host.empty());
+    assert(address.port != 0);
+    request_header_buffer = active_request->buildHeader(address.host, address.port);
+  }
   request_body = active_request->requestBody();
   data_sent = 0;
 
@@ -373,38 +381,52 @@ void HttpClient::Internal::handleDisconnect(Lock& lock, Error disconnectError)
 
   std::deque<std::shared_ptr<HttpRequest>> requestsCopy;
 
+  // Copy of previous active request.
+  std::shared_ptr<HttpRequest> active_copy;
+
   // Push active request back to queue.
   {
     std::scoped_lock reqLock(requests_guard);
     if (active_request) {
-      auto copy = active_request;
-      active_request.reset();
-      if (copy->shouldRetry()) {
-        requests.push_front(copy);
-        copy->updateState(HttpRequest::State::ClientQueued);
+      std::swap(active_copy, active_request);
+      if (active_copy->shouldRetry()) {
+        requests.push_front(active_copy);
+        active_copy->updateState(HttpRequest::State::ClientQueued);
+        active_copy.reset();
       } else {
-        copy->updateState(HttpRequest::State::Idle);
-        copy->notifyFailToSend();
+        active_copy->updateState(HttpRequest::State::Idle);
       }
     }
     requestsCopy = requests;
   }
-  // TODO: Do we need to drop them?
-  for (auto req: requestsCopy) {
-    req->notifyFailToSend();
-  }
 
-  if (onDisconnect && alive) {
-    LOCAL_INFO("HttpClient[%s]::handleDisconnect() - connection is closed from state %s, err=%s, invoking callback", debugName().c_str(), stateCopy.toString(), disconnectError.toString());
-    // Copying all mutable data, which can be changed during callback.
-    auto callback = onDisconnect;
-    auto socketCopy = socket;
+  // Copying all mutable data, which can be changed during callback.
+  auto onDisconnectCopy = onDisconnect;
+  auto socketCopy = socket;
+
+  const bool hasAnyCallbacks = !requestsCopy.empty() || active_copy || (onDisconnect && alive);
+
+  // All the following callbacks must be called without holding either requests_guard or process_guard.
+  // Keeping any of these mutexes locked will lead to potential deadlock caused by calling HttpClient methods in callback.
+  if (hasAnyCallbacks) {
     ScopedUnlock unlock(lock);
-    // Danger: if callback references HttpClient object then there is small chance
-    // this instance is destroyed right after lock is released.
-    callback(socketCopy, stateCopy, disconnectError);
-  } else {
-    LOCAL_INFO("HttpClient[%s]::handleDisconnect() - connection is closed from state %s, err=%s, no callback", debugName().c_str(), stateCopy.toString(), disconnectError.toString());
+    if (active_copy) {
+      active_copy->notifyFailToSend();
+    }
+
+    // TODO: Do we need to drop them?
+    for (auto req: requestsCopy) {
+      req->notifyFailToSend();
+    }
+
+    if (onDisconnectCopy && alive) {
+      LOCAL_INFO("HttpClient[%s]::handleDisconnect() - connection is closed from state %s, err=%s, invoking callback", debugName().c_str(), stateCopy.toString(), disconnectError.toString());
+      // Danger: if callback references HttpClient object then there is small chance
+      // this instance is destroyed right after lock is released.
+      onDisconnectCopy(socketCopy, stateCopy, disconnectError);
+    } else {
+      LOCAL_INFO("HttpClient[%s]::handleDisconnect() - connection is closed from state %s, err=%s, no callback", debugName().c_str(), stateCopy.toString(), disconnectError.toString());
+    }
   }
 }
 
@@ -461,8 +483,12 @@ Error HttpClient::reconnect(int timeoutMs)
   //  return Error::InvalidAddress;
 
   network::NetAddress newAddress;
-  Error resolveErr = network::addressFromString(network::NetAddress::AddressUnspecified,
-    internal_->remoteHost, internal_->remotePort, newAddress);
+  Error resolveErr = Error::Ok;
+  {
+    std::scoped_lock lock2(internal_->address_guard);
+    network::addressFromString(network::NetAddress::AddressUnspecified,
+      internal_->address.host, internal_->address.port, newAddress);
+  }
 
   bool needAddress = false;
   if (!resolveErr) {
@@ -582,13 +608,12 @@ network::URL HttpClient::getRootURL(const std::string& scheme) const
   if (!internal_)
     return url;
 
-  Lock lock(internal_->process_guard, THIS_LOCATION);
-  if (!internal_->address.valid())
+  Lock lock(internal_->address_guard, THIS_LOCATION);
+  if (!internal_->address.resolved.valid())
     return url;
-
   url.scheme = scheme;
-  url.host = internal_->address.address;
-  url.port = static_cast<uint32_t>(internal_->address.port());
+  url.host = internal_->address.host;
+  url.port = static_cast<uint32_t>(internal_->address.port);
   // path and query remain empty (default constructed)
   return url;
 }
@@ -717,8 +742,11 @@ Error HttpClient::connect(const std::string& host, int port)
   }
 
   Lock lock(internal_->process_guard, THIS_LOCATION);
-  internal_->remoteHost = host;
-  internal_->remotePort = port;
+  {
+    Lock lock2(internal_->address_guard, THIS_LOCATION);
+    internal_->address.host = host;
+    internal_->address.port = port;
+  }
 
   if (resolveErr == Error::AddressIsUnknown) {
     if (!internal_->socket) {
@@ -761,9 +789,12 @@ Error HttpClient::Internal::connectImpl(const std::shared_ptr<Internal>& I, Lock
   // Store host and port for:
   // 1. Reconnect.
   // 2. Help building requests.
-  address = newAddress;
+  {
+    std::scoped_lock lock2(address_guard);
+    address.resolved = newAddress;
+  }
 
-  LOCAL_INFO("HttpClient[%s]::connectImpl initiating connection to %s:%d", debugName().c_str(), address.address.c_str(), address.port());
+  LOCAL_INFO("HttpClient[%s]::connectImpl initiating connection to %s:%d", debugName().c_str(), newAddress.address.c_str(), newAddress.port());
 
   bool connected = false;
   if (err == Error::WouldBlock) {
@@ -772,7 +803,7 @@ Error HttpClient::Internal::connectImpl(const std::shared_ptr<Internal>& I, Lock
     connected = true;
   } else {
     // Failed to initialize connection.
-    LOCAL_WARN("HttpClient[%s]::connect failed to initialize connection to %s:%d", debugName().c_str(), address.address.c_str(), address.port());
+    LOCAL_WARN("HttpClient[%s]::connect failed to initialize connection to %s:%d", debugName().c_str(), newAddress.address.c_str(), newAddress.port());
     return err;
   }
   socket->setKeepAlive(true);
@@ -960,12 +991,18 @@ void HttpClient::Internal::handleWaitAddress(const std::shared_ptr<Internal>& I,
   if (events & PollSet::EventTimer) {
     MINIROS_DEBUG_NAMED("client", "HttpClient[%s]::handleWaitAddress(%s) - retry address", debugName().c_str(), PollSet::eventToString(events).c_str());
 
-    Error resolveErr = network::addressFromString(network::NetAddress::AddressUnspecified, remoteHost, remotePort, address);
+    Address addr;
+    {
+      std::scoped_lock lock2(address_guard);
+      addr = address;
+    }
+
+    Error resolveErr = network::addressFromString(network::NetAddress::AddressUnspecified, addr.host, addr.port, addr.resolved);
     if (!resolveErr) {
       handleDisconnect(lock, resolveErr);
     } else {
       // Now we have proper address.
-      connectImpl(I, lock, address);
+      connectImpl(I, lock, addr.resolved);
     }
   } else if (events & PollSet::EventError) {
   } else {
@@ -977,7 +1014,12 @@ void HttpClient::Internal::handleReconnecting(const std::shared_ptr<Internal>& I
 {
   if (events & PollSet::EventTimer) {
     MINIROS_DEBUG_NAMED("client", "HttpClient[%s]::handleReconnecting(%s) - retry connect", debugName().c_str(), PollSet::eventToString(events).c_str());
-    connectImpl(I, lock, address);
+    network::NetAddress addr;
+    {
+      std::scoped_lock lock2(address_guard);
+      addr = address.resolved;
+    }
+    connectImpl(I, lock, addr);
   } else if (events & PollSet::EventError) {
   } else {
     LOCAL_ERROR("HttpClient[%s]::handleReconnecting(%s) - unhandled events", debugName().c_str(), PollSet::eventToString(events).c_str());
