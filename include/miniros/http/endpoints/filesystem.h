@@ -20,6 +20,9 @@ public:
   /// @param fsPath - path to root folder at filesystem.
   FilesystemEndpoint(const std::string& uriRoot, const std::string& fsPath);
 
+  /// Get ContentType for specific file.
+  virtual std::string contentTypeForFile(const std::filesystem::path& path) const;
+
   Error handle(const network::ClientInfo& clientInfo, std::shared_ptr<HttpRequest> request) override;
 
 protected:
