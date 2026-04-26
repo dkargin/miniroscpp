@@ -428,21 +428,14 @@ else()
 endif()
 target_link_libraries(minibag PRIVATE ${MINIBAG_LIBS})
 
-
 target_include_directories(minibag PRIVATE ${MINIROS_INCLUDE_DIRS} ${MINIROS_INCLUDE_GENERATED_DIRS})
 
 set(MINIROS_LIBRARY roscxx PARENT_SCOPE)
 
-set(MINIROS_EXPORT
-    roscxx
-    bag_storage
-    ${rosbag_INTERNAL_LIBS}
-    PARENT_SCOPE)
-
 if (MINIROS_BUILD_SHARED)
   set(MINIROS_EXPORT
       roscxx
-      roscxx_static
+      #roscxx_static
       bag_storage
       ${rosbag_INTERNAL_LIBS}
       PARENT_SCOPE)
