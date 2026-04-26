@@ -1,6 +1,5 @@
 add_subdirectory(replacements)
 
-
 if (PkgConfig_FOUND)
   pkg_check_modules(PKG_LIBS REQUIRED libsystemd)
   if (PKG_LIBS_FOUND)
@@ -410,7 +409,7 @@ target_include_directories(bag_storage PRIVATE ${MINIROS_INCLUDE_ROOT} ${rosbag_
 target_compile_definitions(bag_storage PRIVATE rosbag_EXPORTS rosbag_storage_EXPORTS roslz4_EXPORTS)
 
 set_property(TARGET bag_storage PROPERTY CXX_STANDARD 17)
-target_link_libraries(bag_storage PRIVATE ${ENCRYPT_LIBRARIES} ${rosbag_INTERNAL_LIBS} ${rosbag_EXTERNAL_LIBS} PUBLIC roscxx)
+target_link_libraries(bag_storage PUBLIC roscxx PRIVATE ${ENCRYPT_LIBRARIES} ${rosbag_INTERNAL_LIBS} ${rosbag_EXTERNAL_LIBS} Threads::Threads)
 
 add_executable(minibag
     rosbag/main.cpp
@@ -419,13 +418,14 @@ add_executable(minibag
     rosbag/time_translator.cpp
 )
 
-set(MINIBAG_LIBS bag_storage impl::program_options)
+set(MINIBAG_LIBS bag_storage impl::program_options Threads::Threads)
 
 if (MINIROS_PORTABLE_TOOLS)
   list(APPEND MINIBAG_LIBS roscxx_static)
 else()
   list(APPEND MINIBAG_LIBS roscxx)
 endif()
+
 target_link_libraries(minibag PRIVATE ${MINIBAG_LIBS})
 
 target_include_directories(minibag PRIVATE ${MINIROS_INCLUDE_DIRS} ${MINIROS_INCLUDE_GENERATED_DIRS})
