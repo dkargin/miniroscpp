@@ -21,6 +21,11 @@ FilesystemEndpoint::FilesystemEndpoint(const std::string& uriRoot, const std::st
   :prefix_path_(uriRoot),  root_path_(fsPath)
 {}
 
+void FilesystemEndpoint::enableImageView(bool flag)
+{
+  image_view_enabled_ = flag;
+}
+
 bool isSubpath(const std::filesystem::path& path, const std::filesystem::path& base) {
   const auto mismatch_pair = std::mismatch(path.begin(), path.end(), base.begin(), base.end());
   return mismatch_pair.second == base.end();
@@ -156,6 +161,91 @@ Error FilesystemEndpoint::handle(const network::ClientInfo& clientInfo, std::sha
     type = "text/html";
   } else {
     // 2. Open and read file.
+    const std::string mimeType = contentTypeForFile(fsPath);
+    const bool isImage = mimeType.rfind("image/", 0) == 0;
+    const bool requestRawImage = request->getParameter("raw") == "1";
+
+    if (image_view_enabled_ && isImage && !requestRawImage) {
+      std::filesystem::path relativePath = std::filesystem::path(path);
+      std::filesystem::path parentPath = relativePath.parent_path();
+      std::filesystem::path currentName = relativePath.filename();
+
+      std::vector<std::filesystem::path> imageFiles;
+      for (const std::filesystem::path& dirEntry : std::filesystem::directory_iterator(fsPath.parent_path())) {
+        if (!std::filesystem::is_regular_file(dirEntry)) {
+          continue;
+        }
+        std::filesystem::path entry = dirEntry.filename();
+        if (!show_hidden_ && !entry.empty()) {
+          const std::string str = entry.string();
+          if (!str.empty() && str[0] == '.') {
+            continue;
+          }
+        }
+
+        if (contentTypeForFile(dirEntry).rfind("image/", 0) == 0) {
+          imageFiles.push_back(entry);
+        }
+      }
+      std::sort(imageFiles.begin(), imageFiles.end());
+
+      const auto currentIt = std::find(imageFiles.begin(), imageFiles.end(), currentName);
+
+      auto makeFileUrl = [this, &parentPath](const std::filesystem::path& fileName) {
+        const std::filesystem::path fullPath = parentPath / fileName;
+        const std::string relative = fullPath.generic_string();
+        if (prefix_path_.empty() || prefix_path_ == "/") {
+          return std::string("/") + relative;
+        }
+        if (prefix_path_.back() == '/') {
+          return prefix_path_ + relative;
+        }
+        return prefix_path_ + "/" + relative;
+      };
+
+      const std::string currentUrl = makeFileUrl(currentName);
+      const std::string imageDataUrl = currentUrl + "?raw=1";
+
+      std::string firstUrl;
+      std::string prevUrl;
+      std::string nextUrl;
+      std::string lastUrl;
+      if (!imageFiles.empty()) {
+        firstUrl = makeFileUrl(imageFiles.front());
+        lastUrl = makeFileUrl(imageFiles.back());
+      }
+      if (currentIt != imageFiles.end() && currentIt != imageFiles.begin()) {
+        prevUrl = makeFileUrl(*(currentIt - 1));
+      }
+      if (currentIt != imageFiles.end() && (currentIt + 1) != imageFiles.end()) {
+        nextUrl = makeFileUrl(*(currentIt + 1));
+      }
+
+      auto navButton = [](const char* label, const std::string& url) {
+        if (url.empty()) {
+          return std::string("<button disabled>") + label + "</button>";
+        }
+        return std::string("<a href=\"") + url + "\"><button>" + label + "</button></a>";
+      };
+
+      std::stringstream ss;
+      ss << "<!doctype html><html><head><meta charset=\"utf-8\"/>"
+         << "<title>" << currentName.string() << "</title></head><body>";
+      ss << "<h2>" << currentName.string() << "</h2>";
+      ss << "<p>"
+         << navButton("first", firstUrl) << " "
+         << navButton("prev", prevUrl) << " "
+         << navButton("next", nextUrl) << " "
+         << navButton("last", lastUrl)
+         << "</p>";
+      ss << "<div><img src=\"" << imageDataUrl
+         << "\" alt=\"" << currentName.string()
+         << "\" style=\"max-width:100%;max-height:90vh;\"/></div>";
+      ss << "</body></html>";
+
+      body = ss.str();
+      type = "text/html";
+    } else {
     std::ifstream in(fsPath);
 
     if (!in.is_open()) {
@@ -164,7 +254,8 @@ Error FilesystemEndpoint::handle(const network::ClientInfo& clientInfo, std::sha
 
     std::istreambuf_iterator<char> it{in}, end;
     body.assign(it, end);
-    type = contentTypeForFile(fsPath);
+    type = mimeType;
+    }
   }
   request->setResponseBody(body, type);
   // 3. Deliver.
