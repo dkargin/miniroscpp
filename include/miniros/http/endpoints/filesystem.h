@@ -23,6 +23,9 @@ public:
   /// Get ContentType for specific file.
   virtual std::string contentTypeForFile(const std::filesystem::path& path) const;
 
+  /// Enable custom HTML image viewer.
+  void enableImageView(bool flag);
+
   Error handle(const network::ClientInfo& clientInfo, std::shared_ptr<HttpRequest> request) override;
 
 protected:
@@ -32,6 +35,9 @@ protected:
 
   /// Show hidden files.
   bool show_hidden_ = false;
+
+  /// Serve images through HTML page with navigation.
+  bool image_view_enabled_ = false;
 };
 
 }
