@@ -252,7 +252,7 @@ protected:
   State m_state = State::Initial;
 
   /// Collection of active requests.
-  std::set<std::shared_ptr<http::HttpRequest>> m_activeRequests;
+  std::set<std::shared_ptr<http::HttpRequest>> m_activeRequests GUARDED_BY(m_guard);
 };
 
 using NodeRefPtr = std::shared_ptr<NodeRef>;

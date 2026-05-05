@@ -250,6 +250,7 @@ std::shared_ptr<http::HttpClient> NodeRef::makeClient(PollSet* ps)
   });
 
   client->setResponseHandler([this](const std::shared_ptr<http::HttpRequest>& req) {
+    std::scoped_lock lock(m_guard);
     m_activeRequests.erase(req);
   });
   return client;
@@ -376,7 +377,10 @@ Error NodeRef::sendPublisherUpdate(const std::string& callerId, const std::strin
 
   auto request = http::makeRequest(m_apiUrl.path, "publisherUpdate");
   request->setParams(callerId, topic, update);
-  m_activeRequests.insert(request);
+  {
+    std::scoped_lock lock(m_guard);
+    m_activeRequests.insert(request);
+  }
   MINIROS_INFO("%s::sendPublisherUpdate(%s)", debugName().c_str(), topic.c_str());
 
   return client->enqueueRequest(request);
