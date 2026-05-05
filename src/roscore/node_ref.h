@@ -15,6 +15,7 @@
 
 #include "miniros/http/http_client.h"
 #include "miniros/internal/safe_set.h"
+#include "miniros/internal/threading.h"
 
 #include "registrations.h"
 
@@ -250,7 +251,7 @@ protected:
   /// Request to get PID of a process.
   std::shared_ptr<http::XmlRpcRequest> m_reqGetPid GUARDED_BY(m_guard);
 
-  State m_state = State::Initial GUARDED_BY(m_guard);
+  State m_state GUARDED_BY(m_guard) = State::Initial;
 
   /// Collection of active requests.
   SafeSet<std::shared_ptr<http::HttpRequest>> m_activeRequests;
