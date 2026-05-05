@@ -233,7 +233,7 @@ std::shared_ptr<http::HttpClient> NodeRef::makeClient(PollSet* ps)
     return {};
   auto client = std::make_shared<http::HttpClient>(ps);
   std::weak_ptr<NodeRef> wnode = weak_from_this();
-  std::weak_ptr<http::HttpClient> wclient;
+  std::weak_ptr<http::HttpClient> wclient = client;
   client->setDisconnectHandler(
     [wnode, wclient](std::shared_ptr<network::NetSocket> socket, http::HttpClient::State state, Error err)
     {
@@ -242,16 +242,20 @@ std::shared_ptr<http::HttpClient> NodeRef::makeClient(PollSet* ps)
       }
     });
 
-  client->setConnectHandler([this](std::shared_ptr<network::NetSocket> socket) {
-    MINIROS_INFO("%s - connected", debugName().c_str());
-    std::unique_lock<std::mutex> lock(m_guard);
-    updateState(State::Connected, lock);
-    return true;
+  client->setConnectHandler([wnode](std::shared_ptr<network::NetSocket> socket) {
+    if (auto node = wnode.lock()) {
+      MINIROS_INFO("%s - connected", node->debugName().c_str());
+      std::unique_lock<std::mutex> lock(node->m_guard);
+      node->updateState(State::Connected, lock);
+      return true;
+    }
+    return false;
   });
 
-  client->setResponseHandler([this](const std::shared_ptr<http::HttpRequest>& req) {
-    std::scoped_lock lock(m_guard);
-    m_activeRequests.erase(req);
+  client->setResponseHandler([wnode](const std::shared_ptr<http::HttpRequest>& req) {
+    if (auto node = wnode.lock()) {
+      node->m_activeRequests.erase(req);
+    }
   });
   return client;
 }
@@ -307,8 +311,10 @@ Error NodeRef::activateConnection(const std::string& callerId, PollSet* ps)
 void NodeRef::handleDisconnect(const std::weak_ptr<http::HttpClient>& wclient)
 {
   auto client = wclient.lock();
-  if (!client)
+  if (!client) {
+    MINIROS_ERROR("%s - http client is lost during disconnect at state=%s", debugName().c_str(), m_state.toString());
     return;
+  }
   std::unique_lock<std::mutex> lock(m_guard);
   if (m_state == State::ShuttingDown) {
     deactivateConnectionUnsafe();
@@ -377,12 +383,8 @@ Error NodeRef::sendPublisherUpdate(const std::string& callerId, const std::strin
 
   auto request = http::makeRequest(m_apiUrl.path, "publisherUpdate");
   request->setParams(callerId, topic, update);
-  {
-    std::scoped_lock lock(m_guard);
-    m_activeRequests.insert(request);
-  }
   MINIROS_INFO("%s::sendPublisherUpdate(%s)", debugName().c_str(), topic.c_str());
-
+  m_activeRequests.insert(request);
   return client->enqueueRequest(request);
 }
 
@@ -399,12 +401,9 @@ Error NodeRef::sendParameterUpdate(const std::string& callerId, const std::strin
 
   auto request = http::makeRequest(m_apiUrl.path, "paramUpdate");
   request->setParams(callerId, param, value ? *value : RpcValue::Dict());
-  {
-    std::unique_lock lock(m_guard);
-    m_activeRequests.insert(request);
-  }
 
   MINIROS_INFO("%s::sendParameterUpdate(%s)", debugName().c_str(), param.c_str());
+  m_activeRequests.insert(request);
   return client->enqueueRequest(request);
 }
 
@@ -431,9 +430,8 @@ Error NodeRef::sendShutdown(const std::string& msg)
     m_reqShutdown->setParams(msg);
   }
 
-  if (Error err = client->enqueueRequest(m_reqShutdown); !err) {
-    return err;
-  }
+  m_activeRequests.insert(m_reqShutdown);
+  client->enqueueRequest(m_reqShutdown);
   std::unique_lock lock(m_guard);
   updateState(State::ShuttingDown, lock);
   return Error::Ok;
@@ -475,6 +473,7 @@ Error NodeRef::sendGetPid(const std::string& callerId)
 
   MINIROS_INFO("%s::sendGetPid()", debugName().c_str());
   // Generate the request body (no parameters needed for shutdown)
+  m_activeRequests.insert(m_reqShutdown);
   return client->enqueueRequest(m_reqGetPid);
 }
 
