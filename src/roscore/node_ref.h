@@ -14,6 +14,7 @@
 #include "miniros/network/url.h"
 
 #include "miniros/http/http_client.h"
+#include "miniros/internal/safe_set.h"
 
 #include "registrations.h"
 
@@ -239,20 +240,20 @@ protected:
   /// Generic guard for data and state objects.
   mutable std::mutex m_guard;
 
-  std::shared_ptr<http::HttpClient> m_client;
+  std::shared_ptr<http::HttpClient> m_client GUARDED_BY(m_clientGuard);
   /// Guard for interaction with http client.
   mutable std::mutex m_clientGuard;
 
   /// Request to shut down node.
-  std::shared_ptr<http::XmlRpcRequest> m_reqShutdown;
+  std::shared_ptr<http::XmlRpcRequest> m_reqShutdown GUARDED_BY(m_guard);
 
   /// Request to get PID of a process.
-  std::shared_ptr<http::XmlRpcRequest> m_reqGetPid;
+  std::shared_ptr<http::XmlRpcRequest> m_reqGetPid GUARDED_BY(m_guard);
 
-  State m_state = State::Initial;
+  State m_state = State::Initial GUARDED_BY(m_guard);
 
   /// Collection of active requests.
-  std::set<std::shared_ptr<http::HttpRequest>> m_activeRequests GUARDED_BY(m_guard);
+  SafeSet<std::shared_ptr<http::HttpRequest>> m_activeRequests;
 };
 
 using NodeRefPtr = std::shared_ptr<NodeRef>;

@@ -644,6 +644,7 @@ Error HttpClient::enqueueRequest(const std::shared_ptr<HttpRequest>& request)
 
   assert(internal_);
   if (!internal_) {
+    request->updateState(HttpRequest::State::Done);
     return Error::InternalError;
   }
 
