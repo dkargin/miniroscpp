@@ -6,6 +6,7 @@
 #define MINIROS_HTTP_SERVER_H
 
 #include <memory>
+#include <mutex> // for unique_lock and scoped_lock
 #include <string>
 
 #include "miniros/http/http_tools.h"

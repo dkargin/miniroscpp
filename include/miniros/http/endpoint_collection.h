@@ -7,6 +7,8 @@
 
 #include <mutex>
 #include <memory>
+#include <list>
+#include <algorithm>
 
 #include "miniros/macros.h"
 #include "miniros/http/http_endpoint.h"
