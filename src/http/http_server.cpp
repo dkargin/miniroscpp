@@ -287,12 +287,20 @@ std::shared_ptr<HttpServerConnection> HttpServer::makeConnection(const std::shar
   return std::make_shared<HttpServerConnection>(internal_->lifetime, socket);
 }
 
-Error HttpServer::registerEndpoint(std::unique_ptr<EndpointFilter>&& filter, const std::shared_ptr<EndpointHandler>& handler, const CallbackQueuePtr& cb)
+void HttpServer::registerEndpoint(std::unique_ptr<EndpointFilter>&& filter, const std::shared_ptr<EndpointHandler>& handler, const CallbackQueuePtr& cb)
 {
   if (!internal_ || !internal_->endpoints)
-    return Error::InternalError;
+    return;
 
-  return internal_->endpoints->registerEndpoint(std::move(filter), handler, cb);
+  internal_->endpoints->registerEndpoint(std::move(filter), handler, cb);
+}
+
+void HttpServer::unregisterAll(const std::shared_ptr<EndpointHandler>& handler)
+{
+  if (!internal_ || !internal_->endpoints)
+    return;
+
+  internal_->endpoints->unregisterAll(handler);
 }
 
 std::pair<std::shared_ptr<EndpointHandler>, std::shared_ptr<CallbackQueue>> HttpServer::findEndpoint(const HttpParserFrame& frame)

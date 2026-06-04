@@ -56,7 +56,10 @@ public:
   /// @param filter - filter object. HTTP server will take care of removal of this object.
   /// @param handler - handler for specified endpoint.
   /// @param cb - callback queue to send requests to. Set to nullptr to execute request right inside spinner thread.
-  Error registerEndpoint(std::unique_ptr<EndpointFilter>&& filter, const std::shared_ptr<EndpointHandler>& handler, const std::shared_ptr<CallbackQueue>& cb);
+  void registerEndpoint(std::unique_ptr<EndpointFilter>&& filter, const std::shared_ptr<EndpointHandler>& handler, const std::shared_ptr<CallbackQueue>& cb);
+
+  /// Unregister all endpoints using specific handler.
+  void unregisterAll(const std::shared_ptr<EndpointHandler>& handler);
 
   /// Find endpoint for request.
   std::pair<std::shared_ptr<EndpointHandler>, std::shared_ptr<CallbackQueue>> findEndpoint(const HttpParserFrame& frame);
