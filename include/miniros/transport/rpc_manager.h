@@ -64,6 +64,8 @@ MINIROS_DECL XmlRpc::XmlRpcValue responseBool(int code, const std::string& msg, 
 
 class PollSet;
 class XMLRPCCallWrapper;
+class CallbackQueue;
+
 typedef std::shared_ptr<XMLRPCCallWrapper> XMLRPCCallWrapperPtr;
 
 /// Asynchronous RPC connection.
