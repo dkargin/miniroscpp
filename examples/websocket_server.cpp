@@ -79,17 +79,12 @@ int main(int argc, char** argv)
   auto wsHandler = std::make_shared<WebSocketHandler>(onWebSocketCreated);
   
   // Register WebSocket endpoint first (more specific route)
-  Error err = server.registerEndpoint(
+  server.registerEndpoint(
     std::make_unique<SimpleFilter>(HttpMethod::Get, "/ws"),
     wsHandler,
     nullptr  // No callback queue - handle synchronously
   );
-  
-  if (err != Error::Ok) {
-    std::cerr << "Failed to register WebSocket endpoint: " << err.toString() << std::endl;
-    return 1;
-  }
-  
+
   // Get the examples directory path (where this source file is located)
   std::filesystem::path examplesDir = std::filesystem::path(__FILE__).parent_path();
   
@@ -98,19 +93,14 @@ int main(int argc, char** argv)
   
   // Register filesystem endpoint to serve static files (including websocket_test.html)
   // This is registered after WebSocket endpoint so exact matches take precedence
-  err = server.registerEndpoint(
+  server.registerEndpoint(
     std::make_unique<SimpleFilter>(HttpMethod::Get, "/", SimpleFilter::CheckType::Prefix),
     fsEndpoint,
     nullptr
   );
-  
-  if (err != Error::Ok) {
-    std::cerr << "Failed to register filesystem endpoint: " << err.toString() << std::endl;
-    return 1;
-  }
-  
+
   // Start server on port 8080
-  err = server.start(8080);
+  Error err = server.start(8080);
   if (err != Error::Ok) {
     std::cerr << "Failed to start HTTP server: " << err.toString() << std::endl;
     return 1;

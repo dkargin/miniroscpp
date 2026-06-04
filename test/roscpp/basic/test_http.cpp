@@ -174,10 +174,9 @@ TEST_F(HttpServerTest, SimpleGet)
 
   // Register the /data endpoint
   auto dataHandler = std::make_shared<DataEndpointHandler>();
-  Error regErr = server_->registerEndpoint(
+  server_->registerEndpoint(
     std::make_unique<http::SimpleFilter>(http::HttpMethod::Get, "/data"),
     dataHandler, {});
-  ASSERT_EQ(regErr, Error::Ok);
 
   int port = getServerPort();
 
@@ -266,10 +265,9 @@ TEST_F(HttpServerTest, PostWithJson)
 {
   // Register the /api/data POST endpoint
   auto jsonHandler = std::make_shared<JsonPostEndpointHandler>();
-  Error regErr = server_->registerEndpoint(
+  server_->registerEndpoint(
     std::make_unique<http::SimpleFilter>(http::HttpMethod::Post, "/api/data"),
     jsonHandler, {});
-  ASSERT_EQ(regErr, Error::Ok);
 
   // Create and configure POST request to /api/data
   auto request = std::make_shared<http::HttpRequest>(http::HttpMethod::Post, "/api/data");
@@ -379,10 +377,9 @@ TEST_F(HttpServerTest, GetWithCallbackQueue)
 
   // Register the /data endpoint with callback queue
   auto dataHandler = std::make_shared<DataEndpointHandler>();
-  Error regErr = server_->registerEndpoint(
+  server_->registerEndpoint(
     std::make_unique<http::SimpleFilter>(http::HttpMethod::Get, "/data"),
     dataHandler, callback_queue_);
-  ASSERT_EQ(regErr, Error::Ok);
 
   // Create and configure GET request to /data
   auto request = std::make_shared<http::HttpRequest>(http::HttpMethod::Get, "/data");
@@ -449,10 +446,9 @@ TEST_F(HttpServerTest, MultipleRequestsWithCallbackQueue)
 {
   // Register endpoint with callback queue
   auto handler = std::make_shared<ThreadTrackingHandler>();
-  Error regErr = server_->registerEndpoint(
+  server_->registerEndpoint(
     std::make_unique<http::SimpleFilter>(http::HttpMethod::Get, "/async-multi"),
     handler, callback_queue_);
-  ASSERT_EQ(regErr, Error::Ok);
 
   // Create HTTP client
   http::HttpClient client(&poll_manager_.getPollSet());
@@ -495,10 +491,9 @@ TEST_F(HttpServerTest, CallbackQueueThreadIsolation)
 
   // Register endpoint with callback queue
   auto handler = std::make_shared<ThreadTrackingHandler>();
-  Error regErr = server_->registerEndpoint(
+  server_->registerEndpoint(
     std::make_unique<http::SimpleFilter>(http::HttpMethod::Get, "/thread-check"),
     handler, callback_queue_);
-  ASSERT_EQ(regErr, Error::Ok);
 
   // Create HTTP client
   http::HttpClient client(&poll_manager_.getPollSet());
@@ -533,17 +528,15 @@ TEST_F(HttpServerTest, MixedSyncAndAsyncEndpoints)
 {
   // Register async endpoint with callback queue
   auto asyncHandler = std::make_shared<ThreadTrackingHandler>();
-  Error regErr1 = server_->registerEndpoint(
+  server_->registerEndpoint(
     std::make_unique<http::SimpleFilter>(http::HttpMethod::Get, "/async"),
     asyncHandler, callback_queue_);
-  ASSERT_EQ(regErr1, Error::Ok);
 
   // Register sync endpoint without callback queue
   auto syncHandler = std::make_shared<DataEndpointHandler>();
-  Error regErr2 = server_->registerEndpoint(
+  server_->registerEndpoint(
     std::make_unique<http::SimpleFilter>(http::HttpMethod::Get, "/sync"),
     syncHandler, {});
-  ASSERT_EQ(regErr2, Error::Ok);
 
   // Create HTTP client
   http::HttpClient client(&poll_manager_.getPollSet());
