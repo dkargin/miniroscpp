@@ -31,6 +31,7 @@
 #include <string>
 #include <memory>
 
+#include "miniros/rostime.h"
 #include "miniros/xmlrpcpp/XmlRpcValue.h"
 #include "miniros/network/url.h"
 
