@@ -24,20 +24,27 @@ class MINIROS_DECL EndpointCollection {
 public:
   struct Binding {
     std::unique_ptr<EndpointFilter> filter;
-    std::shared_ptr<EndpointHandler> endpoint;
+    std::shared_ptr<EndpointHandler> handler;
     CallbackQueuePtr callbackQueue;
 
-    Binding(std::unique_ptr<EndpointFilter>&& filter, const std::shared_ptr<EndpointHandler>& endpoint, const CallbackQueuePtr& cb)
-      : filter(std::move(filter)), endpoint(endpoint), callbackQueue(cb)
+    Binding(std::unique_ptr<EndpointFilter>&& filter, const std::shared_ptr<EndpointHandler>& handler, const CallbackQueuePtr& cb)
+      : filter(std::move(filter)), handler(handler), callbackQueue(cb)
     {}
   };
 
 
-  Error registerEndpoint(std::unique_ptr<EndpointFilter>&& filter, const std::shared_ptr<EndpointHandler>& handler, const CallbackQueuePtr& cb)
+  void registerEndpoint(std::unique_ptr<EndpointFilter>&& filter, const std::shared_ptr<EndpointHandler>& handler, const CallbackQueuePtr& cb)
   {
     std::unique_lock lock(guard_);
     endpoints_.emplace_back(std::move(filter), handler, cb);
-    return Error::Ok;
+  }
+
+  void unregisterAll(const std::shared_ptr<EndpointHandler>& handler)
+  {
+    std::unique_lock lock(guard_);
+    std::remove_if(endpoints_.begin(), endpoints_.end(), [handler](const Binding& bind) {
+      return bind.handler == handler;
+    });
   }
 
   std::pair<std::shared_ptr<EndpointHandler>, std::shared_ptr<CallbackQueue>> findEndpoint(const HttpParserFrame& frame) const
@@ -46,7 +53,7 @@ public:
 
     for (const Binding& binding: endpoints_) {
       if (binding.filter->check(frame)) {
-        return {binding.endpoint, binding.callbackQueue};
+        return {binding.handler, binding.callbackQueue};
       }
     }
 
@@ -55,7 +62,7 @@ public:
 
 protected:
   /// A collection of endpoints.
-  std::vector<Binding> endpoints_;
+  std::list<Binding> endpoints_;
 
   /// A mutex for endpoints.
   mutable std::mutex guard_;
