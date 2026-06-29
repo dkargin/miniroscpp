@@ -231,6 +231,7 @@ std::shared_ptr<HttpRequest> HttpServerConnection::makeRequestObject(Lock& lock)
 {
   auto requestObject = std::make_shared<HttpRequest>();
   requestObject->resetResponse();
+  requestObject->setMethod(http_frame_.requestMethod);
   requestObject->setPath(std::string{http_frame_.getPath()});
   requestObject->setRequestBody(std::string{http_frame_.body()});
 
