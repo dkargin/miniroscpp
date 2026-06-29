@@ -245,6 +245,7 @@ class JsonPostEndpointHandler : public http::EndpointHandler {
 public:
   Error handle(const network::ClientInfo& clientInfo, std::shared_ptr<http::HttpRequest> request) override
   {
+    EXPECT_EQ(request->method(), http::HttpMethod::Post);
 
     // Read JSON from request body
     std::string_view requestBody = request->requestBody();
