@@ -28,6 +28,7 @@
  */
 
 #include <vector>
+#include <iomanip>
 
 #include <gtest/gtest.h>
 #include <miniros/rate.h>
