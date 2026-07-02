@@ -63,7 +63,7 @@ Error TopicInfoEndpoint::handle(const network::ClientInfo& clientInfo, std::shar
 
   std::string body = "<!doctype html><html><title>Mini ROS master</title><body>";
 
-  if (name.empty() || internal->renderTopicInfo(name, body)) {
+  if (name.empty() || !internal->renderTopicInfo(name, body)) {
     request->setResponseStatus(404, "Topic not found");
   } else {
     request->setResponseStatusOk();

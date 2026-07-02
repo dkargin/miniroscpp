@@ -62,13 +62,30 @@ void Master::Internal::renderMasterStatus(std::string& output) const
 
 Error Master::Internal::renderTopicInfo(const std::string_view& name, std::string& output) const
 {
-  std::stringstream ss;
-
   std::string type = regManager.getTopicType(name);
-  ss << "<p>" << print::HB(name) << " ";
+  const bool hasType = !type.empty();
 
-  if (type.empty())
+  std::vector<std::shared_ptr<NodeRef>> publishers;
+  size_t numPubs = regManager.iteratePublishers(name, [&](const std::shared_ptr<NodeRef>& node) {
+    publishers.push_back(node);
+    return true;
+  });
+
+  std::vector<std::shared_ptr<NodeRef>> subscribers;
+  size_t numSubs = regManager.iterateSubscribers(name, [&](const std::shared_ptr<NodeRef>& node) {
+    subscribers.push_back(node);
+    return true;
+  });
+
+  if (!hasType && numPubs == 0 && numSubs == 0) {
+    return Error::FileNotFound;
+  }
+
+  if (!hasType)
     type = "unknown";
+
+  std::stringstream ss;
+  ss << "<p>" << print::HB(name) << " ";
   ss << "(" << type << ")";
   ss << "</p>" << std::endl;
 
@@ -77,14 +94,13 @@ Error Master::Internal::renderTopicInfo(const std::string_view& name, std::strin
   //  - node2
   ss << "<p>" << print::HB("Publishers: ") << std::endl;
   ss << "<ul>";
-  size_t numPubs = regManager.iteratePublishers(name, [&](const std::shared_ptr<NodeRef>& node) {
+  for (const std::shared_ptr<NodeRef>& node: publishers) {
     const std::string& name = node->id();
     std::string url = node->getApi();
     ss << "<li>";
     ss << print::PrefixUrl("/node", name, name) << ": " << print::Url(url, url);
     ss << "</li>";
-    return true;
-  });
+  }
   ss << "</ul>";
   if (!numPubs) {
     ss << "none" << std::endl;
@@ -96,14 +112,13 @@ Error Master::Internal::renderTopicInfo(const std::string_view& name, std::strin
   //  - node2
   ss << "<p>" << print::HB("Subscribers: ") << std::endl;
   ss << "<ul>";
-  size_t numSubs = regManager.iterateSubscribers(name, [&](const std::shared_ptr<NodeRef>& node) {
+  for (const std::shared_ptr<NodeRef>& node: subscribers) {
     const std::string& name = node->id();
     std::string url = node->getApi();
     ss << "<li>";
     ss << print::PrefixUrl("/node", name, name) << ": " << print::Url(url, url);
     ss << "</li>";
-    return true;
-  });
+  }
   ss << "</ul>";
   if (!numSubs) {
     ss << "none" << std::endl;
