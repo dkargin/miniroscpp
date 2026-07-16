@@ -460,12 +460,12 @@ HttpServerConnection::EventReport HttpServerConnection::handleWriteResponse(Lock
       double dur = (SteadyTime::now() - request_start_).toSec() * 1000;
       LOCAL_DEBUG("Served HTTP response in %fms", dur);
     } else if (err == Error::EndOfFile) {
-      LOCAL_DEBUG("HttpServerConnection error: %s", err.toString());
+      LOCAL_WARN("HttpServerConnection(%d) error: %s", debugFd_, err.toString());
       report.cmd = EventReport::Disconnect;
       report.disconnectMsg = "remote connection was closed";
       return report;
     } else {
-      LOCAL_ERROR("HttpServerConnection error: %s", err.toString());
+      LOCAL_ERROR("HttpServerConnection(%d) error: %s", debugFd_, err.toString());
       report.cmd = EventReport::Disconnect;
       report.disconnectMsg = "unexpected error in remote connection";
       return report;

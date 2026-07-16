@@ -615,7 +615,7 @@ std::pair<size_t, Error> NetSocket::send(const void* rawData, size_t size, const
     } else {
       n = ::send(internal_->fd, sp, static_cast<socklen_t>(size - written), flags);
     }
-    LOCAL_DEBUG_NAMED("socket", "NetSocket(%d)::send returned %d.", (int)internal_->fd, n);
+    LOCAL_DEBUG_NAMED("socket", "NetSocket[%d]::send returned %d.", (int)internal_->fd, n);
     if (n > 0) {
       if (isDatagram()) {
         written = n;
@@ -630,14 +630,14 @@ std::pair<size_t, Error> NetSocket::send(const void* rawData, size_t size, const
     if (expectingBlock(err)) {
       wouldBlock = true;
     } else if (err == EPIPE || err == ECONNRESET) {
-      LOCAL_WARN("NetSocket::send() connection closed: %s", strerror(errno));
+      LOCAL_WARN("NetSocket[%d]::send() connection closed: %s", internal_->fd, strerror(errno));
       return {written, Error::EndOfFile};
     } else {
-      LOCAL_ERROR("NetSocket::send() unexpected error: %s", strerror(errno));
+      LOCAL_ERROR("NetSocket[%d]::send() unexpected error: %s", internal_->fd, strerror(errno));
       return {written, Error::SystemError};
     }
   }
-  return {written, Error::Ok};
+  return {written, wouldBlock? Error::WouldBlock : Error::Ok};
 }
 
 #ifdef WIN32
@@ -666,9 +666,12 @@ int fillIoVec(iovec out[2], const char* header, size_t headerSize, const char* b
     return 2;
   }
   written -= headerSize;
-  out[0].iov_base = (void*)(body + written);
-  out[0].iov_len = bodySize - written;
-  return 1;
+  if (written > 0) {
+    out[0].iov_base = (void*)(body + written);
+    out[0].iov_len = bodySize - written;
+    return 1;
+  }
+  return 0;
 }
 #endif
 
@@ -684,12 +687,19 @@ std::pair<size_t, Error> NetSocket::write2(
 #endif
 
   // Number of blocks to be written.
-  int blocks = fillIoVec(out, header, headerSize, body, bodySize, 0);
+  int blocks = fillIoVec(out, header, headerSize, body, bodySize, written);
+
+  if (blocks == 0) {
+    printf("NetSocket[%d]::write2(size=%d, written=%d) - nothing to send\n", internal_->fd, int(headerSize + bodySize), int(written));
+    return {0, Error::Ok};
+  }
+
+  size_t written0 = written;
 
   bool wouldBlock = false;
   while (written < headerSize + bodySize && !wouldBlock) {
     bool error = false;
-    if (written < headerSize) {
+    if (written < headerSize + bodySize) {
 #ifdef WIN32
       DWORD n = 0;
       int ret = WSASend(internal_->fd, out, blocks, &n, 0, 0, 0);
@@ -715,15 +725,15 @@ std::pair<size_t, Error> NetSocket::write2(
     if (expectingBlock(err)) {
       wouldBlock = true;
     } else if (err == EPIPE || err == ECONNRESET) {
-      LOCAL_WARN("NetSocket::write2() connection closed : %s", strerror(errno));
-      return {written, Error::EndOfFile};
+      LOCAL_WARN("NetSocket[%d]::write2() connection closed : %s", internal_->fd, strerror(errno));
+      return {written - written0, Error::EndOfFile};
     } else {
-      LOCAL_ERROR("NetSocket::write2() sending: %s", strerror(errno));
-      return {written, Error::SystemError};
+      LOCAL_ERROR("NetSocket[%d]::write2() sending: %s", internal_->fd, strerror(errno));
+      return {written - written0, Error::SystemError};
     }
   }
 
-  return {written, Error::Ok};
+  return {written - written0, wouldBlock? Error::WouldBlock : Error::Ok};
 }
 
 bool NetSocket::isDatagram() const
@@ -796,12 +806,12 @@ Error NetSocket::checkConnected()
     }
     // Connection failed with error_code
     const char* msg = strerror(err);
-    MINIROS_WARN("NetSocket::checkConnected - unhandled error %s", msg);
+    MINIROS_WARN("NetSocket[%d]::checkConnected - unhandled error %s", internal_->fd, msg);
     return Error::SystemError;
   }
   // Error retrieving SO_ERROR
   const char* msg = strerror(errno);
-  MINIROS_WARN("NetSocket::checkConnected - unhandled error %s", msg);
+  MINIROS_WARN("NetSocket[%d]::checkConnected - unhandled error %s", internal_->fd, msg);
   return Error::SystemError;
 }
 
@@ -830,6 +840,7 @@ void NetSocket::disconnect()
     int flags = SHUT_RDWR;
 #endif
     ::shutdown(internal_->fd, flags);
+    LOCAL_DEBUG_NAMED("sock", "NetSocket[%d]::disconnect()", internal_->fd);
     internal_->state = State::Initial;
   }
 }
