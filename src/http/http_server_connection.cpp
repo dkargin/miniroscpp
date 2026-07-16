@@ -391,20 +391,22 @@ HttpServerConnection::EventReport HttpServerConnection::handleWriteResponse(Lock
     if (written > 0) {
       data_sent_ += written;
       double dur = (SteadyTime::now() - request_start_).toSec() * 1000;
-      LOCAL_DEBUG("HttpServerConnection written %d/%d bytes of header, t=%fms",
-        static_cast<int>(written), static_cast<int>(totalSize), dur);
+      LOCAL_DEBUG("HttpServerConnection written %d/%d bytes of response, t=%fms",
+        static_cast<int>(data_sent_), static_cast<int>(totalSize), dur);
     }
 
     report.bytesWritten = written;
 
     if (err == Error::WouldBlock) {
+      // Partial send; keep WriteResponse and wait for the next EventOut.
       report.cmd = EventReport::Repeat;
       return report;
     }
 
     if (err == Error::Ok) {
       if (data_sent_ < totalSize) {
-        // Failed to write all data, so we need to yield to spinner and try later.
+        // write2 returned Ok without finishing — keep retrying on EventOut.
+        report.cmd = EventReport::Repeat;
         return report;
       }
       data_sent_ = 0;
