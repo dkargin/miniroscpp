@@ -643,32 +643,46 @@ std::pair<size_t, Error> NetSocket::send(const void* rawData, size_t size, const
 #ifdef WIN32
 int fillIoVec(WSABUF out[2], const char* header, size_t headerSize, const char* body, size_t bodySize, size_t written)
 {
+  // Skip bytes already acknowledged by previous (possibly partial) writes.
   if (written < headerSize) {
     out[0].buf = (char*)(header + written);
     out[0].len = static_cast<socklen_t>(headerSize - written);
-    out[1].buf = (char*)(body);
-    out[1].len = static_cast<socklen_t>(bodySize);
-    return 2;
+    if (bodySize > 0) {
+      out[1].buf = (char*)(body);
+      out[1].len = static_cast<socklen_t>(bodySize);
+      return 2;
+    }
+    return 1;
   }
-  written -= headerSize;
-  out[0].buf = (char*)(body + written);
-  out[0].len = static_cast<socklen_t>(bodySize - written);
-  return 1;
+
+  const size_t bodyOffset = written - headerSize;
+  if (bodyOffset < bodySize) {
+    out[0].buf = (char*)(body + bodyOffset);
+    out[0].len = static_cast<socklen_t>(bodySize - bodyOffset);
+    return 1;
+  }
+  return 0;
 }
 #else
 int fillIoVec(iovec out[2], const char* header, size_t headerSize, const char* body, size_t bodySize, size_t written)
 {
+  // Skip bytes already acknowledged by previous (possibly partial) writes.
+  // written == headerSize must still produce a body iovec when body remains.
   if (written < headerSize) {
     out[0].iov_base = (void*)(header + written);
     out[0].iov_len = headerSize - written;
-    out[1].iov_base = (void*)(body);
-    out[1].iov_len = bodySize;
-    return 2;
+    if (bodySize > 0) {
+      out[1].iov_base = (void*)(body);
+      out[1].iov_len = bodySize;
+      return 2;
+    }
+    return 1;
   }
-  written -= headerSize;
-  if (written > 0) {
-    out[0].iov_base = (void*)(body + written);
-    out[0].iov_len = bodySize - written;
+
+  const size_t bodyOffset = written - headerSize;
+  if (bodyOffset < bodySize) {
+    out[0].iov_base = (void*)(body + bodyOffset);
+    out[0].iov_len = bodySize - bodyOffset;
     return 1;
   }
   return 0;
@@ -680,44 +694,65 @@ std::pair<size_t, Error> NetSocket::write2(
   const char* body, size_t bodySize,
   size_t written)
 {
+  if (!internal_) {
+    return {0, Error::InternalError};
+  }
+  if (internal_->fd < 0) {
+    return {0, Error::InvalidHandle};
+  }
+  if (headerSize > 0 && !header) {
+    return {0, Error::InvalidValue};
+  }
+  if (bodySize > 0 && !body) {
+    return {0, Error::InvalidValue};
+  }
+
 #ifdef WIN32
   WSABUF out[2] = {};
 #else
   iovec out[2] = {};
 #endif
 
-  // Number of blocks to be written.
-  int blocks = fillIoVec(out, header, headerSize, body, bodySize, written);
-
-  if (blocks == 0) {
-    printf("NetSocket[%d]::write2(size=%d, written=%d) - nothing to send\n", internal_->fd, int(headerSize + bodySize), int(written));
+  const size_t totalSize = headerSize + bodySize;
+  if (written >= totalSize) {
     return {0, Error::Ok};
   }
 
-  size_t written0 = written;
+  // Number of blocks to be written.
+  int blocks = fillIoVec(out, header, headerSize, body, bodySize, written);
+  if (blocks == 0) {
+    LOCAL_ERROR("NetSocket[%d]::write2(size=%zu, written=%zu) - nothing to send while data remains",
+      internal_->fd, totalSize, written);
+    return {0, Error::InternalError};
+  }
 
+  size_t written0 = written;
   bool wouldBlock = false;
-  while (written < headerSize + bodySize && !wouldBlock) {
-    bool error = false;
-    if (written < headerSize + bodySize) {
+
+  while (written < totalSize && !wouldBlock) {
 #ifdef WIN32
-      DWORD n = 0;
-      int ret = WSASend(internal_->fd, out, blocks, &n, 0, 0, 0);
-      if (ret != 0)
-        error = true;
+    DWORD n = 0;
+    int ret = WSASend(internal_->fd, out, blocks, &n, 0, 0, 0);
+    if (ret == 0 && n > 0) {
 #else
-      struct msghdr msg = {};
-      msg.msg_iov = out;
-      msg.msg_iovlen = blocks;
-      constexpr int flags = MSG_NOSIGNAL;
-      ssize_t n = sendmsg(internal_->fd, &msg, flags);
+    struct msghdr msg = {};
+    msg.msg_iov = out;
+    msg.msg_iovlen = blocks;
+    constexpr int flags = MSG_NOSIGNAL;
+    ssize_t n = sendmsg(internal_->fd, &msg, flags);
+    if (n > 0) {
 #endif
-      if (n > 0) {
-        written += n;
-        blocks = fillIoVec(out, header, headerSize, body, bodySize, written);
-        continue;
+      written += static_cast<size_t>(n);
+      if (written >= totalSize) {
+        break;
       }
-      error = true;
+      blocks = fillIoVec(out, header, headerSize, body, bodySize, written);
+      if (blocks == 0) {
+        LOCAL_ERROR("NetSocket[%d]::write2() lost remaining payload at written=%zu/%zu",
+          internal_->fd, written, totalSize);
+        return {written - written0, Error::InternalError};
+      }
+      continue;
     }
 
     // We are here only if some error has happened.
@@ -733,7 +768,7 @@ std::pair<size_t, Error> NetSocket::write2(
     }
   }
 
-  return {written - written0, wouldBlock? Error::WouldBlock : Error::Ok};
+  return {written - written0, wouldBlock ? Error::WouldBlock : Error::Ok};
 }
 
 bool NetSocket::isDatagram() const
