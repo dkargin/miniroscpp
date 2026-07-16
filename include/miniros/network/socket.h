@@ -190,6 +190,17 @@ public:
 
   /// Write two separate buffers to a socket.
   /// It is often HTTP header and a payload from a separate buffer.
+  /// @param header - pointer to first part of the packet.
+  /// @param headerSize - size of the header.
+  /// @param body - pointer to second part of the packet.
+  /// @param bodySize - size of body part. Can be zero to be completely omitted.
+  /// @param written - number of bytes already written. This number of bytes will be skipped from [header+body].
+  /// @returns a tuple with a number of bytes actually sent during this call and error status.
+  /// Expected errors:
+  ///  - Error::Ok - everything is OK.
+  ///  - Error::WouldBlock - sent data partially, next sending attempt will be blocking.
+  ///  - Error::EndOfFile - connection is closed by peer. Corresponds to EPIPE/ECONNRESET.
+  ///  - Error::SystemError - some unexpected system error. Socket should be closed.
   virtual std::pair<size_t, Error> write2(const char* header, size_t headerSize,
     const char* body, size_t bodySize,
     size_t written = 0);
