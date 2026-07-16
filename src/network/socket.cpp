@@ -629,8 +629,11 @@ std::pair<size_t, Error> NetSocket::send(const void* rawData, size_t size, const
     int err = last_socket_error();
     if (expectingBlock(err)) {
       wouldBlock = true;
+    } else if (err == EPIPE || err == ECONNRESET) {
+      LOCAL_WARN("NetSocket::send() connection closed: %s", strerror(errno));
+      return {written, Error::EndOfFile};
     } else {
-      LOCAL_WARN("Error while sending: %s", strerror(errno));
+      LOCAL_ERROR("NetSocket::send() unexpected error: %s", strerror(errno));
       return {written, Error::SystemError};
     }
   }
@@ -711,7 +714,11 @@ std::pair<size_t, Error> NetSocket::write2(
     int err = last_socket_error();
     if (expectingBlock(err)) {
       wouldBlock = true;
+    } else if (err == EPIPE || err == ECONNRESET) {
+      LOCAL_WARN("NetSocket::write2() connection closed : %s", strerror(errno));
+      return {written, Error::EndOfFile};
     } else {
+      LOCAL_ERROR("NetSocket::write2() sending: %s", strerror(errno));
       return {written, Error::SystemError};
     }
   }
