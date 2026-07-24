@@ -237,6 +237,25 @@ std::set<std::shared_ptr<NodeRef>> RegistrationManager::pullShutdownNodes()
   return result;
 }
 
+void RegistrationManager::scheduleShutdown(const std::shared_ptr<NodeRef>& node)
+{
+  assert(node);
+  if (!node)
+    return;
+  std::scoped_lock<std::mutex> lock(m_guard);
+  m_nodesToShutdown.insert(node);
+}
+
+void RegistrationManager::scheduleDeadNodesForShutdown()
+{
+  std::scoped_lock<std::mutex> lock(m_guard);
+  for (const auto& [key, node] : m_nodes) {
+    assert(node);
+    if (node->getState() == NodeRef::State::Dead)
+      m_nodesToShutdown.insert(node);
+  }
+}
+
 std::vector<NodeRefPtr> RegistrationManager::checkNodesForRemoval()
 {
   std::vector<NodeRefPtr> graveyard;

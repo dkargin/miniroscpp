@@ -102,6 +102,13 @@ public:
   /// Take collection of nodes for shutdown.
   std::set<std::shared_ptr<NodeRef>> pullShutdownNodes();
 
+  /// Queue a node for shutdown / unregistration on the next Master::update().
+  /// Used for superseded nodes and for nodes that became unreachable.
+  void scheduleShutdown(const std::shared_ptr<NodeRef>& node);
+
+  /// Queue all currently Dead nodes that are still registered.
+  void scheduleDeadNodesForShutdown();
+
   std::ostream& writeJson(std::ostream& os, miniros::JsonState& state, const miniros::JsonSettings& settings) const;
 
   /// Drop all registrations for specified node.

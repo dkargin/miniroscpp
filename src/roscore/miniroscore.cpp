@@ -95,6 +95,8 @@ int main(int argc, const char ** argv) {
     ("pidfile", po::value<std::string>(), "Path to a PID file")
     ("discovery", po::value<int>(), "Sets UDP port for master discovery.")
     ("discovery_group", po::value<std::string>(), "Multicast address for master discovery")
+    ("node_check_period", po::value<double>()->default_value(5.0),
+      "Period in seconds for checking whether registered nodes are still alive (0 disables)")
     ;
 
   po::variables_map vm;
@@ -169,6 +171,7 @@ int main(int argc, const char ** argv) {
 
   master.setResolveNodeIP(resolve);
   master.setDumpParameters(dumpParameters);
+  master.setNodeCheckPeriod(vm["node_check_period"].as<double>());
 
   PidFile pidFile;
   if (vm.count("pidfile")) {

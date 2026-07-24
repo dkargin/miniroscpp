@@ -22,6 +22,7 @@
 #include "miniros/http/endpoints/filesystem.h"
 #include "miniros/http/http_filters.h"
 #include "miniros/callback_queue.h"
+#include "miniros/rostime.h"
 
 namespace miniros {
 
@@ -231,16 +232,100 @@ void Master::setResolveNodeIP(bool resolv)
   internal_->parameterStorage.setParam("master", "/resolve_ip", resolv);
 }
 
+void Master::setNodeCheckPeriod(double seconds)
+{
+  if (!internal_)
+    return;
+  if (seconds < 0)
+    seconds = 0;
+  internal_->nodeCheckPeriod = WallDuration(seconds);
+  internal_->lastNodeCheck = SteadyTime();
+  MINIROS_INFO("Node liveness check period set to %.3fs%s",
+               seconds, seconds <= 0 ? " (disabled)" : "");
+}
+
+void Master::Internal::checkNodesAlive()
+{
+  auto nodes = regManager.listAllNodes();
+  for (const std::shared_ptr<NodeRef>& node : nodes) {
+    if (!node)
+      continue;
+
+    if (node->isLocal())
+      continue;
+
+    if (node->getState() == NodeRef::State::Dead) {
+      regManager.scheduleShutdown(node);
+      continue;
+    }
+
+    if (!node->needRequests())
+      continue;
+
+    // Refresh PID / probe reachability via Slave API.
+    if (Error err = node->sendGetPid("/master"); !err) {
+      // NotConnected is expected while reconnecting; disconnect handler marks
+      // the node Dead when reconnect fails, then scheduleDeadNodesForShutdown
+      // picks it up.
+      MINIROS_DEBUG("sendGetPid(%s) returned %s", node->id().c_str(), err.toString());
+    }
+  }
+}
+
+void Master::Internal::shutdownNode(const std::shared_ptr<NodeRef>& node, const std::string& reason)
+{
+  assert(node);
+  if (!node)
+    return;
+
+  std::set<std::string> publishedTopics;
+  {
+    node->lock();
+    publishedTopics = node->getPublicationsUnsafe();
+    node->unlock();
+  }
+
+  // Ask the node to shut down if the HTTP client is still usable.
+  if (Error err = node->sendShutdown(reason); !err) {
+    MINIROS_DEBUG("sendShutdown(%s) returned %s", node->id().c_str(), err.toString());
+  }
+
+  regManager.dropRegistrations(*node);
+  node->clear();
+
+  // Tell remaining subscribers that publishers for these topics have changed.
+  for (const std::string& topic : publishedTopics) {
+    auto subscribers = regManager.getTopicSubscribers(topic);
+    handler.notifyTopicSubscribers(topic, subscribers);
+  }
+
+  node->markDead();
+}
+
 void Master::update()
 {
-  auto shutdownNodes = internal_->regManager.pullShutdownNodes();
+  // Queue unreachable nodes discovered via disconnect / failed reconnect.
+  internal_->regManager.scheduleDeadNodesForShutdown();
 
-  for (std::shared_ptr<NodeRef> nr: shutdownNodes) {
-    RpcValue msg;
+  if (internal_->nodeCheckPeriod.toSec() > 0) {
+    const SteadyTime now = SteadyTime::now();
+    if (internal_->lastNodeCheck.isZero() ||
+        (now - internal_->lastNodeCheck) >= internal_->nodeCheckPeriod) {
+      internal_->lastNodeCheck = now;
+      internal_->checkNodesAlive();
+    }
+  }
+
+  auto shutdownNodes = internal_->regManager.pullShutdownNodes();
+  for (std::shared_ptr<NodeRef> nr : shutdownNodes) {
     std::stringstream ss;
-    ss << "[" << nr->id() << "] Reason: new node registered with same name";
-    msg = ss.str();
-    nr->sendShutdown(msg);
+    auto current = internal_->regManager.getNodeByName(nr->id());
+    if (current && current != nr) {
+      ss << "[" << nr->id() << "] Reason: new node registered with same name";
+    } else {
+      ss << "[" << nr->id() << "] Reason: node unreachable";
+    }
+    internal_->shutdownNode(nr, ss.str());
   }
 
   auto graveyard = internal_->regManager.checkNodesForRemoval();

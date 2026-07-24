@@ -79,6 +79,10 @@ public:
   /// Can return an error if multicast address is invalid.
   Error setDiscoveryGroup(const std::string& group);
 
+  /// Set period for periodic node liveness checks (getPid / local PID probe).
+  /// @param seconds - check interval in seconds; 0 disables periodic checks.
+  void setNodeCheckPeriod(double seconds);
+
   /// Update queued tasks.
   void update();
 
