@@ -54,6 +54,7 @@ public:
         const ConnectionPtr& connection,
         miniros::Connection::DropReason reason) override
     {
+        (void)reason;
         owner_.onConnectionDropped(connection);
     }
 
@@ -76,7 +77,12 @@ ServiceServerLink::ServiceServerLink(const std::string& service_name, bool persi
 
 ServiceServerLink::~ServiceServerLink()
 {
-  MINIROS_ASSERT(connection_->isDropped());
+  if (drop_watcher_)
+  {
+    drop_watcher_->disconnect();
+  }
+
+  MINIROS_ASSERT(!connection_ || connection_->isDropped());
 
   clearCalls();
 }
@@ -131,10 +137,16 @@ bool ServiceServerLink::initialize(const ConnectionPtr& connection)
 
   connection_->addDropWatcher(drop_watcher_.get());
 
+  std::weak_ptr<ServiceServerLink> weak_self = shared_from_this();
+
   connection_->setHeaderReceivedCallback(
-      [this](const ConnectionPtr& conn, const Header& header)
+      [weak_self](const ConnectionPtr& conn, const Header& header)
       {
-          return onHeaderReceived(conn, header);
+          if (auto self = weak_self.lock())
+          {
+            return self->onHeaderReceived(conn, header);
+          }
+          return false;
       });
 
   M_string header;
@@ -145,9 +157,12 @@ bool ServiceServerLink::initialize(const ConnectionPtr& connection)
   header.insert(extra_outgoing_header_values_.begin(), extra_outgoing_header_values_.end());
 
   connection_->writeHeader(header,
-      [this](const ConnectionPtr& conn)
+      [weak_self](const ConnectionPtr& conn)
       {
-          this->onHeaderWritten(conn);
+          if (auto self = weak_self.lock())
+          {
+            self->onHeaderWritten(conn);
+          }
       });
 
   return true;
@@ -339,6 +354,10 @@ void ServiceServerLink::processNextCall()
     if (!persistent_)
     {
       MINIROS_DEBUG_NAMED("superdebug", "Dropping non-persistent client to service [%s]", service_name_.c_str());
+      if (drop_watcher_)
+      {
+        drop_watcher_->disconnect();
+      }
       connection_->drop(Connection::Destructing);
     }
     else

@@ -55,18 +55,31 @@
 namespace miniros
 {
 
-class TransportPublisherLink::DropWatcher : public Connection::DropWatcher {
+class TransportPublisherLink::DropWatcher
+  : public Connection::DropWatcher
+  , public std::enable_shared_from_this<DropWatcher>
+{
 public:
-    DropWatcher(TransportPublisherLink& owner) : owner_(owner) {}
+  explicit DropWatcher(const std::weak_ptr<TransportPublisherLink>& owner)
+  : owner_(owner)
+  {
+  }
 
-    void onConnectionDropped(
-        const ConnectionPtr& connection,
-        miniros::Connection::DropReason reason) override
+  void onConnectionDropped(
+      const ConnectionPtr& connection,
+      miniros::Connection::DropReason reason) override
+  {
+    // Keep this watcher alive for the whole callback. The owner link may be
+    // destroyed if drop()/removePublisherLink releases the last shared_ptr.
+    const auto keep_watcher = shared_from_this();
+    if (const auto owner = owner_.lock())
     {
-        owner_.onConnectionDropped(connection, reason);
+      owner->onConnectionDropped(connection, reason);
     }
+  }
 
-    TransportPublisherLink& owner_;
+private:
+  std::weak_ptr<TransportPublisherLink> owner_;
 };
 
 TransportPublisherLink::TransportPublisherLink(const SubscriptionPtr& parent, const std::string& xmlrpc_uri, const TransportHints& transport_hints)
@@ -75,7 +88,6 @@ TransportPublisherLink::TransportPublisherLink(const SubscriptionPtr& parent, co
 , needs_retry_(false)
 , dropping_(false)
 {
-    drop_watcher_ = std::make_unique<DropWatcher>(*this);
 }
 
 TransportPublisherLink::~TransportPublisherLink()
@@ -87,25 +99,44 @@ TransportPublisherLink::~TransportPublisherLink()
     getInternalTimerManager()->remove(retry_timer_handle_);
   }
 
-  connection_->drop(Connection::Destructing);
+  // Disconnect the drop watcher before dropping the connection so a concurrent
+  // TransportDisconnect cannot call into a half-destroyed link.
+  if (drop_watcher_)
+  {
+    drop_watcher_->disconnect();
+    drop_watcher_.reset();
+  }
+
+  if (connection_)
+  {
+    connection_->drop(Connection::Destructing);
+  }
 }
 
 bool TransportPublisherLink::initialize(const ConnectionPtr& connection)
 {
   connection_ = connection;
-  // slot_type is used to automatically track the TransporPublisherLink class' existence
-  // and disconnect when this class' reference count is decremented to 0. It increments
-  // then decrements the shared_from_this reference count around calls to the
-  // onConnectionDropped function, preventing a coredump in the middle of execution.
-  auto thisptr = std::static_pointer_cast<TransportPublisherLink>(shared_from_this());
+
+  auto self = std::static_pointer_cast<TransportPublisherLink>(shared_from_this());
+  if (!drop_watcher_)
+  {
+    drop_watcher_ = std::make_shared<DropWatcher>(self);
+  }
+  // Re-attach on retry: pushBack() disconnects from the previous Connection first.
   connection_->addDropWatcher(drop_watcher_.get());
+
+  std::weak_ptr<TransportPublisherLink> weak_self = self;
 
   if (connection_->getTransport()->requiresHeader())
   {
     connection_->setHeaderReceivedCallback(
-      [this](const ConnectionPtr& conn, const Header& header)
+      [weak_self](const ConnectionPtr& conn, const Header& header)
       {
-        return this->onHeaderReceived(conn, header);
+        if (auto locked = weak_self.lock())
+        {
+          return locked->onHeaderReceived(conn, header);
+        }
+        return false;
       });
 
     SubscriptionPtr parent = parent_.lock();
@@ -120,14 +151,24 @@ bool TransportPublisherLink::initialize(const ConnectionPtr& connection)
     header["callerid"] = this_node::getName();
     header["type"] = parent->datatype();
     header["tcp_nodelay"] = transport_hints_.getTCPNoDelay() ? "1" : "0";
-    connection_->writeHeader(header, [this](const ConnectionPtr& conn){this->onHeaderWritten(conn);});
+    connection_->writeHeader(header,
+      [weak_self](const ConnectionPtr& conn)
+      {
+        if (auto locked = weak_self.lock())
+        {
+          locked->onHeaderWritten(conn);
+        }
+      });
   }
   else
   {
     connection_->read(4,
-      [this](const ConnectionPtr& conn, const std::shared_ptr<uint8_t[]>& buffer, uint32_t size, bool success)
+      [weak_self](const ConnectionPtr& conn, const std::shared_ptr<uint8_t[]>& buffer, uint32_t size, bool success)
       {
-        this->onMessageLength(conn, buffer, size, success);
+        if (auto locked = weak_self.lock())
+        {
+          locked->onMessageLength(conn, buffer, size, success);
+        }
       });
   }
 
@@ -137,7 +178,16 @@ bool TransportPublisherLink::initialize(const ConnectionPtr& connection)
 void TransportPublisherLink::drop()
 {
   dropping_ = true;
-  connection_->drop(Connection::Destructing);
+
+  if (drop_watcher_)
+  {
+    drop_watcher_->disconnect();
+  }
+
+  if (connection_)
+  {
+    connection_->drop(Connection::Destructing);
+  }
 
   if (SubscriptionPtr parent = parent_.lock())
   {
@@ -168,10 +218,15 @@ bool TransportPublisherLink::onHeaderReceived(const ConnectionPtr& conn, const H
     retry_timer_handle_ = -1;
   }
 
+  std::weak_ptr<TransportPublisherLink> weak_self =
+      std::static_pointer_cast<TransportPublisherLink>(shared_from_this());
   connection_->read(4,
-    [this](const ConnectionPtr& conn, const std::shared_ptr<uint8_t[]>& buffer, uint32_t size, bool success)
+    [weak_self](const ConnectionPtr& conn, const std::shared_ptr<uint8_t[]>& buffer, uint32_t size, bool success)
     {
-      this->onMessageLength(conn, buffer, size, success);
+      if (auto self = weak_self.lock())
+      {
+        self->onMessageLength(conn, buffer, size, success);
+      }
     });
 
   return true;
@@ -187,13 +242,19 @@ void TransportPublisherLink::onMessageLength(const ConnectionPtr& conn, const st
     retry_timer_handle_ = -1;
   }
 
+  std::weak_ptr<TransportPublisherLink> weak_self =
+      std::static_pointer_cast<TransportPublisherLink>(shared_from_this());
+
   if (!success)
   {
     if (connection_) {
       connection_->read(4,
-        [this](const ConnectionPtr& conn, const std::shared_ptr<uint8_t[]>& buffer, uint32_t size, bool success)
+        [weak_self](const ConnectionPtr& conn, const std::shared_ptr<uint8_t[]>& buffer, uint32_t size, bool success)
         {
-          this->onMessageLength(conn, buffer, size, success);
+          if (auto self = weak_self.lock())
+          {
+            self->onMessageLength(conn, buffer, size, success);
+          }
         });
     }
     return;
@@ -215,9 +276,12 @@ void TransportPublisherLink::onMessageLength(const ConnectionPtr& conn, const st
   }
 
   connection_->read(len,
-    [this](const ConnectionPtr& conn, const std::shared_ptr<uint8_t[]>& buffer, uint32_t size, bool success)
+    [weak_self](const ConnectionPtr& conn, const std::shared_ptr<uint8_t[]>& buffer, uint32_t size, bool success)
     {
-      this->onMessage(conn, buffer, size, success);
+      if (auto self = weak_self.lock())
+      {
+        self->onMessage(conn, buffer, size, success);
+      }
     });
 }
 
@@ -235,10 +299,15 @@ void TransportPublisherLink::onMessage(const ConnectionPtr& conn, const std::sha
 
   if (success || !connection_->getTransport()->requiresHeader())
   {
+    std::weak_ptr<TransportPublisherLink> weak_self =
+        std::static_pointer_cast<TransportPublisherLink>(shared_from_this());
     connection_->read(4,
-      [this](const ConnectionPtr& conn, const std::shared_ptr<uint8_t[]>& buffer, uint32_t size, bool success)
+      [weak_self](const ConnectionPtr& conn, const std::shared_ptr<uint8_t[]>& buffer, uint32_t size, bool success)
       {
-        this->onMessageLength(conn, buffer, size, success);
+        if (auto self = weak_self.lock())
+        {
+          self->onMessageLength(conn, buffer, size, success);
+        }
       });
   }
 }
@@ -320,8 +389,8 @@ void TransportPublisherLink::onConnectionDropped(const ConnectionPtr& conn, Conn
     {
       retry_period_ = WallDuration(0.1);
       next_retry_ = SteadyTime::now() + retry_period_;
-      // shared_from_this() shared_ptr is used to ensure TransportPublisherLink is not
-      // destroyed in the middle of onRetryTimer execution
+      // Tracked object keeps this link alive across onRetryTimer; if the link is
+      // destroyed the timer manager skips the callback.
       retry_timer_handle_ = getInternalTimerManager()->add(WallDuration(retry_period_),
         [this](const miniros::SteadyTimerEvent& event){this->onRetryTimer(event);},
         getInternalCallbackQueue().get(),

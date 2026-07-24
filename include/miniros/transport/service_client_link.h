@@ -54,6 +54,12 @@ public:
   bool handleHeader(const Header& header);
 
   /**
+   * \brief Detach from the connection and remove this link from its parent.
+   * Must be called while a shared_ptr to this link still exists.
+   */
+  void drop();
+
+  /**
    * \brief Writes a response to the current request.
    * \param ok Whether the callback was successful or not
    * \param resp The message response.  ServiceClientLink will delete this
@@ -75,13 +81,12 @@ private:
   bool persistent_;
 
   class DropWatcher;
-  std::unique_ptr<DropWatcher> drop_watcher_;
+  // shared_ptr so the watcher can outlive this link if onConnectionDropped
+  // causes the last owner reference to this link to be released.
+  std::shared_ptr<DropWatcher> drop_watcher_;
 };
 typedef std::shared_ptr<ServiceClientLink> ServiceClientLinkPtr;
 
 } // namespace miniros
 
 #endif // ROSCPP_PUBLISHER_DATA_HANDLER_H
-
-
-

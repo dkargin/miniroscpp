@@ -352,15 +352,41 @@ void Connection::drop(DropReason reason)
 
   if (did_drop)
   {
+    // Advance the iterator before invoking the callback so a watcher may
+    // disconnect itself safely without invalidating the walk.
     {
-        std::scoped_lock<DropWatchers> lock(drop_watchers_);
-        for (auto it = drop_watchers_.begin(); it != drop_watchers_.end(); it++)
-        {
-            if (!it)
-              break;
-            it->onConnectionDropped(shared_from_this(), reason);
-        }
+      std::scoped_lock<DropWatchers> lock(drop_watchers_);
+      auto it = drop_watchers_.begin();
+      const auto end = drop_watchers_.end();
+      while (it != end)
+      {
+        DropWatcher& watcher = *it;
+        ++it;
+        watcher.onConnectionDropped(shared_from_this(), reason);
+      }
     }
+
+    // Drop pending I/O callbacks so they cannot touch link objects that are
+    // being destroyed concurrently with this disconnect.
+    {
+      std::scoped_lock<std::recursive_mutex> lock(read_mutex_);
+      read_callback_ = {};
+      read_buffer_.reset();
+      read_size_ = 0;
+      read_filled_ = 0;
+      has_read_callback_ = 0;
+    }
+    {
+      std::scoped_lock<std::mutex> lock(write_callback_mutex_);
+      write_callback_ = {};
+      write_buffer_ = {};
+      write_size_ = 0;
+      write_sent_ = 0;
+      has_write_callback_ = 0;
+    }
+    header_func_ = {};
+    header_written_callback_ = {};
+
     transport_->close();
   }
 }

@@ -28,6 +28,8 @@
 #ifndef MINIROS_TRANSPORT_PUBLISHER_LINK_H
 #define MINIROS_TRANSPORT_PUBLISHER_LINK_H
 
+#include <atomic>
+
 #include "miniros/common.h"
 #include "publisher_link.h"
 #include "connection.h"
@@ -81,13 +83,15 @@ private:
   ConnectionPtr connection_;
 
   class DropWatcher;
-  std::unique_ptr<DropWatcher> drop_watcher_;
+  // shared_ptr so the watcher can outlive this link if a drop callback releases
+  // the last owner reference while Connection::drop is still notifying watchers.
+  std::shared_ptr<DropWatcher> drop_watcher_;
 
   int32_t retry_timer_handle_;
   bool needs_retry_;
   WallDuration retry_period_;
   SteadyTime next_retry_;
-  bool dropping_;
+  std::atomic_bool dropping_;
 };
 
 typedef std::shared_ptr<TransportPublisherLink> TransportPublisherLinkPtr;
