@@ -177,9 +177,6 @@ public:
   /// @return Error::Ok if connection was initiated successfully, error code otherwise.
   Error activateConnection(const std::string& callerId, PollSet* ps);
 
-  /// Release HTTP client and drop all related objects.
-  void deactivateConnectionUnsafe();
-
   /// Send shutdown request to remote node.
   /// @param msg - message sent to remote node.
   /// @return Error::Ok if request was queued successfully, error code otherwise.
@@ -206,17 +203,30 @@ public:
   /// Get client object.
   std::shared_ptr<http::HttpClient> getClient();
 
+  /// Last known PID of the node process (0 if unknown).
+  /// Obtained via Slave API getPid; not used for OS-level signals.
+  int pid() const;
+
+  /// Mark node as dead and tear down its HTTP client.
+  void markDead();
+
 protected:
   using Lock = std::unique_lock<std::mutex>;
-  void updateState(State newState, Lock& lock);
+  using ClientLock = std::unique_lock<std::mutex>;
+
+  void updateState(State newState, Lock& lock) REQUIRES(m_guard);
+
+  /// Release HTTP client and drop all related objects.
+  /// @param lock - must already own m_guard.
+  /// @param clientLock - must already own m_clientGuard.
+  void deactivateConnectionUnsafe(Lock& lock, ClientLock& clientLock) REQUIRES(m_guard) REQUIRES(m_clientGuard);
 
   /// Creates client object.
   std::shared_ptr<http::HttpClient> makeClient(PollSet* ps);
 
   /// Handler for disconnect events from HttpClient.
-  void handleDisconnect(const std::weak_ptr<http::HttpClient>& client);
+  void handleDisconnect(const std::weak_ptr<http::HttpClient>& client, Error disconnectError);
 
-protected:
   std::set<std::string> m_paramSubscriptions;
   std::set<std::string> m_topicSubscriptions;
   std::set<std::string> m_topicPublications;
@@ -237,6 +247,9 @@ protected:
   int m_pid = 0;
 
   int m_flags = 0;
+
+  /// Caller id used for Slave API requests (typically master name).
+  std::string m_callerId;
 
   /// Generic guard for data and state objects.
   mutable std::mutex m_guard;

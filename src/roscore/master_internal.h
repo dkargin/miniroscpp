@@ -65,6 +65,12 @@ struct Master::Internal {
   /// Some unique UUID of this instance.
   UUID uuid;
 
+  /// Period between node liveness checks (0 disables periodic checks).
+  WallDuration nodeCheckPeriod{5.0};
+
+  /// Timestamp of the last periodic node liveness check.
+  SteadyTime lastNodeCheck;
+
   Internal(const std::shared_ptr<RPCManager>& manager);
   ~Internal();
 
@@ -84,6 +90,13 @@ struct Master::Internal {
   /// Callback for discovery event.
   /// It is called from PollSet thread.
   void onDiscovery(const DiscoveryEvent& evt);
+
+  /// Probe registered nodes via getPid and queue unreachable ones for shutdown.
+  void checkNodesAlive();
+
+  /// Drop registrations for a node, notify remaining subscribers, and optionally
+  /// send a Slave API shutdown request when the connection is still usable.
+  void shutdownNode(const std::shared_ptr<NodeRef>& node, const std::string& reason);
 };
 
 }

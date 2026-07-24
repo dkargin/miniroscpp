@@ -238,15 +238,22 @@ std::shared_ptr<http::HttpClient> NodeRef::makeClient(PollSet* ps)
     [wnode, wclient](std::shared_ptr<network::NetSocket> socket, http::HttpClient::State state, Error err)
     {
       if (auto node = wnode.lock()) {
-        node->handleDisconnect(wclient);
+        node->handleDisconnect(wclient, err);
       }
     });
 
   client->setConnectHandler([wnode](std::shared_ptr<network::NetSocket> socket) {
     if (auto node = wnode.lock()) {
       MINIROS_INFO("%s - connected", node->debugName().c_str());
-      std::unique_lock<std::mutex> lock(node->m_guard);
-      node->updateState(State::Connected, lock);
+      std::string callerId;
+      {
+        std::unique_lock<std::mutex> lock(node->m_guard);
+        node->updateState(State::Connected, lock);
+        callerId = node->m_callerId;
+      }
+      // Verify the node after (re)connect; request is queued until the socket is idle.
+      if (!callerId.empty())
+        node->sendGetPid(callerId);
       return true;
     }
     return false;
@@ -280,6 +287,7 @@ Error NodeRef::activateConnection(const std::string& callerId, PollSet* ps)
       return Error::InvalidAddress;
     }
     url = m_apiUrl;
+    m_callerId = callerId;
   }
 
   std::shared_ptr<http::HttpClient> client;
@@ -304,35 +312,64 @@ Error NodeRef::activateConnection(const std::string& callerId, PollSet* ps)
     updateState(State::Connecting, lock);
   }
 
-  sendGetPid(callerId);
+  // getPid is sent from the connect handler once the socket is up.
   return Error::Ok;
 }
 
-void NodeRef::handleDisconnect(const std::weak_ptr<http::HttpClient>& wclient)
+void NodeRef::handleDisconnect(const std::weak_ptr<http::HttpClient>& wclient, Error disconnectError)
 {
   auto client = wclient.lock();
   if (!client) {
     MINIROS_ERROR("%s - http client is lost during disconnect at state=%s", debugName().c_str(), m_state.toString());
     return;
   }
-  std::unique_lock<std::mutex> lock(m_guard);
-  if (m_state == State::ShuttingDown) {
-    deactivateConnectionUnsafe();
-    MINIROS_INFO("%s - disconnected at state=%s, HttpClient state=%s", debugName().c_str(), m_state.toString(), client->getState().toString());
+
+  // Lock order matches activateConnection: m_clientGuard then m_guard.
+  ClientLock clientLock(m_clientGuard);
+  Lock lock(m_guard);
+
+  if (m_state == State::ShuttingDown || m_state == State::Dead) {
+    deactivateConnectionUnsafe(lock, clientLock);
+    MINIROS_INFO("%s - disconnected at state=%s err=%s, HttpClient state=%s",
+                 debugName().c_str(), m_state.toString(), disconnectError.toString(),
+                 client->getState().toString());
     updateState(State::Dead, lock);
+    return;
+  }
+
+  // Connection refused means nothing is listening on the node's Slave API port —
+  // typically the process exited. Do not keep retrying.
+  // Cap other transient failures so we cannot spin reconnect forever.
+  constexpr int kMaxReconnectAttempts = 3;
+  const int attempts = client->getReconnectAttempts();
+  const bool permanentFailure =
+    disconnectError == Error::ConnectionRefused ||
+    disconnectError == Error::InvalidAddress ||
+    attempts >= kMaxReconnectAttempts;
+
+  if (permanentFailure) {
+    MINIROS_WARN("%s - giving up reconnect (err=%s attempts=%d); marking node dead",
+                 debugName().c_str(), disconnectError.toString(), attempts);
+    deactivateConnectionUnsafe(lock, clientLock);
+    updateState(State::Dead, lock);
+    return;
+  }
+
+  if (Error err = client->reconnect(5)) {
+    MINIROS_INFO("%s - disconnected at state %s err=%s. Initiating reconnect (attempt %d)",
+                 debugName().c_str(), m_state.toString(), disconnectError.toString(),
+                 client->getReconnectAttempts());
+    updateState(State::Connecting, lock);
   } else {
-    if (Error err = client->reconnect(5)) {
-      MINIROS_INFO("%s - disconnected at state %s. Initiating reconnect", debugName().c_str(), m_state.toString());
-      updateState(State::Connecting, lock);
-    } else {
-      MINIROS_INFO("%s - disconnected at state %s. Failed to initiate reconnect: %s", debugName().c_str(), m_state.toString(), err.toString());
-      updateState(State::Dead, lock);
-    }
+    MINIROS_INFO("%s - disconnected at state %s. Failed to initiate reconnect: %s",
+                 debugName().c_str(), m_state.toString(), err.toString());
+    deactivateConnectionUnsafe(lock, clientLock);
+    updateState(State::Dead, lock);
   }
 }
 
 
-void NodeRef::deactivateConnectionUnsafe()
+void NodeRef::deactivateConnectionUnsafe(Lock& /*lock*/, ClientLock& /*clientLock*/)
 {
   m_client.reset();
   m_reqGetPid.reset();
@@ -351,7 +388,7 @@ bool NodeRef::needRequests() const
 }
 
 
-void NodeRef::updateState(State newState, Lock& lock)
+void NodeRef::updateState(State newState, Lock& /*lock*/)
 {
   if (newState == m_state)
     return;
@@ -454,27 +491,48 @@ Error NodeRef::sendGetPid(const std::string& callerId)
     return Error::NotConnected;
   }
 
+  std::shared_ptr<http::XmlRpcRequest> reqGetPid;
   {
     std::unique_lock lock(m_guard);
+    if (!callerId.empty())
+      m_callerId = callerId;
+
     if (!m_reqGetPid) {
       m_reqGetPid = http::makeRequest(m_apiUrl.path, "getPid");
-      m_reqGetPid->setParams(callerId);
+      m_reqGetPid->setParams(m_callerId);
       m_reqGetPid->generateRequestBody();
       std::weak_ptr<NodeRef> wnode = this->shared_from_this();
       m_reqGetPid->onComplete = [wnode] (int code, const std::string& msg, const RpcValue& data) {
         if (auto node = wnode.lock())
           node->responseGetPid(code, msg, data);
       };
-    } else if (m_reqShutdown->state() != http::HttpRequest::State::Idle) {
-      // Already sent request.
-      return Error::Ok;
+      m_reqGetPid->setFailureCallback([wnode]() {
+        if (auto node = wnode.lock()) {
+          std::shared_ptr<http::XmlRpcRequest> req;
+          {
+            std::unique_lock lock(node->m_guard);
+            req = node->m_reqGetPid;
+          }
+          if (req)
+            node->m_activeRequests.erase(req);
+        }
+      });
+    } else {
+      auto s = m_reqGetPid->state();
+      if (s != http::HttpRequest::State::Idle && s != http::HttpRequest::State::Done) {
+        // Already in flight.
+        return Error::Ok;
+      }
+      // Reuse completed request object.
+      m_reqGetPid->resetResponse();
+      m_reqGetPid->updateState(http::HttpRequest::State::Idle);
     }
+    reqGetPid = m_reqGetPid;
   }
 
   MINIROS_INFO("%s::sendGetPid()", debugName().c_str());
-  // Generate the request body (no parameters needed for shutdown)
-  m_activeRequests.insert(m_reqShutdown);
-  return client->enqueueRequest(m_reqGetPid);
+  m_activeRequests.insert(reqGetPid);
+  return client->enqueueRequest(reqGetPid);
 }
 
 void NodeRef::responseGetPid(int code, const std::string& msg, const RpcValue& data)
@@ -482,10 +540,12 @@ void NodeRef::responseGetPid(int code, const std::string& msg, const RpcValue& d
   if (code && data.getType() == XmlRpc::XmlRpcValue::TypeInt) {
     std::unique_lock lock(m_guard);
     m_pid = data.as<int>();
-    if (m_state == State::Connecting)
+    MINIROS_INFO("%s::responseGetPid() pid=%d", debugName().c_str(), m_pid);
+    if (m_state == State::Connecting || m_state == State::Connected)
       updateState(State::Verified, lock);
   } else {
-    MINIROS_ERROR("Unexpected response: %s", data.toJsonStr().c_str());
+    MINIROS_ERROR("%s::responseGetPid unexpected response code=%d data=%s msg=%s",
+                  debugName().c_str(), code, data.toJsonStr().c_str(), msg.c_str());
   }
 }
 
@@ -495,6 +555,24 @@ size_t NodeRef::getQueuedRequests() const
   if (!m_client)
     return 0;
   return m_client->getQueuedRequests();
+}
+
+int NodeRef::pid() const
+{
+  std::unique_lock lock(m_guard);
+  return m_pid;
+}
+
+void NodeRef::markDead()
+{
+  // Lock order matches activateConnection: m_clientGuard then m_guard.
+  ClientLock clientLock(m_clientGuard);
+  Lock lock(m_guard);
+  if (m_state == State::Dead)
+    return;
+  MINIROS_WARN("%s::markDead()", debugName().c_str());
+  deactivateConnectionUnsafe(lock, clientLock);
+  updateState(State::Dead, lock);
 }
 
 } // namespace master
