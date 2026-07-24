@@ -46,48 +46,79 @@
 namespace miniros
 {
 
-class ServiceClientLink::DropWatcher : public Connection::DropWatcher {
+class ServiceClientLink::DropWatcher
+  : public Connection::DropWatcher
+  , public std::enable_shared_from_this<DropWatcher>
+{
 public:
-    DropWatcher(ServiceClientLink& owner) : owner_(owner) {}
+  explicit DropWatcher(const std::weak_ptr<ServiceClientLink>& owner)
+  : owner_(owner)
+  {
+  }
 
-    void onConnectionDropped(
-        const ConnectionPtr& connection,
-        miniros::Connection::DropReason reason) override
+  void onConnectionDropped(
+      const ConnectionPtr& connection,
+      miniros::Connection::DropReason reason) override
+  {
+    (void)reason;
+    // Keep this watcher alive for the whole callback. removeServiceClientLink()
+    // may drop the last shared_ptr to ServiceClientLink, which would otherwise
+    // destroy a member DropWatcher while this method is still on the stack.
+    const auto keep_watcher = shared_from_this();
+    if (const auto owner = owner_.lock())
     {
-        owner_.onConnectionDropped(connection);
+      owner->onConnectionDropped(connection);
     }
+  }
 
-    ServiceClientLink& owner_;
+private:
+  std::weak_ptr<ServiceClientLink> owner_;
 };
 
 
 ServiceClientLink::ServiceClientLink()
 : persistent_(false)
 {
-    drop_watcher_ = std::make_unique<DropWatcher>(*this);
 }
 
 ServiceClientLink::~ServiceClientLink()
 {
-  if (connection_)
+  // Safety net: drop() should already have detached us while a shared_ptr existed.
+  if (drop_watcher_)
   {
-    if (connection_->isSendingHeaderError())
-    {
-      drop_watcher_->disconnect();
-    }
-    else
-    {
-      connection_->drop(Connection::Destructing);
-    }
+    drop_watcher_->disconnect();
+    drop_watcher_.reset();
   }
 }
 
 bool ServiceClientLink::initialize(const ConnectionPtr& connection)
 {
   connection_ = connection;
+  // Created here (not in the ctor) so weak_from_this() is valid.
+  drop_watcher_ = std::make_shared<DropWatcher>(weak_from_this());
   connection_->addDropWatcher(drop_watcher_.get());
 
   return true;
+}
+
+void ServiceClientLink::drop()
+{
+  // Detach before dropping the connection so PollManager cannot call into this
+  // link after we start tearing it down. Caller must still hold a shared_ptr.
+  if (drop_watcher_)
+  {
+    drop_watcher_->disconnect();
+  }
+
+  if (connection_ && !connection_->isSendingHeaderError())
+  {
+    connection_->drop(Connection::Destructing);
+  }
+
+  if (ServicePublicationPtr parent = parent_.lock())
+  {
+    parent->removeServiceClientLink(shared_from_this());
+  }
 }
 
 bool ServiceClientLink::handleHeader(const Header& header)
@@ -161,6 +192,8 @@ bool ServiceClientLink::handleHeader(const Header& header)
   {
     parent_ = ServicePublicationWPtr(ss);
 
+    std::weak_ptr<ServiceClientLink> weak_self = shared_from_this();
+
     // Send back a success, with info
     M_string m;
     m["request_type"] = ss->getRequestDataType();
@@ -169,9 +202,12 @@ bool ServiceClientLink::handleHeader(const Header& header)
     m["md5sum"] = ss->getMD5Sum();
     m["callerid"] = this_node::getName();
     connection_->writeHeader(m,
-        [this](const ConnectionPtr& conn)
+        [weak_self](const ConnectionPtr& conn)
         {
-            this->onHeaderWritten(conn);
+            if (auto self = weak_self.lock())
+            {
+              self->onHeaderWritten(conn);
+            }
         });
 
     ss->addServiceClientLink(shared_from_this());
@@ -184,6 +220,13 @@ void ServiceClientLink::onConnectionDropped(const ConnectionPtr& conn)
 {
   (void)conn;
   MINIROS_ASSERT(conn == connection_);
+
+  // Already running under Connection::drop's watcher lock (recursive). Detach
+  // so a concurrent destructor does not block on the same list.
+  if (drop_watcher_)
+  {
+    drop_watcher_->disconnect();
+  }
 
   if (ServicePublicationPtr parent = parent_.lock())
   {
@@ -278,4 +321,3 @@ void ServiceClientLink::processResponse(bool ok, const SerializedMessage& res)
 
 
 } // namespace miniros
-

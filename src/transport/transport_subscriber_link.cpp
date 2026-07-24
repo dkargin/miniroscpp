@@ -48,6 +48,7 @@ public:
         const ConnectionPtr& connection,
         miniros::Connection::DropReason reason) override
     {
+        (void)reason;
         owner_.onConnectionDropped(connection);
     }
 
@@ -118,6 +119,9 @@ bool TransportSubscriberLink::handleHeader(const Header& header)
   topic_ = pt->getName();
   parent_ = PublicationWPtr(pt);
 
+  std::weak_ptr<TransportSubscriberLink> weak_self =
+      std::static_pointer_cast<TransportSubscriberLink>(shared_from_this());
+
   // Send back a success, with info
   M_string m;
   m["type"] = pt->getDataType();
@@ -126,7 +130,14 @@ bool TransportSubscriberLink::handleHeader(const Header& header)
   m["callerid"] = this_node::getName();
   m["latching"] = pt->isLatching() ? "1" : "0";
   m["topic"] = topic_;
-  connection_->writeHeader(m, [this](const ConnectionPtr& conn) {this->onHeaderWritten(conn);});
+  connection_->writeHeader(m,
+    [weak_self](const ConnectionPtr& conn)
+    {
+      if (auto self = weak_self.lock())
+      {
+        self->onHeaderWritten(conn);
+      }
+    });
 
   pt->addSubscriberLink(shared_from_this());
 
@@ -184,8 +195,16 @@ void TransportSubscriberLink::startMessageWrite(bool immediate_write)
 
   if (m.num_bytes > 0)
   {
+    std::weak_ptr<TransportSubscriberLink> weak_self =
+        std::static_pointer_cast<TransportSubscriberLink>(shared_from_this());
     connection_->write(m.buf, m.num_bytes,
-      [this](const ConnectionPtr& conn){this->onMessageWritten(conn);}, immediate_write);
+      [weak_self](const ConnectionPtr& conn)
+      {
+        if (auto self = weak_self.lock())
+        {
+          self->onMessageWritten(conn);
+        }
+      }, immediate_write);
   }
 }
 
@@ -247,13 +266,16 @@ std::string TransportSubscriberLink::getTransportInfo()
 
 void TransportSubscriberLink::drop()
 {
-  // Only drop the connection if it's not already sending a header error
-  // If it is, it will automatically drop itself
-  if (connection_->isSendingHeaderError())
+  // Always detach the drop watcher first so a concurrent PollManager drop
+  // cannot race with destruction of this link.
+  if (drop_watcher_)
   {
     drop_watcher_->disconnect();
   }
-  else
+
+  // Only drop the connection if it's not already sending a header error
+  // If it is, it will automatically drop itself
+  if (connection_ && !connection_->isSendingHeaderError())
   {
     connection_->drop(Connection::Destructing);
   }

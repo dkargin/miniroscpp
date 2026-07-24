@@ -192,7 +192,9 @@ void ServicePublication::dropAllConnections()
   }
 
   for (ServiceClientLinkPtr link: local_links)
-    link->getConnection()->drop(Connection::Destructing);
+  {
+    link->drop();
+  }
 }
 
 } // namespace miniros
