@@ -42,7 +42,7 @@ template<>
 void TimerManager<SteadyTime, WallDuration, SteadyTimerEvent>::threadFunc()
 {
   SteadyTime current;
-  while (!quit_)
+  while (!quit_.load(std::memory_order_acquire))
   {
     SteadyTime sleep_end;
 
@@ -86,7 +86,8 @@ void TimerManager<SteadyTime, WallDuration, SteadyTimerEvent>::threadFunc()
       }
     }
 
-    while (!new_timer_ && SteadyTime::now() < sleep_end && !quit_)
+    while (!new_timer_.load(std::memory_order_acquire) && SteadyTime::now() < sleep_end
+           && !quit_.load(std::memory_order_acquire))
     {
       current = SteadyTime::now();
 
@@ -101,7 +102,7 @@ void TimerManager<SteadyTime, WallDuration, SteadyTimerEvent>::threadFunc()
       timers_cond_.wait_until(lock, end_tp);
     }
 
-    new_timer_ = false;
+    new_timer_.store(false, std::memory_order_release);
   }
 }
 #endif

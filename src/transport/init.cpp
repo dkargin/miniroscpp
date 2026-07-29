@@ -670,6 +670,8 @@ void InternalCallbackKeeper::shutdownLocked(std::unique_lock<std::recursive_mute
     PollManager::instance()->shutdown();
   }
 
+  shutdownInternalTimerManager();
+
   stop();
 
   g_started = false;
