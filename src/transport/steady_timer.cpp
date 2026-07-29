@@ -31,6 +31,8 @@
 #endif
 
 #include "miniros/steady_timer.h"
+
+#include "common.h"
 #include "miniros/transport/timer_manager.h"
 
 namespace miniros
@@ -41,6 +43,7 @@ namespace miniros
 template<>
 void TimerManager<SteadyTime, WallDuration, SteadyTimerEvent>::threadFunc()
 {
+  setThreadName("SteadyTimerManager");
   SteadyTime current;
   while (!quit_.load(std::memory_order_acquire))
   {

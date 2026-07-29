@@ -40,6 +40,7 @@
 #include "miniros/internal/forwards.h"
 #include "miniros/rostime.h"
 #include "miniros/console.h"
+#include "miniros/common.h"
 #include "miniros/callback_queue_interface.h"
 
 namespace miniros
@@ -475,7 +476,9 @@ void TimerManager<T, D, E>::setPeriod(int32_t handle, const D& period, bool rese
 template<class T, class D, class E>
 void TimerManager<T, D, E>::threadFunc()
 {
+  setThreadName("TimerManager");
   T current;
+
   while (!quit_.load(std::memory_order_acquire))
   {
     T sleep_end;
