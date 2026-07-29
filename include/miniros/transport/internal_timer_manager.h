@@ -39,6 +39,7 @@ typedef TimerManager<SteadyTime, WallDuration, SteadyTimerEvent> InternalTimerMa
 typedef std::shared_ptr<InternalTimerManager> InternalTimerManagerPtr;
 
 MINIROS_DECL void initInternalTimerManager();
+MINIROS_DECL void shutdownInternalTimerManager();
 MINIROS_DECL InternalTimerManagerPtr getInternalTimerManager();
 
 } // namespace miniros

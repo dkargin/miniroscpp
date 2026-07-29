@@ -46,4 +46,11 @@ void initInternalTimerManager()
   }
 }
 
+void shutdownInternalTimerManager()
+{
+  // Destroy under an explicit shutdown path so the timer thread joins before
+  // static teardown (which otherwise races with threadFunc reading quit_).
+  g_timer_manager.reset();
+}
+
 } // namespace miniros

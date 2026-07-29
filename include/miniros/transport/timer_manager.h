@@ -29,6 +29,7 @@
 #define MINIROS_TIMER_MANAGER_H
 
 #include <algorithm>
+#include <atomic>
 #include <vector>
 #include <list>
 #include <thread>
@@ -110,7 +111,7 @@ private:
   V_TimerInfo timers_;
   std::mutex timers_mutex_;
   std::condition_variable timers_cond_;
-  volatile bool new_timer_;
+  std::atomic_bool new_timer_{false};
 
   std::mutex waiting_mutex_;
   std::list<int32_t> waiting_;
@@ -122,7 +123,7 @@ private:
 
   std::thread thread_;
 
-  bool quit_;
+  std::atomic_bool quit_{false};
 
   class TimerQueueCallback : public CallbackInterface
   {
@@ -211,7 +212,7 @@ private:
 
 template<class T, class D, class E>
 TimerManager<T, D, E>::TimerManager() :
-  new_timer_(false), id_counter_(0), thread_started_(false), quit_(false)
+  id_counter_(0), thread_started_(false)
 {
 
 }
@@ -219,7 +220,7 @@ TimerManager<T, D, E>::TimerManager() :
 template<class T, class D, class E>
 TimerManager<T, D, E>::~TimerManager()
 {
-  quit_ = true;
+  quit_.store(true, std::memory_order_release);
   {
     std::scoped_lock<std::mutex> lock(timers_mutex_);
     timers_cond_.notify_all();
@@ -326,7 +327,7 @@ int32_t TimerManager<T, D, E>::add(const D& period, const std::function<void(con
       waiting_.sort([this](int32_t lhs, int32_t rhs) -> bool {return this->waitingCompare(lhs, rhs);});
     }
 
-    new_timer_ = true;
+    new_timer_.store(true, std::memory_order_release);
     timers_cond_.notify_all();
   }
 
@@ -393,7 +394,7 @@ void TimerManager<T, D, E>::schedule(const TimerInfoPtr& info)
     waiting_.sort([this](int32_t lhs, int32_t rhs) -> bool {return this->waitingCompare(lhs, rhs);});
   }
 
-  new_timer_ = true;
+  new_timer_.store(true, std::memory_order_release);
   timers_cond_.notify_one();
 }
 
@@ -467,7 +468,7 @@ void TimerManager<T, D, E>::setPeriod(int32_t handle, const D& period, bool rese
     waiting_.sort([this](int32_t lhs, int32_t rhs) -> bool {return this->waitingCompare(lhs, rhs);});
   }
 
-  new_timer_ = true;
+  new_timer_.store(true, std::memory_order_release);
   timers_cond_.notify_one();
 }
 
@@ -475,7 +476,7 @@ template<class T, class D, class E>
 void TimerManager<T, D, E>::threadFunc()
 {
   T current;
-  while (!quit_)
+  while (!quit_.load(std::memory_order_acquire))
   {
     T sleep_end;
 
@@ -541,7 +542,8 @@ void TimerManager<T, D, E>::threadFunc()
       }
     }
 
-    while (!new_timer_ && T::now() < sleep_end && !quit_)
+    while (!new_timer_.load(std::memory_order_acquire) && T::now() < sleep_end
+           && !quit_.load(std::memory_order_acquire))
     {
       // detect backwards jumps in time
 
@@ -573,7 +575,7 @@ void TimerManager<T, D, E>::threadFunc()
       }
     }
 
-    new_timer_ = false;
+    new_timer_.store(false, std::memory_order_release);
   }
 }
 
