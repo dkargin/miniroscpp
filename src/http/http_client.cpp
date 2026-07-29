@@ -63,13 +63,15 @@ bool HttpClient::State::hasRequest() const
 }
 
 struct HttpClient::Internal {
-  DisconnectHandler onDisconnect;
-  ConnectHandler onConnect;
-  ResponseHandler onResponse;
+  /// Callbacks are guarded separately from process_guard so setter APIs
+  /// (setDisconnectHandler, etc.) do not nest under the I/O state machine lock.
+  mutable std::mutex handlers_mutex;
+  DisconnectHandler onDisconnect GUARDED_BY(handlers_mutex);
+  ConnectHandler onConnect GUARDED_BY(handlers_mutex);
+  ResponseHandler onResponse GUARDED_BY(handlers_mutex);
+  TimeoutHandler onIdleTimeout GUARDED_BY(handlers_mutex);
+  int idleTimeoutMs GUARDED_BY(handlers_mutex) = 0;
 
-  /// Idle timeout handler and timeout value.
-  TimeoutHandler onIdleTimeout;
-  int idleTimeoutMs = 0;
   int reconnectAttempts = 0;
 
   /// Some internal ID of HTTP client.
@@ -243,10 +245,14 @@ void HttpClient::Internal::release(Lock& lock) REQUIRES(process_guard)
 
   detachFromPollSet();
 
-  onConnect = {};
-  onDisconnect = {};
-  onIdleTimeout = {};
-  onResponse = {};
+  {
+    std::scoped_lock handlers_lock(handlers_mutex);
+    onConnect = {};
+    onDisconnect = {};
+    onIdleTimeout = {};
+    onResponse = {};
+    idleTimeoutMs = 0;
+  }
 
   updateState(lock, State::Invalid);
   socket.reset();
@@ -402,10 +408,14 @@ void HttpClient::Internal::handleDisconnect(Lock& lock, Error disconnectError)
   }
 
   // Copying all mutable data, which can be changed during callback.
-  auto onDisconnectCopy = onDisconnect;
+  DisconnectHandler onDisconnectCopy;
+  {
+    std::scoped_lock handlers_lock(handlers_mutex);
+    onDisconnectCopy = onDisconnect;
+  }
   auto socketCopy = socket;
 
-  const bool hasAnyCallbacks = !requestsCopy.empty() || active_copy || (onDisconnect && alive);
+  const bool hasAnyCallbacks = !requestsCopy.empty() || active_copy || (onDisconnectCopy && alive);
 
   // All the following callbacks must be called without holding either requests_guard or process_guard.
   // Keeping any of these mutexes locked will lead to potential deadlock caused by calling HttpClient methods in callback.
@@ -435,7 +445,7 @@ void HttpClient::setDisconnectHandler(DisconnectHandler&& handler)
 {
   if (!internal_)
     return;
-  Lock lock(internal_->process_guard, THIS_LOCATION);
+  std::scoped_lock lock(internal_->handlers_mutex);
   internal_->onDisconnect = std::move(handler);
 }
 
@@ -443,7 +453,7 @@ void HttpClient::setConnectHandler(ConnectHandler&& onConnect)
 {
   if (!internal_)
     return;
-  Lock lock(internal_->process_guard, THIS_LOCATION);
+  std::scoped_lock lock(internal_->handlers_mutex);
   internal_->onConnect = std::move(onConnect);
 }
 
@@ -451,7 +461,7 @@ void HttpClient::setResponseHandler(ResponseHandler&& onResponse)
 {
   if (!internal_)
     return;
-  Lock lock(internal_->process_guard, THIS_LOCATION);
+  std::scoped_lock lock(internal_->handlers_mutex);
   internal_->onResponse = std::move(onResponse);
 }
 
@@ -461,11 +471,14 @@ void HttpClient::setIdleTimeoutHandler(int timeoutMs, TimeoutHandler&& handler)
   if (!internal_)
     return;
 
-  Lock lock(internal_->process_guard, THIS_LOCATION);
-  internal_->onIdleTimeout = std::move(handler);
-  internal_->idleTimeoutMs = timeoutMs;
+  {
+    std::scoped_lock handlers_lock(internal_->handlers_mutex);
+    internal_->onIdleTimeout = std::move(handler);
+    internal_->idleTimeoutMs = timeoutMs;
+  }
 
-  // If we're currently in Idle state and have a valid socket, set the timer
+  // Timer arming needs the socket / poll_set from the I/O state machine.
+  Lock lock(internal_->process_guard, THIS_LOCATION);
   if (internal_->state.load() == State::Idle && internal_->socket && internal_->poll_set && timeoutMs > 0) {
     internal_->poll_set->setTimerEvent(internal_->socket->fd(), timeoutMs);
     LOCAL_INFO("HttpClient[%s]::setIdleTimeoutHandler: Set idle timeout timer to %d ms", internal_->debugName().c_str(), timeoutMs);
@@ -927,8 +940,12 @@ void HttpClient::handleSocketEvents(const std::shared_ptr<Internal>& I, int evtF
         // This is disconnect event.
       } else if (evtFlags & PollSet::EventTimer) {
         // Got timeout waiting - call idle timeout handler
-        if (I->onIdleTimeout && I->socket) {
-          auto callback = I->onIdleTimeout;
+        TimeoutHandler callback;
+        {
+          std::scoped_lock handlers_lock(I->handlers_mutex);
+          callback = I->onIdleTimeout;
+        }
+        if (callback && I->socket) {
           auto socket = I->socket;
           State stateCopy = state.load();
           ScopedUnlock unlock(lock);
@@ -977,8 +994,13 @@ void HttpClient::handleSocketEvents(const std::shared_ptr<Internal>& I, int evtF
   // Socket can be destroyed in disconnect handler.
   if (I->socket && I->socket->valid()) {
     int fd = I->socket->fd();
-    if (state == State::Idle && initialState != State::Idle && I->idleTimeoutMs > 0) {
-      I->poll_set->setTimerEvent(fd, I->idleTimeoutMs);
+    int idleMs = 0;
+    {
+      std::scoped_lock handlers_lock(I->handlers_mutex);
+      idleMs = I->idleTimeoutMs;
+    }
+    if (state == State::Idle && initialState != State::Idle && idleMs > 0) {
+      I->poll_set->setTimerEvent(fd, idleMs);
     }
 
     int newEvt = I->eventsForState(state);
@@ -1054,8 +1076,12 @@ void HttpClient::Internal::handleConnecting(Lock& lock, int evtFlags)
       reconnectAttempts = 0;
       updateState(lock, State::Idle);
 
-      if (onConnect && alive) {
-        auto callback = onConnect;
+      ConnectHandler callback;
+      {
+        std::scoped_lock handlers_lock(handlers_mutex);
+        callback = onConnect;
+      }
+      if (callback && alive) {
         auto socketCopy = socket;
         ScopedUnlock unlock(lock);
         // Danger: if callback references HttpClient object then there is small chance
@@ -1203,14 +1229,23 @@ void HttpClient::Internal::handleProcessResponse(Lock& lock)
     MINIROS_DEBUG_NAMED("client", "HttpClient[%s]::handleProcessResponse() received response in %fms",
       debugName().c_str(), dur.toSec()*1000);
 
-    if (onResponse && alive) {
-      auto callback = onResponse;
-      ScopedUnlock unlock(lock);
-      // Danger: if callback references HttpClient object then there is small chance
-      // this instance is destroyed right after lock is released.
-      callback(req);
+    ResponseHandler responseCallback;
+    {
+      std::scoped_lock handlers_lock(handlers_mutex);
+      responseCallback = onResponse;
     }
-    req->processResponse();
+    {
+      ScopedUnlock unlock(lock);
+      if (responseCallback && alive) {
+        // Danger: if callback references HttpClient object then there is small chance
+        // this instance is destroyed right after lock is released.
+        responseCallback(req);
+      }
+      // processResponse runs user completion handlers (e.g. Subscription::pendingConnectionDone).
+      // Must not hold process_guard: those handlers take their own locks and would invert
+      // with callers that hold Subscription locks while configuring this client.
+      req->processResponse();
+    }
     // MasterLink will immediately continue operating.
     req->updateState(HttpRequest::State::Done);
     // Disown request object.
