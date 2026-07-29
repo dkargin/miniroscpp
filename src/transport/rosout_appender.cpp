@@ -135,7 +135,7 @@ void ROSOutAppender::log(::miniros::console::Level level, const char* str, const
   }
 
   std::scoped_lock<std::mutex> lock(queue_mutex_);
-  log_queue_.push_back(msg);
+  log_queue_.push_back(std::move(msg));
   queue_condition_.notify_all();
 }
 

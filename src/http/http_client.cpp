@@ -288,9 +288,9 @@ void HttpClient::Internal::updateState(Lock& lock, State newState)
     cv.notify_all();
   }
 
-  std::shared_ptr<HttpRequest> activeReq;
-  activeReq = active_request;
-  if (activeReq) {
+#ifdef SERIOUS_DEBUG
+  // This block causes a lot of notifications in helgrind.
+  if (std::shared_ptr<HttpRequest> activeReq = active_request) {
     LOCAL_DEBUG("HttpClient[%s]::updateState(%s) from %s at step=%d req=%d dt=%f", debugName().c_str(),
       newState.toString(), oldState.toString(),
       updateCounter.load(), activeReq->id(), activeReq->elapsed().toSec());
@@ -299,6 +299,7 @@ void HttpClient::Internal::updateState(Lock& lock, State newState)
     LOCAL_DEBUG("HttpClient[%s]::updateState(%s) from %s at step=%d", debugName().c_str(),
       newState.toString(), oldState.toString(), updateCounter.load());
   }
+#endif
 }
 
 int HttpClient::Internal::eventsForState(State::State_t s) const
@@ -635,7 +636,7 @@ std::shared_ptr<network::NetSocket> HttpClient::detach()
   return sock;
 }
 
-Error HttpClient::enqueueRequest(const std::shared_ptr<HttpRequest>& request)
+Error HttpClient::enqueueRequest(std::shared_ptr<HttpRequest> request)
 {
   assert(request);
   if (!request) {
@@ -1177,9 +1178,14 @@ void HttpClient::Internal::handleReadResponse(Lock& lock, int evtFlags, bool fal
 void HttpClient::Internal::handleProcessResponse(Lock& lock)
 {
   MINIROS_PROFILE_SCOPE2("HttpClient", "handleProcessResponse");
+
+  std::shared_ptr<HttpRequest> req;
+  {
+    std::scoped_lock reqLock(requests_guard);
+    std::swap(req, active_request);
+  }
   // Response received and parsed - store it in HttpRequest
-  if (active_request) {
-    auto req = active_request;
+  if (req) {
     req->setResponseHeader(response_http_frame);
 
     // Store response body.
@@ -1205,7 +1211,10 @@ void HttpClient::Internal::handleProcessResponse(Lock& lock)
       callback(req);
     }
     req->processResponse();
+    // MasterLink will immediately continue operating.
     req->updateState(HttpRequest::State::Done);
+    // Disown request object.
+    req.reset();
   }
 
   updateState(lock, State::Idle);

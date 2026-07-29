@@ -247,9 +247,8 @@ void HttpRequest::reset()
   response_body_.clear();
 }
 
-void HttpRequest::updateState(State state)
+void HttpRequest::updateStateLocked(Lock& /*lock*/, State state)
 {
-  Lock lock(mutex_, THIS_LOCATION);
   if (state_ == state)
     return;
 
@@ -259,6 +258,19 @@ void HttpRequest::updateState(State state)
   state_ = state;
   cv_.notify_all();
 }
+
+void HttpRequest::updateState(State state)
+{
+  Lock lock(mutex_, THIS_LOCATION);
+  updateStateLocked(lock, state);
+}
+
+void HttpRequest::doneAndDisown(std::shared_ptr<HttpRequest>&& req)
+{
+  Lock lock(req->mutex_, THIS_LOCATION);
+  req->updateStateLocked(lock, State::Done);
+}
+
 
 HttpRequest::State HttpRequest::state() const
 {

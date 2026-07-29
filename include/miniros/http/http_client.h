@@ -93,7 +93,7 @@ public:
   ///  - InvalidValue if request is empty.
   ///  - InternalError if internal_ is empty.
   /// This function is can not fail for ordinary reasons.
-  Error enqueueRequest(const std::shared_ptr<HttpRequest>& request);
+  Error enqueueRequest(std::shared_ptr<HttpRequest> request);
 
   /// Drop request from queue.
   /// @returns possible errors:

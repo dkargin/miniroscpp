@@ -291,8 +291,11 @@ void RPCManager::shutdown()
 
   // kill the last few clients that were started in the shutdown process
   {
-    std::scoped_lock<std::mutex> lock(internal_->clients_mutex_);
-    internal_->clients_.clear();
+    std::multimap<network::URL, std::shared_ptr<http::HttpClient>> leftovers;
+    {
+      std::scoped_lock<std::mutex> lock(internal_->clients_mutex_);
+      std::swap(leftovers, internal_->clients_);
+    }
   }
 
   // This assumes each client will actively unregister itself. It will not happen.
