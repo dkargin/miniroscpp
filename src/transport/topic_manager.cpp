@@ -129,12 +129,14 @@ Error TopicManager::start(PollManagerPtr pm, MasterLinkPtr master_link, Connecti
 
 void TopicManager::shutdown()
 {
-  std::scoped_lock<std::mutex> shutdown_lock(shutting_down_mutex_);
-  if (shutting_down_) {
-    return;
-  }
-
   {
+    std::scoped_lock<std::mutex> shutdown_lock(shutting_down_mutex_);
+    if (shutting_down_) {
+      return;
+    }
+
+    // Set the flag while holding the list mutexes so advertise/subscribe paths
+    // that check isShuttingDown() under those locks cannot race past it.
     std::lock(subs_mutex_, advertised_topics_mutex_);
     shutting_down_ = true;
     subs_mutex_.unlock();
@@ -153,35 +155,39 @@ void TopicManager::shutdown()
   MINIROS_DEBUG("Shutting down topics...");
   MINIROS_DEBUG("  shutting down publishers");
 
+  // Snapshot then drop outside advertised_topics_mutex_: Publication::drop() →
+  // Connection::drop() takes Connection::read_mutex_, and the poll thread can
+  // already hold read_mutex_ while calling lookupPublication() (which takes
+  // advertised_topics_mutex_). Holding both in opposite orders deadlocks.
   std::vector<std::string> droppedTopics;
+  std::vector<PublicationPtr> pubs;
   {
     std::scoped_lock<std::recursive_mutex> adv_lock(advertised_topics_mutex_);
-
-    for (PublicationPtr pub : advertised_topics_) {
-      if (!pub->isDropped()) {
-        droppedTopics.push_back(pub->getName());
-      }
-      pub->drop();
-    }
-    advertised_topics_.clear();
+    pubs.swap(advertised_topics_);
   }
 
-  for (auto topic: droppedTopics) {
+  for (const PublicationPtr& pub : pubs) {
+    if (!pub->isDropped()) {
+      droppedTopics.push_back(pub->getName());
+    }
+    pub->drop();
+  }
+
+  for (const auto& topic : droppedTopics) {
     unregisterPublisher(topic);
   }
 
   // unregister all of our subscriptions
   MINIROS_DEBUG("  shutting down subscribers");
+  std::list<SubscriptionPtr> subs;
   {
     std::scoped_lock<std::mutex> subs_lock(subs_mutex_);
+    std::swap(subs, subscriptions_);
+  }
 
-    for (SubscriptionPtr s : subscriptions_) {
-      // Remove us as a subscriber from the master
-      unregisterSubscriber(s->getName());
-      // now, drop our side of the connection
-      s->shutdown();
-    }
-    subscriptions_.clear();
+  for (const SubscriptionPtr& s : subs) {
+    unregisterSubscriber(s->getName());
+    s->shutdown();
   }
 
   rpc_manager_.reset();
@@ -439,20 +445,25 @@ bool TopicManager::unadvertise(const std::string& topic, const SubscriberCallbac
 
   pub->removeCallbacks(callbacks);
 
+  bool should_unregister = false;
+  std::string pubName;
   {
     std::unique_lock<std::recursive_mutex> lock(advertised_topics_mutex_);
     if (pub->getNumCallbacks() == 0) {
-      std::string pubName = pub->getName();
-      pub->drop();
-
+      pubName = pub->getName();
       advertised_topics_.erase(i);
       {
         std::unique_lock<std::mutex> lock2(advertised_topic_names_mutex_);
         advertised_topic_names_.remove(pubName);
       }
-      lock.unlock();
-      unregisterPublisher(pubName);
+      should_unregister = true;
     }
+  }
+
+  // Drop outside advertised_topics_mutex_ (see shutdown() for lock-order notes).
+  if (should_unregister) {
+    pub->drop();
+    unregisterPublisher(pubName);
   }
 
   return true;
