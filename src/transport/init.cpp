@@ -278,9 +278,9 @@ CallbackQueuePtr getInternalCallbackQueue()
 void basicSigintHandler(int sig)
 {
   (void)sig;
-
-  MINIROS_DEBUG("Got SIGINT. Initiating shutdown");
-  miniros::requestShutdown();
+  // Async-signal-safe only: do not allocate, log, or take locks here.
+  // InternalCallbackKeeper::threadFunc() observes this flag and runs shutdown.
+  g_shutdown_requested.store(true, std::memory_order_relaxed);
 }
 
 bool isStarted()
@@ -731,6 +731,13 @@ void InternalCallbackKeeper::threadFunc()
 
   while (!stop_internal_queue_ && internal_callback_queue_)
   {
+    // SIGINT only sets g_shutdown_requested (no callback enqueue from the handler).
+    if (g_shutdown_requested.load(std::memory_order_relaxed)
+        && !g_shutting_down.load(std::memory_order_relaxed))
+    {
+      call();
+      continue;
+    }
     internal_callback_queue_->callAvailable(WallDuration(0.1));
   }
 }
