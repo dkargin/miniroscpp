@@ -42,6 +42,8 @@
 #include "miniros/io/poll_set.h"
 #include "miniros/io/io.h"
 #include "miniros/transport/transport_tcp.h"
+
+#include "internal/threading.h"
 #include "miniros/header.h"
 #include <miniros/rosassert.h>
 
@@ -68,6 +70,12 @@ TransportTCP::TransportTCP(PollSet* poll_set, int flags)
 TransportTCP::~TransportTCP()
 {
   MINIROS_ASSERT_MSG(sock_ == -1, "TransportTCP socket [%d] was never closed", sock_);
+  // We should be already closed.
+  std::scoped_lock<std::recursive_mutex> lock(close_mutex_);
+  disconnect_cb_ = {};
+  read_cb_ = {};
+  write_cb_ = {};
+  accept_cb_ = {};
 }
 
 bool TransportTCP::setSocket(int sock)
@@ -675,6 +683,7 @@ void TransportTCP::socketUpdate(int events)
       return;
     }
 
+    auto self = shared_from_this();
     // Handle read events before err/hup/nval, since there may be data left on the wire
     if ((events & POLLIN) && expecting_read_)
     {
@@ -686,6 +695,7 @@ void TransportTCP::socketUpdate(int events)
         if (transport)
         {
           MINIROS_ASSERT(accept_cb_);
+          ScopedUnlock ulock(close_mutex_);
           accept_cb_(transport);
         }
       }
@@ -693,7 +703,8 @@ void TransportTCP::socketUpdate(int events)
       {
         if (read_cb_)
         {
-          read_cb_(shared_from_this());
+          ScopedUnlock ulock(close_mutex_);
+          read_cb_(self);
         }
       }
     }
@@ -702,7 +713,8 @@ void TransportTCP::socketUpdate(int events)
     {
       if (write_cb_)
       {
-        write_cb_(shared_from_this());
+        ScopedUnlock ulock(close_mutex_);
+        write_cb_(self);
       }
     }
   }

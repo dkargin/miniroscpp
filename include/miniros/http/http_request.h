@@ -66,6 +66,8 @@ public:
     State_t value;
   };
 
+  using Lock = TimeCheckLock<std::mutex>;
+
   HttpRequest();
 
   HttpRequest(HttpMethod method, const std::string& path);
@@ -125,7 +127,15 @@ public:
   /// Reset request for reuse
   virtual void reset();
 
+  /// Update internal state and notify all waiters.
   void updateState(State state);
+
+  /// Update internal state and notify all waiters.
+  /// This function requires preliminary lock.s
+  void updateStateLocked(Lock& lock, State state);
+
+  /// Mark request as done and simultaneously disown shared pointer while locked.
+  static void doneAndDisown(std::shared_ptr<HttpRequest>&& req);
 
   State state() const;
 
@@ -201,8 +211,6 @@ public:
 
   /// Time from the moment request was sent.
   WallDuration elapsed() const;
-
-  using Lock = TimeCheckLock<std::mutex>;
 
 protected:
   State state_ = State::Idle;
