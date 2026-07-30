@@ -50,6 +50,13 @@
 namespace miniros
 {
 
+// MSG_NOSIGNAL does not exist on macOS.
+#if defined(__APPLE__) || defined(__MACH__)
+# ifndef MSG_NOSIGNAL
+#   define MSG_NOSIGNAL SO_NOSIGPIPE
+# endif
+#endif
+
 bool TransportTCP::s_use_keepalive_ = true;
 bool TransportTCP::s_use_ipv6_ = false;
 
@@ -550,7 +557,11 @@ int32_t TransportTCP::write(uint8_t* buffer, uint32_t size)
 
   // never write more than INT_MAX since this is the maximum we can report back with the current return type
   uint32_t writesize = std::min<uint32_t>(size, static_cast<uint32_t>(INT_MAX));
-  int num_bytes = ::send(sock_, reinterpret_cast<const char*>(buffer), writesize, 0);
+  int flags = 0;
+#ifndef WIN32
+  flags |= MSG_NOSIGNAL;
+#endif
+  int num_bytes = ::send(sock_, reinterpret_cast<const char*>(buffer), writesize, flags);
   if (num_bytes < 0)
   {
     if ( !last_socket_error_is_would_block() )
