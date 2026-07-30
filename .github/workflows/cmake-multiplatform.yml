@@ -41,7 +41,10 @@ jobs:
       with:
         submodules: 'true'
     - name: Install dependencies
-      run: sudo apt-get install -y libgpgme-dev libssl-dev libgtest-dev gdb valgrind
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends \
+          libgpgme-dev libssl-dev libgtest-dev gdb valgrind
     - name: Set reusable strings
       # Turn repeated input strings (such as the build output directory) into step outputs. These step outputs can be used throughout the workflow file.
       id: strings
