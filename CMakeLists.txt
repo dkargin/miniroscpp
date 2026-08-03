@@ -47,6 +47,44 @@ if (MINIROS_PATCH_RPATH)
   set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
 endif()
 
+# Sanitizers must be applied globally (compile + link) so libraries, tools,
+# tests and examples are all instrumented. ASan and TSan cannot be combined.
+if (MINIROS_SANITIZE_MEMORY AND MINIROS_SANITIZE_THREADS)
+  message(FATAL_ERROR
+    "MINIROS_SANITIZE_MEMORY (ASan) and MINIROS_SANITIZE_THREADS (TSan) "
+    "cannot be enabled at the same time")
+endif()
+
+if (MINIROS_SANITIZE_MEMORY OR MINIROS_SANITIZE_THREADS)
+  if (NOT (CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU"))
+    message(FATAL_ERROR
+      "Sanitizers require Clang or GCC (got ${CMAKE_CXX_COMPILER_ID})")
+  endif()
+  # Better stack traces; do not omit frame pointers under sanitizers.
+  add_compile_options(-g -fno-omit-frame-pointer)
+endif()
+
+if (MINIROS_SANITIZE_MEMORY)
+  message(STATUS "Enabling AddressSanitizer + UndefinedBehaviorSanitizer")
+  add_compile_options(-fsanitize=address,undefined)
+  add_link_options(-fsanitize=address,undefined)
+endif()
+
+if (MINIROS_SANITIZE_THREADS)
+  message(STATUS "Enabling ThreadSanitizer")
+  # GCC's libtsan is often broken on Linux 6.6+ with default ASLR entropy
+  # (SEGV / "unexpected memory mapping"). Prefer Clang 18+, or:
+  #   sudo sysctl vm.mmap_rnd_bits=28
+  if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    message(WARNING
+      "TSan with GCC frequently crashes on modern Linux kernels due to ASLR. "
+      "Prefer -DCMAKE_CXX_COMPILER=clang++ (Clang 18+) or lower ASLR entropy "
+      "with: sudo sysctl vm.mmap_rnd_bits=28")
+  endif()
+  add_compile_options(-fsanitize=thread)
+  add_link_options(-fsanitize=thread)
+endif()
+
 set(MINIROS_INCLUDE_DIRS ${CMAKE_CURRENT_BINARY_DIR})
 set(MINIROS_INCLUDE_BUILD ${CMAKE_CURRENT_BINARY_DIR})
 
