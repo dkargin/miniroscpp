@@ -55,25 +55,8 @@ elseif (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
   list(APPEND MINIROS_COMPILE_OPTIONS "/wd4996")
 endif()
 
-if (MINIROS_SANITIZE_MEMORY)
-  if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-    list(APPEND MINIROS_COMPILE_OPTIONS "-fsanitize=address")
-    list(APPEND MINIROS_LINK_OPTIONS "-fsanitize=address" "-fsanitize=undefined")
-  elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    list(APPEND MINIROS_COMPILE_OPTIONS "-fsanitize=address")
-    list(APPEND MINIROS_LINK_OPTIONS "-fsanitize=address" "-fsanitize=undefined")
-  endif()
-endif ()
-
-if (MINIROS_SANITIZE_THREADS)
-  if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-    list(APPEND MINIROS_COMPILE_OPTIONS "-fsanitize=thread")
-    list(APPEND MINIROS_LINK_OPTIONS "-fsanitize=thread")
-  elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    list(APPEND MINIROS_COMPILE_OPTIONS "-fsanitize=thread")
-    list(APPEND MINIROS_LINK_OPTIONS "-fsanitize=thread")
-  endif()
-endif()
+# ASan/TSan flags are applied globally from the root CMakeLists.txt
+# (add_compile_options / add_link_options) so all targets are instrumented.
 
 set(rostime_SRC
     rostime/duration.cpp
