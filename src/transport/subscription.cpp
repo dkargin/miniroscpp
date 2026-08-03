@@ -694,7 +694,8 @@ uint32_t Subscription::handleMessage(const SerializedMessage& m, bool ser, bool 
         nonconst_need_copy = true;
       }
 
-      info->subscription_queue_->push(info->helper_, deserializer, info->has_tracked_object_, info->tracked_object_, nonconst_need_copy, receipt_time, &was_full);
+      info->subscription_queue_->push(info->helper_, std::move(deserializer),
+        info->has_tracked_object_, info->tracked_object_, nonconst_need_copy, receipt_time, &was_full);
 
       if (was_full)
       {
