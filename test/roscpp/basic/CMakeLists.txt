@@ -31,7 +31,8 @@ set_target_properties(${TEST_GROUP}-notify_child PROPERTIES FOLDER "Tests")
 miniros_add_test(${TEST_GROUP}-test_launcher SOURCES test_launcher.cpp)
 # TARGET_FILE resolves .exe and multi-config output dirs.
 target_compile_definitions(${TEST_GROUP}-test_launcher PRIVATE
-  MINIROS_NOTIFY_CHILD="$<TARGET_FILE:${TEST_GROUP}-notify_child>")
+  MINIROS_NOTIFY_CHILD="$<TARGET_FILE:${TEST_GROUP}-notify_child>"
+  MINIROS_TEST_BIN_DIR="${CMAKE_BINARY_DIR}/bin")
 add_dependencies(${TEST_GROUP}-test_launcher ${TEST_GROUP}-notify_child)
 
 # Node starts before master; connects once its own miniroscore appears (no global master).

@@ -12,6 +12,7 @@
 #include "master_link.h"
 #include "node_handle.h"
 #include "parameter_storage.h"
+#include "multimaster_protocol.h"
 
 #include "miniros/transport/rpc_manager.h"
 #include "miniros/this_node.h"
@@ -40,50 +41,17 @@ Master::Internal::Internal(const std::shared_ptr<RPCManager>& manager)
   rpcManager = manager;
   resolver.scanAdapters();
   cache.bind(&regManager, &handler);
+  multimaster = std::make_unique<MultimasterManager>(&resolver, &regManager);
+  cache.setPeerPersistence(
+    [this]() { return multimaster ? multimaster->collectCachedPeers() : std::vector<CachedPeer>{}; },
+    [this](const std::vector<CachedPeer>& peers) {
+      if (multimaster)
+        multimaster->restoreCachedPeers(peers);
+    });
+  multimaster->setTopologyChanged([this]() { cache.markDirty(); });
 }
 
-Master::Internal::~Internal()
-{
-  if (timerBroadcasts)
-    timerBroadcasts = {};
-}
-
-void Master::Internal::onBroadcast(const SteadyTimerEvent& evt)
-{
-  if (!discovery)
-    return;
-  discovery->doBroadcast();
-}
-
-int isVersionCompatible(int version)
-{
-  return version == MINIROS_INTERNAL_API_VERSION;
-}
-
-void Master::Internal::onDiscovery(const DiscoveryEvent& evt)
-{
-  if (uuid == evt.uuid) {
-    // Discovered self.
-    return;
-  }
-  if (!isVersionCompatible(evt.version)) {
-    return;
-  }
-  std::string name = "/master" + std::string("_") + evt.uuid.toString();
-  network::URL masterUrl;
-  std::string URI = evt.masterUri.str();
-
-  auto report = regManager.registerNodeApi(name, URI, NodeRef::NODE_MASTER | NodeRef::NODE_MINIROS);
-  if (report.created) {
-    MINIROS_INFO("Registered new master=%s at %s", name.c_str(), URI.c_str());
-  }
-  RequesterInfo reqInfo;
-  reqInfo.callerId = name;
-  reqInfo.callerApi = URI;
-  reqInfo.clientAddress = evt.senderAddress;
-  auto hostInfo = resolver.updateHost(reqInfo);
-  report.node->updateHost(hostInfo);
-}
+Master::Internal::~Internal() = default;
 
 Master::Master(std::shared_ptr<RPCManager> manager)
 {
@@ -156,21 +124,27 @@ bool Master::start(PollSet* poll_set, int port)
     internal_->cache.beginRestore(boundPort > 0 ? boundPort : port, internal_->uuid.toString());
   }
 
-  if (internal_->discovery) {
-    MINIROS_DEBUG("Starting discovery module");
-    internal_->discovery->setDiscoveryCallback(
-        // This is invoked at poll queue thread.
-      [this](const DiscoveryEvent& event) {
-          internal_->onDiscovery(event);
-        });
-
+  if (internal_->multimaster) {
     auto url = internal_->rpcManager->getServerUrl();
-    if (!internal_->discovery->start(poll_set, internal_->uuid, url)) {
+    internal_->multimaster->setCollectSnapshot([this]() {
+      return internal_->collectMultimasterSnapshot();
+    });
+    internal_->multimaster->setApplyRecords([this](const UUID& peer, const std::vector<miniros_msgs::RegistrationRecord>& records, bool snapshot) {
+      internal_->applyMultimasterRecords(peer, records, snapshot);
+    });
+    internal_->multimaster->setDropPeer([this](const UUID& peer) {
+      internal_->dropMultimasterPeer(peer);
+    });
+    if (Error err = internal_->multimaster->start(poll_set, internal_->uuid, url); !err) {
+      MINIROS_ERROR("Failed to start multimaster UDP: %s", err.toString());
       stop();
       return false;
     }
-  } else {
-    MINIROS_DEBUG("Starting without discovery module");
+    // Re-pair peers from cache before (or alongside) fresh discovery.
+    if (internal_->cache.enabled())
+      internal_->cache.restorePeers();
+    // Discovery is always active; token only gates pairing.
+    internal_->multimaster->sendDiscover();
   }
 
   MINIROS_DEBUG("Master startup is complete.");
@@ -183,13 +157,33 @@ void Master::stop()
     return;
   const int port = internal_->rpcManager ? internal_->rpcManager->getServerPort() : 0;
   internal_->cache.flush(port, internal_->uuid.toString());
+  if (internal_->multimaster)
+    internal_->multimaster->stop();
   if (internal_->rpcManager)
     internal_->rpcManager->shutdown();
 }
 
 bool Master::ok() const
 {
-  return internal_ && internal_->rpcManager && !internal_->rpcManager->isShuttingDown();
+  if (!internal_ || !internal_->rpcManager || internal_->rpcManager->isShuttingDown())
+    return false;
+  if (internal_->shutdownRequested.load())
+    return false;
+  return true;
+}
+
+void Master::setDebugApi(bool enabled)
+{
+  if (internal_)
+    internal_->debugApiEnabled = enabled;
+}
+
+void Master::requestShutdown()
+{
+  if (!internal_)
+    return;
+  internal_->shutdownRequested.store(true);
+  MINIROS_INFO("Master shutdown requested");
 }
 
 void Master::setupBindings(const std::shared_ptr<CallbackQueue>& cb)
@@ -229,7 +223,7 @@ void Master::setupBindings(const std::shared_ptr<CallbackQueue>& cb)
     internal_->httpTopicInfoEndpoint.reset(new TopicInfoEndpoint(internal_.get()));
     internal_->httpPublishedTopicsEndpoint.reset(new PublishedTopicsEndpoint(internal_.get()));
     internal_->httpTopicTypesEndpoint.reset(new TopicTypesEndpoint(internal_.get()));
-    internal_->httpMultimasterConnectEndpoint.reset(new MultimasterConnectEndpoint(internal_.get()));
+    internal_->httpMultimasterApiEndpoint.reset(new MultimasterApiEndpoint(internal_.get()));
 
     server->registerEndpoint(std::make_unique<http::SimpleFilter>(http::HttpMethod::Get, "/"), internal_->httpRootEndpoint, cb);
     server->registerEndpoint(
@@ -241,8 +235,16 @@ void Master::setupBindings(const std::shared_ptr<CallbackQueue>& cb)
       internal_->httpPublishedTopicsEndpoint, cb);
     server->registerEndpoint(std::make_unique<http::SimpleFilter>(http::HttpMethod::Get, "/api2/topic_types"),
       internal_->httpTopicTypesEndpoint, cb);
-    server->registerEndpoint(std::make_unique<http::SimpleFilter>(http::HttpMethod::Get, "/api2/multimaster/connect"),
-      internal_->httpMultimasterConnectEndpoint, cb);
+    server->registerEndpoint(
+      std::make_unique<http::SimpleFilter>(http::HttpMethod::Get, "/api2/multimaster", http::SimpleFilter::CheckType::Prefix),
+      internal_->httpMultimasterApiEndpoint, cb);
+    if (internal_->debugApiEnabled) {
+      internal_->httpDebugApiEndpoint.reset(new DebugApiEndpoint(internal_.get()));
+      server->registerEndpoint(
+        std::make_unique<http::SimpleFilter>(http::HttpMethod::Get, "/debugAPI", http::SimpleFilter::CheckType::Prefix),
+        internal_->httpDebugApiEndpoint, cb);
+      MINIROS_WARN("Debug HTTP API enabled (GET /debugAPI/...)");
+    }
     server->registerEndpoint(std::make_unique<http::SimpleFilter>(http::HttpMethod::Get, "/favicon.ico"),
       std::make_shared<MasterFaviconEndpoint>(), cb);
 
@@ -289,6 +291,9 @@ void Master::Internal::checkNodesAlive()
     if (node->isLocal())
       continue;
 
+    if (node->getNodeFlags() & (NodeRef::NODE_MASTER | NodeRef::NODE_FOREIGN))
+      continue;
+
     if (node->getState() == NodeRef::State::Dead) {
       regManager.scheduleShutdown(node);
       continue;
@@ -315,9 +320,8 @@ void Master::Internal::shutdownNode(const std::shared_ptr<NodeRef>& node, const 
 
   std::set<std::string> publishedTopics;
   {
-    node->lock();
-    publishedTopics = node->getPublicationsUnsafe();
-    node->unlock();
+    NodeRef::Lock nodeLock(*node);
+    publishedTopics = node->getPublicationsLocked(nodeLock);
   }
 
   // Ask the node to shut down if the HTTP client is still usable.
@@ -354,13 +358,36 @@ void Master::update()
 
   auto shutdownNodes = internal_->regManager.pullShutdownNodes();
   for (std::shared_ptr<NodeRef> nr : shutdownNodes) {
-    std::stringstream ss;
+    if (!nr)
+      continue;
+    // Never kill the in-process master or peer-master UI entries.
+    if (nr->getNodeFlags() & (NodeRef::NODE_LOCAL | NodeRef::NODE_MASTER)) {
+      MINIROS_WARN("Skipping shutdown of protected node %s", nr->id().c_str());
+      continue;
+    }
+    // Superseded NodeRef: a newer registration already owns this name in
+    // RegistrationManager. dropRegistrations() keys by name, so shutting down
+    // the old object would wipe the live node's pubs/subs/services — which is
+    // exactly what broke multimaster snapshot replace (pair sends two snapshots).
     auto current = internal_->regManager.getNodeByName(nr->id());
     if (current && current != nr) {
-      ss << "[" << nr->id() << "] Reason: new node registered with same name";
-    } else {
-      ss << "[" << nr->id() << "] Reason: node unreachable";
+      nr->clear();
+      if (nr->getState() != NodeRef::State::Dead)
+        nr->markDead();
+      continue;
     }
+    // Foreign mirrors are owned by multimaster sync (dropMultimasterPeer), not
+    // by Slave-API liveness. If one is queued while still current, dispose
+    // without pretending we can shutdown() a remote process.
+    if (nr->getNodeFlags() & NodeRef::NODE_FOREIGN) {
+      internal_->regManager.dropRegistrations(*nr);
+      nr->clear();
+      if (nr->getState() != NodeRef::State::Dead)
+        nr->markDead();
+      continue;
+    }
+    std::stringstream ss;
+    ss << "[" << nr->id() << "] Reason: node unreachable";
     internal_->shutdownNode(nr, ss.str());
   }
 
@@ -376,6 +403,14 @@ void Master::update()
       internal_->parameterStorage.dropSubscriptions(node);
     }
     internal_->cache.markDirty();
+  }
+
+  if (internal_->multimaster)
+    internal_->multimaster->update();
+
+  if (internal_->multimaster) {
+    for (const PeerInfo& peer : internal_->multimaster->listPeers())
+      internal_->registerPeerMasterNode(peer);
   }
 }
 
@@ -414,6 +449,16 @@ Master::RpcValue Master::registerService(const std::string& caller_id, const std
   if (r.statusCode == 1)
     internal_->cache.markDirty();
 
+  if (r.statusCode == 1 && internal_->multimaster) {
+    miniros_msgs::RegistrationRecord rec;
+    rec.kind = miniros_msgs::RegistrationRecord::KIND_SRV_REGISTER;
+    rec.name = service;
+    rec.node_name = caller_id;
+    rec.node_api = caller_api;
+    rec.service_api = service_api;
+    internal_->multimaster->announceLocalChange(rec);
+  }
+
   RpcValue res = RpcValue::Array(3);
   res[0] = r.statusCode;
   res[1] = r.statusMessage;
@@ -431,6 +476,15 @@ Master::RpcValue Master::unregisterService(const std::string& caller_id, const s
   ReturnStruct r = internal_->handler.unregisterService(requesterInfo, service, service_api);
   if (r.statusCode == 1)
     internal_->cache.markDirty();
+
+  if (r.statusCode == 1 && internal_->multimaster) {
+    miniros_msgs::RegistrationRecord rec;
+    rec.kind = miniros_msgs::RegistrationRecord::KIND_SRV_UNREGISTER;
+    rec.name = service;
+    rec.node_name = caller_id;
+    rec.service_api = service_api;
+    internal_->multimaster->announceLocalChange(rec);
+  }
 
   RpcValue res = RpcValue::Array(3);
   res[0] = r.statusCode;
@@ -537,8 +591,18 @@ Master::RpcValue Master::registerPublisher(const std::string& caller_id, const s
   requesterInfo.callerApi = caller_api;
 
   ReturnStruct st = internal_->handler.registerPublisher(requesterInfo, topic, type);
-  if (st.statusCode == 1)
+  if (st.statusCode == 1) {
     internal_->cache.markDirty();
+    if (internal_->multimaster) {
+      miniros_msgs::RegistrationRecord rec;
+      rec.kind = miniros_msgs::RegistrationRecord::KIND_PUB_REGISTER;
+      rec.name = topic;
+      rec.type = type;
+      rec.node_name = caller_id;
+      rec.node_api = caller_api;
+      internal_->multimaster->announceLocalChange(rec);
+    }
+  }
   RpcValue res = RpcValue::Array(3);
   res[0] = st.statusCode;
   res[1] = st.statusMessage;
@@ -556,8 +620,17 @@ Master::RpcValue Master::unregisterPublisher(
   requesterInfo.callerApi = caller_api;
 
   ReturnStruct st = internal_->handler.unregisterPublisher(requesterInfo, topic);
-  if (st.statusCode == 1)
+  if (st.statusCode == 1) {
     internal_->cache.markDirty();
+    if (internal_->multimaster) {
+      miniros_msgs::RegistrationRecord rec;
+      rec.kind = miniros_msgs::RegistrationRecord::KIND_PUB_UNREGISTER;
+      rec.name = topic;
+      rec.node_name = caller_id;
+      rec.node_api = caller_api;
+      internal_->multimaster->announceLocalChange(rec);
+    }
+  }
   RpcValue res = RpcValue::Array(3);
   res[0] = st.statusCode;
   res[1] = st.statusMessage;
@@ -575,8 +648,18 @@ Master::RpcValue Master::registerSubscriber(const std::string& caller_id, const 
   requesterInfo.callerApi = caller_api;
 
   ReturnStruct st = internal_->handler.registerSubscriber(requesterInfo, topic, type);
-  if (st.statusCode == 1)
+  if (st.statusCode == 1) {
     internal_->cache.markDirty();
+    if (internal_->multimaster) {
+      miniros_msgs::RegistrationRecord rec;
+      rec.kind = miniros_msgs::RegistrationRecord::KIND_SUB_REGISTER;
+      rec.name = topic;
+      rec.type = type;
+      rec.node_name = caller_id;
+      rec.node_api = caller_api;
+      internal_->multimaster->announceLocalChange(rec);
+    }
+  }
   RpcValue res = RpcValue::Array(3);
   res[0] = st.statusCode;
   res[1] = st.statusMessage;
@@ -594,8 +677,17 @@ Master::RpcValue Master::unregisterSubscriber(const std::string& caller_id, cons
   requesterInfo.callerApi = caller_api;
 
   ReturnStruct st = internal_->handler.unregisterSubscriber(requesterInfo, topic);
-  if (st.statusCode == 1)
+  if (st.statusCode == 1) {
     internal_->cache.markDirty();
+    if (internal_->multimaster) {
+      miniros_msgs::RegistrationRecord rec;
+      rec.kind = miniros_msgs::RegistrationRecord::KIND_SUB_UNREGISTER;
+      rec.name = topic;
+      rec.node_name = caller_id;
+      rec.node_api = caller_api;
+      internal_->multimaster->announceLocalChange(rec);
+    }
+  }
   RpcValue res = RpcValue::Array(3);
   res[0] = st.statusCode;
   res[1] = st.statusMessage;
@@ -705,7 +797,7 @@ void Master::registerSelfRef()
   }
 
   auto report = internal_->regManager.registerNodeApi(
-    name, api, NodeRef::NODE_LOCAL | NodeRef::NODE_MINIROS);
+    name, api, NodeRef::NODE_LOCAL | NodeRef::NODE_MASTER | NodeRef::NODE_MINIROS);
   if (report.created) {
     MINIROS_INFO("Registered local master node %s at %s", name.c_str(), api.c_str());
   }
@@ -781,40 +873,230 @@ void Master::setDumpParameters(bool dump)
     internal_->parameterStorage.setDumpParameters(dump);
 }
 
-void Master::initEvents(NodeHandle& nh)
+void Master::initEvents(NodeHandle& /*nh*/)
 {
-  if (!internal_)
-    return;
-  WallDuration period(10);
-  internal_->timerBroadcasts = nh.createSteadyTimer(period, &Internal::onBroadcast, internal_.get());
 }
 
-void Master::enableDiscoveryBroadcasts(int port)
+void Master::setMultimasterToken(const std::string& token)
 {
-  if (!internal_)
+  if (!internal_ || !internal_->multimaster)
     return;
-
-  if (port && !internal_->discovery) {
-    internal_->discovery.reset(new Discovery(&internal_->resolver));
-    internal_->discovery->setUdpBroadcasts(port);
-  }
-  else if (!port && internal_->discovery) {
-    internal_->discovery.reset();
-  }
+  internal_->multimaster->setToken(token);
+  if (!token.empty())
+    internal_->parameterStorage.setParam("master", "/multimaster/token_set", true);
 }
 
-Error Master::setDiscoveryGroup(const std::string& group)
+void Master::setMultimasterUdpPort(int port)
 {
-  if (!internal_)
+  if (!internal_ || !internal_->multimaster)
+    return;
+  internal_->multimaster->setUdpPort(port);
+}
+
+void Master::setMultimasterMulticast(const std::string& addr, int port)
+{
+  if (!internal_ || !internal_->multimaster)
+    return;
+  internal_->multimaster->setMulticast(addr, port);
+}
+
+Error Master::addMultimasterPeer(const std::string& host, int udpPort)
+{
+  if (!internal_ || !internal_->multimaster)
     return Error::InternalError;
-
-  if (!internal_->discovery) {
-    internal_->discovery.reset(new Discovery(&internal_->resolver));
-  }
-
-  return internal_->discovery->setMulticast(group);
+  if (host.empty() || udpPort <= 0)
+    return Error::InvalidValue;
+  network::NetAddress addr = network::NetAddress::fromIp4String(host, udpPort);
+  if (!addr.valid())
+    addr = network::NetAddress::fromString(network::NetAddress::AddressUnspecified, host, udpPort);
+  if (!addr.valid())
+    return Error::InvalidAddress;
+  return internal_->multimaster->addPeerProbe(addr);
 }
 
+std::vector<miniros_msgs::RegistrationRecord> Master::Internal::collectMultimasterSnapshot() const
+{
+  std::vector<miniros_msgs::RegistrationRecord> out;
+  // Keep rosout traffic local to each master; never advertise the in-process
+  // master node (/miniroscore) itself.
+  const std::set<std::string> localOnly{"/rosout", "/rosout_agg"};
+
+  for (const std::shared_ptr<NodeRef>& node : regManager.listAllNodes()) {
+    if (!node)
+      continue;
+    const int flags = node->getNodeFlags();
+    // LOCAL = in-process master/rosout; MASTER = peer or self master UI entry;
+    // FOREIGN = already mirrored from another master.
+    if (flags & (NodeRef::NODE_FOREIGN | NodeRef::NODE_MASTER | NodeRef::NODE_LOCAL))
+      continue;
+
+    const std::string nodeName = node->id();
+    const std::string nodeApi = node->getApi();
+    std::set<std::string> pubs, subs, srvs;
+    {
+      NodeRef::Lock nodeLock(*node);
+      pubs = node->getPublicationsLocked(nodeLock);
+      subs = node->getSubscriptionsLocked(nodeLock);
+      srvs = node->getServicesLocked(nodeLock);
+    }
+
+    // Hold RegistrationManager while reading topic types / service APIs — they
+    // share m_guard with register/unregister (TSan race otherwise).
+    RegistrationManager::Lock regLock(regManager);
+    const auto& topicTypes = regManager.getTopicTypesUnsafe(regLock);
+    for (const std::string& topic : pubs) {
+      if (localOnly.count(topic))
+        continue;
+      miniros_msgs::RegistrationRecord r;
+      r.kind = miniros_msgs::RegistrationRecord::KIND_PUB_REGISTER;
+      r.name = topic;
+      auto tit = topicTypes.find(topic);
+      r.type = (tit != topicTypes.end()) ? tit->second : std::string{};
+      r.node_name = nodeName;
+      r.node_api = nodeApi;
+      out.push_back(std::move(r));
+    }
+    for (const std::string& topic : subs) {
+      if (localOnly.count(topic))
+        continue;
+      miniros_msgs::RegistrationRecord r;
+      r.kind = miniros_msgs::RegistrationRecord::KIND_SUB_REGISTER;
+      r.name = topic;
+      auto tit = topicTypes.find(topic);
+      r.type = (tit != topicTypes.end()) ? tit->second : std::string{};
+      r.node_name = nodeName;
+      r.node_api = nodeApi;
+      out.push_back(std::move(r));
+    }
+    for (const std::string& service : srvs) {
+      miniros_msgs::RegistrationRecord r;
+      r.kind = miniros_msgs::RegistrationRecord::KIND_SRV_REGISTER;
+      r.name = service;
+      r.node_name = nodeName;
+      r.node_api = nodeApi;
+      r.service_api = regManager.services.get_service_api(service);
+      out.push_back(std::move(r));
+    }
+  }
+  return out;
+}
+
+void Master::Internal::registerPeerMasterNode(const PeerInfo& peer)
+{
+  if (peer.state == PeerState::GuidCollision)
+    return;
+  if (!peer.uuid.valid())
+    return;
+  std::string name = "/master_" + peer.uuid.toString();
+  std::string URI = peer.masterUri.str();
+  if (URI.empty() && peer.lastAddress.valid()) {
+    network::URL u;
+    u.scheme = "http://";
+    u.host = peer.lastAddress.address;
+    u.port = peer.masterUri.port ? peer.masterUri.port : static_cast<uint32_t>(peer.lastAddress.port());
+    URI = u.str();
+  }
+  if (URI.empty())
+    return;
+
+  if (auto existing = regManager.getNodeByName(name)) {
+    if (existing->getApi() == URI)
+      return;
+  }
+
+  auto report = regManager.registerNodeApi(name, URI, NodeRef::NODE_MASTER | NodeRef::NODE_MINIROS);
+  if (report.created) {
+    MINIROS_INFO("Registered peer master=%s at %s", name.c_str(), URI.c_str());
+  }
+}
+
+void Master::Internal::dropMultimasterPeer(const UUID& peer)
+{
+  const std::string key = peer.toString();
+  auto it = foreignNodesByPeer.find(key);
+  if (it == foreignNodesByPeer.end())
+    return;
+
+  std::set<std::string> topicsToNotify;
+  for (const std::string& nodeName : it->second) {
+    auto node = regManager.getNodeByName(nodeName);
+    if (!node)
+      continue;
+    {
+      NodeRef::Lock nodeLock(*node);
+      const auto& pubs = node->getPublicationsLocked(nodeLock);
+      topicsToNotify.insert(pubs.begin(), pubs.end());
+    }
+    regManager.dropRegistrations(*node);
+    node->clear();
+    node->markDead();
+    regManager.scheduleShutdown(node);
+  }
+  foreignNodesByPeer.erase(it);
+
+  for (const std::string& topic : topicsToNotify) {
+    handler.notifyTopicSubscribers(topic, regManager.getTopicSubscribers(topic));
+  }
+}
+
+void Master::Internal::applyMultimasterRecords(const UUID& peer, const std::vector<miniros_msgs::RegistrationRecord>& records, bool snapshot)
+{
+  const std::string peerKey = peer.toString();
+  if (snapshot)
+    dropMultimasterPeer(peer);
+
+  auto& foreignNodes = foreignNodesByPeer[peerKey];
+  std::set<std::string> topicsToNotify;
+  constexpr int kForeignFlags = NodeRef::NODE_FOREIGN | NodeRef::NODE_MINIROS;
+
+  for (const miniros_msgs::RegistrationRecord& r : records) {
+    if (r.name == "/rosout" || r.name == "/rosout_agg")
+      continue;
+
+    switch (r.kind) {
+    case miniros_msgs::RegistrationRecord::KIND_PUB_REGISTER: {
+      auto node = regManager.register_publisher(r.name, r.type, r.node_name, r.node_api, kForeignFlags);
+      if (node) {
+        foreignNodes.insert(r.node_name);
+        topicsToNotify.insert(r.name);
+      }
+      break;
+    }
+    case miniros_msgs::RegistrationRecord::KIND_PUB_UNREGISTER: {
+      regManager.unregister_publisher(r.name, r.node_name, r.node_api);
+      topicsToNotify.insert(r.name);
+      break;
+    }
+    case miniros_msgs::RegistrationRecord::KIND_SUB_REGISTER: {
+      auto node = regManager.register_subscriber(r.name, r.type, r.node_name, r.node_api, kForeignFlags);
+      if (node) {
+        foreignNodes.insert(r.node_name);
+      }
+      break;
+    }
+    case miniros_msgs::RegistrationRecord::KIND_SUB_UNREGISTER: {
+      regManager.unregister_subscriber(r.name, r.node_name, r.node_api);
+      break;
+    }
+    case miniros_msgs::RegistrationRecord::KIND_SRV_REGISTER: {
+      auto node = regManager.register_service(r.name, r.node_name, r.node_api,
+        r.service_api.empty() ? r.node_api : r.service_api, kForeignFlags);
+      if (node) {
+        foreignNodes.insert(r.node_name);
+      }
+      break;
+    }
+    case miniros_msgs::RegistrationRecord::KIND_SRV_UNREGISTER: {
+      regManager.unregister_service(r.name, r.node_name, r.service_api);
+      break;
+    }
+    }
+  }
+
+  for (const std::string& topic : topicsToNotify) {
+    handler.notifyTopicSubscribers(topic, regManager.getTopicSubscribers(topic));
+  }
+}
 
 } // namespace master
 } // namespace miniros

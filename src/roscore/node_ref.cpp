@@ -189,17 +189,17 @@ void NodeRef::unlock() const
   m_guard.unlock();
 }
 
-const std::set<std::string>& NodeRef::getSubscriptionsUnsafe() const
+const std::set<std::string>& NodeRef::getSubscriptionsLocked(const Lock&) const
 {
   return m_topicSubscriptions;
 }
 
-const std::set<std::string>& NodeRef::getPublicationsUnsafe() const
+const std::set<std::string>& NodeRef::getPublicationsLocked(const Lock&) const
 {
   return m_topicPublications;
 }
 
-const std::set<std::string>& NodeRef::getServicesUnsafe() const
+const std::set<std::string>& NodeRef::getServicesLocked(const Lock&) const
 {
   return m_services;
 }
@@ -352,7 +352,7 @@ void NodeRef::handleDisconnect(const std::weak_ptr<http::HttpClient>& wclient, E
 
   // Lock order matches activateConnection: m_clientGuard then m_guard.
   ClientLock clientLock(m_clientGuard);
-  Lock lock(m_guard);
+  GuardLock lock(m_guard);
 
   if (m_state == State::ShuttingDown || m_state == State::Dead) {
     deactivateConnectionUnsafe(lock, clientLock);
@@ -396,7 +396,7 @@ void NodeRef::handleDisconnect(const std::weak_ptr<http::HttpClient>& wclient, E
 }
 
 
-void NodeRef::deactivateConnectionUnsafe(Lock& /*lock*/, ClientLock& /*clientLock*/)
+void NodeRef::deactivateConnectionUnsafe(GuardLock& /*lock*/, ClientLock& /*clientLock*/)
 {
   m_client.reset();
   m_reqGetPid.reset();
@@ -417,7 +417,7 @@ bool NodeRef::needRequests() const
 }
 
 
-void NodeRef::updateState(State newState, Lock& /*lock*/)
+void NodeRef::updateState(State newState, GuardLock& /*lock*/)
 {
   if (newState == m_state)
     return;
@@ -752,7 +752,7 @@ void NodeRef::markDead()
 {
   // Lock order matches activateConnection: m_clientGuard then m_guard.
   ClientLock clientLock(m_clientGuard);
-  Lock lock(m_guard);
+  GuardLock lock(m_guard);
   if (m_state == State::Dead)
     return;
   MINIROS_WARN("%s::markDead()", debugName().c_str());

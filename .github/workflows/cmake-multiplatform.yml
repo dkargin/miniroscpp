@@ -151,6 +151,8 @@ jobs:
         for f in \
           bin/late-master-logs/miniroscore.crash \
           bin/late-master-logs/miniroscore.console.log \
+          bin/multimaster-logs/*.crash \
+          bin/multimaster-logs/*.console.log \
           master-logs/miniroscore.crash \
           master-logs/miniroscore.console.log \
           master-logs/master-fail-*/miniroscore.crash \
@@ -186,7 +188,7 @@ jobs:
           done
         done
         echo "======== END MASTER CRASH / CONSOLE ========"
-        ls -la bin/late-master-logs master-logs cores bin/cores 2>/dev/null || true
+        ls -la bin/late-master-logs bin/multimaster-logs master-logs cores bin/cores 2>/dev/null || true
 
     - name: Test-memcheck
       working-directory: ${{ steps.strings.outputs.build-output-dir }}
@@ -212,5 +214,6 @@ jobs:
             ${{ steps.strings.outputs.build-output-dir }}/bin/cores/
             ${{ steps.strings.outputs.build-output-dir }}/master-logs/
             ${{ steps.strings.outputs.build-output-dir }}/bin/late-master-logs/
+            ${{ steps.strings.outputs.build-output-dir }}/bin/multimaster-logs/
             ${{ steps.strings.outputs.build-output-dir }}/bin/master-fail-*/
           if-no-files-found: ignore

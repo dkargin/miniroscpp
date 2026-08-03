@@ -64,6 +64,12 @@ public:
   void stop();
   bool ok() const;
 
+  /// Enable debug HTTP API at /debugAPI/... (for tests).
+  void setDebugApi(bool enabled);
+
+  /// Request process exit; Master::ok() becomes false. Used by debug shutdown API.
+  void requestShutdown();
+
   /// Setup RPC callbacks.
   void setupBindings(const std::shared_ptr<CallbackQueue>& cb);
 
@@ -72,12 +78,21 @@ public:
 
   void setResolveNodeIP(bool resolv);
 
-  /// Enable automatic discovery of other masters.
-  void enableDiscoveryBroadcasts(int port);
+  /// Shared secret for multimaster pairing. Empty disables auto-pair until a
+  /// token is provided (CLI or HTTP form). Manual pairing between open masters
+  /// (no token) is still allowed. Discovery still runs.
+  /// Changing the token leaves the current collective.
+  void setMultimasterToken(const std::string& token);
 
-  /// Set multicast address for service discovery.
-  /// Can return an error if multicast address is invalid.
-  Error setDiscoveryGroup(const std::string& group);
+  /// UDP port for multimaster unicast sync. 0 = use master RPC port.
+  void setMultimasterUdpPort(int port);
+
+  /// Multicast discovery group host:port. Empty host disables multicast.
+  void setMultimasterMulticast(const std::string& addr, int port);
+
+  /// Add an explicit peer to probe with DISCOVER (useful for same-host masters on different ports).
+  /// Format accepted by CLI: host:port
+  Error addMultimasterPeer(const std::string& host, int udpPort);
 
   /// Set period for periodic node liveness checks (getPid / local PID probe).
   /// @param seconds - check interval in seconds; 0 disables periodic checks.

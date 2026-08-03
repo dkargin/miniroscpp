@@ -79,19 +79,19 @@ public:
   /// @param service_api - ?
   /// @returns reference to a node.
   std::shared_ptr<NodeRef> _register(Registrations& r, const std::string& key, const std::string& nodeName, const std::string& nodeApi,
-    const std::string& service_api = "");
+    const std::string& service_api = "", int flags = 0);
 
   ReturnStruct unregisterObject(Registrations& r, const std::string& key, const std::string& nodeName,
     const std::string& nodeApi, const std::string& service_api = "");
 
   std::shared_ptr<NodeRef> register_service(const std::string& service, const std::string& caller_id, const std::string& nodeName,
-    const std::string& service_api);
+    const std::string& service_api, int flags = 0);
 
   std::shared_ptr<NodeRef> register_publisher(const std::string& topic, const std::string& topic_type,
-    const std::string& caller_id, const std::string& caller_api);
+    const std::string& caller_id, const std::string& caller_api, int flags = 0);
 
   std::shared_ptr<NodeRef> register_subscriber(const std::string& topic, const std::string& topic_type,
-    const std::string& nodeName, const std::string& nodeApi);
+    const std::string& nodeName, const std::string& nodeApi, int flags = 0);
 
   ReturnStruct unregister_service(const std::string& service, const std::string& caller_id, const std::string& service_api);
 

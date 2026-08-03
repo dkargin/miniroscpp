@@ -71,7 +71,11 @@ ReturnStruct MasterHandler::registerService(const RequesterInfo& requesterInfo, 
 std::string MasterHandler::lookupService(const RequesterInfo& requesterInfo, const std::string& service) const
 {
   // service_api looks like "rosrpc://hostname:port". It differs from ClientAPI URL.
-  std::string service_api = m_regManager->services.get_service_api(service);
+  std::string service_api;
+  {
+    RegistrationManager::Lock lock(*m_regManager);
+    service_api = m_regManager->services.get_service_api(service);
+  }
   std::shared_ptr<NodeRef> node = m_regManager->getNodeByAPI(service_api);
   if (node && requesterInfo.clientAddress.valid()) {
     network::URL url = m_resolver->resolveAddressFor(node, requesterInfo.clientAddress, requesterInfo.localAddress);

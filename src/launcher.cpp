@@ -6,6 +6,7 @@
 #include <csignal>
 #include <cstring>
 #include <algorithm>
+#include <filesystem>
 #include <iostream>
 #include <map>
 #include <sstream>
@@ -146,6 +147,7 @@ struct Launcher::Internal {
 #endif
 
   std::vector<std::string> env;
+  std::filesystem::path outputLog;
   bool detached = false;
   bool notifyEnabled = false;
   ChildReady ready;
@@ -239,6 +241,13 @@ Error Launcher::start(const std::filesystem::path& appPath, const std::vector<st
 
   std::vector<std::string> envOverrides = internal_->env;
 
+  std::filesystem::path consoleLog = internal_->outputLog;
+  if (!consoleLog.empty()) {
+    std::error_code ec;
+    if (consoleLog.has_parent_path())
+      std::filesystem::create_directories(consoleLog.parent_path(), ec);
+  }
+
 #ifdef WIN32
   if (internal_->notifyEnabled) {
     SECURITY_ATTRIBUTES sa;
@@ -261,6 +270,31 @@ Error Launcher::start(const std::filesystem::path& appPath, const std::vector<st
   si.cb = sizeof(si);
   ZeroMemory(&pi, sizeof(pi));
 
+  HANDLE logHandle = INVALID_HANDLE_VALUE;
+  HANDLE nulInput = INVALID_HANDLE_VALUE;
+  if (!consoleLog.empty()) {
+    SECURITY_ATTRIBUTES saLog;
+    ZeroMemory(&saLog, sizeof(saLog));
+    saLog.nLength = sizeof(saLog);
+    saLog.bInheritHandle = TRUE;
+    logHandle = CreateFileA(consoleLog.u8string().c_str(), GENERIC_WRITE,
+      FILE_SHARE_READ | FILE_SHARE_WRITE, &saLog, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (logHandle == INVALID_HANDLE_VALUE)
+      return Error::SystemError;
+    // STARTF_USESTDHANDLES requires all three handles; use NUL for stdin so
+    // redirection works without a console (CI / GUI hosts).
+    nulInput = CreateFileA("NUL", GENERIC_READ, FILE_SHARE_READ, &saLog, OPEN_EXISTING,
+      FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (nulInput == INVALID_HANDLE_VALUE) {
+      CloseHandle(logHandle);
+      return Error::SystemError;
+    }
+    si.dwFlags |= STARTF_USESTDHANDLES;
+    si.hStdInput = nulInput;
+    si.hStdOutput = logHandle;
+    si.hStdError = logHandle;
+  }
+
   std::string argString = "\"" + compatPath + "\"";
   for (const auto& arg : args) {
     argString += " ";
@@ -279,21 +313,23 @@ Error Launcher::start(const std::filesystem::path& appPath, const std::vector<st
     pos += e.size() + 1;
   }
 
-  DWORD creationFlags = CREATE_UNICODE_ENVIRONMENT;
-  // We built an ANSI env block above; use CreateProcessA without UNICODE env.
-  creationFlags = 0;
+  DWORD creationFlags = 0;
 
   if (!CreateProcessA(compatPath.c_str(),
         argString.data(),
         nullptr,
         nullptr,
-        TRUE, // inherit handles (notify write pipe)
+        TRUE, // inherit handles (notify write pipe / console log)
         creationFlags,
         envBlock.data(),
         nullptr,
         &si,
         &pi)) {
     const DWORD err = GetLastError();
+    if (logHandle != INVALID_HANDLE_VALUE)
+      CloseHandle(logHandle);
+    if (nulInput != INVALID_HANDLE_VALUE)
+      CloseHandle(nulInput);
     internal_->closeNotify();
     if (err == ERROR_FILE_NOT_FOUND || err == ERROR_PATH_NOT_FOUND)
       return Error::FileNotFound;
@@ -301,6 +337,10 @@ Error Launcher::start(const std::filesystem::path& appPath, const std::vector<st
       return Error::PermissionDenied;
     return Error::SystemError;
   }
+  if (logHandle != INVALID_HANDLE_VALUE)
+    CloseHandle(logHandle);
+  if (nulInput != INVALID_HANDLE_VALUE)
+    CloseHandle(nulInput);
   CloseHandle(pi.hThread);
   if (internal_->notifyWrite != INVALID_HANDLE_VALUE) {
     CloseHandle(internal_->notifyWrite);
@@ -337,6 +377,9 @@ Error Launcher::start(const std::filesystem::path& appPath, const std::vector<st
     envOverrides.push_back(std::string("NOTIFY_SOCKET=@") + name);
   }
 
+  // Capture path as a C string for the child (path object lives in parent).
+  const std::string consoleLogStr = consoleLog.empty() ? std::string() : consoleLog.u8string();
+
   pid_t child = fork();
   if (child < 0) {
     internal_->closeNotify();
@@ -363,27 +406,22 @@ Error Launcher::start(const std::filesystem::path& appPath, const std::vector<st
       setsid();
       ::signal(SIGHUP, SIG_IGN);
       close(STDIN_FILENO);
-      close(STDOUT_FILENO);
-      close(STDERR_FILENO);
-      // Optional console capture for detached masters (CI debug). Path comes from
-      // Launcher::env("MINIROS_MASTER_CONSOLE_LOG", ...) — getenv still sees the
-      // pre-exec parent environment here, so read the override list directly.
-      std::string consoleLog;
-      constexpr const char kPrefix[] = "MINIROS_MASTER_CONSOLE_LOG=";
-      for (const std::string& e : envOverrides) {
-        if (e.compare(0, sizeof(kPrefix) - 1, kPrefix) == 0) {
-          consoleLog = e.substr(sizeof(kPrefix) - 1);
-          break;
-        }
+      // Keep stdout/stderr open until we know whether to redirect or discard.
+      if (consoleLogStr.empty()) {
+        close(STDOUT_FILENO);
+        close(STDERR_FILENO);
       }
-      if (!consoleLog.empty()) {
-        const int fd = ::open(consoleLog.c_str(), O_WRONLY | O_CREAT | O_APPEND, 0644);
-        if (fd >= 0) {
-          dup2(fd, STDOUT_FILENO);
-          dup2(fd, STDERR_FILENO);
-          if (fd > STDERR_FILENO)
-            ::close(fd);
-        }
+    }
+    if (!consoleLogStr.empty()) {
+      const int fd = ::open(consoleLogStr.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
+      if (fd >= 0) {
+        dup2(fd, STDOUT_FILENO);
+        dup2(fd, STDERR_FILENO);
+        if (fd > STDERR_FILENO)
+          ::close(fd);
+      } else if (flags & FLAG_DETACHED) {
+        close(STDOUT_FILENO);
+        close(STDERR_FILENO);
       }
     }
     if (execve(appPath.c_str(), pargs.data(), penv.data()) != 0)
@@ -395,6 +433,27 @@ Error Launcher::start(const std::filesystem::path& appPath, const std::vector<st
     internal_->detached = true;
   return Error::Ok;
 #endif
+}
+
+Launcher& Launcher::env(const char* name, const char* value)
+{
+  if (internal_ && name && value) {
+    internal_->env.push_back(std::string(name) + "=" + value);
+  }
+  return *this;
+}
+
+Launcher& Launcher::redirectOutput(const std::filesystem::path& path)
+{
+  if (internal_)
+    internal_->outputLog = path;
+  return *this;
+}
+
+const std::filesystem::path& Launcher::outputLog() const
+{
+  static const std::filesystem::path kEmpty;
+  return internal_ ? internal_->outputLog : kEmpty;
 }
 
 bool Launcher::valid() const
@@ -429,14 +488,6 @@ bool Launcher::running()
   }
   return false;
 #endif
-}
-
-Launcher& Launcher::env(const char* name, const char* value)
-{
-  if (internal_ && name && value) {
-    internal_->env.push_back(std::string(name) + "=" + value);
-  }
-  return *this;
 }
 
 Error Launcher::signal(int signo)

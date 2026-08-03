@@ -99,7 +99,7 @@ miniros::Error startMaster(miniros::Launcher& launcher, int port)
   launcher.env("ROS_HOSTNAME", "127.0.0.1")
           .env("MINIROS_MASTER_LOG_DIR", logDir.string().c_str())
           .env("MINIROS_CRASH_LOG", crashLog.c_str())
-          .env("MINIROS_MASTER_CONSOLE_LOG", consoleLog.c_str());
+          .redirectOutput(consoleLog);
 
   const std::vector<std::string> args = {
     "-p", std::to_string(port),

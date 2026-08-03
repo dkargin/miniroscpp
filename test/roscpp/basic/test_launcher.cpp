@@ -1,5 +1,5 @@
 //
-// Tests for Launcher notify / waitReady, start failures, crash, and kill behaviour.
+// Tests for Launcher notify / waitReady, start failures, crash, kill, and redirectOutput.
 //
 
 #include <chrono>
@@ -203,6 +203,95 @@ TEST(Launcher, TerminateKillsSignalIgnoringLoop)
   ASSERT_EQ(termErr, miniros::Error::Ok) << termErr.toString();
   EXPECT_NE(launcher.waitExit(), 0);
   EXPECT_FALSE(launcher.valid());
+}
+
+std::filesystem::path launcherLogDir()
+{
+#ifdef MINIROS_TEST_BIN_DIR
+  return std::filesystem::path(MINIROS_TEST_BIN_DIR) / "launcher-logs";
+#else
+  return std::filesystem::temp_directory_path() / "miniros-launcher-logs";
+#endif
+}
+
+std::string readEntireFile(const std::filesystem::path& path)
+{
+  std::ifstream in(path, std::ios::binary);
+  if (!in)
+    return {};
+  return std::string(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+}
+
+TEST(Launcher, RedirectOutputCapturesStdoutAndStderr)
+{
+  ASSERT_TRUE(std::filesystem::exists(notifyChildPath())) << notifyChildPath();
+
+  const auto logPath = launcherLogDir() / "redirect-attached.log";
+  std::error_code ec;
+  std::filesystem::remove(logPath, ec);
+
+  miniros::Launcher launcher;
+  launcher.redirectOutput(logPath);
+  EXPECT_EQ(launcher.outputLog(), logPath);
+
+  ASSERT_EQ(launcher.start(notifyChildPath(), {"say", "attached-marker"}, 0), miniros::Error::Ok);
+  EXPECT_EQ(launcher.waitExit(), 0);
+
+  ASSERT_TRUE(std::filesystem::is_regular_file(logPath, ec)) << logPath;
+  const std::string body = readEntireFile(logPath);
+  EXPECT_NE(body.find("STDOUT:attached-marker"), std::string::npos) << body;
+  EXPECT_NE(body.find("STDERR:attached-marker"), std::string::npos) << body;
+}
+
+TEST(Launcher, RedirectOutputWorksWhenDetached)
+{
+  ASSERT_TRUE(std::filesystem::exists(notifyChildPath())) << notifyChildPath();
+
+  const auto logPath = launcherLogDir() / "redirect-detached.log";
+  std::error_code ec;
+  std::filesystem::remove(logPath, ec);
+
+  miniros::Launcher launcher;
+  launcher.redirectOutput(logPath);
+  ASSERT_EQ(launcher.start(notifyChildPath(), {"say", "detached-marker"},
+              miniros::Launcher::FLAG_DETACHED),
+    miniros::Error::Ok);
+  EXPECT_EQ(launcher.waitExit(), 0);
+
+  ASSERT_TRUE(std::filesystem::is_regular_file(logPath, ec)) << logPath;
+  const std::string body = readEntireFile(logPath);
+  EXPECT_NE(body.find("STDOUT:detached-marker"), std::string::npos) << body;
+  EXPECT_NE(body.find("STDERR:detached-marker"), std::string::npos) << body;
+}
+
+TEST(Launcher, RedirectOutputTruncatesAndCreatesParents)
+{
+  ASSERT_TRUE(std::filesystem::exists(notifyChildPath())) << notifyChildPath();
+
+  const auto nestedRoot = launcherLogDir() / "nested-auto";
+  const auto logPath = nestedRoot / "deep" / "truncate.log";
+  std::error_code ec;
+  std::filesystem::remove_all(nestedRoot, ec);
+
+  {
+    miniros::Launcher launcher;
+    launcher.redirectOutput(logPath);
+    ASSERT_EQ(launcher.start(notifyChildPath(), {"say", "first-run"}, 0), miniros::Error::Ok);
+    EXPECT_EQ(launcher.waitExit(), 0);
+  }
+  ASSERT_TRUE(std::filesystem::is_regular_file(logPath, ec)) << logPath;
+  EXPECT_NE(readEntireFile(logPath).find("STDOUT:first-run"), std::string::npos);
+
+  {
+    miniros::Launcher launcher;
+    launcher.redirectOutput(logPath);
+    ASSERT_EQ(launcher.start(notifyChildPath(), {"say", "second-run"}, 0), miniros::Error::Ok);
+    EXPECT_EQ(launcher.waitExit(), 0);
+  }
+  const std::string body = readEntireFile(logPath);
+  EXPECT_EQ(body.find("first-run"), std::string::npos) << body;
+  EXPECT_NE(body.find("STDOUT:second-run"), std::string::npos) << body;
+  EXPECT_NE(body.find("STDERR:second-run"), std::string::npos) << body;
 }
 
 int main(int argc, char** argv)

@@ -70,7 +70,7 @@ void RegistrationManager::setPollSet(PollSet* ps)
 }
 
 std::shared_ptr<NodeRef> RegistrationManager::_register(Registrations& r, const std::string& key, const std::string& nodeName, const std::string& nodeApi,
-  const std::string& service_api)
+  const std::string& service_api, int flags)
 {
   std::string nameError;
   if (!names::validate(key, nameError)) {
@@ -78,7 +78,7 @@ std::shared_ptr<NodeRef> RegistrationManager::_register(Registrations& r, const 
     return {};
   }
 
-  RegistrationReport report = registerNodeApi(nodeName, nodeApi, 0);
+  RegistrationReport report = registerNodeApi(nodeName, nodeApi, flags);
   if (!report.node) {
     MINIROS_ERROR("Failed to register NodeRef(node=%s api=%s)", nodeName.c_str(), nodeApi.c_str());
     return {};
@@ -86,7 +86,9 @@ std::shared_ptr<NodeRef> RegistrationManager::_register(Registrations& r, const 
 
   report.node->add(r.type(), key);
 
-  if (report.previous) {
+  if (report.previous && report.previous != report.node) {
+    // Clears stale (topic,name,api) rows for this node name. registerObj below
+    // re-adds the key being registered; the new process re-advertises the rest.
     dropRegistrations(*report.previous);
   }
   r.registerObj(key, nodeName, nodeApi, service_api);
@@ -145,31 +147,31 @@ bool RegistrationManager::unregisterNode(const std::shared_ptr<NodeRef>& node)
 }
 
 std::shared_ptr<NodeRef> RegistrationManager::register_service(const std::string& service, const std::string& caller_id,
-  const std::string& nodeName, const std::string& service_api)
+  const std::string& nodeName, const std::string& service_api, int flags)
 {
-  return _register(services, service, caller_id, nodeName, service_api);
+  return _register(services, service, caller_id, nodeName, service_api, flags);
 }
 
 std::shared_ptr<NodeRef> RegistrationManager::register_publisher(const std::string& topic, const std::string& topic_type,
-  const std::string& caller_id, const std::string& caller_api)
+  const std::string& caller_id, const std::string& caller_api, int flags)
 {
   {
     std::scoped_lock<std::mutex> lock(m_guard);
     if (!topic_types_.count(topic))
       topic_types_[topic] = topic_type;
   }
-  return _register(publishers, topic, caller_id, caller_api);
+  return _register(publishers, topic, caller_id, caller_api, "", flags);
 }
 
 std::shared_ptr<NodeRef> RegistrationManager::register_subscriber(const std::string& topic, const std::string& topic_type,
-  const std::string& nodeName, const std::string& nodeApi)
+  const std::string& nodeName, const std::string& nodeApi, int flags)
 {
   {
     std::scoped_lock<std::mutex> lock(m_guard);
     if (!topic_types_.count(topic))
       topic_types_[topic] = topic_type;
   }
-  return _register(subscribers, topic, nodeName, nodeApi);
+  return _register(subscribers, topic, nodeName, nodeApi, "", flags);
 }
 
 ReturnStruct RegistrationManager::unregister_service(const std::string& service, const std::string& caller_id,
@@ -201,7 +203,13 @@ RegistrationManager::registerNodeApi(const std::string& nodeName, const std::str
   auto it = m_nodes.find(nodeName);
   if (it != m_nodes.end()) {
     report.node = it->second;
-    if (report.node->getApi() == nodeApi) {
+    const bool sameApi = report.node->getApi() == nodeApi;
+    const bool dead = report.node->getState() == NodeRef::State::Dead;
+
+    // Reuse a live node with the same API. Dead nodes must be replaced: multimaster
+    // snapshot apply dropMultimasterPeer()'s markDead() then re-registers the same
+    // name/API; keeping the Dead object leaves pubs on a GC victim.
+    if (sameApi && !dead) {
       if (flags & NodeRef::NODE_LOCAL)
         report.node->setLocal();
       report.node->setNodeFlags(flags);
@@ -211,7 +219,7 @@ RegistrationManager::registerNodeApi(const std::string& nodeName, const std::str
     // A surviving node may re-advertise while MasterCache is still restoring it,
     // often with a differently spelled URI (hostname vs IP). Superseding would
     // abort restore (drop getPublications) and drop the only live peer.
-    if (report.node->isRestoreInProgress()) {
+    if (!dead && report.node->isRestoreInProgress()) {
       MINIROS_WARN_NAMED("reg",
         "Keeping restoring node \"%s\" (cached api=%s, live api=%s)",
         nodeName.c_str(), report.node->getApi().c_str(), nodeApi.c_str());
@@ -221,12 +229,23 @@ RegistrationManager::registerNodeApi(const std::string& nodeName, const std::str
       return report;
     }
 
+    // Local/in-process master identity must not be displaced by a peer's
+    // identically named node (classic multimaster /miniroscore collision).
+    const int existingFlags = report.node->getNodeFlags();
+    if (!dead && (existingFlags & (NodeRef::NODE_LOCAL | NodeRef::NODE_MASTER))) {
+      MINIROS_WARN_NAMED("reg",
+        "Refusing to supersede protected node \"%s\" (api=%s flags=0x%x) with api=%s",
+        nodeName.c_str(), report.node->getApi().c_str(), existingFlags, nodeApi.c_str());
+      report.node.reset();
+      return report;
+    }
+
     // TODO: Need to check PID of the new node and verify that it has changed.
     // TODO: Need to check some alternative IP addresses to verify this node is really new.
-    NodeRefPtr prevNode;
-
     report.previous = report.node;
-    MINIROS_WARN_NAMED("reg", "New node registered with name=\"%s\" api=%s", nodeName.c_str(), nodeApi.c_str());
+    if (!dead) {
+      MINIROS_WARN_NAMED("reg", "New node registered with name=\"%s\" api=%s", nodeName.c_str(), nodeApi.c_str());
+    }
     m_nodesToShutdown.insert(report.node);
   }
 
@@ -234,7 +253,13 @@ RegistrationManager::registerNodeApi(const std::string& nodeName, const std::str
   report.created = true;
 
   // Peer masters are not Slave API endpoints — do not open HttpClient / getPid.
-  const bool skipHttp = (flags & NodeRef::NODE_MASTER) != 0;
+  // Foreign mirrors are owned by the peer master; local nodes connect to them
+  // directly via TCPROS. Probing foreign Slave APIs from this master races with
+  // snapshot replace and fails on filtered cross-host XML-RPC.
+  // Local master (NODE_LOCAL|NODE_MASTER) still gets a client for in-process use.
+  const bool skipHttp =
+    (flags & NodeRef::NODE_FOREIGN) != 0 ||
+    ((flags & NodeRef::NODE_MASTER) != 0 && (flags & NodeRef::NODE_LOCAL) == 0);
   if (!skipHttp) {
     assert(poll_set_);
     if (Error err = report.node->activateConnection(name_, poll_set_); !err) {
@@ -271,12 +296,27 @@ void RegistrationManager::scheduleShutdown(const std::shared_ptr<NodeRef>& node)
 
 void RegistrationManager::scheduleDeadNodesForShutdown()
 {
-  std::scoped_lock<std::mutex> lock(m_guard);
-  for (const auto& [key, node] : m_nodes) {
-    assert(node);
-    if (node->getState() == NodeRef::State::Dead)
-      m_nodesToShutdown.insert(node);
+  std::vector<std::shared_ptr<NodeRef>> nodes;
+  {
+    std::scoped_lock<std::mutex> lock(m_guard);
+    nodes.reserve(m_nodes.size());
+    for (const auto& [key, node] : m_nodes) {
+      assert(node);
+      nodes.push_back(node);
+    }
   }
+
+  std::vector<std::shared_ptr<NodeRef>> dead;
+  for (const auto& node : nodes) {
+    if (node->getState() == NodeRef::State::Dead)
+      dead.push_back(node);
+  }
+  if (dead.empty())
+    return;
+
+  std::scoped_lock<std::mutex> lock(m_guard);
+  for (const auto& node : dead)
+    m_nodesToShutdown.insert(node);
 }
 
 std::vector<NodeRefPtr> RegistrationManager::checkNodesForRemoval()
@@ -291,6 +331,9 @@ std::vector<NodeRefPtr> RegistrationManager::checkNodesForRemoval()
       // getPublications / service restore finishes. Do not treat that empty
       // window as "gone" or restore never completes.
       if (node->isRestoreInProgress())
+        continue;
+      // Peer masters have no pub/sub/service registrations; keep them for UI / pairing.
+      if (node->getNodeFlags() & NodeRef::NODE_MASTER)
         continue;
       if (node->getState() == NodeRef::State::Dead || node->isEmpty()) {
         graveyard.push_back(node);
