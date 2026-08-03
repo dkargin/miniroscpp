@@ -171,22 +171,20 @@ void Connection::readTransport()
     {
       ReadFinishedFunc callback;
       uint32_t size;
-      std::shared_ptr<uint8_t[]> buffer;
 
       MINIROS_ASSERT(has_read_callback_);
 
       // store off the read info in case another read() call is made from within the callback
       callback = read_callback_;
       size = read_size_;
-      buffer = read_buffer_;
+      std::shared_ptr<uint8_t[]> buffer = std::move(read_buffer_);
       read_callback_ = {};
-      read_buffer_.reset();
       read_size_ = 0;
       read_filled_ = 0;
       has_read_callback_ = 0;
 
       MINIROS_DEBUG("Calling read callback");
-      callback(shared_from_this(), buffer, size, true);
+      callback(shared_from_this(), std::move(buffer), size, true);
     }
     else
     {
@@ -420,7 +418,7 @@ void Connection::writeHeader(const M_string& key_vals, const WriteFinishedFunc& 
   {
     this->onHeaderWritten(conn);
   };
-  write(full_msg, msg_len, wrapFn, false);
+  write(std::move(full_msg), msg_len, wrapFn, false);
 }
 
 void Connection::sendHeaderError(const std::string& error_msg)
@@ -485,7 +483,7 @@ void Connection::onHeaderRead(const ConnectionPtr& conn, const std::shared_ptr<u
 
       transport_->parseHeader(header_);
 
-      header_func_(conn, header_);
+      (void)header_func_(conn, header_);
     }
   }
 

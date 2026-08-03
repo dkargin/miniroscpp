@@ -46,7 +46,7 @@ SubscriptionQueue::~SubscriptionQueue()
 
 }
 
-void SubscriptionQueue::push(const SubscriptionCallbackHelperPtr& helper, const MessageDeserializerPtr& deserializer,
+void SubscriptionQueue::push(const SubscriptionCallbackHelperPtr& helper, MessageDeserializerPtr deserializer,
                                  bool has_tracked_object, const VoidConstWPtr& tracked_object, bool nonconst_need_copy,
                                  miniros::Time receipt_time, bool* was_full)
 {
@@ -148,10 +148,8 @@ CallbackInterface::CallResult SubscriptionQueue::call()
     --queue_size_;
   }
 
-  VoidConstPtr msg = i.deserializer->deserialize();
-
   // msg can be null here if deserialization failed
-  if (msg)
+  if (VoidConstPtr msg = i.deserializer->deserialize())
   {
     try
     {
@@ -161,7 +159,10 @@ CallbackInterface::CallResult SubscriptionQueue::call()
     {}
 
     SubscriptionCallbackHelperCallParams params;
-    params.event = MessageEvent<void const>(msg, i.deserializer->getConnectionHeader(), i.receipt_time, i.nonconst_need_copy, MessageEvent<void const>::CreateFunction());
+    auto connHeader = i.deserializer->getConnectionHeader();
+    i.deserializer.reset();
+    params.event = MessageEvent<void const>(std::move(msg), connHeader,
+      i.receipt_time, i.nonconst_need_copy, MessageEvent<void const>::CreateFunction());
     i.helper->call(params);
   }
 
