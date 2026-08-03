@@ -66,3 +66,8 @@ The cache is rewritten when the graph changes and again on clean shutdown.
 
 `miniroscore` uses [sd_notify](https://www.freedesktop.org/software/systemd/man/latest/sd_notify.html) protocol to tell SystemD that master has actually started and ready. Its usage is implied in scripts/miniroscore.service unit.
 These notifications do not need any additional external libraries, just the capability of compiler and platform to write into unix socket. 
+
+# Multimaster #
+
+See [multimaster.md](multimaster.md) for UDP discovery/pairing and registration sync between
+`miniroscore` instances.

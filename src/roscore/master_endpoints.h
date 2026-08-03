@@ -62,16 +62,27 @@ class MasterFaviconEndpoint : public http::EndpointHandler {
   Error handle(const network::ClientInfo& clientInfo, std::shared_ptr<http::HttpRequest> request) override;
 };
 
-class MultimasterConnectEndpoint : public http::EndpointHandler {
+/// Multimaster HTTP API root. Handles GET /api2/multimaster/<command> (JSON).
+class MultimasterApiEndpoint : public http::EndpointHandler {
 public:
-  MultimasterConnectEndpoint(Master::Internal* internal) : internal(internal) {}
+  MultimasterApiEndpoint(Master::Internal* internal) : internal(internal) {}
 
   Error handle(const network::ClientInfo& clientInfo, std::shared_ptr<http::HttpRequest> request) override;
 
   Master::Internal* internal = nullptr;
 };
 
-}
-}
+/// Debug HTTP API root (enabled with --debugAPI). Handles GET /debugAPI/<command>.
+class DebugApiEndpoint : public http::EndpointHandler {
+public:
+  DebugApiEndpoint(Master::Internal* internal) : internal(internal) {}
+
+  Error handle(const network::ClientInfo& clientInfo, std::shared_ptr<http::HttpRequest> request) override;
+
+  Master::Internal* internal = nullptr;
+};
+
+} // namespace master
+} // namespace miniros
 
 #endif // MINIROS_MASTER_ENDPOINTS_H

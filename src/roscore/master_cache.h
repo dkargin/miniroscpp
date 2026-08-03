@@ -7,6 +7,7 @@
 
 #include <atomic>
 #include <filesystem>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -41,21 +42,41 @@ struct CachedNode {
   std::vector<CachedService> services;
 };
 
+/// One multimaster peer that was paired (or mid-request) when the snapshot was taken.
+/// On restore the master re-probes the sync address and sends REQUEST.
+struct CachedPeer {
+  std::string uuid;
+  std::string uri;
+  std::string sync_host;
+  int sync_port = 0;
+  /// PeerState name at snapshot time (see MultimasterManager::peerStateName).
+  std::string state;
+};
+
 struct MasterCacheData {
   std::string guid;
+  /// Hostname that wrote this file (ROS_HOSTNAME / gethostname). GUID is not
+  /// reused when the cache is copied onto a different machine.
+  std::string host;
   int port = 0;
   std::vector<CachedNode> nodes;
+  std::vector<CachedPeer> peers;
 };
 
 /// Owns on-disk master state (cache.<port> in cwd) and the async restore session.
 class MasterCache {
 public:
   using RpcValue = XmlRpc::XmlRpcValue;
+  using CollectPeersFn = std::function<std::vector<CachedPeer>()>;
+  using RestorePeersFn = std::function<void(const std::vector<CachedPeer>&)>;
 
   MasterCache() = default;
 
   /// Wire graph dependencies used during restore / snapshot.
   void bind(RegistrationManager* regs, MasterHandler* handler);
+
+  /// Optional multimaster pairing persistence (collect on save, restore after UDP start).
+  void setPeerPersistence(CollectPeersFn collect, RestorePeersFn restore);
 
   void setEnabled(bool enabled);
   bool enabled() const { return enabled_; }
@@ -76,6 +97,9 @@ public:
   /// @param port - bound server port (updates path for later saves if it differs).
   /// @param runtimeGuid - GUID of this master instance (/run_id).
   void beginRestore(int port, const std::string& runtimeGuid);
+
+  /// Re-apply cached multimaster pairings (call after MultimasterManager::start).
+  void restorePeers();
 
   /// Drive restore progress and flush dirty state when idle.
   void update(int port, const std::string& guid);
@@ -113,6 +137,8 @@ private:
 
   RegistrationManager* regs_ = nullptr;
   MasterHandler* handler_ = nullptr;
+  CollectPeersFn collectPeers_;
+  RestorePeersFn restorePeers_;
 
   bool enabled_ = false;
   /// Written from RPC/callback threads via markDirty(); read/cleared on the

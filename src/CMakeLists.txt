@@ -69,6 +69,7 @@ set(cpp_common_SRC
     errors.cpp
     header.cpp
     common.cpp
+    uuid.cpp
     build_config.cpp
     launcher.cpp
     names.cpp
@@ -265,7 +266,8 @@ set(transport_SRC
 
 # minimaster contains core rosmaster API. It can be embedded to some other apps.
 set(master_SRC
-    roscore/discovery.cpp
+    roscore/multimaster.cpp
+    roscore/multimaster_protocol.cpp
     roscore/master.cpp
     roscore/master_cache.cpp
     roscore/master_endpoints.cpp

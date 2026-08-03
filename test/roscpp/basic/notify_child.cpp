@@ -1,8 +1,9 @@
 //
 // Helper process for Launcher tests.
 // Usage: basic-notify_child [mode] [rpcPort] [uri]
-// Modes: ready (default), crash, throw, loop, ignore
+// Modes: ready (default), crash, throw, loop, ignore, silent, say
 //
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <cctype>
@@ -60,6 +61,16 @@ int main(int argc, char** argv)
 
   if (mode == "silent") {
     // Exit without notify — used to exercise waitReady() timeout.
+    return 0;
+  }
+
+  if (mode == "say") {
+    // Print distinct markers on stdout and stderr for redirectOutput() tests.
+    const char* tag = (argi < argc && argv[argi] && argv[argi][0]) ? argv[argi] : "launcher-say";
+    std::fprintf(stdout, "STDOUT:%s\n", tag);
+    std::fprintf(stderr, "STDERR:%s\n", tag);
+    std::fflush(stdout);
+    std::fflush(stderr);
     return 0;
   }
 

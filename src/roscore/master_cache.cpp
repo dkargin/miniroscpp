@@ -11,7 +11,9 @@
 #include "miniros/common.h"
 #include "miniros/console.h"
 #include "miniros/internal/nlohmann_json.hpp"
+#include "miniros/network/network.h"
 
+#include <cctype>
 #include <cerrno>
 #include <cstring>
 #include <fstream>
@@ -30,10 +32,54 @@ namespace master {
 
 using json = nlohmann::json;
 
+namespace {
+
+bool hostnamesEqual(const std::string& a, const std::string& b)
+{
+  if (a.size() != b.size())
+    return false;
+  for (size_t i = 0; i < a.size(); ++i) {
+    if (std::tolower(static_cast<unsigned char>(a[i])) !=
+        std::tolower(static_cast<unsigned char>(b[i])))
+      return false;
+  }
+  return true;
+}
+
+bool looksLikeLoopbackHost(const std::string& host)
+{
+  if (host.empty() || host == "localhost" || host == "::1")
+    return true;
+  return host.rfind("127.", 0) == 0;
+}
+
+/// Host that originally wrote this cache, or inferred from a non-loopback node API.
+std::string recordedCacheHost(const MasterCacheData& data)
+{
+  if (!data.host.empty())
+    return data.host;
+  for (const CachedNode& node : data.nodes) {
+    std::string host;
+    uint32_t port = 0;
+    if (!network::splitURI(node.api, host, port) || host.empty() || looksLikeLoopbackHost(host))
+      continue;
+    return host;
+  }
+  return {};
+}
+
+} // namespace
+
 void MasterCache::bind(RegistrationManager* regs, MasterHandler* handler)
 {
   regs_ = regs;
   handler_ = handler;
+}
+
+void MasterCache::setPeerPersistence(CollectPeersFn collect, RestorePeersFn restore)
+{
+  collectPeers_ = std::move(collect);
+  restorePeers_ = std::move(restore);
 }
 
 void MasterCache::setEnabled(bool enabled)
@@ -63,6 +109,17 @@ Error MasterCache::load(int port)
   Error err = loadFile(path_, data_);
   if (!err)
     return err;
+
+  const std::string here = network::getHost();
+  const std::string recorded = recordedCacheHost(data_);
+  if (!recorded.empty() && !here.empty() && !hostnamesEqual(recorded, here)) {
+    MINIROS_WARN("MasterCache: \"%s\" was written on host \"%s\", this process is \"%s\". "
+                 "Ignoring stored GUID/nodes/peers (copied cache?).",
+                 path_.string().c_str(), recorded.c_str(), here.c_str());
+    data_ = MasterCacheData{};
+    loaded_ = false;
+    return Error::Ok;
+  }
 
   loaded_ = true;
   return Error::Ok;
@@ -131,11 +188,26 @@ void MasterCache::beginRestore(int port, const std::string& runtimeGuid)
                  cn.state.empty() ? "?" : cn.state.c_str());
   }
 
-  // Snapshot nodes are consumed; keep guid for dirty comparisons until next save.
+  // Snapshot nodes are consumed; keep guid/peers for dirty comparisons and
+  // restorePeers() (called after MultimasterManager::start).
   data_.nodes.clear();
 
   if (started == 0)
     finalizeRestore();
+}
+
+void MasterCache::restorePeers()
+{
+  if (!enabled_ || !restorePeers_ || data_.peers.empty()) {
+    data_.peers.clear();
+    return;
+  }
+
+  const std::vector<CachedPeer> peers = std::move(data_.peers);
+  data_.peers.clear();
+  MINIROS_INFO("MasterCache: restoring %zu multimaster peer pairing(s)", peers.size());
+  restorePeers_(peers);
+  dirty_.store(true, std::memory_order_relaxed);
 }
 
 void MasterCache::update(int port, const std::string& guid)
@@ -324,6 +396,7 @@ MasterCacheData MasterCache::collect(int port, const std::string& guid) const
 {
   MasterCacheData data;
   data.guid = guid;
+  data.host = network::getHost();
   data.port = port;
   if (!regs_)
     return data;
@@ -332,7 +405,9 @@ MasterCacheData MasterCache::collect(int port, const std::string& guid) const
     if (!node)
       continue;
     const int flags = node->getNodeFlags();
-    if (flags & (NodeRef::NODE_LOCAL | NodeRef::NODE_MASTER))
+    // Local master, peer-master UI entries, and foreign (mirrored) nodes are not
+    // restored via Slave API — pairing + sync re-imports them after restart.
+    if (flags & (NodeRef::NODE_LOCAL | NodeRef::NODE_MASTER | NodeRef::NODE_FOREIGN))
       continue;
     if (node->getState() == NodeRef::State::Dead)
       continue;
@@ -350,8 +425,8 @@ MasterCacheData MasterCache::collect(int port, const std::string& guid) const
     // that abort nlohmann::json::dump().
     std::vector<std::string> serviceNames;
     {
-      std::unique_lock nodeLock(*node);
-      const auto& services = node->getServicesUnsafe();
+      NodeRef::Lock nodeLock(*node);
+      const auto& services = node->getServicesLocked(nodeLock);
       serviceNames.assign(services.begin(), services.end());
     }
     {
@@ -367,6 +442,10 @@ MasterCacheData MasterCache::collect(int port, const std::string& guid) const
 
     data.nodes.push_back(std::move(cn));
   }
+
+  if (collectPeers_)
+    data.peers = collectPeers_();
+
   return data;
 }
 
@@ -487,6 +566,8 @@ Error MasterCache::loadFile(const std::filesystem::path& path, MasterCacheData& 
 
   if (root.contains("guid") && root["guid"].is_string())
     out.guid = root["guid"].get<std::string>();
+  if (root.contains("host") && root["host"].is_string())
+    out.host = root["host"].get<std::string>();
   if (root.contains("port") && root["port"].is_number_integer())
     out.port = root["port"].get<int>();
 
@@ -521,8 +602,30 @@ Error MasterCache::loadFile(const std::filesystem::path& path, MasterCacheData& 
     }
   }
 
-  MINIROS_INFO("MasterCache: loaded \"%s\" (guid=%s nodes=%zu)",
-               path.string().c_str(), out.guid.c_str(), out.nodes.size());
+  if (root.contains("peers") && root["peers"].is_array()) {
+    for (const auto& peerJson : root["peers"]) {
+      if (!peerJson.is_object())
+        continue;
+      CachedPeer peer;
+      if (peerJson.contains("uuid") && peerJson["uuid"].is_string())
+        peer.uuid = peerJson["uuid"].get<std::string>();
+      if (peerJson.contains("uri") && peerJson["uri"].is_string())
+        peer.uri = peerJson["uri"].get<std::string>();
+      if (peerJson.contains("sync_host") && peerJson["sync_host"].is_string())
+        peer.sync_host = peerJson["sync_host"].get<std::string>();
+      if (peerJson.contains("sync_port") && peerJson["sync_port"].is_number_integer())
+        peer.sync_port = peerJson["sync_port"].get<int>();
+      if (peerJson.contains("state") && peerJson["state"].is_string())
+        peer.state = peerJson["state"].get<std::string>();
+      if (!peer.uuid.empty() && !peer.sync_host.empty() && peer.sync_port > 0)
+        out.peers.push_back(std::move(peer));
+    }
+  }
+
+  MINIROS_INFO("MasterCache: loaded \"%s\" (guid=%s host=%s nodes=%zu peers=%zu)",
+               path.string().c_str(), out.guid.c_str(),
+               out.host.empty() ? "?" : out.host.c_str(),
+               out.nodes.size(), out.peers.size());
   return Error::Ok;
 }
 
@@ -664,6 +767,7 @@ Error MasterCache::saveFile(const std::filesystem::path& path, const MasterCache
 
   json root;
   root["guid"] = data.guid;
+  root["host"] = data.host;
   root["port"] = data.port;
   root["nodes"] = json::array();
   for (const CachedNode& node : data.nodes) {
@@ -682,6 +786,17 @@ Error MasterCache::saveFile(const std::filesystem::path& path, const MasterCache
     root["nodes"].push_back(std::move(nodeJson));
   }
 
+  root["peers"] = json::array();
+  for (const CachedPeer& peer : data.peers) {
+    json peerJson;
+    peerJson["uuid"] = peer.uuid;
+    peerJson["uri"] = peer.uri;
+    peerJson["sync_host"] = peer.sync_host;
+    peerJson["sync_port"] = peer.sync_port;
+    peerJson["state"] = peer.state;
+    root["peers"].push_back(std::move(peerJson));
+  }
+
   std::string payload;
   try {
     // replace: never abort the master on a stray non-UTF-8 byte in a name/URI.
@@ -694,7 +809,8 @@ Error MasterCache::saveFile(const std::filesystem::path& path, const MasterCache
   if (Error err = writeAtomically(path, payload, detail); !err)
     return err;
 
-  MINIROS_DEBUG("MasterCache: saved \"%s\" (nodes=%zu)", path.string().c_str(), data.nodes.size());
+  MINIROS_DEBUG("MasterCache: saved \"%s\" (nodes=%zu peers=%zu)",
+                path.string().c_str(), data.nodes.size(), data.peers.size());
   setDetail("saved " + path.string());
   return Error::Ok;
 }

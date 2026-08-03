@@ -8,6 +8,8 @@
 #include "miniros/http/http_printers.h"
 #include "node_ref.h"
 
+#include <set>
+#include <sstream>
 #include <vector>
 
 namespace miniros {
@@ -18,13 +20,19 @@ using namespace http;
 void Master::Internal::renderMasterStatus(std::string& output) const
 {
   std::stringstream ss;
+  ss << "<p>GUID: <code>" << uuid.toString() << "</code></p>\n";
   ss << print::HB("Nodes:");
   ss << "<ul>";
   for (const std::shared_ptr<NodeRef>& r : regManager.listAllNodes()) {
     const std::string& name = r->id();
     std::string url = r->getApi();
+    const int flags = r->getNodeFlags();
     ss << "<li>";
     ss << print::PrefixUrl("node", name, name) << ": " << print::Url(url, url);
+    if (flags & NodeRef::NODE_MASTER)
+      ss << " <em>[peer master]</em>";
+    else if (flags & NodeRef::NODE_FOREIGN)
+      ss << " <em>[foreign]</em>";
     ss << "</li>";
   }
   ss << "</ul>\n";
@@ -56,6 +64,83 @@ void Master::Internal::renderMasterStatus(std::string& output) const
     ss << "</dl></div></li>";
   }
   ss << "</ul>\n";
+
+  if (multimaster) {
+    const bool localHasToken = multimaster->hasToken();
+    ss << print::HB("Multimaster:");
+    ss << "<p>GUID: <code>" << uuid.toString() << "</code>";
+    ss << " | UDP sync port: " << multimaster->udpPort();
+    ss << " | discovery: on";
+    const std::string mc = multimaster->multicastEndpoint();
+    ss << " | multicast: " << (mc.empty() ? "off" : mc);
+    ss << " | token: " << (localHasToken ? "set" : "none") << "</p>";
+    ss << "<p><small>Token is required only when joining a mesh that already has one. "
+          "Open masters (no token) can pair without entering a token.</small></p>";
+
+    if (multimaster->hasPairedPeers()) {
+      ss << "<form method=\"GET\" action=\"/api2/multimaster/disconnect\" style=\"margin:0.5em 0;\">";
+      ss << "<button type=\"submit\">Disconnect all</button>";
+      ss << "</form>\n";
+    }
+
+    const auto peers = multimaster->listPeers();
+    bool hasGuidCollision = false;
+    for (const PeerInfo& peer : peers) {
+      if (peer.state == PeerState::GuidCollision) {
+        hasGuidCollision = true;
+        break;
+      }
+    }
+    if (hasGuidCollision) {
+      ss << "<p style=\"color:#c62828;font-weight:bold;\">Warning: another master is advertising this GUID "
+            "(copied cache or cloned identity). It is listed below in red and cannot be paired. "
+            "Delete <code>cache.&lt;port&gt;</code> on that host or start with <code>--no-cache</code>.</p>\n";
+    }
+
+    if (peers.empty()) {
+      ss << "<p><em>No peer masters discovered yet.</em></p>\n";
+    } else {
+      ss << "<ul>";
+      for (const PeerInfo& peer : peers) {
+        const bool collision = peer.state == PeerState::GuidCollision;
+        if (collision)
+          ss << "<li style=\"color:#c62828;\">";
+        else
+          ss << "<li>";
+        ss << peer.uuid.toString() << " — <b>" << MultimasterManager::peerStateName(peer.state) << "</b>";
+        if (!peer.masterUri.empty())
+          ss << " @ " << print::Url(peer.masterUri.str(), peer.masterUri.str());
+        if (peer.lastAddress.valid())
+          ss << " from " << peer.lastAddress.str();
+        ss << " (remote_token=" << (peer.remoteHasToken ? "yes" : "no");
+        ss << ", match=" << (peer.tokenMatch ? "yes" : "no") << ")";
+        ss << " pubs=" << peer.foreignPubs << " subs=" << peer.foreignSubs << " srvs=" << peer.foreignSrvs;
+        if (collision) {
+          ss << " — pairing forbidden (same GUID)";
+        } else if (peer.state != PeerState::Paired && peer.state != PeerState::Requesting) {
+          // Need a token only when the remote advertises one and we do not already match.
+          const bool tokenRequired = peer.remoteHasToken && !peer.tokenMatch;
+          ss << "<form method=\"GET\" action=\"/api2/multimaster/connect\" style=\"display:inline;margin-left:0.5em;\">";
+          ss << "<input type=\"hidden\" name=\"uuid\" value=\"" << peer.uuid.toString() << "\"/>";
+          ss << "<input type=\"password\" name=\"token\" placeholder=\"";
+          if (tokenRequired)
+            ss << "collective token (required)";
+          else if (localHasToken)
+            ss << "token (optional, already set)";
+          else
+            ss << "token (optional)";
+          ss << "\"";
+          if (tokenRequired)
+            ss << " required";
+          ss << "/>";
+          ss << "<button type=\"submit\">pair</button>";
+          ss << "</form>";
+        }
+        ss << "</li>";
+      }
+      ss << "</ul>\n";
+    }
+  }
 
   output += ss.str();
 }
@@ -167,12 +252,42 @@ Error Master::Internal::renderNodeInfo(const std::string_view& name, std::string
     }
   }
 
-  // Add "pair" button if node has NODE_MASTER flag
+  // Add pair form if node has NODE_MASTER flag
   if (flags & NodeRef::NODE_MASTER) {
-    std::string pairUrl = "/api2/multimaster/connect?node=" + std::string(name);
-    ss << "<br/><form method=\"GET\" action=\"" << pairUrl << "\">";
-    ss << "<button type=\"submit\">pair</button>";
-    ss << "</form>";
+    const bool localHasToken = multimaster && multimaster->hasToken();
+    bool remoteHasToken = false;
+    bool tokenMatch = false;
+    bool guidCollision = false;
+    if (multimaster) {
+      for (const PeerInfo& peer : multimaster->listPeers()) {
+        if (peer.masterUri.str() == url) {
+          remoteHasToken = peer.remoteHasToken;
+          tokenMatch = peer.tokenMatch;
+          guidCollision = peer.state == PeerState::GuidCollision;
+          break;
+        }
+      }
+    }
+    if (guidCollision) {
+      ss << "<br/><span style=\"color:#c62828;font-weight:bold;\">Cannot pair: this peer uses this master's GUID.</span>";
+    } else {
+      const bool tokenRequired = remoteHasToken && !tokenMatch;
+      ss << "<br/><form method=\"GET\" action=\"/api2/multimaster/connect\">";
+      ss << "<input type=\"hidden\" name=\"node\" value=\"" << std::string(name) << "\"/>";
+      ss << "<input type=\"password\" name=\"token\" placeholder=\"";
+      if (tokenRequired)
+        ss << "collective token (required)";
+      else if (localHasToken)
+        ss << "token (optional, already set)";
+      else
+        ss << "token (optional)";
+      ss << "\"";
+      if (tokenRequired)
+        ss << " required";
+      ss << "/>";
+      ss << "<button type=\"submit\">pair</button>";
+      ss << "</form>";
+    }
   }
 
   ss << "</p>";
@@ -182,16 +297,21 @@ Error Master::Internal::renderNodeInfo(const std::string_view& name, std::string
     ss << "<p>Requests = " << nodePtr->getQueuedRequests() << "</p>";
   }
 
-
-  std::unique_lock nodeLock(*nodePtr);
-
-  std::unique_lock<const RegistrationManager> regLock(regManager);
-
-  const auto& topicTypes = regManager.getTopicTypesUnsafe(regLock);
+  // Do not hold NodeRef and RegistrationManager together: register/GC take
+  // RegistrationManager then NodeRef. Nested locks here inverted that order
+  // and deadlocked the HTTP callback against Master::update().
+  std::set<std::string> subscriptions, publications, services;
+  {
+    NodeRef::Lock nodeLock(*nodePtr);
+    subscriptions = nodePtr->getSubscriptionsLocked(nodeLock);
+    publications = nodePtr->getPublicationsLocked(nodeLock);
+    services = nodePtr->getServicesLocked(nodeLock);
+  }
+  const auto topicTypes = regManager.getTopicTypes("root");
 
   // 2. Subscriptions: a list of subscribed topics with types and hrefs
   ss << "<p>" << print::HB("Subscriptions: ") << std::endl;
-  if (const auto& subscriptions = nodePtr->getSubscriptionsUnsafe(); !subscriptions.empty()) {
+  if (!subscriptions.empty()) {
     ss << "<ul>";
     for (const std::string& topic: subscriptions) {
       auto it = topicTypes.find(topic);
@@ -209,7 +329,7 @@ Error Master::Internal::renderNodeInfo(const std::string_view& name, std::string
 
   // 3. Publications: a list of published topics with hrefs.
   ss << "<p>" << print::HB("Publications: ") << std::endl;
-  if (const auto& publications = nodePtr->getPublicationsUnsafe(); !publications.empty()) {
+  if (!publications.empty()) {
     ss << "<ul>";
     for (const std::string& topic: publications) {
       auto it = topicTypes.find(topic);
@@ -227,7 +347,7 @@ Error Master::Internal::renderNodeInfo(const std::string_view& name, std::string
 
   // 4. Services.
   ss << "<p>" << print::HB("Services: ") << std::endl;
-  if (const auto& services = nodePtr->getServicesUnsafe(); !services.empty()) {
+  if (!services.empty()) {
     ss << "<ul>";
     for (const std::string& service: services) {
       ss << "<li>" << service << "</li>";

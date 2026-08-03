@@ -521,7 +521,7 @@ Error NetSocket::joinMulticastGroup(const NetAddress& group, bool loop)
     }
 
     int iLoop = loop ? 1 : 0;
-    if (setsockopt(fd, IPPROTO_IP, IP_MULTICAST_LOOP, (char*) &loop, sizeof(loop)) != 0) {
+    if (setsockopt(fd, IPPROTO_IP, IP_MULTICAST_LOOP, (char*) &iLoop, sizeof(iLoop)) != 0) {
       const char* err = last_socket_error_string();
       MINIROS_ERROR_NAMED("socket", "NetSocket[%d]::joinMulticastGroup() failed to set loop to %d: %s", fd, iLoop, err);
     }

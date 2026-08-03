@@ -14,11 +14,9 @@ Here is the list of different envorinment variables, which can influence behavio
 
 **HOME** - the last choice for picking ROS log folder.
 
-**MINIROS_MASTER_LOG_DIR** - preferred log directory for CI/`manage-master` (also exported as `ROS_LOG_DIR` to miniroscore). Contains `rosout.log` from the master's Rosout aggregator, plus `miniroscore.console.log` and `miniroscore.crash`.
+**MINIROS_MASTER_LOG_DIR** - preferred log directory for CI/`manage-master` (also exported as `ROS_LOG_DIR` to miniroscore). Contains `rosout.log` from the master's Rosout aggregator, plus `miniroscore.console.log` (via `Launcher::redirectOutput()`) and `miniroscore.crash`.
 
 **MINIROS_MASTER_DEBUG** - if `1`/`true`, `manage-master start` raises `--xmlrpc_log=4`.
-
-**MINIROS_MASTER_CONSOLE_LOG** - path for redirected miniroscore stdout/stderr; set by `manage-master` whenever a log dir is used (detached masters normally discard stdio).
 
 **MINIROS_CRASH_LOG** - file where `handleCrashes()` writes an async-signal-safe stack dump on SIGSEGV/SIGABRT/…; `manage-master` points this at `$MINIROS_MASTER_LOG_DIR/miniroscore.crash`.
 

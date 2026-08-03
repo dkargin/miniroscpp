@@ -87,10 +87,9 @@ miniros::Error startMaster(int port, miniros::Launcher& launcher)
   const auto consoleLog = (logDir / "miniroscore.console.log").string();
   // Truncate previous run so failure dumps are not stale.
   std::ofstream(crashLog, std::ios::trunc);
-  std::ofstream(consoleLog, std::ios::trunc);
   launcher.env("MINIROS_MASTER_LOG_DIR", logDir.string().c_str())
           .env("MINIROS_CRASH_LOG", crashLog.c_str())
-          .env("MINIROS_MASTER_CONSOLE_LOG", consoleLog.c_str());
+          .redirectOutput(consoleLog);
 
   const std::vector<std::string> args = {
     "-p", std::to_string(port),

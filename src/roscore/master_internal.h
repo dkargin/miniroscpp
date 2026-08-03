@@ -1,6 +1,9 @@
 #ifndef MINIROS_MASTER_INTERNAL_H
 #define MINIROS_MASTER_INTERNAL_H
 
+#include <atomic>
+#include <map>
+#include <set>
 #include <string_view>
 
 #include "master.h"
@@ -8,10 +11,9 @@
 #include "registration_manager.h"
 #include "parameter_storage.h"
 #include "master_handler.h"
-#include "discovery.h"
 #include "master_cache.h"
+#include "multimaster.h"
 
-#include "miniros/steady_timer.h"
 #include "miniros/rostime.h"
 
 namespace miniros {
@@ -22,7 +24,8 @@ class NodeInfoEndpoint;
 class TopicInfoEndpoint;
 class PublishedTopicsEndpoint;
 class TopicTypesEndpoint;
-class MultimasterConnectEndpoint;
+class MultimasterApiEndpoint;
+class DebugApiEndpoint;
 
 struct Master::Internal {
   std::shared_ptr<RPCManager> rpcManager;
@@ -52,14 +55,17 @@ struct Master::Internal {
   /// Endpoint for accessing /api2/topic_types
   std::shared_ptr<TopicTypesEndpoint> httpTopicTypesEndpoint;
 
-  /// Endpoint for accessing /api2/multimaster/connect
-  std::shared_ptr<MultimasterConnectEndpoint> httpMultimasterConnectEndpoint;
+  /// Endpoint for accessing /api2/multimaster/...
+  std::shared_ptr<MultimasterApiEndpoint> httpMultimasterApiEndpoint;
 
-  /// Discovery service for companion masters.
-  std::unique_ptr<Discovery> discovery;
+  /// Endpoint for accessing /debugAPI/... (only when debugApiEnabled).
+  std::shared_ptr<DebugApiEndpoint> httpDebugApiEndpoint;
 
-  /// Timer for periodic broadcasts.
-  SteadyTimer timerBroadcasts;
+  /// Multimaster discovery + registration sync over UDP.
+  std::unique_ptr<MultimasterManager> multimaster;
+
+  /// Foreign node names imported from each peer UUID string.
+  std::map<std::string, std::set<std::string>> foreignNodesByPeer;
 
   std::shared_ptr<CallbackQueue> callbackQueue;
 
@@ -71,6 +77,12 @@ struct Master::Internal {
 
   /// Timestamp of the last periodic node liveness check.
   SteadyTime lastNodeCheck;
+
+  /// When true, /api2/debug/* endpoints are registered.
+  bool debugApiEnabled = false;
+
+  /// Set by debug shutdown endpoint; makes Master::ok() return false.
+  std::atomic_bool shutdownRequested{false};
 
   Internal(const std::shared_ptr<RPCManager>& manager);
   ~Internal();
@@ -84,20 +96,24 @@ struct Master::Internal {
   /// Render information about specific node.
   Error renderNodeInfo(const std::string_view& name, std::string& output, bool showInternalInfo) const;
 
-  /// Callback for broadcasting timer.
-  /// It is called from main thread.
-  void onBroadcast(const SteadyTimerEvent& evt);
-
-  /// Callback for discovery event.
-  /// It is called from PollSet thread.
-  void onDiscovery(const DiscoveryEvent& evt);
-
   /// Probe registered nodes via getPid and queue unreachable ones for shutdown.
   void checkNodesAlive();
 
   /// Drop registrations for a node, notify remaining subscribers, and optionally
   /// send a Slave API shutdown request when the connection is still usable.
   void shutdownNode(const std::shared_ptr<NodeRef>& node, const std::string& reason);
+
+  /// Collect local registrations for multimaster snapshot (excludes local-only topics).
+  std::vector<miniros_msgs::RegistrationRecord> collectMultimasterSnapshot() const;
+
+  /// Apply inbound multimaster registration records from a peer.
+  void applyMultimasterRecords(const UUID& peer, const std::vector<miniros_msgs::RegistrationRecord>& records, bool snapshot);
+
+  /// Drop all foreign registrations imported from a peer.
+  void dropMultimasterPeer(const UUID& peer);
+
+  /// Ensure a discovered peer master appears as NODE_MASTER in the node list.
+  void registerPeerMasterNode(const PeerInfo& peer);
 };
 
 }

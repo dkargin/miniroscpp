@@ -96,10 +96,16 @@ int main(int argc, const char ** argv) {
     ("resolve", po::value<bool>()->default_value(false), "Resolve node IP address")
     ("dump_parameters", po::value<bool>()->default_value(false), "Dump all ROSParam values on every update")
     ("pidfile", po::value<std::string>(), "Path to a PID file")
-    ("discovery", po::value<int>(), "Sets UDP port for master discovery.")
-    ("discovery_group", po::value<std::string>(), "Multicast address for master discovery")
+    ("discovery", po::value<int>(), "UDP port for multimaster unicast sync (default: master RPC port)")
+    ("multicast", po::value<std::string>()->default_value("239.255.42.42:11312"),
+      "Multicast discovery group addr:port (use 'off' to disable)")
+    ("token", po::value<std::string>(),
+      "Shared secret for multimaster collective (optional; can also be entered in the web UI)")
+    ("peer", po::value<std::vector<std::string>>()->composing(),
+      "Peer master host:syncUdpPort to probe (repeatable; fallback when multicast is blocked)")
     ("node_check_period", po::value<double>()->default_value(5.0),
       "Period in seconds for checking whether registered nodes are still alive (0 disables)")
+    ("debugAPI", "Enable debug HTTP API at /debugAPI/... (e.g. GET /debugAPI/shutdown)")
     ;
 
   po::variables_map vm;
@@ -174,22 +180,63 @@ int main(int argc, const char ** argv) {
   master.setNodeCheckPeriod(vm["node_check_period"].as<double>());
   // Cache files (cache.<port>) are written to the current working directory.
   master.setCacheEnabled(!vm.count("no-cache"));
+  if (vm.count("debugAPI"))
+    master.setDebugApi(true);
 
   PidFile pidFile;
   if (vm.count("pidfile")) {
     pidFile.create(vm["pidfile"].as<std::string>().c_str());
   }
 
-  if (vm.count("discovery")) {
-    int discoveryPort = vm["discovery"].as<int>();
-    master.enableDiscoveryBroadcasts(discoveryPort);
+  if (vm.count("token")) {
+    master.setMultimasterToken(vm["token"].as<std::string>());
   }
 
-  if (vm.count("discovery_group")) {
-    std::string discoveryGroup = vm["discovery_group"].as<std::string>();
-    Error err = master.setDiscoveryGroup(discoveryGroup);
-    if (err != Error::Ok) {
-      MINIROS_ERROR("Failed to set up address for discovery multicasts: %s", err.toString());
+  if (vm.count("discovery")) {
+    master.setMultimasterUdpPort(vm["discovery"].as<int>());
+  }
+
+  if (vm.count("multicast")) {
+    const std::string mc = vm["multicast"].as<std::string>();
+    if (mc.empty() || mc == "off" || mc == "none") {
+      master.setMultimasterMulticast("", 0);
+    } else {
+      auto colon = mc.rfind(':');
+      if (colon == std::string::npos) {
+        MINIROS_ERROR("Invalid --multicast \"%s\", expected addr:port or 'off'", mc.c_str());
+        return EXIT_FAILURE;
+      }
+      std::string host = mc.substr(0, colon);
+      int mcPort = 0;
+      try {
+        mcPort = std::stoi(mc.substr(colon + 1));
+      } catch (...) {
+        MINIROS_ERROR("Invalid --multicast port in \"%s\"", mc.c_str());
+        return EXIT_FAILURE;
+      }
+      master.setMultimasterMulticast(host, mcPort);
+    }
+  }
+
+  if (vm.count("peer")) {
+    for (const std::string& peer : vm["peer"].as<std::vector<std::string>>()) {
+      auto colon = peer.rfind(':');
+      if (colon == std::string::npos) {
+        MINIROS_ERROR("Invalid --peer \"%s\", expected host:port", peer.c_str());
+        return EXIT_FAILURE;
+      }
+      std::string host = peer.substr(0, colon);
+      int peerPort = 0;
+      try {
+        peerPort = std::stoi(peer.substr(colon + 1));
+      } catch (...) {
+        MINIROS_ERROR("Invalid --peer port in \"%s\"", peer.c_str());
+        return EXIT_FAILURE;
+      }
+      if (Error err = master.addMultimasterPeer(host, peerPort); !err) {
+        MINIROS_ERROR("Failed to add multimaster peer \"%s\": %s", peer.c_str(), err.toString());
+        return EXIT_FAILURE;
+      }
     }
   }
 

@@ -35,6 +35,8 @@ struct MINIROS_DECL ChildReady {
  *
  * Prefer stop() for a cooperative interrupt and terminate() for a forceful kill.
  * Prefer stopAndWait() when tearing down so a stuck child cannot hang the parent forever.
+ *
+ * Use redirectOutput() to keep stdout/stderr in a file (useful for CI / FLAG_DETACHED).
  */
 class MINIROS_DECL Launcher {
 public:
@@ -61,6 +63,15 @@ public:
 
   /// Add environment variables (merged with the parent environment for the child).
   Launcher& env(const char* name, const char* value);
+
+  /// Capture child stdout and stderr into @p path.
+  /// Parent directories are created if needed; the file is truncated when start() runs.
+  /// Empty path disables capture (default). Call before start().
+  /// Works for both attached and FLAG_DETACHED children (detached otherwise discards stdio).
+  Launcher& redirectOutput(const std::filesystem::path& path);
+
+  /// Path last passed to redirectOutput(); empty if unset.
+  const std::filesystem::path& outputLog() const;
 
   /// Cooperative stop: SIGINT on POSIX, Ctrl-Break / console interrupt on Windows.
   Error stop();

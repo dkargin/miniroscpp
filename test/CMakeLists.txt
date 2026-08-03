@@ -50,7 +50,9 @@ miniros_add_test(test_time SOURCES rostime/test_time.cpp)
 
 add_subdirectory(xmlrpc)
 add_subdirectory(roscpp/basic)
+
 # Advanced tests need a live master and are not yet ported for Win32 CI.
 if(NOT WIN32)
   add_subdirectory(roscpp/advanced)
+	add_subdirectory(multimaster)
 endif()

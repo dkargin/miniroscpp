@@ -153,23 +153,23 @@ public:
   /// Save state in a json form.
   void writeJson(std::ostream& os, miniros::JsonState& state, const miniros::JsonSettings& settings);
 
+  /// Proof-of-ownership for NodeRef::lock()/unlock() (BasicLockable).
+  using Lock = std::unique_lock<const NodeRef>;
+
   /// Lock internal mutex.
   void lock() const;
 
   /// Unlock internal mutex.
   void unlock() const;
 
-  /// Get access to a subscription set.
-  /// It is thread-unsafe method and should be done inside external lock.
-  const std::set<std::string>& getSubscriptionsUnsafe() const;
+  /// Access subscriptions; caller must hold Lock from this node.
+  const std::set<std::string>& getSubscriptionsLocked(const Lock&) const;
 
-  /// Get access to a publication set.
-  /// It is thread-unsafe method and should be done inside external lock.
-  const std::set<std::string>& getPublicationsUnsafe() const;
+  /// Access publications; caller must hold Lock from this node.
+  const std::set<std::string>& getPublicationsLocked(const Lock&) const;
 
-  /// Get access to a service set.
-  /// It is thread-unsafe method and should be done inside external lock.
-  const std::set<std::string>& getServicesUnsafe() const;
+  /// Access services; caller must hold Lock from this node.
+  const std::set<std::string>& getServicesLocked(const Lock&) const;
 
   /// It is thread-unsafe method and should be done inside external lock.
   std::set<std::string> getParamSubscriptions() const;
@@ -257,15 +257,15 @@ public:
   void markDead();
 
 protected:
-  using Lock = std::unique_lock<std::mutex>;
+  using GuardLock = std::unique_lock<std::mutex>;
   using ClientLock = std::unique_lock<std::mutex>;
 
-  void updateState(State newState, Lock& lock) REQUIRES(m_guard);
+  void updateState(State newState, GuardLock& lock) REQUIRES(m_guard);
 
   /// Release HTTP client and drop all related objects.
   /// @param lock - must already own m_guard.
   /// @param clientLock - must already own m_clientGuard.
-  void deactivateConnectionUnsafe(Lock& lock, ClientLock& clientLock) REQUIRES(m_guard) REQUIRES(m_clientGuard);
+  void deactivateConnectionUnsafe(GuardLock& lock, ClientLock& clientLock) REQUIRES(m_guard) REQUIRES(m_clientGuard);
 
   /// Creates client object.
   std::shared_ptr<http::HttpClient> makeClient(PollSet* ps);
