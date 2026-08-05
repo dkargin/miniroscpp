@@ -229,7 +229,10 @@ int main(int argc, const char ** argv) {
     return EXIT_FAILURE;
   }
 
-  notifyNodeStarted();
+  NodeNotifyInfo started;
+  started.rpcPort = master.getPort();
+  started.uri = master.getUri();
+  notifyNodeStarted(started);
   double durStartMs = (SteadyTime::now() - timeStart).toSec() * 1000.;
   MINIROS_INFO("All components have started in %fms. URL=%s", durStartMs, master.getUri().c_str());
 
@@ -244,7 +247,10 @@ int main(int argc, const char ** argv) {
 
   MINIROS_INFO("Exiting main loop");
 
-  notifyNodeExiting();
+  NodeNotifyInfo stopping;
+  stopping.rpcPort = master.getPort();
+  stopping.uri = master.getUri();
+  notifyNodeExiting(stopping);
   r.reset();
   master.stop();
 

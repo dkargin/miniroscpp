@@ -55,27 +55,34 @@
 #include <sys/prctl.h>
 #endif
 
+#if defined(WIN32)
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+#endif
+
 #include "internal_config.h"
 
 #include <mutex>
 #include <thread>
+#include <iostream>
 
 #ifdef HAVE_GLIBC_BACKTRACE
 #include <execinfo.h>  // For backtrace()
 #endif
 
-#ifdef MINIROS_USE_LIBSYSTEMD
-
 #ifndef WIN32
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <fcntl.h>
 #endif
 
 #ifdef HAVE_LIBSYSTEMD
 #include <systemd/sd-daemon.h>
 #endif
-#endif
 
+#include "miniros/transport/rpc_manager.h"
 #include "internal/profiling.h"
 
 
@@ -125,119 +132,202 @@ std::string getThreadName()
   return ss.str();
 }
 
-#ifdef MINIROS_USE_LIBSYSTEMD
+namespace {
 
+#if !defined(WIN32)
 struct SmartFd {
   int fd = -1;
-
   ~SmartFd()
   {
-    if (fd >= 0) {
+    if (fd >= 0)
       close(fd);
-    }
   }
-
-  operator int() const { return fd;}
+  operator int() const { return fd; }
 };
 
-/// Portable version of systemd notifier.
-static int portableSystemdNotify(const char *message) {
+/// Send to NOTIFY_SOCKET (sd_notify protocol). Returns 1 notified, 0 no socket, <0 errno-style.
+int sendNotifySocket(const char* message)
+{
+  const char* socket_path = getenv("NOTIFY_SOCKET");
+  if (!socket_path)
+    return 0;
+  if (!message || !*message)
+    return -EINVAL;
 
-  union sockaddr_union {
+  const size_t message_length = strlen(message);
+  union {
     struct sockaddr sa;
     struct sockaddr_un sun;
   } socket_addr = {};
-
   socket_addr.sun.sun_family = AF_UNIX;
 
-  size_t path_length, message_length;
-  SmartFd fd;
-
-  const char *socket_path;
-
-  /* Verify the argument first */
-  if (!message)
-    return -EINVAL;
-
-  message_length = strlen(message);
-  if (message_length == 0)
-    return -EINVAL;
-
-  /* If the variable is not set, the protocol is a noop */
-  socket_path = getenv("NOTIFY_SOCKET");
-  if (!socket_path) {
-    std::cerr << "No NOTIFY_SOCKET variable was set. No systemd notification will be done." << std::endl;
-    return 0; /* Not set? Nothing to do */
-  }
-
-  /* Only AF_UNIX is supported, with path or abstract sockets */
   if (socket_path[0] != '/' && socket_path[0] != '@')
     return -EAFNOSUPPORT;
-
-  path_length = strlen(socket_path);
-  /* Ensure there is room for NUL byte */
+  const size_t path_length = strlen(socket_path);
   if (path_length >= sizeof(socket_addr.sun.sun_path))
     return -E2BIG;
 
   memcpy(socket_addr.sun.sun_path, socket_path, path_length);
-
-  /* Support for abstract socket */
   if (socket_addr.sun.sun_path[0] == '@')
     socket_addr.sun.sun_path[0] = 0;
 
-  fd.fd = socket(AF_UNIX, SOCK_DGRAM|SOCK_CLOEXEC, 0);
-  if (fd < 0) {
-    std::cerr << "Failed to create sdnotify socket" << std::endl;
+  SmartFd fd;
+  fd.fd = socket(AF_UNIX, SOCK_DGRAM | SOCK_CLOEXEC, 0);
+  if (fd < 0)
     return -errno;
-  }
 
-  if (connect(fd, &socket_addr.sa, offsetof(struct sockaddr_un, sun_path) + path_length) != 0) {
-    std::cerr << "Failed to connect sdnotify socket" << std::endl;
+  if (connect(fd, &socket_addr.sa, offsetof(struct sockaddr_un, sun_path) + path_length) != 0)
     return -errno;
-  }
 
-  ssize_t written = write(fd, message, message_length);
-  if (written != (ssize_t) message_length) {
-    std::cerr << "Failed to write sdnotify message" << std::endl;
+  const ssize_t written = write(fd, message, message_length);
+  if (written != static_cast<ssize_t>(message_length))
     return written < 0 ? -errno : -EPROTO;
-  }
+  return 1;
+}
+#endif
 
-  return 1; /* Notified! */
+/// Inherited pipe channel for Launcher (and Windows XP/7 baseline).
+Error sendNotifyPipe(const char* message)
+{
+  if (!message || !*message)
+    return Error::InvalidValue;
+
+#if defined(WIN32)
+  const char* handleStr = getenv("MINIROS_NOTIFY_HANDLE");
+  if (!handleStr || !*handleStr)
+    return Error::NotSupported;
+  char* end = nullptr;
+  const unsigned long long value = _strtoui64(handleStr, &end, 0);
+  if (end == handleStr || value == 0)
+    return Error::InvalidHandle;
+  HANDLE handle = reinterpret_cast<HANDLE>(static_cast<uintptr_t>(value));
+  DWORD written = 0;
+  const DWORD len = static_cast<DWORD>(strlen(message));
+  if (!WriteFile(handle, message, len, &written, nullptr) || written != len)
+    return Error::SystemError;
+  return Error::Ok;
+#else
+  const char* fdStr = getenv("MINIROS_NOTIFY_FD");
+  if (!fdStr || !*fdStr)
+    return Error::NotSupported;
+  char* end = nullptr;
+  const long fd = strtol(fdStr, &end, 10);
+  if (end == fdStr || fd < 0)
+    return Error::InvalidHandle;
+  const size_t len = strlen(message);
+  const ssize_t written = write(static_cast<int>(fd), message, len);
+  if (written != static_cast<ssize_t>(len))
+    return Error::SystemError;
+  return Error::Ok;
+#endif
 }
 
-#endif
-/// Sends signal to systemd.
-/// More info can be found at:
-/// https://www.freedesktop.org/software/systemd/man/latest/sd_notify.html
-Error systemdNotify(const char* status)
+Error sendSystemdNotify(const char* message)
 {
 #ifdef HAVE_LIBSYSTEMD
-  if (sd_notify(0, status) != 0) {
+  // Prefer libsystemd when available; it also honors NOTIFY_SOCKET.
+  if (!getenv("NOTIFY_SOCKET"))
+    return Error::NotSupported;
+  if (sd_notify(0, message) < 0)
     return Error::SystemError;
-  }
   return Error::Ok;
-#elif defined(MINIROS_USE_LIBSYSTEMD)
-  if (portableSystemdNotify(status))
+#elif !defined(WIN32)
+  const int rc = sendNotifySocket(message);
+  if (rc > 0)
+    return Error::Ok;
+  if (rc == 0)
+    return Error::NotSupported;
+  return Error::SystemError;
+#else
+  (void)message;
+  return Error::NotSupported;
+#endif
+}
+
+NodeNotifyInfo resolveNotifyInfo(const NodeNotifyInfo& in)
+{
+  NodeNotifyInfo info = in;
+#if defined(WIN32)
+  if (info.pid <= 0)
+    info.pid = static_cast<int64_t>(GetCurrentProcessId());
+#else
+  if (info.pid <= 0)
+    info.pid = static_cast<int64_t>(getpid());
+#endif
+  if (info.rpcPort <= 0) {
+    const RPCManagerPtr& rpc = RPCManager::instance();
+    if (rpc) {
+      info.rpcPort = static_cast<int>(rpc->getServerPort());
+      if (info.uri.empty() && info.rpcPort > 0)
+        info.uri = rpc->getServerUrlStr();
+    }
+  }
+  return info;
+}
+
+std::string buildNotifyPayload(const NodeNotifyInfo& info, bool ready)
+{
+  std::ostringstream oss;
+  if (ready)
+    oss << "READY=1\n";
+  else
+    oss << "STOPPING=1\n";
+  oss << "MAINPID=" << info.pid << "\n";
+  if (info.rpcPort > 0)
+    oss << "X_MINIROS_RPC_PORT=" << info.rpcPort << "\n";
+  if (!info.uri.empty())
+    oss << "X_MINIROS_URI=" << info.uri << "\n";
+  return oss.str();
+}
+
+Error dispatchNotify(const std::string& payload)
+{
+  int attempted = 0;
+  int succeeded = 0;
+
+  if (getenv("NOTIFY_SOCKET")) {
+    ++attempted;
+    if (sendSystemdNotify(payload.c_str()))
+      ++succeeded;
+  }
+
+#if defined(WIN32)
+  if (getenv("MINIROS_NOTIFY_HANDLE")) {
+#else
+  if (getenv("MINIROS_NOTIFY_FD")) {
+#endif
+    ++attempted;
+    if (sendNotifyPipe(payload.c_str()))
+      ++succeeded;
+  }
+
+  if (attempted == 0)
+    return Error::Ok; // Silent no-op when no owner channel is configured.
+  if (succeeded > 0)
     return Error::Ok;
   return Error::SystemError;
-#endif
-  return Error::NotImplemented;
 }
+
+} // namespace
 
 Error notifyNodeStarted()
 {
-#ifdef MINIROS_USE_LIBSYSTEMD
-  return systemdNotify("READY=1");
-#endif
-  return Error::NotSupported;
+  return notifyNodeStarted(NodeNotifyInfo{});
+}
+
+Error notifyNodeStarted(const NodeNotifyInfo& info)
+{
+  return dispatchNotify(buildNotifyPayload(resolveNotifyInfo(info), true));
 }
 
 Error notifyNodeExiting()
 {
-#ifdef MINIROS_USE_LIBSYSTEMD
-  return systemdNotify("STOPPING=1");
-#endif
-  return Error::NotSupported;
+  return notifyNodeExiting(NodeNotifyInfo{});
+}
+
+Error notifyNodeExiting(const NodeNotifyInfo& info)
+{
+  return dispatchNotify(buildNotifyPayload(resolveNotifyInfo(info), false));
 }
 
 static std::random_device              rd;

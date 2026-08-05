@@ -39,3 +39,8 @@ Liveness and cleanup:
 
 The check period is configured with the `--node_check_period` option of `miniroscore` (seconds; `0` disables
 periodic checks). Default is 5 seconds.
+
+# Process readiness #
+
+`miniroscore` uses [sd_notify](https://www.freedesktop.org/software/systemd/man/latest/sd_notify.html) protocol to tell SystemD that master has actually started and ready. Its usage is implied in scripts/miniroscore.service unit.
+These notifications do not need any additional external libraries, just the capability of compiler and platform to write into unix socket. 
