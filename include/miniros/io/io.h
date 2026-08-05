@@ -180,6 +180,10 @@ MINIROS_DECL int close_socket(socket_fd_t &socket);
 MINIROS_DECL int create_socket_pair(socket_fd_t socket_pair[2]);
 MINIROS_DECL int create_signal_pair(signal_fd_t signal_pair[2]);
 
+/// Ensure platform networking is ready (WSAStartup on Windows). Safe to call repeatedly.
+/// Call once from process main() when using sockets without miniros::init().
+MINIROS_DECL void ensureNetworkInitialized();
+
 MINIROS_DECL int create_socket_watcher();
 MINIROS_DECL void close_socket_watcher(int fd);
 MINIROS_NODISCARD MINIROS_DECL Error add_socket_to_watcher(int epfd, int fd, int events);

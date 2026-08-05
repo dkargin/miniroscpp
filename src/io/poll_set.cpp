@@ -89,12 +89,12 @@ struct PollSet::Internal {
 
   signal_fd_t signal_pipe_[2] GUARDED_BY(signal_mutex_) = {MINIROS_INVALID_SOCKET, MINIROS_INVALID_SOCKET};
 
-  int epfd_;
+  int epfd_ = MINIROS_INVALID_SOCKET;
 
   Internal()
-    :epfd_(create_socket_watcher())
   {
-
+    ensureNetworkInitialized();
+    epfd_ = create_socket_watcher();
   }
 
   /// Check if specified fd is related to internal signaling.
@@ -283,7 +283,7 @@ bool PollSet::addEvents(int sock, int events)
       LOCAL_ERROR("PollSet::addEvents(%d, %s) - failed to add FD to watcher: %s", sock,
         eventToString(events).c_str(), strerror(errno));
     } else {
-      LOCAL_INFO("PollSet::addEvents(%d, %s) - set events", sock,
+      LOCAL_DEBUG("PollSet::addEvents(%d, %s) - set events", sock,
         eventToString(events).c_str());
     }
   } else {
@@ -291,7 +291,7 @@ bool PollSet::addEvents(int sock, int events)
       LOCAL_ERROR("PollSet::addEvents(%d, %s) - failed update events in watcher: %s", sock,
         eventToString(events).c_str(), strerror(errno));
     } else {
-      LOCAL_INFO("PollSet::addEvents(%d, %s) - added events", sock,
+      LOCAL_DEBUG("PollSet::addEvents(%d, %s) - added events", sock,
         eventToString(events).c_str());
     }
   }

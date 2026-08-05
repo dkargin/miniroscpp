@@ -54,24 +54,6 @@ static int poll_fd(socket_fd_t sock)
 class Poller : public testing::Test
 {
 public:
-  Poller()
-  {
-#ifdef WIN32
-    WSADATA wsaData;
-    WSAStartup(MAKEWORD(2, 0), &wsaData);
-#endif
-  }
-
-  ~Poller() override
-  {
-    close_socket(sockets_[0]);
-    close_socket(sockets_[1]);
-
-#ifdef WIN32
-    WSACleanup();
-#endif
-  }
-
   void waitThenSignal()
   {
     std::this_thread::sleep_for(std::chrono::microseconds(100000));
@@ -95,6 +77,12 @@ protected:
     {
       FAIL();
     }
+  }
+
+  void TearDown() override
+  {
+    close_socket(sockets_[0]);
+    close_socket(sockets_[1]);
   }
 
   PollSet poll_set_;
@@ -453,6 +441,7 @@ int main(int argc, char** argv)
 {
   testing::InitGoogleTest(&argc, argv);
   miniros::handleCrashes();
+  miniros::ensureNetworkInitialized();
 
 #ifndef _WIN32
   signal(SIGPIPE, SIG_IGN);

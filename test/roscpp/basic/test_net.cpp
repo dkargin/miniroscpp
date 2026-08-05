@@ -160,9 +160,11 @@ TEST(Address, invalidAddress)
   EXPECT_EQ(err, Error::InvalidValue);
   ASSERT_FALSE(address.valid());
 
-  // Check some valid hostname with just an unknown IP.
-  Error err2 = addressFromString(NetAddress::AddressIPv4, "nice_but_not_known", 1234, address);
-  EXPECT_EQ(err2, Error::AddressIsUnknown);
+  // Valid-looking hostname under the reserved .invalid TLD (RFC 2606) — must not resolve.
+  // Platforms disagree on getaddrinfo status (EAI_NONAME vs EAI_FAIL/AGAIN), so accept either
+  // InvalidValue or AddressIsUnknown; never Ok.
+  Error err2 = addressFromString(NetAddress::AddressIPv4, "no-such-host.invalid", 1234, address);
+  EXPECT_TRUE(err2.code == Error::AddressIsUnknown || err2.code == Error::InvalidValue) << err2.toString();
   EXPECT_FALSE(address.valid());
 }
 
@@ -404,6 +406,7 @@ TEST(SocketTCP, Write2HeaderOnlyAndBodyOnlyEdges)
 int main(int argc, char** argv)
 {
   testing::InitGoogleTest(&argc, argv);
+  miniros::ensureNetworkInitialized();
 
   return RUN_ALL_TESTS();
 }
