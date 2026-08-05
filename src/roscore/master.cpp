@@ -14,6 +14,7 @@
 #include "parameter_storage.h"
 
 #include "miniros/transport/rpc_manager.h"
+#include "miniros/this_node.h"
 
 #include "internal_config.h"
 
@@ -636,6 +637,25 @@ std::shared_ptr<NodeRef> Master::registerNodeApi(const std::string& nodeId, cons
 
   auto report = internal_->regManager.registerNodeApi(nodeId, nodeApi, 0);
   return report.node;
+}
+
+void Master::registerSelfRef()
+{
+  if (!internal_ || !internal_->rpcManager)
+    return;
+
+  const std::string& name = this_node::getName();
+  const std::string& api = internal_->rpcManager->getServerUrlStr();
+  if (name.empty() || api.empty()) {
+    MINIROS_WARN("registerSelfRef: missing node name or RPC URL");
+    return;
+  }
+
+  auto report = internal_->regManager.registerNodeApi(
+    name, api, NodeRef::NODE_LOCAL | NodeRef::NODE_MINIROS);
+  if (report.created) {
+    MINIROS_INFO("Registered local master node %s at %s", name.c_str(), api.c_str());
+  }
 }
 
 std::shared_ptr<NodeRef> Master::getNodeByName(const std::string& nodeId) const

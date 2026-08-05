@@ -202,6 +202,9 @@ RegistrationManager::registerNodeApi(const std::string& nodeName, const std::str
   if (it != m_nodes.end()) {
     report.node = it->second;
     if (report.node->getApi() == nodeApi) {
+      if (flags & NodeRef::NODE_LOCAL)
+        report.node->setLocal();
+      report.node->setNodeFlags(flags);
       return report;
     }
 
@@ -217,14 +220,21 @@ RegistrationManager::registerNodeApi(const std::string& nodeName, const std::str
   report.node.reset(new NodeRef(nodeName, nodeApi));
   report.created = true;
 
-  assert(poll_set_);
-  if (Error err = report.node->activateConnection(name_, poll_set_); !err) {
-    MINIROS_ERROR("RegistrationManager::registerNodeApi(%s) - failed to activate connection", nodeName.c_str());
+  // Peer masters are not Slave API endpoints — do not open HttpClient / getPid.
+  const bool skipHttp = (flags & NodeRef::NODE_MASTER) != 0;
+  if (!skipHttp) {
+    assert(poll_set_);
+    if (Error err = report.node->activateConnection(name_, poll_set_); !err) {
+      MINIROS_ERROR("RegistrationManager::registerNodeApi(%s) - failed to activate connection", nodeName.c_str());
+    }
   }
 
-  m_nodes[nodeName] = report.node;
-
+  // Apply NODE_LOCAL after activateConnection so its isLocal() early-out does not skip the client.
+  if (flags & NodeRef::NODE_LOCAL)
+    report.node->setLocal();
   report.node->setNodeFlags(flags);
+
+  m_nodes[nodeName] = report.node;
 
   return report;
 }
