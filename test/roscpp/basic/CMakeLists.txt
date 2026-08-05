@@ -26,8 +26,9 @@ target_link_libraries(${TEST_GROUP}-notify_child roscxx)
 set_target_properties(${TEST_GROUP}-notify_child PROPERTIES FOLDER "Tests")
 
 miniros_add_test(${TEST_GROUP}-test_launcher SOURCES test_launcher.cpp)
+# TARGET_FILE resolves .exe and multi-config output dirs.
 target_compile_definitions(${TEST_GROUP}-test_launcher PRIVATE
-  MINIROS_TEST_BIN_DIR="${CMAKE_BINARY_DIR}/bin")
+  MINIROS_NOTIFY_CHILD="$<TARGET_FILE:${TEST_GROUP}-notify_child>")
 add_dependencies(${TEST_GROUP}-test_launcher ${TEST_GROUP}-notify_child)
 
 if(catkin_FOUND AND CATKIN_ENABLE_TESTING)
