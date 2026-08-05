@@ -429,7 +429,7 @@ Master::RpcValue Master::getSystemState(const std::string& caller_id, const Clie
       RpcValue xmlApis;
       xmlApis.setSize(apis.size());
       for (size_t i = 0; i < apis.size(); i++) {
-        xmlApis[i] = apis[i];
+        xmlApis[static_cast<int>(i)] = apis[i];
       }
 
       RpcValue group;

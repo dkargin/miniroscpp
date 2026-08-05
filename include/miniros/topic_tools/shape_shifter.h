@@ -205,7 +205,7 @@ std::shared_ptr<M> ShapeShifter::instantiate() const
   // The IStream never modifies its data, and nothing else has access to this
   // object, so the const_cast here is ok
   miniros::serialization::IStream s(const_cast<unsigned char*>(msgBuf.data()),
-                                msgBuf.size());
+                                static_cast<uint32_t>(msgBuf.size()));
   miniros::serialization::deserialize(s, *p);
 
   return p;
@@ -213,8 +213,10 @@ std::shared_ptr<M> ShapeShifter::instantiate() const
 
 template<typename Stream>
 void ShapeShifter::write(Stream& stream) const {
-  if (msgBuf.size() > 0)
-    memcpy(stream.advance(msgBuf.size()), msgBuf.data(), msgBuf.size());
+  if (msgBuf.size() > 0) {
+    uint8_t* ptr = stream.advance(static_cast<uint32_t>(msgBuf.size()));
+    memcpy(ptr, msgBuf.data(), msgBuf.size());
+  }
 }
 
 template<typename Stream>

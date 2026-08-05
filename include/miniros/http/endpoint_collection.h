@@ -42,7 +42,7 @@ public:
   void unregisterAll(const std::shared_ptr<EndpointHandler>& handler)
   {
     std::unique_lock lock(guard_);
-    std::remove_if(endpoints_.begin(), endpoints_.end(), [handler](const Binding& bind) {
+    (void)std::remove_if(endpoints_.begin(), endpoints_.end(), [handler](const Binding& bind) {
       return bind.handler == handler;
     });
   }
