@@ -17,6 +17,7 @@
 #include "miniros/http/http_endpoint.h"
 #include "miniros/http/http_filters.h"
 
+#include "miniros/io/io.h"
 #include "miniros/io/poll_manager.h"
 #include "miniros/callback_queue.h"
 #include "miniros/internal/watchdog.h"
@@ -581,6 +582,7 @@ int main(int argc, char** argv)
 {
   testing::InitGoogleTest(&argc, argv);
   miniros::handleCrashes();
+  miniros::ensureNetworkInitialized();
   miniros::console::set_logger_level("destructor", console::Level::Debug);
   miniros::console::set_logger_level("miniros.http", console::Level::Debug);
   miniros::console::set_logger_level("miniros.poll_set", console::Level::Debug);

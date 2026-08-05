@@ -21,18 +21,23 @@
 
 namespace {
 
-std::filesystem::path binDir()
-{
-#ifdef MINIROS_TEST_BIN_DIR
-  return std::filesystem::path(MINIROS_TEST_BIN_DIR);
-#else
-  return std::filesystem::current_path();
-#endif
-}
-
 std::filesystem::path notifyChildPath()
 {
-  return binDir() / "basic-notify_child";
+#ifdef MINIROS_NOTIFY_CHILD
+  return std::filesystem::path(MINIROS_NOTIFY_CHILD);
+#elif defined(MINIROS_TEST_BIN_DIR)
+  std::filesystem::path p = std::filesystem::path(MINIROS_TEST_BIN_DIR) / "basic-notify_child";
+#  if defined(WIN32)
+  p += ".exe";
+#  endif
+  return p;
+#else
+  std::filesystem::path p = std::filesystem::current_path() / "basic-notify_child";
+#  if defined(WIN32)
+  p += ".exe";
+#  endif
+  return p;
+#endif
 }
 
 void clearNotifyEnv()
@@ -118,13 +123,14 @@ TEST(Launcher, WaitReadyTimesOutWithoutNotify)
 TEST(Launcher, StartFailsWhenFileMissing)
 {
   miniros::Launcher launcher;
-  EXPECT_EQ(launcher.start(binDir() / "no_such_launcher_binary_xyz", {}, 0), miniros::Error::FileNotFound);
+  EXPECT_EQ(launcher.start(notifyChildPath().parent_path() / "no_such_launcher_binary_xyz", {}, 0),
+    miniros::Error::FileNotFound);
   EXPECT_FALSE(launcher.valid());
 }
 
 TEST(Launcher, StartFailsWithoutExecutePermission)
 {
-  const auto path = binDir() / "launcher_noexec_probe";
+  const auto path = notifyChildPath().parent_path() / "launcher_noexec_probe";
   {
     std::ofstream out(path);
     ASSERT_TRUE(out) << path;

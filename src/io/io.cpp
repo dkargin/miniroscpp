@@ -41,10 +41,14 @@
 #include "rosconsole/local_log.h"
 
 #include <cassert>
-#include <errno.h> // for EFAULT and co.
+#include <cerrno> // for EFAULT and co.
+#include <cstdio>
+#include <mutex>
+#include <sstream>
+
 #include <miniros/io/io.h>
 #include <miniros/rosassert.h> // don't need if we dont call the pipe functions.
-#include <sstream>
+
 #ifdef WIN32
 #else
 #include <cstring> // strerror
@@ -448,6 +452,22 @@ Error poll_sockets(int epfd, socket_pollfd* fds, nfds_t nfds, int timeout, std::
 /*****************************************************************************
 ** Socket Utilities
 *****************************************************************************/
+
+void ensureNetworkInitialized()
+{
+#ifdef WIN32
+  static std::once_flag once;
+  std::call_once(once, []() {
+    WSADATA wsaData;
+    const int rc = WSAStartup(MAKEWORD(2, 2), &wsaData);
+    if (rc != 0) {
+      // Avoid depending on logging here; callers will see subsequent socket failures.
+      fprintf(stderr, "miniros: WSAStartup failed with error %d\n", rc);
+    }
+  });
+#endif
+}
+
 /**
  * Sets the socket as non blocking.
  * @return int : 0 on success, WSAGetLastError()/errno on failure.

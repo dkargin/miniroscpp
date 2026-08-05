@@ -41,6 +41,7 @@
 #include "miniros/this_node.h"
 
 #include "miniros/callback_queue.h"
+#include "miniros/io/io.h"
 #include "miniros/io/poll_manager.h"
 
 #include "miniros/transport/connection_manager.h"
@@ -515,10 +516,9 @@ void init(const M_string& remappings, const std::string& name, uint32_t options)
     // Disable SIGPIPE
 #ifndef WIN32
     signal(SIGPIPE, SIG_IGN);
-#else
-    WSADATA wsaData;
-    WSAStartup(MAKEWORD(2, 0), &wsaData);
 #endif
+    ensureNetworkInitialized();
+
     check_ipv6_environment();
     network::init(remappings);
 

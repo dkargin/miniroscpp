@@ -34,6 +34,7 @@
  */
 
 #include <gtest/gtest.h>
+#include "miniros/io/io.h"
 #include "miniros/io/poll_set.h"
 #include "miniros/transport/transport_tcp.h"
 
@@ -476,6 +477,7 @@ int main(int argc, char** argv)
 {
   testing::InitGoogleTest(&argc, argv);
   miniros::handleCrashes();
+  miniros::ensureNetworkInitialized();
 
 #ifndef _WIN32
   signal(SIGPIPE, SIG_IGN);
