@@ -202,7 +202,7 @@ bool NodeRef::isLocal() const
 void NodeRef::setNodeFlags(int flags)
 {
   std::unique_lock lock(m_guard);
-  m_flags |= flags & (NODE_LOCAL | NODE_MASTER | NODE_FOREIGN);
+  m_flags |= flags & (NODE_LOCAL | NODE_MASTER | NODE_FOREIGN | NODE_MINIROS);
 }
 
 int NodeRef::getNodeFlags() const
@@ -251,8 +251,8 @@ std::shared_ptr<http::HttpClient> NodeRef::makeClient(PollSet* ps)
         node->updateState(State::Connected, lock);
         callerId = node->m_callerId;
       }
-      // Verify the node after (re)connect; request is queued until the socket is idle.
-      if (!callerId.empty())
+      // Verify remote nodes after (re)connect; in-process nodes skip getPid.
+      if (!callerId.empty() && !node->isLocal())
         node->sendGetPid(callerId);
       return true;
     }
@@ -483,6 +483,10 @@ std::shared_ptr<http::HttpClient> NodeRef::getClient()
 Error NodeRef::sendGetPid(const std::string& callerId)
 {
   if (!needRequests())
+    return Error::Ok;
+
+  // Same-process nodes are always alive; no Slave API round-trip.
+  if (isLocal())
     return Error::Ok;
 
   auto client = getClient();

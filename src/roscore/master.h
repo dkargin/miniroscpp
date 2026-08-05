@@ -89,6 +89,9 @@ public:
   /// Init periodic events.
   void initEvents(NodeHandle& nh);
 
+  /// Register this process's node (LocalMaster) as NODE_LOCAL so liveness checks skip it.
+  void registerSelfRef();
+
   std::shared_ptr<NodeRef> registerNodeApi(const std::string& nodeId, const std::string& nodeApi) const;
   std::shared_ptr<NodeRef> getNodeByName(const std::string& nodeId) const;
 

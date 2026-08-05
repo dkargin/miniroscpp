@@ -217,7 +217,8 @@ int main(int argc, const char ** argv) {
   std::unique_ptr<master::Rosout> r;
   if (useRosout) {
     MINIROS_INFO("Creating Rosout object");
-    //master.registerSelfRef();
+    // Register /miniroscore as NODE_LOCAL before Rosout attaches pubs/subs.
+    master.registerSelfRef();
     r.reset(new master::Rosout(node));
   }
 
