@@ -48,9 +48,31 @@ MINIROS_DECL void setThreadName(const char* name);
 /// Get debug-friendly thread name.
 MINIROS_DECL std::string getThreadName();
 
-/// Notify system that node has successfully started.
+/// Payload for readiness / exit notifications (sd_notify-compatible KEY=value lines).
+struct MINIROS_DECL NodeNotifyInfo {
+  /// Process id. 0 → current process.
+  int64_t pid = 0;
+  /// XML-RPC / HTTP listen port. 0 → try RPCManager::instance() if started.
+  int rpcPort = 0;
+  /// Optional URI string (e.g. http://host:port).
+  std::string uri;
+};
+
+/**
+ * Notify owner/systemd that the node is ready.
+ *
+ * Payload includes READY=1, MAINPID, and optional X_MINIROS_RPC_PORT / X_MINIROS_URI.
+ * Delivery channels (any may be set; silent no-op if none):
+ * - NOTIFY_SOCKET — systemd Type=notify, or Unix Launcher with FLAG_NOTIFY
+ * - MINIROS_NOTIFY_HANDLE — inherited pipe write HANDLE (Windows)
+ * - MINIROS_NOTIFY_FD — inherited pipe fd (POSIX; useful in unit tests)
+ */
 MINIROS_DECL Error notifyNodeStarted();
+MINIROS_DECL Error notifyNodeStarted(const NodeNotifyInfo& info);
+
+/// Notify owner/systemd that the node is exiting (STOPPING=1 + MAINPID / optional fields).
 MINIROS_DECL Error notifyNodeExiting();
+MINIROS_DECL Error notifyNodeExiting(const NodeNotifyInfo& info);
 
 /// UUID has the following hex structure:
 /// 8-4-4-4-12

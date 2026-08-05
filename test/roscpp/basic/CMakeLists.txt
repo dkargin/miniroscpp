@@ -21,6 +21,15 @@ miniros_add_test(${TEST_GROUP}-test_http_parser SOURCES test_http_parser.cpp)
 miniros_add_test(${TEST_GROUP}-test_http SOURCES test_http.cpp)
 miniros_add_test(${TEST_GROUP}-test_net SOURCES test_net.cpp)
 
+add_executable(${TEST_GROUP}-notify_child notify_child.cpp)
+target_link_libraries(${TEST_GROUP}-notify_child roscxx)
+set_target_properties(${TEST_GROUP}-notify_child PROPERTIES FOLDER "Tests")
+
+miniros_add_test(${TEST_GROUP}-test_launcher SOURCES test_launcher.cpp)
+target_compile_definitions(${TEST_GROUP}-test_launcher PRIVATE
+  MINIROS_TEST_BIN_DIR="${CMAKE_BINARY_DIR}/bin")
+add_dependencies(${TEST_GROUP}-test_launcher ${TEST_GROUP}-notify_child)
+
 if(catkin_FOUND AND CATKIN_ENABLE_TESTING)
   message(STATUS "Trying to find rostest for more complex testing")
   find_package(rostest REQUIRED)
