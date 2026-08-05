@@ -489,6 +489,78 @@ int close_socket(socket_fd_t& socket)
 #endif // WIN32
 }
 
+/**
+ * Connected bidirectional socket pair for tests and internal signalling sockets.
+ * @return 0 on success, -1 on failure.
+ */
+int create_socket_pair(socket_fd_t socket_pair[2])
+{
+#ifdef WIN32
+  socket_pair[0] = INVALID_SOCKET;
+  socket_pair[1] = INVALID_SOCKET;
+
+  union {
+    struct sockaddr_in inaddr;
+    struct sockaddr addr;
+  } a;
+  socklen_t addrlen = sizeof(a.inaddr);
+
+  socket_fd_t listen_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+  if (listen_socket == INVALID_SOCKET) {
+    return -1;
+  }
+
+  int reuse = 1;
+  if (setsockopt(listen_socket, SOL_SOCKET, SO_REUSEADDR, (char*)&reuse, (socklen_t)sizeof(reuse)) == SOCKET_ERROR) {
+    ::closesocket(listen_socket);
+    return -1;
+  }
+
+  memset(&a, 0, sizeof(a));
+  a.inaddr.sin_family = AF_INET;
+  a.inaddr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+  a.inaddr.sin_port = 0;
+
+  if (bind(listen_socket, &a.addr, sizeof(a.inaddr)) == SOCKET_ERROR) {
+    ::closesocket(listen_socket);
+    return -1;
+  }
+  if (getsockname(listen_socket, &a.addr, &addrlen) == SOCKET_ERROR) {
+    ::closesocket(listen_socket);
+    return -1;
+  }
+  if (listen(listen_socket, 1) == SOCKET_ERROR) {
+    ::closesocket(listen_socket);
+    return -1;
+  }
+
+  DWORD overlapped_flag = 0;
+  socket_pair[0] = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, overlapped_flag);
+  if (socket_pair[0] == INVALID_SOCKET) {
+    ::closesocket(listen_socket);
+    return -1;
+  }
+  if (connect(socket_pair[0], &a.addr, sizeof(a.inaddr)) == SOCKET_ERROR) {
+    ::closesocket(listen_socket);
+    ::closesocket(socket_pair[0]);
+    return -1;
+  }
+  socket_pair[1] = accept(listen_socket, NULL, NULL);
+  if (socket_pair[1] == INVALID_SOCKET) {
+    ::closesocket(listen_socket);
+    ::closesocket(socket_pair[0]);
+    return -1;
+  }
+  ::closesocket(listen_socket);
+  return 0;
+#else
+  if (socketpair(AF_UNIX, SOCK_STREAM, 0, socket_pair) != 0) {
+    return -1;
+  }
+  return 0;
+#endif
+}
+
 /*****************************************************************************
 ** Signal Pair
 *****************************************************************************/
@@ -500,98 +572,16 @@ int close_socket(socket_fd_t& socket)
 int create_signal_pair(signal_fd_t signal_pair[2])
 {
 #ifdef WIN32 // use a socket pair
-  signal_pair[0] = INVALID_SOCKET;
-  signal_pair[1] = INVALID_SOCKET;
-
-  union {
-    struct sockaddr_in inaddr;
-    struct sockaddr addr;
-  } a;
-  socklen_t addrlen = sizeof(a.inaddr);
-
-  /*********************
-   ** Listen Socket
-   **********************/
-  socket_fd_t listen_socket = INVALID_SOCKET;
-  listen_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-  if (listen_socket == INVALID_SOCKET) {
+  if (create_socket_pair(signal_pair) != 0) {
     return -1;
   }
-
-  // allow it to be bound to an address already in use - do we actually need this?
-  int reuse = 1;
-  if (setsockopt(listen_socket, SOL_SOCKET, SO_REUSEADDR, (char*)&reuse, (socklen_t)sizeof(reuse)) == SOCKET_ERROR) {
-    ::closesocket(listen_socket);
-    return -1;
-  }
-
-  memset(&a, 0, sizeof(a));
-  a.inaddr.sin_family = AF_INET;
-  a.inaddr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-  // For TCP/IP, if the port is specified as zero, the service provider assigns
-  // a unique port to the application from the dynamic client port range.
-  a.inaddr.sin_port = 0;
-
-  if (bind(listen_socket, &a.addr, sizeof(a.inaddr)) == SOCKET_ERROR) {
-    ::closesocket(listen_socket);
-    return -1;
-  }
-  // we need this below because the system auto filled in some entries, e.g. port #
-  if (getsockname(listen_socket, &a.addr, &addrlen) == SOCKET_ERROR) {
-    ::closesocket(listen_socket);
-    return -1;
-  }
-  // max 1 connection permitted
-  if (listen(listen_socket, 1) == SOCKET_ERROR) {
-    ::closesocket(listen_socket);
-    return -1;
-  }
-
-  /*********************
-   ** Connection
-   **********************/
-  // do we need io overlapping?
-  // DWORD flags = (make_overlapped ? WSA_FLAG_OVERLAPPED : 0);
-  DWORD overlapped_flag = 0;
-  signal_pair[0] = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, overlapped_flag);
-  if (signal_pair[0] == INVALID_SOCKET) {
-    ::closesocket(listen_socket);
-    ::closesocket(signal_pair[0]);
-    return -1;
-  }
-  // reusing the information from above to connect to the listener
-  if (connect(signal_pair[0], &a.addr, sizeof(a.inaddr)) == SOCKET_ERROR) {
-    ::closesocket(listen_socket);
-    ::closesocket(signal_pair[0]);
-    return -1;
-  }
-  /*********************
-   ** Accept
-   **********************/
-  signal_pair[1] = accept(listen_socket, NULL, NULL);
-  if (signal_pair[1] == INVALID_SOCKET) {
-    ::closesocket(listen_socket);
-    ::closesocket(signal_pair[0]);
-    ::closesocket(signal_pair[1]);
-    return -1;
-  }
-  /*********************
-  ** Nonblocking
-  **********************/
-  // should we do this or should we set io overlapping?
   if ((set_non_blocking(signal_pair[0]) != 0) || (set_non_blocking(signal_pair[1]) != 0)) {
-    ::closesocket(listen_socket);
     ::closesocket(signal_pair[0]);
     ::closesocket(signal_pair[1]);
     return -1;
   }
-  /*********************
-  ** Cleanup
-  **********************/
-  ::closesocket(listen_socket); // the listener has done its job.
   return 0;
 #else  // use a pipe pair
-       // initialize
   signal_pair[0] = -1;
   signal_pair[1] = -1;
 

@@ -69,9 +69,9 @@ public:
   /// Check type of provided address in a string form.
   static Type checkAddressType(const std::string& address);
 
-  friend bool operator < (const NetAddress& a, const NetAddress& b);
-  friend bool operator == (const NetAddress& a, const NetAddress& b);
-  friend bool operator != (const NetAddress& a, const NetAddress& b);
+  friend MINIROS_DECL bool operator < (const NetAddress& a, const NetAddress& b);
+  friend MINIROS_DECL bool operator == (const NetAddress& a, const NetAddress& b);
+  friend MINIROS_DECL bool operator != (const NetAddress& a, const NetAddress& b);
 
   /// Get pointer to a raw address.
   /// Typically, it is sockaddr_t object.
@@ -131,8 +131,12 @@ protected:
   size_t rawAddressSize_ = 0;
 };
 
+MINIROS_DECL bool operator < (const NetAddress& a, const NetAddress& b);
+MINIROS_DECL bool operator == (const NetAddress& a, const NetAddress& b);
+MINIROS_DECL bool operator != (const NetAddress& a, const NetAddress& b);
+
 /// Address comparator which checks for IP address only, without comparing the port.
-struct AddressCompareNoPort {
+struct MINIROS_DECL AddressCompareNoPort {
   bool operator()(const NetAddress& a, const NetAddress& b) const;
 };
 

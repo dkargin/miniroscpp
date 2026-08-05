@@ -37,11 +37,6 @@
 #include "miniros/io/poll_set.h"
 #include "miniros/io/io.h"
 
-#ifndef _WIN32
-# include <sys/socket.h>
-#endif
-
-#include <fcntl.h>
 #include <thread>
 #include <chrono>
 #include <cassert>
@@ -50,121 +45,10 @@
 
 using namespace miniros;
 
-
-
-int set_nonblocking(int &socket)
+// PollSet still takes int fds; sockets are socket_fd_t (SOCKET on Win64).
+static int poll_fd(socket_fd_t sock)
 {
-#ifndef _WIN32
-  if (fcntl(socket, F_SETFL, O_NONBLOCK) == -1)
-  {
-    return errno;
-  }
-#else
-  u_long non_blocking = 1;
-  if (ioctlsocket(socket, FIONBIO, &non_blocking) != 0)
-  {
-    return WSAGetLastError();
-  }
-#endif
-  return 0;
-}
-
-int create_socket_pair(int socket_pair[2])
-{
-#ifndef _WIN32
-  return socketpair(AF_UNIX, SOCK_STREAM, 0, socket_pair);
-#else
-  socket_pair[0] = INVALID_SOCKET;
-  socket_pair[1] = INVALID_SOCKET;
-
-  /*********************
-  ** Listen Socket
-  **********************/
-  socket_fd_t listen_socket = INVALID_SOCKET;
-  listen_socket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-  if (listen_socket == INVALID_SOCKET)
-  {
-    return WSAGetLastError();
-  }
-
-  // allow it to be bound to an address already in use - do we actually need this?
-  int reuse = 1;
-  if (setsockopt(listen_socket, SOL_SOCKET, SO_REUSEADDR, reinterpret_cast<const char*>(&reuse), static_cast<socklen_t>(sizeof(reuse))) == SOCKET_ERROR)
-  {
-    ::closesocket(listen_socket);
-    return WSAGetLastError();
-  }
-
-  union
-  {
-    struct sockaddr_in inaddr;
-    struct sockaddr addr;
-  } a;
-
-  memset(&a, 0, sizeof(a));
-  a.inaddr.sin_family = AF_INET;
-  a.inaddr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-  // For TCP/IP, if the port is specified as zero, the service provider assigns
-  // a unique port to the application from the dynamic client port range.
-  a.inaddr.sin_port = 0;
-
-  if (bind(listen_socket, &a.addr, sizeof(a.inaddr)) == SOCKET_ERROR)
-  {
-    ::closesocket(listen_socket);
-    return WSAGetLastError();
-  }
-
-  // we need this below because the system auto filled in some entries, e.g. port #
-  socklen_t addrlen = static_cast<socklen_t>(sizeof(a.inaddr));
-  if (getsockname(listen_socket, &a.addr, &addrlen) == SOCKET_ERROR)
-  {
-    ::closesocket(listen_socket);
-    return WSAGetLastError();
-  }
-  // max 1 connection permitted
-  if (listen(listen_socket, 1) == SOCKET_ERROR)
-  {
-    ::closesocket(listen_socket);
-    return WSAGetLastError();
-  }
-
-  /*********************
-  ** Connection
-  **********************/
-  DWORD overlapped_flag = 0;
-  socket_pair[0] = WSASocket(AF_INET, SOCK_STREAM, 0, NULL, 0, overlapped_flag);
-  if (socket_pair[0] == INVALID_SOCKET)
-  {
-    ::closesocket(listen_socket);
-    ::closesocket(socket_pair[0]);
-    return WSAGetLastError();
-  }
-
-  // reusing the information from above to connect to the listener
-  if (connect(socket_pair[0], &a.addr, sizeof(a.inaddr)) == SOCKET_ERROR)
-  {
-    ::closesocket(listen_socket);
-    ::closesocket(socket_pair[0]);
-    return WSAGetLastError();
-  }
-
-  /*********************
-  ** Accept
-  **********************/
-  socket_pair[1] = accept(listen_socket, NULL, NULL);
-  if (socket_pair[1] == INVALID_SOCKET)
-  {
-    ::closesocket(listen_socket);
-    ::closesocket(socket_pair[0]);
-    return WSAGetLastError();
-  }
-
-  /*********************
-  ** Cleanup
-  **********************/
-  ::closesocket(listen_socket);  // the listener has done its job.
-  return 0;
-#endif
+  return static_cast<int>(sock);
 }
 
 class Poller : public testing::Test
@@ -172,20 +56,20 @@ class Poller : public testing::Test
 public:
   Poller()
   {
-#ifdef _WIN32
+#ifdef WIN32
     WSADATA wsaData;
     WSAStartup(MAKEWORD(2, 0), &wsaData);
-#endif    
+#endif
   }
 
   ~Poller() override
   {
-    ::close(sockets_[0]);
-    ::close(sockets_[1]);
+    close_socket(sockets_[0]);
+    close_socket(sockets_[1]);
 
-#ifdef _WIN32
+#ifdef WIN32
     WSACleanup();
-#endif    
+#endif
   }
 
   void waitThenSignal()
@@ -203,37 +87,38 @@ protected:
     {
       FAIL();
     }
-    if(set_nonblocking(sockets_[0]) != 0)
+    if (set_non_blocking(sockets_[0]) != 0)
     {
       FAIL();
     }
-    if(set_nonblocking(sockets_[1]) != 0)
+    if (set_non_blocking(sockets_[1]) != 0)
     {
       FAIL();
     }
   }
 
   PollSet poll_set_;
-
-  int sockets_[2] = {MINIROS_INVALID_SOCKET, MINIROS_INVALID_SOCKET};
+  socket_fd_t sockets_[2] = {MINIROS_INVALID_SOCKET, MINIROS_INVALID_SOCKET};
 };
 
 class SocketHelper
 {
 public:
-  SocketHelper(int sock)
+  SocketHelper(socket_fd_t sock)
   : bytes_read_(0)
   , bytes_written_(0)
   , pollouts_received_(0)
   , socket_(sock)
   {}
 
+  int fd() const { return poll_fd(socket_); }
+
   void processEvents(int events)
   {
     if (events & POLLIN)
     {
       char b;
-      while(read(socket_, &b, 1) > 0)
+      while (read_socket(socket_, &b, 1) > 0)
       {
         ++bytes_read_;
       };
@@ -250,7 +135,7 @@ public:
   void write()
   {
     char b = 0;
-    if (::write(socket_, &b, 1) > 0)
+    if (write_socket(socket_, &b, 1) > 0)
     {
       ++bytes_written_;
     }
@@ -259,45 +144,49 @@ public:
   int bytes_read_;
   int bytes_written_;
   int pollouts_received_;
-  int socket_;
+  socket_fd_t socket_;
 };
+
+static int write_byte(socket_fd_t sock)
+{
+  char b = 0;
+  return write_socket(sock, &b, 1);
+}
 
 TEST_F(Poller, read)
 {
   SocketHelper sh(sockets_[0]);
-  ASSERT_TRUE(poll_set_.addSocket(sh.socket_, 0, [&sh](int events) {
+  ASSERT_TRUE(poll_set_.addSocket(sh.fd(), 0, [&sh](int events) {
     sh.processEvents(events);
     return 0;
   }));
 
-  char b = 0;
-
-  int ret = write(sockets_[1], &b, 1);
+  int ret = write_byte(sockets_[1]);
   ASSERT_GT(ret, 0);
   poll_set_.update(1);
 
   ASSERT_EQ(sh.bytes_read_, 0);
 
-  ASSERT_TRUE(poll_set_.addEvents(sh.socket_, POLLIN));
+  ASSERT_TRUE(poll_set_.addEvents(sh.fd(), POLLIN));
   poll_set_.update(1);
   ASSERT_EQ(sh.bytes_read_, 1);
 
-  ret = write(sockets_[1], &b, 1);
+  ret = write_byte(sockets_[1]);
   ASSERT_GT(ret, 0);
   poll_set_.update(1);
   ASSERT_EQ(sh.bytes_read_, 2);
 
-  ASSERT_TRUE(poll_set_.delEvents(sh.socket_, POLLIN));
-  ret = write(sockets_[1], &b, 1);
+  ASSERT_TRUE(poll_set_.delEvents(sh.fd(), POLLIN));
+  ret = write_byte(sockets_[1]);
   ASSERT_GT(ret, 0);
   poll_set_.update(1);
   ASSERT_EQ(sh.bytes_read_, 2);
 
-  ASSERT_TRUE(poll_set_.addEvents(sh.socket_, POLLIN));
+  ASSERT_TRUE(poll_set_.addEvents(sh.fd(), POLLIN));
   poll_set_.update(1);
   ASSERT_EQ(sh.bytes_read_, 3);
 
-  ASSERT_TRUE(poll_set_.delSocket(sockets_[0]));
+  ASSERT_TRUE(poll_set_.delSocket(poll_fd(sockets_[0])));
   poll_set_.update(1);
   ASSERT_EQ(sh.bytes_read_, 3);
 }
@@ -305,18 +194,18 @@ TEST_F(Poller, read)
 TEST_F(Poller, write)
 {
   SocketHelper sh(sockets_[0]);
-  ASSERT_TRUE(poll_set_.addSocket(sh.socket_, 0, [&sh](int events) {
+  ASSERT_TRUE(poll_set_.addSocket(sh.fd(), 0, [&sh](int events) {
     sh.processEvents(events);
     return 0;
   }));
-  ASSERT_TRUE(poll_set_.addEvents(sh.socket_, POLLOUT));
+  ASSERT_TRUE(poll_set_.addEvents(sh.fd(), POLLOUT));
 
   poll_set_.update(1);
 
   ASSERT_EQ(sh.pollouts_received_, 1);
   ASSERT_EQ(sh.bytes_written_, 1);
 
-  ASSERT_TRUE(poll_set_.delEvents(sh.socket_, POLLOUT));
+  ASSERT_TRUE(poll_set_.delEvents(sh.fd(), POLLOUT));
   poll_set_.update(1);
   ASSERT_EQ(sh.pollouts_received_, 1);
   ASSERT_EQ(sh.bytes_written_, 1);
@@ -326,18 +215,18 @@ TEST_F(Poller, readAndWrite)
 {
   SocketHelper sh1(sockets_[0]);
   SocketHelper sh2(sockets_[1]);
-  ASSERT_TRUE(poll_set_.addSocket(sh1.socket_, 0, [&sh1](int events) {
+  ASSERT_TRUE(poll_set_.addSocket(sh1.fd(), 0, [&sh1](int events) {
     sh1.processEvents(events);
     return 0;
   }));
 
-  ASSERT_TRUE(poll_set_.addSocket(sh2.socket_, 0, [&sh2](int events) {
+  ASSERT_TRUE(poll_set_.addSocket(sh2.fd(), 0, [&sh2](int events) {
     sh2.processEvents(events);
     return 0;
   }));
 
-  ASSERT_TRUE(poll_set_.addEvents(sh1.socket_, POLLIN));
-  ASSERT_TRUE(poll_set_.addEvents(sh2.socket_, POLLIN));
+  ASSERT_TRUE(poll_set_.addEvents(sh1.fd(), POLLIN));
+  ASSERT_TRUE(poll_set_.addEvents(sh2.fd(), POLLIN));
 
   sh1.write();
   sh2.write();
@@ -350,16 +239,16 @@ TEST_F(Poller, readAndWrite)
   ASSERT_EQ(sh1.bytes_read_, 1);
   ASSERT_EQ(sh2.bytes_read_, 1);
 
-  ASSERT_TRUE(poll_set_.addEvents(sh1.socket_, POLLOUT));
-  ASSERT_TRUE(poll_set_.addEvents(sh2.socket_, POLLOUT));
+  ASSERT_TRUE(poll_set_.addEvents(sh1.fd(), POLLOUT));
+  ASSERT_TRUE(poll_set_.addEvents(sh2.fd(), POLLOUT));
 
   poll_set_.update(1);
 
   ASSERT_EQ(sh1.bytes_written_, 2);
   ASSERT_EQ(sh2.bytes_written_, 2);
 
-  ASSERT_TRUE(poll_set_.delEvents(sh1.socket_, POLLOUT));
-  ASSERT_TRUE(poll_set_.delEvents(sh2.socket_, POLLOUT));
+  ASSERT_TRUE(poll_set_.delEvents(sh1.fd(), POLLOUT));
+  ASSERT_TRUE(poll_set_.delEvents(sh2.fd(), POLLOUT));
 
   poll_set_.update(1);
 
@@ -370,48 +259,48 @@ TEST_F(Poller, readAndWrite)
 TEST_F(Poller, multiAddDel)
 {
   SocketHelper sh(sockets_[0]);
-  ASSERT_TRUE(poll_set_.addSocket(sh.socket_, 0, [&sh](int events) {
+  ASSERT_TRUE(poll_set_.addSocket(sh.fd(), 0, [&sh](int events) {
     sh.processEvents(events);
     return 0;
   }));
   // Should return false if adding same socket twice.
-  ASSERT_FALSE(poll_set_.addSocket(sh.socket_, 0, [&sh](int events) {
+  ASSERT_FALSE(poll_set_.addSocket(sh.fd(), 0, [&sh](int events) {
     sh.processEvents(events);
     return 0;
   }));
 
-  ASSERT_TRUE(poll_set_.addEvents(sh.socket_, 0));
-  // Expecting false because sh.socket_+1 is not added to PollSet.
-  ASSERT_FALSE(poll_set_.addEvents(sh.socket_ + 1, 0));
+  ASSERT_TRUE(poll_set_.addEvents(sh.fd(), 0));
+  // Expecting false because sh.fd()+1 is not added to PollSet.
+  ASSERT_FALSE(poll_set_.addEvents(sh.fd() + 1, 0));
 
-  ASSERT_TRUE(poll_set_.delEvents(sh.socket_, 0));
-  // Expecting false because sh.socket_+1 is not added to PollSet.
-  ASSERT_FALSE(poll_set_.delEvents(sh.socket_ + 1, 0));
+  ASSERT_TRUE(poll_set_.delEvents(sh.fd(), 0));
+  // Expecting false because sh.fd()+1 is not added to PollSet.
+  ASSERT_FALSE(poll_set_.delEvents(sh.fd() + 1, 0));
 
-  // Expecting false because sh.socket_+1 is not added to PollSet.
-  ASSERT_FALSE(poll_set_.delSocket(sh.socket_ + 1));
-  ASSERT_TRUE(poll_set_.delSocket(sh.socket_));
+  // Expecting false because sh.fd()+1 is not added to PollSet.
+  ASSERT_FALSE(poll_set_.delSocket(sh.fd() + 1));
+  ASSERT_TRUE(poll_set_.delSocket(sh.fd()));
 }
 
 void addThread(PollSet* ps, SocketHelper* sh, Barrier* barrier)
 {
   barrier->wait();
 
-  ps->addSocket(sh->socket_, 0, [sh](int events) {
+  ps->addSocket(sh->fd(), 0, [sh](int events) {
     sh->processEvents(events);
     return 0;
   });
-  ps->addEvents(sh->socket_, POLLIN);
-  ps->addEvents(sh->socket_, POLLOUT);
+  ps->addEvents(sh->fd(), POLLIN);
+  ps->addEvents(sh->fd(), POLLOUT);
 }
 
 void delThread(PollSet* ps, SocketHelper* sh, Barrier* barrier)
 {
   barrier->wait();
 
-  ps->delEvents(sh->socket_, POLLIN);
-  ps->delEvents(sh->socket_, POLLOUT);
-  ps->delSocket(sh->socket_);
+  ps->delEvents(sh->fd(), POLLIN);
+  ps->delEvents(sh->fd(), POLLOUT);
+  ps->delSocket(sh->fd());
 }
 
 /**
@@ -493,29 +382,29 @@ void addDelManyTimesThread(PollSet* ps, SocketHelper* sh1, SocketHelper* sh2, Ba
 
   for (int i = 0; i < count; ++i)
   {
-    ps->addSocket(sh1->socket_, 0, [sh1](int events) {
+    ps->addSocket(sh1->fd(), 0, [sh1](int events) {
       sh1->processEvents(events);
       return 0;
     });
-    ps->addEvents(sh1->socket_, POLLIN);
-    ps->addEvents(sh1->socket_, POLLOUT);
+    ps->addEvents(sh1->fd(), POLLIN);
+    ps->addEvents(sh1->fd(), POLLOUT);
 
-    ps->addSocket(sh2->socket_, 0, [sh2](int events) {
+    ps->addSocket(sh2->fd(), 0, [sh2](int events) {
       sh2->processEvents(events);
       return 0;
     });
-    ps->addEvents(sh2->socket_, POLLIN);
-    ps->addEvents(sh2->socket_, POLLOUT);
+    ps->addEvents(sh2->fd(), POLLIN);
+    ps->addEvents(sh2->fd(), POLLOUT);
 
     std::this_thread::sleep_for(std::chrono::microseconds(100));
 
-    ps->delEvents(sh1->socket_, POLLIN);
-    ps->delEvents(sh1->socket_, POLLOUT);
-    ps->delSocket(sh1->socket_);
+    ps->delEvents(sh1->fd(), POLLIN);
+    ps->delEvents(sh1->fd(), POLLOUT);
+    ps->delSocket(sh1->fd());
 
-    ps->delEvents(sh2->socket_, POLLIN);
-    ps->delEvents(sh2->socket_, POLLOUT);
-    ps->delSocket(sh2->socket_);
+    ps->delEvents(sh2->fd(), POLLIN);
+    ps->delEvents(sh2->fd(), POLLOUT);
+    ps->delSocket(sh2->fd());
   }
 
   *done = true;

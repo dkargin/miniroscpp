@@ -175,6 +175,9 @@ MINIROS_DECL Error poll_sockets(int epfd, socket_pollfd *fds, nfds_t nfds, int t
 
 MINIROS_DECL int set_non_blocking(socket_fd_t &socket);
 MINIROS_DECL int close_socket(socket_fd_t &socket);
+/// Create a connected bidirectional socket pair (AF_UNIX socketpair, or TCP loopback on Windows).
+/// Does not set non-blocking mode; call set_non_blocking() if needed.
+MINIROS_DECL int create_socket_pair(socket_fd_t socket_pair[2]);
 MINIROS_DECL int create_signal_pair(signal_fd_t signal_pair[2]);
 
 MINIROS_DECL int create_socket_watcher();
@@ -203,37 +206,40 @@ inline void close_signal_pair(signal_fd_t signal_pair[2]) {
 }
 
 /**
- * Write to a signal_fd_t device. On windows we're using sockets (because windows
- * select() function cant handle pipes) so we have to use socket functions.
- * On linux, we're just using the pipes.
+ * Cross-platform read/write for sockets (and Windows signal sockets).
+ * Windows sockets need send/recv; Unix sockets and pipes use read/write.
  */
-#ifdef _MSC_VER
-	inline int write_signal(const signal_fd_t &signal, const char *buffer, const unsigned int &nbyte) {
-		return ::send(signal, buffer, nbyte, 0);
-//		return write(signal, buffer, nbyte);
-	}
+#ifdef WIN32
+inline int write_socket(socket_fd_t sock, const char* buffer, unsigned int nbyte)
+{
+  return ::send(sock, buffer, nbyte, 0);
+}
+inline int read_socket(socket_fd_t sock, char* buffer, unsigned int nbyte)
+{
+  return ::recv(sock, buffer, nbyte, 0);
+}
 #else
-	inline ssize_t write_signal(const signal_fd_t &signal, const void *buffer, const size_t &nbyte) {
-		return write(signal, buffer, nbyte);
-	}
+inline int write_socket(socket_fd_t sock, const void* buffer, size_t nbyte)
+{
+  return static_cast<int>(::write(sock, buffer, nbyte));
+}
+inline int read_socket(socket_fd_t sock, void* buffer, size_t nbyte)
+{
+  return static_cast<int>(::read(sock, buffer, nbyte));
+}
 #endif
 
+/** Write to a signal_fd_t device (pipe on Unix, socket on Windows). */
+inline int write_signal(const signal_fd_t& signal, const char* buffer, unsigned int nbyte)
+{
+  return write_socket(signal, buffer, nbyte);
+}
 
-/**
- * Read from a signal_fd_t device. On windows we're using sockets (because windows
- * select() function cant handle pipes) so we have to use socket functions.
- * On linux, we're just using the pipes.
- */
-#ifdef _MSC_VER
-	inline int read_signal(const signal_fd_t &signal, char *buffer, const unsigned int &nbyte) {
-		return ::recv(signal, buffer, nbyte, 0);
-//		return _read(signal, buffer, nbyte);
-	}
-#else
-	inline ssize_t read_signal(const signal_fd_t &signal, void *buffer, const size_t &nbyte) {
-		return read(signal, buffer, nbyte);
-	}
-#endif
+/** Read from a signal_fd_t device (pipe on Unix, socket on Windows). */
+inline int read_signal(const signal_fd_t& signal, char* buffer, unsigned int nbyte)
+{
+  return read_socket(signal, buffer, nbyte);
+}
 
 namespace network {
 
