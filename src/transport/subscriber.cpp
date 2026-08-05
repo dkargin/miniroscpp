@@ -99,7 +99,7 @@ namespace miniros
   {
     if (impl_ && impl_->isValid())
       {
-	return TopicManager::instance()->getNumPublishers(impl_->topic_);
+	return static_cast<uint32_t>(TopicManager::instance()->getNumPublishers(impl_->topic_));
       }
 
     return 0;

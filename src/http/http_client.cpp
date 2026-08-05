@@ -223,7 +223,7 @@ struct HttpClient::Internal {
   int getQueuedRequests() const
   {
     std::scoped_lock lock(requests_guard);
-    int num = requests.size();
+    int num = static_cast<int>(requests.size());
     if (active_request)
       num++;
     return num;

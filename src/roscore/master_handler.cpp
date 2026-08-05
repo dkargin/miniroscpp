@@ -119,7 +119,7 @@ ReturnStruct MasterHandler::registerSubscriber(const RequesterInfo& requesterInf
         strUrl = publishers[i]->getApi();
       }
       MINIROS_INFO_NAMED("handler", "registerSubscriber(\"%s\") - pub=%s", topic.c_str(), strUrl.c_str());
-      rtn.value[i] = strUrl;
+      rtn.value[static_cast<int>(i)] = strUrl;
     }
   }
   return rtn;
@@ -165,7 +165,7 @@ ReturnStruct MasterHandler::registerPublisher(const RequesterInfo& requesterInfo
     network::URL url = m_resolver->resolveAddressFor(subscribers[i], requesterInfo.clientAddress, requesterInfo.localAddress);
     std::string strUrl = url.str();
     MINIROS_INFO_NAMED("handler", "registerPublisher(\"%s\") - sub=%s", topic.c_str(), strUrl.c_str());
-    rtn.value[i] = strUrl;
+    rtn.value[static_cast<int>(i)] = strUrl;
   }
   return rtn;
 }

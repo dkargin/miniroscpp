@@ -235,7 +235,7 @@ bool XmlRpcRequest::parseXmlResponseImpl(const std::string_view& responseView, X
       XmlRpc::XmlRpcUtil::error("Error in XmlRpcRequest::parseResponse: Invalid response value. Response:\n%s", response.c_str());
       return false;
     }
-    offset = offsetCopy;
+    offset = static_cast<int>(offsetCopy);
   } else {
     XmlRpc::XmlRpcUtil::error("Error in XmlRpcRequest::parseResponse: Invalid response - no param or fault tag. Response:\n%s", response.c_str());
     return false;
