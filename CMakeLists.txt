@@ -37,6 +37,21 @@ option(MINIROS_SANITIZE_THREADS "Use TSan to find potential data races" OFF)
 option(MINIROS_THREAD_SAFETY_ANALYSIS  "Use static thread checking from clang" OFF)
 option(MINIROS_PORTABLE_TOOLS "Make miniroscore and minibag portable. Forces linking to static library" OFF)
 
+# NDK / Android toolchain builds (CMAKE_TOOLCHAIN_FILE=android.toolchain.cmake).
+# Requires NDK r22+: libc++ ships std::filesystem there; miniros uses it in the core library.
+# See docs/android.md.
+if(ANDROID)
+  message(STATUS "Android NDK build: static roscxx for console tools (ADB-friendly)")
+  set(MINIROS_BUILD_SHARED OFF CACHE BOOL "Build shared version of miniros" FORCE)
+  set(MINIROS_PORTABLE_TOOLS ON CACHE BOOL "Portable tools" FORCE)
+  set(MINIROS_PATCH_RPATH OFF CACHE BOOL "Update RPATH to use install paths" FORCE)
+  set(MINIROS_USE_SYSTEM_BZIP2 OFF CACHE BOOL "Use bzip2 from system" FORCE)
+  set(MINIROS_USE_SYSTEM_LZ4 OFF CACHE BOOL "Use lz4 from system" FORCE)
+  set(MINIROS_USE_SYSTEM_PROGRAM_OPTIONS OFF CACHE BOOL "Use boost::program_options" FORCE)
+  set(MINIROS_ROSBAG_USE_GPGME_ENCRYPTION OFF CACHE BOOL "Use GPGME encryption support" FORCE)
+  set(MINIROS_ROSBAG_USE_OPENSSL_ENCRYPTION OFF CACHE BOOL "Use openssl encryption for rosbag" FORCE)
+endif()
+
 if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
   option(MINIROS_USE_LIBSYSTEMD "Signal systemd when node has actually started" ON)
 endif()
