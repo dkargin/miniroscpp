@@ -12,18 +12,18 @@ set_target_properties (bag_write PROPERTIES FOLDER "Examples")
 # It follows official ROS tutorial at http://wiki.ros.org/ROS/Tutorials/WritingPublisherSubscriber%28c%2B%2B%29
 # On Android, link the static archive so ADB pushes self-contained binaries.
 if (ANDROID)
-  set(MINIROS_EXAMPLE_ROSCXX roscxx_static)
+  set(MINIROS_EXAMPLE_ROSCXX roscxx_static Threads::Threads)
 else()
   set(MINIROS_EXAMPLE_ROSCXX roscxx)
 endif()
 
 add_executable(talker talker.cpp)
-target_link_libraries(talker ${MINIROS_EXAMPLE_ROSCXX})
+target_link_libraries(talker PRIVATE ${MINIROS_EXAMPLE_ROSCXX})
 target_include_directories(talker PRIVATE ${MINIROS_INCLUDE_GENERATED_DIRS})
 set_target_properties (talker PROPERTIES FOLDER "Examples")
 
 add_executable(listener listener.cpp)
-target_link_libraries(listener ${MINIROS_EXAMPLE_ROSCXX})
+target_link_libraries(listener PRIVATE ${MINIROS_EXAMPLE_ROSCXX})
 target_include_directories(listener PRIVATE ${MINIROS_INCLUDE_GENERATED_DIRS})
 set_target_properties (listener PROPERTIES FOLDER "Examples")
 
