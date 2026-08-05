@@ -1,1 +1,4 @@
 include/generated/*/*.h
+
+# Android NDK out-of-tree builds
+build-android/

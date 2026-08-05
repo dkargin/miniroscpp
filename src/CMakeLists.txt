@@ -304,8 +304,10 @@ if (MINIROS_BUILD_SHARED)
   )
 
   add_library(roscxx_static STATIC ${ALL_SRC})
+  target_compile_options(roscxx_static PRIVATE ${MINIROS_COMPILE_OPTIONS})
   target_link_options(roscxx_static PRIVATE ${MINIROS_LINK_OPTIONS})
   set_property(TARGET roscxx_static PROPERTY CXX_STANDARD 17)
+  set_property(TARGET roscxx_static PROPERTY POSITION_INDEPENDENT_CODE ON)
 
   target_include_directories(roscxx_static
       PRIVATE
@@ -339,23 +341,35 @@ set_property(TARGET roscxx PROPERTY CXX_STANDARD 17)
 
 if(WIN32)
   set(PLATFORM_LIBS wsock32 ws2_32)
+elseif(ANDROID)
+  # NDK uses libc++; std::filesystem is in the C++ runtime (no libstdc++fs).
+  set(PLATFORM_LIBS)
 else()
   set(PLATFORM_LIBS stdc++fs)
 endif()
 
-target_link_libraries(roscxx PRIVATE
-    ${console_bridge_LIBRARIES} 
-    ${PKG_LIBS_LIBRARIES} 
-    ${PLATFORM_LIBS} 
-    Threads::Threads
+target_link_libraries(roscxx
+    PUBLIC Threads::Threads
+    PRIVATE
+    ${console_bridge_LIBRARIES}
+    ${PKG_LIBS_LIBRARIES}
+    ${PLATFORM_LIBS}
 )
+
+# Propagate link deps to executables that use the static archive (portable tools / Android).
+if (MINIROS_BUILD_SHARED)
+  target_link_libraries(roscxx_static
+      PUBLIC Threads::Threads
+      PRIVATE ${console_bridge_LIBRARIES} ${PKG_LIBS_LIBRARIES} ${PLATFORM_LIBS})
+endif()
 
 find_package(PkgConfig QUIET)
 
 add_executable(miniroscore roscore/miniroscore.cpp)
 
 set(MINIROSCORE_LIBS impl::program_options)
-if (MINIROS_PORTABLE_TOOLS)
+# Android and MINIROS_PORTABLE_TOOLS: single-file binaries (no libroscxx.so).
+if (ANDROID OR MINIROS_PORTABLE_TOOLS)
   list(APPEND MINIROSCORE_LIBS roscxx_static)
 else()
   list(APPEND MINIROSCORE_LIBS roscxx)
@@ -403,7 +417,7 @@ add_executable(minibag
 
 set(MINIBAG_LIBS bag_storage impl::program_options Threads::Threads)
 
-if (MINIROS_PORTABLE_TOOLS)
+if (ANDROID OR MINIROS_PORTABLE_TOOLS)
   list(APPEND MINIBAG_LIBS roscxx_static)
 else()
   list(APPEND MINIBAG_LIBS roscxx)
