@@ -22,61 +22,48 @@ miniros_add_test(HelloTest SOURCES HelloTest.cpp)
 
 miniros_add_test(test_dispatch_live SOURCES test_dispatch_live.cpp)
 target_link_libraries(test_dispatch_live test_fixtures)
+if(WIN32)
+  target_link_libraries(test_dispatch_live ws2_32)
+endif()
 
 miniros_add_test(test_ulimit SOURCES test_ulimit.cpp)
 target_link_libraries(test_ulimit test_fixtures)
 
-add_library(mock_socket STATIC mock_socket.cpp)
-target_link_libraries(mock_socket ${GTEST_LIBRARIES})
-set_target_properties(mock_socket PROPERTIES EXCLUDE_FROM_ALL TRUE)
-target_include_directories(mock_socket PRIVATE ${MINIROS_INCLUDE_BUILD}/static)
-
-# Some tests rely on replacing system calls (like write/read) by a mock versions.
-# But we must include actual sources to make this replacement happen.
-miniros_add_test(test_client SOURCES test_client.cpp
-  ${XMLRPC_SRC_ROOT}/XmlRpcClient.cpp
-  ${XMLRPC_SRC_ROOT}/XmlRpcValue.cpp
-  ${XMLRPC_SRC_ROOT}/XmlRpcUtil.cpp
-  ${XMLRPC_SRC_ROOT}/XmlRpcDispatch.cpp
-  ${XMLRPC_SRC_ROOT}/XmlRpcSource.cpp
-  ${XMLRPC_SRC_ROOT}/../b64/b64decode.cpp
-  ${XMLRPC_SRC_ROOT}/../b64/b64encode.cpp)
-
-target_link_libraries(test_client mock_socket)
-if(WIN32)
-  target_link_libraries(test_client ws2_32)
-endif()
-
-if(WIN32)
-  # build everything from source, undefine MINIROS_BUILD_SHARED_LIBS to eliminate the dllimport/dllexport attributes
-  set_target_properties(test_client PROPERTIES COMPILE_FLAGS -UMINIROS_BUILD_SHARED_LIBS)
-endif()
-
-miniros_add_test(test_dispatch SOURCES test_dispatch.cpp
-  ${XMLRPC_SRC_ROOT}/XmlRpcDispatch.cpp
-  ${XMLRPC_SRC_ROOT}/XmlRpcSource.cpp
-  ${XMLRPC_SRC_ROOT}/XmlRpcUtil.cpp
-  ${XMLRPC_SRC_ROOT}/../b64/b64decode.cpp
-  ${XMLRPC_SRC_ROOT}/../b64/b64encode.cpp)
-
-if(WIN32)
-  # build everything from source, undefine MINIROS_BUILD_SHARED_LIBS to eliminate the dllimport/dllexport attributes
-  set_target_properties(test_dispatch PROPERTIES COMPILE_FLAGS -UMINIROS_BUILD_SHARED_LIBS)
-endif()
-
-target_link_libraries(test_dispatch mock_socket)
-if(WIN32)
-  target_link_libraries(test_dispatch ws2_32)
-endif()
-
-if(APPLE)
-  set_target_properties(test_dispatch PROPERTIES LINK_FLAGS "-Wl,-alias,___wrap_poll,_poll")
-elseif(UNIX)
-  set_target_properties(test_dispatch PROPERTIES LINK_FLAGS "-Wl,--wrap=poll")
-endif()
-
-
+# Mock-socket / --wrap tests need ELF symbol interposition; skip on Windows shared builds.
 if(NOT WIN32)
+  add_library(mock_socket STATIC mock_socket.cpp)
+  target_link_libraries(mock_socket ${GTEST_LIBRARIES})
+  set_target_properties(mock_socket PROPERTIES EXCLUDE_FROM_ALL TRUE)
+  target_include_directories(mock_socket PRIVATE ${MINIROS_INCLUDE_BUILD}/static)
+
+  # Some tests rely on replacing system calls (like write/read) by a mock versions.
+  # But we must include actual sources to make this replacement happen.
+  miniros_add_test(test_client SOURCES test_client.cpp
+    ${XMLRPC_SRC_ROOT}/XmlRpcClient.cpp
+    ${XMLRPC_SRC_ROOT}/XmlRpcValue.cpp
+    ${XMLRPC_SRC_ROOT}/XmlRpcUtil.cpp
+    ${XMLRPC_SRC_ROOT}/XmlRpcDispatch.cpp
+    ${XMLRPC_SRC_ROOT}/XmlRpcSource.cpp
+    ${XMLRPC_SRC_ROOT}/../b64/b64decode.cpp
+    ${XMLRPC_SRC_ROOT}/../b64/b64encode.cpp)
+
+  target_link_libraries(test_client mock_socket)
+
+  miniros_add_test(test_dispatch SOURCES test_dispatch.cpp
+    ${XMLRPC_SRC_ROOT}/XmlRpcDispatch.cpp
+    ${XMLRPC_SRC_ROOT}/XmlRpcSource.cpp
+    ${XMLRPC_SRC_ROOT}/XmlRpcUtil.cpp
+    ${XMLRPC_SRC_ROOT}/../b64/b64decode.cpp
+    ${XMLRPC_SRC_ROOT}/../b64/b64encode.cpp)
+
+  target_link_libraries(test_dispatch mock_socket)
+
+  if(APPLE)
+    set_target_properties(test_dispatch PROPERTIES LINK_FLAGS "-Wl,-alias,___wrap_poll,_poll")
+  elseif(UNIX)
+    set_target_properties(test_dispatch PROPERTIES LINK_FLAGS "-Wl,--wrap=poll")
+  endif()
+
   add_executable(test_socket test_socket.cpp test_system_mocks.c
     ${XMLRPC_SRC_ROOT}/XmlRpcSocket.cpp
     ${XMLRPC_SRC_ROOT}/XmlRpcUtil.cpp
@@ -101,6 +88,9 @@ endif()
 
 miniros_add_test(TestValues SOURCES TestValues.cpp)
 
-miniros_add_test(test_util SOURCES test_util.cpp)
+# Accesses XmlRpc static members across the DLL boundary; not portable on Win32 shared builds.
+if(NOT WIN32)
+  miniros_add_test(test_util SOURCES test_util.cpp)
+endif()
 
 miniros_add_test(TestXml SOURCES TestXml.cpp)

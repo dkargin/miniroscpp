@@ -21,7 +21,11 @@ function(miniros_advanced_test TARGET_NAME)
   if (${CMAKE_CURRENT_FUNCTION}_DISABLED)
     # Test is disabled. It is either not ported properly from rostest or does not suite CTest environment
   else()
-    add_test(NAME ${TARGET_NAME} COMMAND ${TEST_LAUNCHER} $<TARGET_FILE:${TARGET_NAME}>)
+    if (WIN32)
+      add_test(NAME ${TARGET_NAME} COMMAND $<TARGET_FILE:${TARGET_NAME}>)
+    else()
+      add_test(NAME ${TARGET_NAME} COMMAND ${TEST_LAUNCHER} $<TARGET_FILE:${TARGET_NAME}>)
+    endif()
     if (${CMAKE_CURRENT_FUNCTION}_WITH_MASTER)
       # Test needs master to operate
       list(APPEND TESTS_WITH_MASTER ${TARGET_NAME})

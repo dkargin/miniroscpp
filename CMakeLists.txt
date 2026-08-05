@@ -139,6 +139,12 @@ else()
   set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
   set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
   set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
+  # Multi-config generators (Visual Studio) otherwise append /$<CONFIG>; keep a flat bin/ for tests and PATH.
+  foreach(_cfg DEBUG RELEASE RELWITHDEBINFO MINSIZEREL)
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_${_cfg} "${CMAKE_BINARY_DIR}/bin")
+    set(CMAKE_LIBRARY_OUTPUT_DIRECTORY_${_cfg} "${CMAKE_BINARY_DIR}/lib")
+    set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY_${_cfg} "${CMAKE_BINARY_DIR}/lib")
+  endforeach()
 endif()
 
 # Generate external config for shared lib.
@@ -265,13 +271,24 @@ endif(catkin_FOUND)
 
 
 if (MINIROS_BUILD_TESTS)
-	find_package(GTest 1.8.0)
+	find_package(GTest 1.8.0 QUIET)
+	# vcpkg / CONFIG packages expose imported targets rather than GTEST_* variables.
+	if (NOT GTEST_FOUND AND NOT GTest_FOUND)
+		find_package(GTest CONFIG QUIET)
+	endif()
+	if ((GTest_FOUND OR GTEST_FOUND) AND TARGET GTest::gtest AND NOT GTEST_LIBRARIES)
+		set(GTEST_LIBRARIES GTest::gtest)
+		if (TARGET GTest::gtest_main)
+			list(APPEND GTEST_LIBRARIES GTest::gtest_main)
+		endif()
+		set(GTEST_FOUND TRUE)
+	endif()
 	# Ensuring target "tests" is exists at a top level CMakeLists for compatibility with Eclipse CDT.
 	if(TARGET tests)
 	else ()
 		add_custom_target(tests)
 	endif()
-		
+
 	if (GTEST_FOUND)
 		add_subdirectory(test)
 	else()

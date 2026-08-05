@@ -26,9 +26,14 @@ function(miniros_add_test TARGET_NAME)
 	if (${CMAKE_CURRENT_FUNCTION}_DISABLED)
 		# Test is disabled. It is either not ported properly from rostest or does not suite CTest environment
 	else()
-		# Running test through helper script.
-		# It helps catching call stacks on remote CI machine.
-		add_test(NAME ${TARGET_NAME} COMMAND ${TEST_LAUNCHER} $<TARGET_FILE:${TARGET_NAME}>)
+		if (WIN32)
+			# Direct execution on Windows (launch_test.sh is bash/gdb-specific).
+			add_test(NAME ${TARGET_NAME} COMMAND $<TARGET_FILE:${TARGET_NAME}>)
+		else()
+			# Running test through helper script.
+			# It helps catching call stacks on remote CI machine.
+			add_test(NAME ${TARGET_NAME} COMMAND ${TEST_LAUNCHER} $<TARGET_FILE:${TARGET_NAME}>)
+		endif()
 		if (${CMAKE_CURRENT_FUNCTION}_WITH_MASTER)
 			# Test needs master to operate
 			# Fixtures are still not working
@@ -45,4 +50,7 @@ miniros_add_test(test_time SOURCES rostime/test_time.cpp)
 
 add_subdirectory(xmlrpc)
 add_subdirectory(roscpp/basic)
-add_subdirectory(roscpp/advanced)
+# Advanced tests need a live master and are not yet ported for Win32 CI.
+if(NOT WIN32)
+  add_subdirectory(roscpp/advanced)
+endif()
