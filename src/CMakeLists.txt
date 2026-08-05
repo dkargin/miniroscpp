@@ -348,19 +348,19 @@ else()
   set(PLATFORM_LIBS stdc++fs)
 endif()
 
-target_link_libraries(roscxx
-    PUBLIC Threads::Threads
-    PRIVATE
+target_link_libraries(roscxx PRIVATE
     ${console_bridge_LIBRARIES}
     ${PKG_LIBS_LIBRARIES}
     ${PLATFORM_LIBS}
+    Threads::Threads
 )
 
-# Propagate link deps to executables that use the static archive (portable tools / Android).
+# Keep Threads PRIVATE so exported miniros::roscxx does not require consumers
+# to have called find_package(Threads). Static tool links add Threads below.
 if (MINIROS_BUILD_SHARED)
-  target_link_libraries(roscxx_static
-      PUBLIC Threads::Threads
-      PRIVATE ${console_bridge_LIBRARIES} ${PKG_LIBS_LIBRARIES} ${PLATFORM_LIBS})
+  target_link_libraries(roscxx_static PRIVATE
+      ${console_bridge_LIBRARIES} ${PKG_LIBS_LIBRARIES} ${PLATFORM_LIBS}
+      Threads::Threads)
 endif()
 
 find_package(PkgConfig QUIET)
@@ -370,7 +370,7 @@ add_executable(miniroscore roscore/miniroscore.cpp)
 set(MINIROSCORE_LIBS impl::program_options)
 # Android and MINIROS_PORTABLE_TOOLS: single-file binaries (no libroscxx.so).
 if (ANDROID OR MINIROS_PORTABLE_TOOLS)
-  list(APPEND MINIROSCORE_LIBS roscxx_static)
+  list(APPEND MINIROSCORE_LIBS roscxx_static Threads::Threads)
 else()
   list(APPEND MINIROSCORE_LIBS roscxx)
 endif()
