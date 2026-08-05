@@ -64,7 +64,11 @@ public:
     server_.reset(new http::HttpServer(ps));
     Error err = server_->start(0);
     ASSERT_EQ(err, Error::Ok);
+#ifndef WIN32
     watchdog_ = std::make_unique<Watchdog>(SIGQUIT);
+#else
+    watchdog_ = std::make_unique<Watchdog>();
+#endif
     watchdog_->watch(50000);
   }
 

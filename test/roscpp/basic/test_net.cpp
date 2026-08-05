@@ -219,7 +219,7 @@ TEST(SocketUDP, SimplestBroadcast)
 
   // Sending to broadcast address from sockaddr_in
   sockaddr_in servaddr;
-  bzero(&servaddr, sizeof(servaddr));
+  memset(&servaddr, 0, sizeof(servaddr));
   servaddr.sin_family = AF_INET;
   servaddr.sin_addr.s_addr = INADDR_BROADCAST; //inet_addr(HOSTNAME);
   servaddr.sin_port = htons(port);

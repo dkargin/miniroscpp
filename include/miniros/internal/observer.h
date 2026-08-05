@@ -4,6 +4,8 @@
 #include <cassert>
 #include <type_traits> // for std::is_base_of
 
+#include "miniros/macros.h"
+
 namespace miniros {
 
 namespace observer {
@@ -21,7 +23,7 @@ class Connections;
 ///   - everything above is thread safe.
 ///
 /// All connections to same target are forming intrusive linked list.
-class Connection {
+class MINIROS_DECL Connection {
 public:
     Connection();
     explicit Connection(impl::Connections* connections);
@@ -113,7 +115,7 @@ protected:
 /// Observer pattern.
 /// Observer attaches to some target object.
 /// Target object can emit some events, which are handled by observer.
-class TargetBase {
+class MINIROS_DECL TargetBase {
 public:
     TargetBase();
     virtual ~TargetBase();

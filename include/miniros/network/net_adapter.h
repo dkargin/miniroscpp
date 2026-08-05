@@ -9,6 +9,7 @@
 #include <string>
 #include <vector>
 
+#include "miniros/macros.h"
 #include "miniros/network/net_address.h"
 
 namespace miniros {
@@ -17,7 +18,7 @@ namespace network {
 struct HostInfo;
 
 /// NetAdapter encapsulates all the information about specific network adapter.
-struct NetAdapter {
+struct MINIROS_DECL NetAdapter {
   /// Name of the adapter.
   std::string name;
 
@@ -66,7 +67,7 @@ protected:
   } flags_;
 };
 
-MINIROS_NODISCARD Error scanAdapters(std::vector<NetAdapter>& adapters);
+MINIROS_NODISCARD MINIROS_DECL Error scanAdapters(std::vector<NetAdapter>& adapters);
 
 }
 }

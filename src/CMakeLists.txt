@@ -351,9 +351,16 @@ endif()
 target_link_libraries(roscxx PRIVATE
     ${console_bridge_LIBRARIES}
     ${PKG_LIBS_LIBRARIES}
-    ${PLATFORM_LIBS}
     Threads::Threads
 )
+
+# Winsock must be PUBLIC so dependents that call htons/socket APIs can link.
+# stdc++fs stays PRIVATE (implementation detail).
+if(WIN32)
+  target_link_libraries(roscxx PUBLIC ${PLATFORM_LIBS})
+elseif(PLATFORM_LIBS)
+  target_link_libraries(roscxx PRIVATE ${PLATFORM_LIBS})
+endif()
 
 # Keep Threads PRIVATE so exported miniros::roscxx does not require consumers
 # to have called find_package(Threads). Static tool links add Threads below.
