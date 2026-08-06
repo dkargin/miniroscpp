@@ -102,19 +102,18 @@ void SubscriptionQueue::clear()
 CallbackInterface::CallResult SubscriptionQueue::call()
 {
   // The callback may result in our own destruction.  Therefore, we may need to keep a reference to ourselves
-  // that outlasts the scoped_try_lock
+  // that outlasts the unique_lock. Match ros_comm: defer_lock so we unlock only if we actually own the mutex
+  // (concurrent callbacks leave it unlocked).
   std::shared_ptr<SubscriptionQueue> self;
+  std::unique_lock<std::recursive_mutex> lock(callback_mutex_, std::defer_lock);
 
   if (!allow_concurrent_callbacks_)
   {
-    //lock.try_lock();
-    if (!callback_mutex_.try_lock())
+    if (!lock.try_lock())
     {
       return CallbackInterface::TryAgain;
     }
   }
-
-  std::lock_guard<std::recursive_mutex> lock(callback_mutex_, std::adopt_lock);
 
   VoidConstPtr tracker;
   Item i;
