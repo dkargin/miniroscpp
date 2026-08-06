@@ -257,19 +257,19 @@ TEST(CallbackQueue, recursive4)
   EXPECT_EQ(cb->count, 3U);
 }
 
-void callAvailableThread(CallbackQueue* queue, bool& done)
+void callAvailableThread(CallbackQueue* queue, std::atomic<bool>& done)
 {
-  while (!done)
+  while (!done.load())
   {
     queue->callAvailable(miniros::WallDuration(0.1));
   }
 }
 
-size_t runThreadedTest(const CountingCallbackPtr& cb, const std::function<void(CallbackQueue*, bool&)>& threadFunc)
+size_t runThreadedTest(const CountingCallbackPtr& cb, const std::function<void(CallbackQueue*, std::atomic<bool>&)>& threadFunc)
 {
   CallbackQueue queue;
   std::vector<std::thread> tg;
-  bool done = false;
+  std::atomic<bool> done{false};
 
   for (uint32_t i = 0; i < 10; ++i)
   {
@@ -289,7 +289,7 @@ size_t runThreadedTest(const CountingCallbackPtr& cb, const std::function<void(C
     miniros::WallDuration(0.01).sleep();
   }
 
-  done = true;
+  done.store(true);
   for (auto& t: tg)
     t.join();
 
@@ -304,9 +304,9 @@ TEST(CallbackQueue, threadedCallAvailable)
   EXPECT_EQ(cb->count, i);
 }
 
-void callOneThread(CallbackQueue* queue, bool& done)
+void callOneThread(CallbackQueue* queue, std::atomic<bool>& done)
 {
-  while (!done)
+  while (!done.load())
   {
     queue->callOne(miniros::WallDuration(0.1));
   }
@@ -383,7 +383,7 @@ TEST(CallbackQueue, recursiveTimer)
   queue.addCallback(cb, 1);
 
   std::vector<std::thread> tg;
-  bool done = false;
+  std::atomic<bool> done{false};
 
   for (uint32_t i = 0; i < 2; ++i)
   {
@@ -395,7 +395,7 @@ TEST(CallbackQueue, recursiveTimer)
     miniros::WallDuration(0.01).sleep();
   }
 
-  done = true;
+  done.store(true);
   for (auto& t: tg)
     t.join();
 }

@@ -38,6 +38,7 @@
 #include "miniros/io/poll_set.h"
 #include "miniros/transport/transport_tcp.h"
 
+#include <atomic>
 #include <thread>
 #include <chrono>
 
@@ -329,10 +330,17 @@ protected:
 
   virtual void TearDown()
   {
-    for (int i = 0; i < 3; ++i)
-      transports_[i]->close();
+    // Stop the poll thread before closing sockets so close/recv cannot race.
     continue_ = false;
-    poll_thread_.join();
+    poll_set_.signal();
+    if (poll_thread_.joinable()) {
+      poll_thread_.join();
+    }
+    for (int i = 0; i < 3; ++i) {
+      if (transports_[i]) {
+        transports_[i]->close();
+      }
+    }
   }
 
   bool isTransportValid(int i) const

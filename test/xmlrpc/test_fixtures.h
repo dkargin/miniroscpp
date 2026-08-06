@@ -23,7 +23,7 @@
 
 #include "xmlrpcpp/XmlRpc.h"
 
-
+#include <atomic>
 #include <mutex>
 #include <thread>
 #include <gtest/gtest.h>
@@ -60,6 +60,6 @@ protected:
   int port;
 
   // Server thread
-  bool server_done;
+  std::atomic<bool> server_done;
   std::thread server_thread;
 };

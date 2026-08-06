@@ -50,13 +50,14 @@ public:
   {
     while (!done->load())
     {
-      queue->callAvailable(WallDuration(50));
+      queue->callAvailable(WallDuration(0.05));
     }
   }
 
   void SetUp() override
   {
     // Create a callback queue and start a thread to process it
+    callback_thread_done_ = false;
     callback_queue_ = std::make_shared<CallbackQueue>();
     callback_thread_ = std::thread(processCallbackQueue, callback_queue_.get(), &callback_thread_done_);
 
@@ -81,10 +82,15 @@ public:
     }
     poll_manager_.shutdown();
 
-    // Stop callback thread
+    // Stop callback thread before destroying the queue it uses.
     callback_thread_done_ = true;
+    if (callback_queue_) {
+      callback_queue_->disable();  // wake callAvailable waiters
+    }
+    if (callback_thread_.joinable()) {
+      callback_thread_.join();
+    }
     callback_queue_.reset();
-    callback_thread_.join();
   }
 };
 
