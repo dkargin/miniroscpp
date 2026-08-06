@@ -141,7 +141,7 @@ struct ProfilingDomain::Internal {
   mutable std::mutex traceMutex;
   FILE* traceDump = nullptr;
 
-  mutable size_t lastNiceThreadId = 0;
+  mutable int64_t lastNiceThreadId = 0;
   mutable std::map<int64_t, int> threadMap;
 
   /// Optional sink for additional trace consumers (e.g. ROS topic).
@@ -149,9 +149,9 @@ struct ProfilingDomain::Internal {
 
   int64_t startTimeNanos = 0;
 
-  int getGoodThreadId() const
+  int64_t getGoodThreadId() const
   {
-    int threadId = currentThreadId();
+    int64_t threadId = currentThreadId();
     std::unique_lock lock(traceMutex);
     auto it = threadMap.find(threadId);
     if (it == threadMap.end()) {
@@ -166,7 +166,7 @@ struct ProfilingDomain::Internal {
     startTimeNanos = GetCurrentTimeNanos();
     const char* dump = getenv("MINIROS_TRACE");
     if (dump != nullptr) {
-      int tid = getGoodThreadId();
+      int64_t tid = getGoodThreadId();
       std::string traceName = dump;
       std::lock_guard<std::mutex> lock(traceMutex);
       traceDump = fopen(traceName.c_str(), "w");

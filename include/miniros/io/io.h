@@ -171,7 +171,7 @@ MINIROS_DECL bool last_socket_error_is_would_block();
 /// @returns error code, or Error::Ok if everything is fine. Expected codes:
 ///   - Error::InvalidValue if empty poll set or no pollable events.
 ///   - Error::SystemError if unexpected system error was encountered.
-MINIROS_DECL Error poll_sockets(int epfd, socket_pollfd *fds, nfds_t nfds, int timeout, std::vector<socket_pollfd>& events);
+MINIROS_DECL Error poll_sockets(socket_fd_t epfd, socket_pollfd *fds, nfds_t nfds, int timeout, std::vector<socket_pollfd>& events);
 
 MINIROS_DECL int set_non_blocking(socket_fd_t &socket);
 MINIROS_DECL int close_socket(socket_fd_t &socket);
@@ -184,11 +184,11 @@ MINIROS_DECL int create_signal_pair(signal_fd_t signal_pair[2]);
 /// Call once from process main() when using sockets without miniros::init().
 MINIROS_DECL void ensureNetworkInitialized();
 
-MINIROS_DECL int create_socket_watcher();
-MINIROS_DECL void close_socket_watcher(int fd);
-MINIROS_NODISCARD MINIROS_DECL Error add_socket_to_watcher(int epfd, int fd, int events);
-MINIROS_NODISCARD MINIROS_DECL Error del_socket_from_watcher(int epfd, int fd);
-MINIROS_NODISCARD MINIROS_DECL Error set_events_on_socket(int epfd, int fd, int events);
+MINIROS_DECL socket_fd_t create_socket_watcher();
+MINIROS_DECL void close_socket_watcher(socket_fd_t fd);
+MINIROS_NODISCARD MINIROS_DECL Error add_socket_to_watcher(socket_fd_t epfd, socket_fd_t fd, int events);
+MINIROS_NODISCARD MINIROS_DECL Error del_socket_from_watcher(socket_fd_t epfd, socket_fd_t fd);
+MINIROS_NODISCARD MINIROS_DECL Error set_events_on_socket(socket_fd_t epfd, socket_fd_t fd, int events);
 
 /*****************************************************************************
 ** Inlines - almost direct api replacements, should stay fast.
