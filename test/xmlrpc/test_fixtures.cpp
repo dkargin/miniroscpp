@@ -38,7 +38,7 @@ XmlRpcTest::XmlRpcTest() : hello(&s), port(0), server_done(false) {}
 
 void XmlRpcTest::work()
 {
-  while (!server_done)
+  while (!server_done.load())
   {
     s.work(0.1); // run the worker queue for 100ms
   }

@@ -37,6 +37,7 @@
 #include "miniros/io/poll_set.h"
 #include "miniros/io/io.h"
 
+#include <atomic>
 #include <thread>
 #include <chrono>
 #include <cassert>
@@ -362,9 +363,9 @@ TEST_F(Poller, DISABLED_addDelMultiThread)
   }
 }
 
-void addDelManyTimesThread(PollSet* ps, SocketHelper* sh1, SocketHelper* sh2, Barrier* barrier, int count, volatile bool* done)
+void addDelManyTimesThread(PollSet* ps, SocketHelper* sh1, SocketHelper* sh2, Barrier* barrier, int count, std::atomic<bool>* done)
 {
-  *done = false;
+  done->store(false);
 
   barrier->wait();
 
@@ -395,7 +396,7 @@ void addDelManyTimesThread(PollSet* ps, SocketHelper* sh1, SocketHelper* sh2, Ba
     ps->delSocket(sh2->fd());
   }
 
-  *done = true;
+  done->store(true);
 }
 
 TEST_F(Poller, updateWhileAddDel)
@@ -404,14 +405,14 @@ TEST_F(Poller, updateWhileAddDel)
   SocketHelper sh2(sockets_[1]);
 
   Barrier barrier(2);
-  volatile bool done = false;
+  std::atomic<bool> done{false};
   const int count = 1000;
 
   std::thread t(addDelManyTimesThread, &poll_set_, &sh1, &sh2, &barrier, count, &done);
 
   barrier.wait();
 
-  while (!done)
+  while (!done.load())
   {
     poll_set_.update(1);
   }

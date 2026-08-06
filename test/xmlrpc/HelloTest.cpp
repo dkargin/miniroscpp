@@ -27,6 +27,7 @@
 #include "xmlrpcpp/XmlRpcServer.h"
 #include "xmlrpcpp/XmlRpcServerMethod.h"
 
+#include <atomic>
 #include <iostream>
 #include <stdlib.h>
 #include <thread>
@@ -95,7 +96,7 @@ protected:
 
   void work()
   {
-    while (!done)
+    while (!done.load())
     {
       s.work(0.1); // run the worker queue for 100ms
     }
@@ -137,7 +138,7 @@ protected:
   int port;
 
   // Server thread
-  bool done;
+  std::atomic<bool> done;
   std::thread server_thread;
 };
 
