@@ -99,6 +99,12 @@ bool NetAddress::isUnspecified() const
   return unspecified;
 }
 
+// Wrapper for unique_ptr.
+void freeAddrInfo(addrinfo* ptr)
+{
+  freeaddrinfo(ptr);
+}
+
 Error addressFromString(NetAddress::Type type, const std::string& address, int port, NetAddress& result)
 {
   // Port 0 is specifically allowed.
@@ -208,7 +214,7 @@ Error addressFromString(NetAddress::Type type, const std::string& address, int p
     return Error::SystemError;
   }
 
-  std::unique_ptr<addrinfo, void (*)(addrinfo*)> wrapAddr(res, &freeaddrinfo);
+  std::unique_ptr<addrinfo, void (*)(addrinfo*)> wrapAddr(res, &freeAddrInfo);
 
   // Try to find a matching address
   // For AddressUnspecified, prefer IPv4 first, then IPv6. It follows behaviour of old ROS1, 

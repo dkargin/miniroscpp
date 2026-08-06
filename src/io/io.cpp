@@ -113,9 +113,9 @@ bool last_socket_error_is_would_block()
 #endif
 }
 
-int create_socket_watcher()
+socket_fd_t create_socket_watcher()
 {
-  int epfd = -1;
+  socket_fd_t epfd = MINIROS_INVALID_SOCKET;
 #if defined(HAVE_EPOLL)
   epfd = ::epoll_create1(0);
   if (epfd < 0) {
@@ -125,9 +125,9 @@ int create_socket_watcher()
   return epfd;
 }
 
-void close_socket_watcher(int fd)
+void close_socket_watcher(socket_fd_t fd)
 {
-  if (fd >= 0)
+  if (fd != MINIROS_INVALID_SOCKET)
     ::close(fd);
 }
 /**
@@ -146,7 +146,7 @@ void close_socket_watcher(int fd)
   a regular file or a directory.
 */
 
-Error add_socket_to_watcher(int epfd, int fd, int events)
+Error add_socket_to_watcher(socket_fd_t epfd, socket_fd_t fd, int events)
 {
 #if defined(HAVE_EPOLL)
   struct epoll_event ev;
@@ -172,7 +172,7 @@ Error add_socket_to_watcher(int epfd, int fd, int events)
   return Error::Ok;
 }
 
-Error del_socket_from_watcher(int epfd, int fd)
+Error del_socket_from_watcher(socket_fd_t epfd, socket_fd_t fd)
 {
 #if defined(HAVE_EPOLL)
   if (::epoll_ctl(epfd, EPOLL_CTL_DEL, fd, NULL)) {
@@ -192,7 +192,7 @@ Error del_socket_from_watcher(int epfd, int fd)
   return Error::Ok;
 }
 
-Error set_events_on_socket(int epfd, int fd, int events)
+Error set_events_on_socket(socket_fd_t epfd, socket_fd_t fd, int events)
 {
 #if defined(HAVE_EPOLL)
   struct epoll_event ev;
@@ -223,7 +223,7 @@ Error set_events_on_socket(int epfd, int fd, int events)
 *****************************************************************************/
 
 #ifdef HAVE_POLL
-static Error poll_sockets_poll(int epfd, socket_pollfd* fds, nfds_t nfds, int timeout, std::vector<socket_pollfd>& events)
+static Error poll_sockets_poll(socket_fd_t epfd, socket_pollfd* fds, nfds_t nfds, int timeout, std::vector<socket_pollfd>& events)
 {
   UNUSED(epfd);
   // Clear the `revents` fields
@@ -264,7 +264,7 @@ static Error poll_sockets_poll(int epfd, socket_pollfd* fds, nfds_t nfds, int ti
 #endif
 
 /// Poller based on ancient `select`
-static Error poll_sockets_select(int epfd, socket_pollfd* fds, nfds_t nfds, int timeout, std::vector<socket_pollfd>& events)
+static Error poll_sockets_select(socket_fd_t epfd, socket_pollfd* fds, nfds_t nfds, int timeout, std::vector<socket_pollfd>& events)
 {
   fd_set readfds, writefds, exceptfds;
   struct timeval tv, *ptv;
@@ -435,7 +435,7 @@ static Error poll_sockets_epoll(int epfd, socket_pollfd* fds, nfds_t nfds, int t
 
 #endif
 
-Error poll_sockets(int epfd, socket_pollfd* fds, nfds_t nfds, int timeout, std::vector<socket_pollfd>& events)
+Error poll_sockets(socket_fd_t epfd, socket_pollfd* fds, nfds_t nfds, int timeout, std::vector<socket_pollfd>& events)
 {
   events.clear();
 #if defined(HAVE_EPOLL)

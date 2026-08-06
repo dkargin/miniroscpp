@@ -467,7 +467,7 @@ Error MasterLink::setParamImpl(const std::string& key, const std::vector<T>& vec
 
   // Copy the contents into the XmlRpcValue
   for (size_t i = 0; i < vec.size(); i++) {
-    xml_vec[i] = vec.at(static_cast<int>(i));
+    xml_vec[static_cast<int>(i)] = vec.at(i);
   }
 
   return this->set(key, xml_vec);

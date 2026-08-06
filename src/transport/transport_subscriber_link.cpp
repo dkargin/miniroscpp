@@ -219,7 +219,7 @@ void TransportSubscriberLink::enqueueMessage(const SerializedMessage& m, bool se
   {
     std::scoped_lock<std::mutex> lock(outbox_mutex_);
 
-    int max_queue = 0;
+    size_t max_queue = 0;
     if (PublicationPtr parent = parent_.lock())
     {
       max_queue = parent->getMaxQueue();
@@ -227,7 +227,8 @@ void TransportSubscriberLink::enqueueMessage(const SerializedMessage& m, bool se
 
     MINIROS_DEBUG_NAMED("superdebug", "TransportSubscriberLink on topic [%s] to caller [%s], queueing message (queue size [%d])", topic_.c_str(), destination_caller_id_.c_str(), (int)outbox_.size());
 
-    if (max_queue > 0 && (int)outbox_.size() >= max_queue)
+    // queue_size 0 means unlimited (same convention as SubscriptionQueue).
+    if (max_queue > 0 && outbox_.size() >= max_queue)
     {
       if (!queue_full_)
       {

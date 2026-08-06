@@ -8,6 +8,7 @@
 #include "xmlrpcpp/XmlRpcUtil.h"
 
 #include "miniros/rostime.h"
+#include "miniros/io/io.h"
 
 
 #if defined(_WIN32)
@@ -88,6 +89,7 @@ void XmlRpcDispatch::work(double timeout)
   const unsigned POLLEX_REQ = POLLPRI; // Out-of-band data received
   const unsigned POLLEX_CHK = (POLLPRI | POLLNVAL); // Out-of-band data or invalid fd
 #else
+  typedef unsigned long nfds_t;
   const unsigned POLLEX_REQ = POLLRDBAND; // Out-of-band data received
   const unsigned POLLEX_CHK = (POLLRDBAND | POLLNVAL); // Out-of-band data or invalid fd
 #endif
@@ -127,7 +129,7 @@ void XmlRpcDispatch::work(double timeout)
     }
 
     // Check for events
-    int nEvents = poll(&fds[0], source_cnt, (timeout_ms < 0) ? -1 : timeout_ms);
+    int nEvents = poll(&fds[0], static_cast<nfds_t>(source_cnt), (timeout_ms < 0) ? -1 : timeout_ms);
 
     if (nEvents < 0)
     {

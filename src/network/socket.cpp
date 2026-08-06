@@ -721,8 +721,8 @@ std::pair<size_t, Error> NetSocket::write2(
   // Number of blocks to be written.
   int blocks = fillIoVec(out, header, headerSize, body, bodySize, written);
   if (blocks == 0) {
-    LOCAL_ERROR("NetSocket[%d]::write2(size=%zu, written=%zu) - nothing to send while data remains",
-      internal_->fd, totalSize, written);
+    LOCAL_ERROR("NetSocket[%d]::write2(size=%lu, written=%lu) - nothing to send while data remains",
+      internal_->fd, static_cast<unsigned long>(totalSize), static_cast<unsigned long>(written));
     return {0, Error::InternalError};
   }
 
@@ -748,8 +748,8 @@ std::pair<size_t, Error> NetSocket::write2(
       }
       blocks = fillIoVec(out, header, headerSize, body, bodySize, written);
       if (blocks == 0) {
-        LOCAL_ERROR("NetSocket[%d]::write2() lost remaining payload at written=%zu/%zu",
-          internal_->fd, written, totalSize);
+        LOCAL_ERROR("NetSocket[%d]::write2() lost remaining payload at written=%lu/%lu",
+          internal_->fd, static_cast<unsigned long>(written), static_cast<unsigned long>(totalSize));
         return {written - written0, Error::InternalError};
       }
       continue;
