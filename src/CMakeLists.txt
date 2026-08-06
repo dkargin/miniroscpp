@@ -339,7 +339,16 @@ endif()
 
 set_property(TARGET roscxx PROPERTY CXX_STANDARD 17)
 
-if(WIN32)
+# Windows target libs (native MSVC/MinGW, or MinGW cross without a proper toolchain file).
+set(MINIROS_TARGET_WINDOWS FALSE)
+if(WIN32 OR MINGW OR CMAKE_SYSTEM_NAME STREQUAL "Windows")
+  set(MINIROS_TARGET_WINDOWS TRUE)
+elseif(CMAKE_CXX_COMPILER MATCHES "[Mm]ingw" OR CMAKE_C_COMPILER MATCHES "[Mm]ingw")
+  set(MINIROS_TARGET_WINDOWS TRUE)
+  message(STATUS "MinGW compiler detected without WIN32; linking Windows platform libraries")
+endif()
+
+if(MINIROS_TARGET_WINDOWS)
   set(PLATFORM_LIBS wsock32 ws2_32)
 elseif(ANDROID)
   # NDK uses libc++; std::filesystem is in the C++ runtime (no libstdc++fs).
@@ -356,7 +365,7 @@ target_link_libraries(roscxx PRIVATE
 
 # Winsock must be PUBLIC so dependents that call htons/socket APIs can link.
 # stdc++fs stays PRIVATE (implementation detail).
-if(WIN32)
+if(MINIROS_TARGET_WINDOWS)
   target_link_libraries(roscxx PUBLIC ${PLATFORM_LIBS})
 elseif(PLATFORM_LIBS)
   target_link_libraries(roscxx PRIVATE ${PLATFORM_LIBS})
