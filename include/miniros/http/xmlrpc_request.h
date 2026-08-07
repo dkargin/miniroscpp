@@ -85,7 +85,7 @@ private:
   /// @param result - reference to response as XMLRPC value.
   /// @param isFault - indicates that response contained <fault> tag. But response itself is correct XMLRPC object.
   /// @returns if parsing was successful.
-  static bool parseXmlResponseImpl(const std::string_view& responseView, RpcValue& result, bool& isFault);
+  bool parseXmlResponseImpl(const std::string_view& responseView, RpcValue& result, bool& isFault) const;
 
   std::string method_name_;
   RpcValue params_ = RpcValue::Array(0);
