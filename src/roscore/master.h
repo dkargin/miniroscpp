@@ -83,6 +83,9 @@ public:
   /// @param seconds - check interval in seconds; 0 disables periodic checks.
   void setNodeCheckPeriod(double seconds);
 
+  /// Enable or disable persistent state (cache.<port> in the current working directory).
+  void setCacheEnabled(bool enabled);
+
   /// Update queued tasks.
   void update();
 

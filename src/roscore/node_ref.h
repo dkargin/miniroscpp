@@ -9,6 +9,9 @@
 #include <mutex>
 #include <set>
 #include <string>
+#include <functional>
+#include <utility>
+#include <vector>
 
 #include "miniros/macros.h"
 #include "miniros/network/url.h"
@@ -60,6 +63,10 @@ public:
       Connected,
       /// Master has managed to contact node by "getPid" request.
       Verified,
+      /// Loaded from master's disk cache; reconnecting and waiting for getPid.
+      Restoring,
+      /// getPid succeeded after cache restore; Slave API topic queries in flight.
+      Recovering,
       /// Sent shutdown request.
       ShuttingDown,
       /// Node is considered dead. It can be caused either by shutdown request
@@ -77,6 +84,16 @@ public:
     }
 
     const char* toString() const;
+
+    /// Parse state name produced by toString(). Returns false on unknown values.
+    bool fromString(const char* name);
+    bool fromString(const std::string& name) { return fromString(name.c_str()); }
+
+    /// True while master is re-attaching this node from a cache snapshot.
+    bool isRestoreInProgress() const
+    {
+      return value_ == Restoring || value_ == Recovering;
+    }
 
   protected:
     State_t value_ = State::Initial;
@@ -188,6 +205,14 @@ public:
   /// Response method for GetPid request.
   void responseGetPid(int code, const std::string& msg, const RpcValue& data);
 
+  /// Query Slave API getPublications. Callback receives ROS (code, msg, data).
+  Error sendGetPublications(const std::string& callerId,
+    std::function<void(int, const std::string&, const RpcValue&)> onComplete);
+
+  /// Query Slave API getSubscriptions. Callback receives ROS (code, msg, data).
+  Error sendGetSubscriptions(const std::string& callerId,
+    std::function<void(int, const std::string&, const RpcValue&)> onComplete);
+
   /// Notify client about updated publishers.
   /// @param callerId - name of requester node.
   /// @param topic - name of updated topic
@@ -206,6 +231,27 @@ public:
   /// Last known PID of the node process (0 if unknown).
   /// Obtained via Slave API getPid; not used for OS-level signals.
   int pid() const;
+
+  /// Mark node as loaded from disk cache (state → Restoring).
+  /// @param services - service name + rosrpc URI pairs to re-register after getPid.
+  void beginRestore(std::vector<std::pair<std::string, std::string>> services);
+
+  /// True while state is Restoring or Recovering.
+  bool isRestoreInProgress() const;
+
+  /// Number of in-flight getPublications/getSubscriptions during Recovering.
+  int restoreQueriesLeft() const;
+
+  /// Start topic recovery queries (Restoring is already past getPid → Recovering).
+  /// Sets restoreQueriesLeft to @p count.
+  void beginTopicRecovery(int queryCount);
+
+  /// Decrement restore query counter; when it hits 0, state → Verified.
+  /// @returns true when recovery for this node has finished.
+  bool notifyRestoreQueryDone();
+
+  /// Take and clear cached service advertisements from the restore snapshot.
+  std::vector<std::pair<std::string, std::string>> takePendingRestoreServices();
 
   /// Mark node as dead and tear down its HTTP client.
   void markDead();
@@ -264,10 +310,22 @@ protected:
   /// Request to get PID of a process.
   std::shared_ptr<http::XmlRpcRequest> m_reqGetPid GUARDED_BY(m_guard);
 
+  /// Request to list publications (restore path).
+  std::shared_ptr<http::XmlRpcRequest> m_reqGetPublications GUARDED_BY(m_guard);
+
+  /// Request to list subscriptions (restore path).
+  std::shared_ptr<http::XmlRpcRequest> m_reqGetSubscriptions GUARDED_BY(m_guard);
+
   State m_state GUARDED_BY(m_guard) = State::Initial;
 
   /// Collection of active requests.
   SafeSet<std::shared_ptr<http::HttpRequest>> m_activeRequests;
+
+  /// Service name → rosrpc URI, kept until Recovering restores them.
+  std::vector<std::pair<std::string, std::string>> m_pendingRestoreServices GUARDED_BY(m_guard);
+
+  /// In-flight getPublications / getSubscriptions during Recovering.
+  int m_restoreQueriesLeft GUARDED_BY(m_guard) = 0;
 };
 
 using NodeRefPtr = std::shared_ptr<NodeRef>;

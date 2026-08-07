@@ -1,7 +1,3 @@
-//
-// Created by dkargin on 8/19/25.
-//
-
 #ifndef MINIROS_MASTER_INTERNAL_H
 #define MINIROS_MASTER_INTERNAL_H
 
@@ -13,8 +9,10 @@
 #include "parameter_storage.h"
 #include "master_handler.h"
 #include "discovery.h"
+#include "master_cache.h"
 
 #include "miniros/steady_timer.h"
+#include "miniros/rostime.h"
 
 namespace miniros {
 namespace master {
@@ -35,6 +33,9 @@ struct Master::Internal {
 
   MasterHandler handler;
   ParameterStorage parameterStorage;
+
+  /// Persistent GUID/node cache and async restore session.
+  MasterCache cache;
 
   /// Endpoint for accessing "GET /".
   std::shared_ptr<MasterRootEndpoint> httpRootEndpoint;
