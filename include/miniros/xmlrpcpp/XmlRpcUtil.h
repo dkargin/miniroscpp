@@ -8,6 +8,7 @@
 #endif
 
 #ifndef MAKEDEPEND
+# include <atomic>
 # include <string>
 #endif
 
@@ -58,18 +59,18 @@ namespace XmlRpc {
 
     //! Returns the level of verbosity of informational messages. 0 is no output, 5 is very verbose.
     static int getVerbosity()
-    { return _verbosity; }
+    { return _verbosity.load(std::memory_order_relaxed); }
 
     //! Specify the level of verbosity of informational messages. 0 is no output, 5 is very verbose.
     static void setVerbosity(int v)
-    { _verbosity = v; }
+    { _verbosity.store(v, std::memory_order_relaxed); }
 
     //! Output a message. Custom error handlers should define this method.
     virtual void log(int level, const char* msg) = 0;
 
   protected:
     static XMLRPCPP_DECL XmlRpcLogHandler* _logHandler;
-    static XMLRPCPP_DECL int _verbosity;
+    static XMLRPCPP_DECL std::atomic<int> _verbosity;
   };
 
   //! Returns log message verbosity. This is short for XmlRpcLogHandler::getVerbosity()

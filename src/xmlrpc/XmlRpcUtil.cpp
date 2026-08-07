@@ -26,7 +26,7 @@ using namespace XmlRpc;
 const char XmlRpc::XMLRPC_VERSION[] = "XMLRPC++ 0.7";
 
 // Default log verbosity: 0 for no messages through 5 (writes everything)
-int XmlRpcLogHandler::_verbosity = 0;
+std::atomic<int> XmlRpcLogHandler::_verbosity{0};
 
 // Default log handler
 static class DefaultLogHandler : public XmlRpcLogHandler {
@@ -34,9 +34,9 @@ public:
 
   void log(int level, const char* msg) override {
 #ifdef USE_WINDOWS_DEBUG
-    if (level <= _verbosity) { OutputDebugString(msg); OutputDebugString("\n"); }
+    if (level <= getVerbosity()) { OutputDebugString(msg); OutputDebugString("\n"); }
 #else
-    if (level <= _verbosity) {
+    if (level <= getVerbosity()) {
       std::scoped_lock lock(_guard);
       std::cout << msg << std::endl;
     }
