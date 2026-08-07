@@ -728,8 +728,8 @@ static std::shared_ptr<char[]> g_print_buffer(new char[INITIAL_BUFFER_SIZE]);
 static size_t g_print_buffer_size = INITIAL_BUFFER_SIZE;
 static std::atomic<std::thread::id> g_printing_thread_id;
 
-void print(FilterBase* filter, void* logger_handle, Level level,
-    const char* file, int line, const char* function, const char* fmt, ...)
+static void printv(FilterBase* filter, void* logger_handle, Level level,
+    const char* file, int line, const char* function, const char* fmt, va_list args)
 {
   if (g_shutting_down)
     return;
@@ -744,12 +744,7 @@ void print(FilterBase* filter, void* logger_handle, Level level,
 
   g_printing_thread_id = std::this_thread::get_id();
 
-  va_list args;
-  va_start(args, fmt);
-
   vformatToBuffer(g_print_buffer, g_print_buffer_size, fmt, args);
-
-  va_end(args);
 
   bool enabled = true;
 
@@ -795,6 +790,15 @@ void print(FilterBase* filter, void* logger_handle, Level level,
   }
 
   g_printing_thread_id = std::thread::id();
+}
+
+void print(FilterBase* filter, void* logger_handle, Level level,
+    const char* file, int line, const char* function, const char* fmt, ...)
+{
+  va_list args;
+  va_start(args, fmt);
+  printv(filter, logger_handle, level, file, line, function, fmt, args);
+  va_end(args);
 }
 
 void print(FilterBase* filter, void* logger_handle, Level level,
@@ -853,6 +857,21 @@ void print(FilterBase* filter, void* logger_handle, Level level,
   g_printing_thread_id = std::thread::id();
 }
 
+void printAtLocation(FilterBase* filter, const LogLocation* loc,
+  const char* file, int line, const char* function, const char* fmt, ...)
+{
+  va_list args;
+  va_start(args, fmt);
+  printv(filter, loc->logger_, loc->level_, file, line, function, fmt, args);
+  va_end(args);
+}
+
+void printAtLocation(FilterBase* filter, const LogLocation* loc,
+  const std::stringstream& str, const char* file, int line, const char* function)
+{
+  print(filter, loc->logger_, loc->level_, str, file, line, function);
+}
+
 // Collection of all log locations.
 // Every macro invocation MINIROS_LOG* registers inside this container.
 std::vector<LogLocation*> g_log_locations;
@@ -867,26 +886,34 @@ void registerLogLocation(LogLocation* loc)
 
 void checkLogLocationEnabledNoLock(LogLocation* loc)
 {
-  loc->logger_enabled_ = ::miniros::console::impl::isEnabledFor(loc->logger_, loc->level_);
+  loc->logger_enabled_.store(
+    ::miniros::console::impl::isEnabledFor(loc->logger_, loc->level_),
+    std::memory_order_relaxed);
+}
+
+void updateLogLocation(LogLocation* loc, const std::string& name, Level level)
+{
+  std::scoped_lock<std::mutex> lock(g_locations_mutex);
+
+  if (!loc->initialized_.load(std::memory_order_relaxed)) {
+    loc->logger_ = ::miniros::console::impl::getHandle(name);
+    loc->level_ = level;
+    g_log_locations.push_back(loc);
+    checkLogLocationEnabledNoLock(loc);
+    // Release: needUpdate()'s acquire load observes logger_/level_/enabled.
+    loc->initialized_.store(true, std::memory_order_release);
+    return;
+  }
+
+  if (loc->level_ != level) {
+    loc->level_ = level;
+    checkLogLocationEnabledNoLock(loc);
+  }
 }
 
 void initializeLogLocation(LogLocation* loc, const std::string& name, Level level)
 {
-  std::scoped_lock<std::mutex> lock(g_locations_mutex);
-
-  if (loc->initialized_)
-  {
-    return;
-  }
-
-  loc->logger_ = ::miniros::console::impl::getHandle(name);
-  loc->level_ = level;
-
-  g_log_locations.push_back(loc);
-
-  checkLogLocationEnabledNoLock(loc);
-
-  loc->initialized_ = true;
+  updateLogLocation(loc, name, level);
 }
 
 void setLogLocationLevel(LogLocation* loc, Level level)
