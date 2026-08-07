@@ -141,6 +141,10 @@ private:
 
   void socketUpdate(int events);
 
+  /// Tear down the socket while \a close_mutex_ is already held.
+  /// Returns the disconnect callback to invoke after releasing the mutex (may be empty).
+  Callback closeLocked(std::unique_lock<std::recursive_mutex>& lock);
+
   socket_fd_t sock_;
   std::atomic<bool> closed_;
   std::recursive_mutex close_mutex_;

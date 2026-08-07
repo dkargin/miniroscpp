@@ -459,41 +459,9 @@ bool TransportTCP::listen(int port, int backlog, const AcceptCallback& accept_cb
 void TransportTCP::close()
 {
   Callback disconnect_cb;
-
-  if (!closed_)
   {
-    {
-      std::scoped_lock<std::recursive_mutex> lock(close_mutex_);
-
-      if (!closed_)
-      {
-        closed_ = true;
-
-        MINIROS_ASSERT(sock_ != MINIROS_INVALID_SOCKET);
-
-        if (poll_set_)
-        {
-          poll_set_->delSocket(sock_);
-        }
-
-        ::shutdown(sock_, MINIROS_SOCKETS_SHUT_RDWR);
-        if ( close_socket(sock_) != 0 )
-        {
-          MINIROS_ERROR("Error closing socket [%d]: [%s]", sock_, last_socket_error_string());
-        } else
-        {
-          MINIROS_DEBUG("TCP socket [%d] closed", sock_);
-        }
-        sock_ = MINIROS_INVALID_SOCKET;
-
-        disconnect_cb = disconnect_cb_;
-
-        disconnect_cb_ = {};
-        read_cb_ = {};
-        write_cb_ = {};
-        accept_cb_ = {};
-      }
-    }
+    std::unique_lock<std::recursive_mutex> lock(close_mutex_);
+    disconnect_cb = closeLocked(lock);
   }
 
   if (disconnect_cb)
@@ -502,93 +470,156 @@ void TransportTCP::close()
   }
 }
 
+TransportTCP::Callback TransportTCP::closeLocked(std::unique_lock<std::recursive_mutex>& lock)
+{
+  MINIROS_ASSERT(lock.owns_lock());
+
+  Callback disconnect_cb;
+
+  if (!closed_)
+  {
+    closed_ = true;
+
+    MINIROS_ASSERT(sock_ != MINIROS_INVALID_SOCKET);
+
+    if (poll_set_)
+    {
+      poll_set_->delSocket(sock_);
+    }
+
+    ::shutdown(sock_, MINIROS_SOCKETS_SHUT_RDWR);
+    if (close_socket(sock_) != 0)
+    {
+      MINIROS_ERROR("Error closing socket [%d]: [%s]", sock_, last_socket_error_string());
+    }
+    else
+    {
+      MINIROS_DEBUG("TCP socket [%d] closed", sock_);
+    }
+    sock_ = MINIROS_INVALID_SOCKET;
+
+    disconnect_cb = disconnect_cb_;
+
+    disconnect_cb_ = {};
+    read_cb_ = {};
+    write_cb_ = {};
+    accept_cb_ = {};
+  }
+
+  return disconnect_cb;
+}
+
 int32_t TransportTCP::read(uint8_t* buffer, uint32_t size)
 {
+  Callback disconnect_cb;
+  int32_t result = -1;
+
   {
-    std::scoped_lock<std::recursive_mutex> lock(close_mutex_);
+    std::unique_lock<std::recursive_mutex> lock(close_mutex_);
 
     if (closed_)
     {
       MINIROS_DEBUG("Tried to read on a closed socket [%d]", sock_);
       return -1;
     }
-  }
 
-  MINIROS_ASSERT(size > 0);
+    MINIROS_ASSERT(size > 0);
 
-  // never read more than INT_MAX since this is the maximum we can report back with the current return type
-  uint32_t read_size = std::min<uint32_t>(size, static_cast<uint32_t>(INT_MAX));
-  int num_bytes = ::recv(sock_, reinterpret_cast<char*>(buffer), read_size, 0);
-  if (num_bytes < 0)
-  {
-    if ( !last_socket_error_is_would_block() ) // !WSAWOULDBLOCK / !EAGAIN && !EWOULDBLOCK
+    // never read more than INT_MAX since this is the maximum we can report back with the current return type
+    uint32_t read_size = std::min<uint32_t>(size, static_cast<uint32_t>(INT_MAX));
+    int num_bytes = ::recv(sock_, reinterpret_cast<char*>(buffer), read_size, 0);
+    if (num_bytes < 0)
     {
-      MINIROS_DEBUG("recv() on socket [%d] failed with error [%s]", sock_, last_socket_error_string());
-      close();
+      if (!last_socket_error_is_would_block()) // !WSAWOULDBLOCK / !EAGAIN && !EWOULDBLOCK
+      {
+        MINIROS_DEBUG("recv() on socket [%d] failed with error [%s]", sock_, last_socket_error_string());
+        disconnect_cb = closeLocked(lock);
+        result = num_bytes;
+      }
+      else
+      {
+        result = 0;
+      }
+    }
+    else if (num_bytes == 0)
+    {
+      MINIROS_DEBUG("Socket [%d] received 0/%u bytes, closing", sock_, size);
+      disconnect_cb = closeLocked(lock);
+      result = -1;
     }
     else
     {
-      num_bytes = 0;
+      result = num_bytes;
     }
   }
-  else if (num_bytes == 0)
+
+  if (disconnect_cb)
   {
-    MINIROS_DEBUG("Socket [%d] received 0/%u bytes, closing", sock_, size);
-    close();
-    return -1;
+    disconnect_cb(shared_from_this());
   }
 
-  return num_bytes;
+  return result;
 }
 
 int32_t TransportTCP::write(uint8_t* buffer, uint32_t size)
 {
+  Callback disconnect_cb;
+  int32_t result = -1;
+
   {
-    std::scoped_lock<std::recursive_mutex> lock(close_mutex_);
+    std::unique_lock<std::recursive_mutex> lock(close_mutex_);
 
     if (closed_)
     {
       MINIROS_DEBUG("Tried to write on a closed socket [%d]", sock_);
       return -1;
     }
-  }
 
-  MINIROS_ASSERT(size > 0);
+    MINIROS_ASSERT(size > 0);
 
-  // never write more than INT_MAX since this is the maximum we can report back with the current return type
-  uint32_t writesize = std::min<uint32_t>(size, static_cast<uint32_t>(INT_MAX));
-  int flags = 0;
+    // never write more than INT_MAX since this is the maximum we can report back with the current return type
+    uint32_t writesize = std::min<uint32_t>(size, static_cast<uint32_t>(INT_MAX));
+    int flags = 0;
 #ifndef WIN32
-  flags |= MSG_NOSIGNAL;
+    flags |= MSG_NOSIGNAL;
 #endif
-  int num_bytes = ::send(sock_, reinterpret_cast<const char*>(buffer), writesize, flags);
-  if (num_bytes < 0)
-  {
-    if ( !last_socket_error_is_would_block() )
+    int num_bytes = ::send(sock_, reinterpret_cast<const char*>(buffer), writesize, flags);
+    if (num_bytes < 0)
     {
-      MINIROS_DEBUG("send() on socket [%d] failed with error [%s]", sock_, last_socket_error_string());
-      close();
+      if (!last_socket_error_is_would_block())
+      {
+        MINIROS_DEBUG("send() on socket [%d] failed with error [%s]", sock_, last_socket_error_string());
+        disconnect_cb = closeLocked(lock);
+        result = num_bytes;
+      }
+      else
+      {
+        result = 0;
+      }
     }
     else
     {
-      num_bytes = 0;
+      result = num_bytes;
     }
   }
 
-  return num_bytes;
+  if (disconnect_cb)
+  {
+    disconnect_cb(shared_from_this());
+  }
+
+  return result;
 }
 
 void TransportTCP::enableRead()
 {
   MINIROS_ASSERT(!(flags_ & SYNCHRONOUS));
 
-  {
-    std::scoped_lock<std::recursive_mutex> lock(close_mutex_);
+  std::scoped_lock<std::recursive_mutex> lock(close_mutex_);
 
-    if (closed_)
-    {
-      return;
-    }
+  if (closed_)
+  {
+    return;
   }
 
   if (!expecting_read_)
@@ -602,13 +633,11 @@ void TransportTCP::disableRead()
 {
   MINIROS_ASSERT(!(flags_ & SYNCHRONOUS));
 
-  {
-    std::scoped_lock<std::recursive_mutex> lock(close_mutex_);
+  std::scoped_lock<std::recursive_mutex> lock(close_mutex_);
 
-    if (closed_)
-    {
-      return;
-    }
+  if (closed_)
+  {
+    return;
   }
 
   if (expecting_read_)
@@ -622,13 +651,11 @@ void TransportTCP::enableWrite()
 {
   MINIROS_ASSERT(!(flags_ & SYNCHRONOUS));
 
-  {
-    std::scoped_lock<std::recursive_mutex> lock(close_mutex_);
+  std::scoped_lock<std::recursive_mutex> lock(close_mutex_);
 
-    if (closed_)
-    {
-      return;
-    }
+  if (closed_)
+  {
+    return;
   }
 
   if (!expecting_write_)
@@ -642,13 +669,11 @@ void TransportTCP::disableWrite()
 {
   MINIROS_ASSERT(!(flags_ & SYNCHRONOUS));
 
-  {
-    std::scoped_lock<std::recursive_mutex> lock(close_mutex_);
+  std::scoped_lock<std::recursive_mutex> lock(close_mutex_);
 
-    if (closed_)
-    {
-      return;
-    }
+  if (closed_)
+  {
+    return;
   }
 
   if (expecting_write_)
@@ -687,15 +712,18 @@ TransportTCPPtr TransportTCP::accept()
 
 void TransportTCP::socketUpdate(int events)
 {
+  Callback disconnect_cb;
+
   {
-    std::scoped_lock<std::recursive_mutex> lock(close_mutex_);
+    std::unique_lock<std::recursive_mutex> lock(close_mutex_);
     if (closed_)
     {
       return;
     }
 
     auto self = shared_from_this();
-    // Handle read events before err/hup/nval, since there may be data left on the wire
+    // Handle read events before err/hup/nval, since there may be data left on the wire.
+    // Callbacks run unlocked (hybrid): read/write hold the mutex across their syscalls.
     if ((events & POLLIN) && expecting_read_)
     {
       if (is_server_)
@@ -706,52 +734,61 @@ void TransportTCP::socketUpdate(int events)
         if (transport)
         {
           MINIROS_ASSERT(accept_cb_);
-          ScopedUnlock ulock(close_mutex_);
+          ScopedUnlock ulock(lock);
           accept_cb_(transport);
         }
       }
-      else
+      else if (read_cb_)
       {
-        if (read_cb_)
-        {
-          ScopedUnlock ulock(close_mutex_);
-          read_cb_(self);
-        }
+        ScopedUnlock ulock(lock);
+        read_cb_(self);
       }
     }
 
-    if ((events & POLLOUT) && expecting_write_)
+    if (closed_)
     {
-      if (write_cb_)
+      return;
+    }
+
+    if ((events & POLLOUT) && expecting_write_ && write_cb_)
+    {
+      ScopedUnlock ulock(lock);
+      write_cb_(self);
+    }
+
+    if (closed_)
+    {
+      return;
+    }
+
+    if ((events & POLLERR) ||
+        (events & POLLHUP) ||
+#if defined(POLLRDHUP) // POLLRDHUP is not part of POSIX!
+        (events & POLLRDHUP) ||
+#endif
+        (events & POLLNVAL))
+    {
+      uint32_t error = -1;
+      socklen_t len = sizeof(error);
+      if (getsockopt(sock_, SOL_SOCKET, SO_ERROR, reinterpret_cast<char*>(&error), &len) < 0)
       {
-        ScopedUnlock ulock(close_mutex_);
-        write_cb_(self);
+        MINIROS_DEBUG("getsockopt failed on socket [%d]", sock_);
       }
+#ifdef _MSC_VER
+      char err[60];
+      strerror_s(err, 60, error);
+      MINIROS_DEBUG("Socket %d closed with (ERR|HUP|NVAL) events %d: %s", sock_, events, err);
+#else
+      MINIROS_DEBUG("Socket %d closed with (ERR|HUP|NVAL) events %d: %s", sock_, events, strerror(error));
+#endif
+
+      disconnect_cb = closeLocked(lock);
     }
   }
 
-  if((events & POLLERR) ||
-     (events & POLLHUP) ||
-#if defined(POLLRDHUP) // POLLRDHUP is not part of POSIX!
-     (events & POLLRDHUP) ||
-#endif
-     (events & POLLNVAL))
+  if (disconnect_cb)
   {
-    uint32_t error = -1;
-    socklen_t len = sizeof(error);
-    if (getsockopt(sock_, SOL_SOCKET, SO_ERROR, reinterpret_cast<char*>(&error), &len) < 0)
-    {
-      MINIROS_DEBUG("getsockopt failed on socket [%d]", sock_);
-    }
-  #ifdef _MSC_VER
-    char err[60];
-    strerror_s(err,60,error);
-    MINIROS_DEBUG("Socket %d closed with (ERR|HUP|NVAL) events %d: %s", sock_, events, err);
-  #else
-    MINIROS_DEBUG("Socket %d closed with (ERR|HUP|NVAL) events %d: %s", sock_, events, strerror(error));
-  #endif
-
-    close();
+    disconnect_cb(shared_from_this());
   }
 }
 
