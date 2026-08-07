@@ -41,6 +41,8 @@
 #include <memory>
 #include <vector>
 #include <sstream>
+#include <atomic>
+#include <cstdarg>
 
 #include "miniros/macros.h"
 
@@ -341,7 +343,7 @@ public:
 
 struct MINIROS_DECL LogLocation;
 /**
- * \brief Internal
+ * \brief Internal — first-time registration of a log call site.
  */
 MINIROS_DECL void initializeLogLocation(LogLocation* loc, const std::string& name, Level level);
 /**
@@ -354,14 +356,32 @@ MINIROS_DECL void setLogLocationLevel(LogLocation* loc, Level level);
 MINIROS_DECL void checkLogLocationEnabled(LogLocation* loc);
 
 /**
- * \brief Internal
+ * \brief Unlikely path: first-time init and/or level change for a call site.
+ * Prefer calling this once via needUpdate() rather than the helpers above.
+ */
+MINIROS_DECL void updateLogLocation(LogLocation* loc, const std::string& name, Level level);
+
+/**
+ * \brief Per-call-site logging state (one static instance per macro site).
+ * Only unlocked hot-path flags are atomic (TSan-safe first-hit init).
  */
 struct LogLocation
 {
-  bool initialized_;
-  bool logger_enabled_;
-  Level level_;
-  void* logger_;
+  std::atomic<bool> initialized_{false};
+  std::atomic<bool> logger_enabled_{false};
+  Level level_{Level::Count};
+  void* logger_{nullptr};
+
+  /// True when first-time init or stored level differs from \p level.
+  bool needUpdate(Level level) const
+  {
+    return !initialized_.load(std::memory_order_acquire) || level_ != level;
+  }
+
+  bool enabled(bool cond) const
+  {
+    return logger_enabled_.load(std::memory_order_relaxed) && cond;
+  }
 };
 
 MINIROS_DECL void vformatToBuffer(std::shared_ptr<char[]>& buffer, size_t& buffer_size, const char* fmt, va_list args);
@@ -380,6 +400,13 @@ MINIROS_DECL void print(FilterBase* filter, void* logger, Level level,
      const char* function, const char* fmt, ...) MINIROS_CONSOLE_PRINTF_ATTRIBUTE(7, 8);
 
 MINIROS_DECL void print(FilterBase* filter, void* logger, Level level,
+     const std::stringstream& str, const char* file, int line, const char* function);
+
+MINIROS_DECL void printAtLocation(FilterBase* filter, const LogLocation* loc,
+     const char* file, int line, const char* function, const char* fmt, ...)
+     MINIROS_CONSOLE_PRINTF_ATTRIBUTE(6, 7);
+
+MINIROS_DECL void printAtLocation(FilterBase* filter, const LogLocation* loc,
      const std::stringstream& str, const char* file, int line, const char* function);
 
 namespace backend
@@ -441,20 +468,13 @@ MINIROS_DECL extern void (*function_print)(void*, console::Level, const char*, c
 
 #define MINIROS_CONSOLE_DEFINE_LOCATION(cond, level, name) \
   MINIROS_CONSOLE_AUTOINIT; \
-  static ::miniros::console::LogLocation loc = {false, false, ::miniros::console::Level::Count, 0}; /* Initialized at compile-time */ \
-  if (MINIROS_UNLIKELY(!loc.initialized_)) \
-  { \
-    initializeLogLocation(&loc, name, level); \
-  } \
-  if (MINIROS_UNLIKELY(loc.level_ != level)) \
-  { \
-    setLogLocationLevel(&loc, level); \
-    checkLogLocationEnabled(&loc); \
-  } \
-  bool enabled = loc.logger_enabled_ && (cond);
+  static ::miniros::console::LogLocation loc{}; \
+  if (MINIROS_UNLIKELY(loc.needUpdate(level))) \
+    ::miniros::console::updateLogLocation(&loc, name, level); \
+  bool enabled = loc.enabled(cond);
 
 #define MINIROS_CONSOLE_PRINT_AT_LOCATION_WITH_FILTER(filter, ...) \
-    ::miniros::console::print(filter, loc.logger_, loc.level_, __FILE__, __LINE__, __MINIROS_CONSOLE_FUNCTION__, __VA_ARGS__)
+    ::miniros::console::printAtLocation(filter, &loc, __FILE__, __LINE__, __MINIROS_CONSOLE_FUNCTION__, __VA_ARGS__)
 
 #define MINIROS_CONSOLE_PRINT_AT_LOCATION(...) \
     MINIROS_CONSOLE_PRINT_AT_LOCATION_WITH_FILTER(0, __VA_ARGS__)
@@ -464,7 +484,7 @@ MINIROS_DECL extern void (*function_print)(void*, console::Level, const char*, c
   { \
     std::stringstream ss; \
     ss << args; \
-    ::miniros::console::print(filter, loc.logger_, loc.level_, ss, __FILE__, __LINE__, __MINIROS_CONSOLE_FUNCTION__); \
+    ::miniros::console::printAtLocation(filter, &loc, ss, __FILE__, __LINE__, __MINIROS_CONSOLE_FUNCTION__); \
   } while (0)
 
 #define MINIROS_CONSOLE_PRINT_STREAM_AT_LOCATION(args) \
