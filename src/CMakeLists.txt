@@ -266,6 +266,7 @@ set(transport_SRC
 set(master_SRC
     roscore/discovery.cpp
     roscore/master.cpp
+    roscore/master_cache.cpp
     roscore/master_endpoints.cpp
     roscore/master_handler.cpp
     roscore/master_html_printers.cpp

@@ -34,6 +34,7 @@
 
 #include "miniros/common.h"
 
+#include <cstring>
 #include <random>
 #include <sstream>
 #include <cstdlib>
@@ -332,7 +333,7 @@ Error notifyNodeExiting(const NodeNotifyInfo& info)
 
 static std::random_device              rd;
 static std::mt19937                    gen(rd());
-static std::uniform_int_distribution<> dis(0, 15);
+static std::uniform_int_distribution<> dis(0, 255);
 
 constexpr unsigned int UUID_Version = 0x40;
 constexpr unsigned int UUID_Variant = 0x80;
@@ -373,26 +374,53 @@ bool UUID::valid() const
   return false;
 }
 
-/// Most lazy method to return string form of UUID.
 std::string UUID::toString() const
 {
-  std::stringstream ss;
-  ss << std::hex;
-  int i = 0;
-  for (;i < 4; i++)
-    ss << static_cast<int>(bytes[i]);
-  ss << "-";
-  for (; i < 6; i++)
-    ss << static_cast<int>(bytes[i]);
-  ss << "-";
-  for (; i < 8; i++)
-    ss << static_cast<int>(bytes[i]);
-  for (; i < 12; i++)
-    ss << static_cast<int>(bytes[i]);
-  ss << "-";
-  for (; i < 16; i++)
-    ss << static_cast<int>(bytes[i]);
-  return ss.str();
+  static const char* hex = "0123456789abcdef";
+  std::string out;
+  out.reserve(36);
+  for (int i = 0; i < Dim; ++i) {
+    if (i == 4 || i == 6 || i == 8 || i == 10)
+      out.push_back('-');
+    out.push_back(hex[bytes[i] >> 4]);
+    out.push_back(hex[bytes[i] & 0xf]);
+  }
+  return out;
+}
+
+bool UUID::fromString(const std::string& str)
+{
+  auto hexNibble = [](char c) -> int {
+    if (c >= '0' && c <= '9')
+      return c - '0';
+    if (c >= 'a' && c <= 'f')
+      return c - 'a' + 10;
+    if (c >= 'A' && c <= 'F')
+      return c - 'A' + 10;
+    return -1;
+  };
+
+  uint8_t parsed[Dim] = {};
+  size_t byteIndex = 0;
+  for (size_t i = 0; i < str.size() && byteIndex < Dim; ) {
+    if (str[i] == '-') {
+      ++i;
+      continue;
+    }
+    if (i + 1 >= str.size())
+      return false;
+    const int hi = hexNibble(str[i]);
+    const int lo = hexNibble(str[i + 1]);
+    if (hi < 0 || lo < 0)
+      return false;
+    parsed[byteIndex++] = static_cast<uint8_t>((hi << 4) | lo);
+    i += 2;
+  }
+  if (byteIndex != Dim)
+    return false;
+
+  std::memcpy(bytes, parsed, Dim);
+  return valid();
 }
 
 bool operator == (const UUID& a, const UUID& b)
@@ -421,6 +449,26 @@ Error changeCurrentDirectory(const std::string& path)
   }
   std::filesystem::current_path(path);
   return Error::Ok;
+}
+
+bool isProcessAlive(int pid)
+{
+  if (pid <= 0)
+    return true;
+
+#if defined(WIN32) || defined(_WIN32)
+  HANDLE h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, static_cast<DWORD>(pid));
+  if (!h)
+    return false;
+  DWORD exitCode = 0;
+  const BOOL ok = GetExitCodeProcess(h, &exitCode);
+  CloseHandle(h);
+  return ok && exitCode == STILL_ACTIVE;
+#else
+  if (::kill(pid, 0) == 0)
+    return true;
+  return errno == EPERM;
+#endif
 }
 
 #ifdef HAVE_GLIBC_BACKTRACE

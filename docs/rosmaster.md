@@ -36,9 +36,31 @@ Liveness and cleanup:
 2. **Periodic probe** — `Master::update()` periodically re-sends `getPid` to verify the Slave API is reachable.
 3. **Shutdown queue** — Dead / superseded nodes are placed into `RegistrationManager::m_nodesToShutdown`.
    Processing that queue drops registrations and notifies remaining nodes about updated publications.
+4. **Cache restore** — nodes loaded from disk start in `Restoring`, move to `Recovering` after `getPid`,
+   then to `Verified` once `getPublications` / `getSubscriptions` complete.
 
 The check period is configured with the `--node_check_period` option of `miniroscore` (seconds; `0` disables
 periodic checks). Default is 5 seconds.
+
+# Persistent state #
+
+`miniroscore` can persist a per-port cache file so a restarted master keeps the same instance GUID
+(`/run_id`) and can reattach to nodes that survived the master's downtime.
+
+State is stored as `cache.<port>` in the current working directory (for example
+`/var/run/miniroscore/cache.11311` when started with `--dir=/var/run/miniroscore`).
+Pass `--no-cache` to disable persistence.
+
+On startup the master:
+
+1. Loads `cache.<port>` once (GUID, nodes, and last-known node states).
+2. Reuses that GUID for `/run_id`, or generates a new one on first run.
+3. Re-registers each cached node by name + Slave API URI (skipping dead cached states / PIDs).
+4. After `getPid` verifies the node, requests `getPublications` / `getSubscriptions` and re-registers them.
+5. Restores services from the cache snapshot (ROS Slave API has no `getServices`).
+6. Sends `publisherUpdate` as topics are restored.
+
+The cache is rewritten when the graph changes and again on clean shutdown.
 
 # Process readiness #
 

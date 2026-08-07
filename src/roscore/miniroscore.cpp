@@ -90,6 +90,7 @@ int main(int argc, const char ** argv) {
     ("xmlrpc_log", po::value<int>()->default_value(1), "Verbosity level of XmlRpc logging")
     ("rosout", po::value<bool>()->default_value(true), "Enable rosout log aggregator")
     ("dir", po::value<std::string>(), "Path to working directory")
+    ("no-cache", "Disable persistent state cache (cache.<port> in cwd)")
     ("resolve", po::value<bool>()->default_value(false), "Resolve node IP address")
     ("dump_parameters", po::value<bool>()->default_value(false), "Dump all ROSParam values on every update")
     ("pidfile", po::value<std::string>(), "Path to a PID file")
@@ -128,13 +129,14 @@ int main(int argc, const char ** argv) {
     resolve = vm["resolve"].as<bool>();
   }
 
+  std::string workingDir;
   if (vm.count("dir")) {
-    std::string wd = vm["dir"].as<std::string>();
+    workingDir = vm["dir"].as<std::string>();
 
-    if (!makeDirectory(wd))
+    if (!makeDirectory(workingDir))
       return EXIT_FAILURE;
 
-    if (!changeCurrentDirectory(wd))
+    if (!changeCurrentDirectory(workingDir))
       return EXIT_FAILURE;
   }
 
@@ -172,6 +174,8 @@ int main(int argc, const char ** argv) {
   master.setResolveNodeIP(resolve);
   master.setDumpParameters(dumpParameters);
   master.setNodeCheckPeriod(vm["node_check_period"].as<double>());
+  // Cache files (cache.<port>) are written to the current working directory.
+  master.setCacheEnabled(!vm.count("no-cache"));
 
   PidFile pidFile;
   if (vm.count("pidfile")) {

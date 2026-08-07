@@ -10,6 +10,9 @@
 
 #include <cassert>
 #include <console.h>
+#include <cstring>
+#include <utility>
+#include <vector>
 
 namespace miniros {
 namespace master {
@@ -25,12 +28,31 @@ const char* NodeRef::State::toString() const
       return "Connected";
     case Verified:
       return "Verified";
+    case Restoring:
+      return "Restoring";
+    case Recovering:
+      return "Recovering";
     case ShuttingDown:
       return "ShuttingDown";
     case Dead:
       return "Dead";
   }
   return "Unknown";
+}
+
+bool NodeRef::State::fromString(const char* name)
+{
+  if (!name)
+    return false;
+  if (std::strcmp(name, "Initial") == 0) { value_ = Initial; return true; }
+  if (std::strcmp(name, "Connecting") == 0) { value_ = Connecting; return true; }
+  if (std::strcmp(name, "Connected") == 0) { value_ = Connected; return true; }
+  if (std::strcmp(name, "Verified") == 0) { value_ = Verified; return true; }
+  if (std::strcmp(name, "Restoring") == 0) { value_ = Restoring; return true; }
+  if (std::strcmp(name, "Recovering") == 0) { value_ = Recovering; return true; }
+  if (std::strcmp(name, "ShuttingDown") == 0) { value_ = ShuttingDown; return true; }
+  if (std::strcmp(name, "Dead") == 0) { value_ = Dead; return true; }
+  return false;
 }
 
 NodeRef::NodeRef(const std::string& _id, const std::string& _api)
@@ -248,7 +270,9 @@ std::shared_ptr<http::HttpClient> NodeRef::makeClient(PollSet* ps)
       std::string callerId;
       {
         std::unique_lock<std::mutex> lock(node->m_guard);
-        node->updateState(State::Connected, lock);
+        // Keep Restoring through TCP connect; getPid advances it to Recovering.
+        if (node->m_state != State::Restoring)
+          node->updateState(State::Connected, lock);
         callerId = node->m_callerId;
       }
       // Verify remote nodes after (re)connect; in-process nodes skip getPid.
@@ -309,7 +333,9 @@ Error NodeRef::activateConnection(const std::string& callerId, PollSet* ps)
     m_client = client;
 
     std::unique_lock lock(m_guard);
-    updateState(State::Connecting, lock);
+    // Restoring nodes stay Restoring until getPid; ordinary nodes go Connecting.
+    if (m_state != State::Restoring)
+      updateState(State::Connecting, lock);
   }
 
   // getPid is sent from the connect handler once the socket is up.
@@ -359,7 +385,8 @@ void NodeRef::handleDisconnect(const std::weak_ptr<http::HttpClient>& wclient, E
     MINIROS_INFO("%s - disconnected at state %s err=%s. Initiating reconnect (attempt %d)",
                  debugName().c_str(), m_state.toString(), disconnectError.toString(),
                  client->getReconnectAttempts());
-    updateState(State::Connecting, lock);
+    if (m_state != State::Restoring && m_state != State::Recovering)
+      updateState(State::Connecting, lock);
   } else {
     MINIROS_INFO("%s - disconnected at state %s. Failed to initiate reconnect: %s",
                  debugName().c_str(), m_state.toString(), err.toString());
@@ -374,6 +401,8 @@ void NodeRef::deactivateConnectionUnsafe(Lock& /*lock*/, ClientLock& /*clientLoc
   m_client.reset();
   m_reqGetPid.reset();
   m_reqShutdown.reset();
+  m_reqGetPublications.reset();
+  m_reqGetSubscriptions.reset();
   m_activeRequests.clear();
   m_pid = 0;
 }
@@ -545,12 +574,116 @@ void NodeRef::responseGetPid(int code, const std::string& msg, const RpcValue& d
     std::unique_lock lock(m_guard);
     m_pid = data.as<int>();
     MINIROS_INFO("%s::responseGetPid() pid=%d", debugName().c_str(), m_pid);
-    if (m_state == State::Connecting || m_state == State::Connected)
+    if (m_state == State::Restoring)
+      updateState(State::Recovering, lock);
+    else if (m_state == State::Connecting || m_state == State::Connected)
       updateState(State::Verified, lock);
   } else {
     MINIROS_ERROR("%s::responseGetPid unexpected response code=%d data=%s msg=%s",
                   debugName().c_str(), code, data.toJsonStr().c_str(), msg.c_str());
   }
+}
+
+Error NodeRef::sendGetPublications(const std::string& callerId,
+  std::function<void(int, const std::string&, const RpcValue&)> onComplete)
+{
+  if (!needRequests())
+    return Error::Ok;
+
+  auto client = getClient();
+  if (!client) {
+    MINIROS_ERROR("%s::sendGetPublications: No client available", debugName().c_str());
+    return Error::NotConnected;
+  }
+
+  std::shared_ptr<http::XmlRpcRequest> req;
+  {
+    std::unique_lock lock(m_guard);
+    if (!callerId.empty())
+      m_callerId = callerId;
+
+    if (!m_reqGetPublications) {
+      m_reqGetPublications = http::makeRequest(m_apiUrl.path, "getPublications");
+    } else {
+      auto s = m_reqGetPublications->state();
+      if (s != http::HttpRequest::State::Idle && s != http::HttpRequest::State::Done)
+        return Error::Ok;
+      m_reqGetPublications->resetResponse();
+      m_reqGetPublications->updateState(http::HttpRequest::State::Idle);
+    }
+
+    m_reqGetPublications->setParams(m_callerId);
+    m_reqGetPublications->generateRequestBody();
+    m_reqGetPublications->onComplete = std::move(onComplete);
+    std::weak_ptr<NodeRef> wnode = shared_from_this();
+    m_reqGetPublications->setFailureCallback([wnode]() {
+      if (auto node = wnode.lock()) {
+        std::shared_ptr<http::XmlRpcRequest> r;
+        {
+          std::unique_lock lock(node->m_guard);
+          r = node->m_reqGetPublications;
+        }
+        if (r)
+          node->m_activeRequests.erase(r);
+      }
+    });
+    req = m_reqGetPublications;
+  }
+
+  MINIROS_INFO("%s::sendGetPublications()", debugName().c_str());
+  m_activeRequests.insert(req);
+  return client->enqueueRequest(req);
+}
+
+Error NodeRef::sendGetSubscriptions(const std::string& callerId,
+  std::function<void(int, const std::string&, const RpcValue&)> onComplete)
+{
+  if (!needRequests())
+    return Error::Ok;
+
+  auto client = getClient();
+  if (!client) {
+    MINIROS_ERROR("%s::sendGetSubscriptions: No client available", debugName().c_str());
+    return Error::NotConnected;
+  }
+
+  std::shared_ptr<http::XmlRpcRequest> req;
+  {
+    std::unique_lock lock(m_guard);
+    if (!callerId.empty())
+      m_callerId = callerId;
+
+    if (!m_reqGetSubscriptions) {
+      m_reqGetSubscriptions = http::makeRequest(m_apiUrl.path, "getSubscriptions");
+    } else {
+      auto s = m_reqGetSubscriptions->state();
+      if (s != http::HttpRequest::State::Idle && s != http::HttpRequest::State::Done)
+        return Error::Ok;
+      m_reqGetSubscriptions->resetResponse();
+      m_reqGetSubscriptions->updateState(http::HttpRequest::State::Idle);
+    }
+
+    m_reqGetSubscriptions->setParams(m_callerId);
+    m_reqGetSubscriptions->generateRequestBody();
+    m_reqGetSubscriptions->onComplete = std::move(onComplete);
+    std::weak_ptr<NodeRef> wnode = shared_from_this();
+    m_reqGetSubscriptions->setFailureCallback([wnode]() {
+      if (auto node = wnode.lock()) {
+        std::shared_ptr<http::XmlRpcRequest> r;
+        {
+          std::unique_lock lock(node->m_guard);
+          r = node->m_reqGetSubscriptions;
+        }
+        if (r)
+          node->m_activeRequests.erase(r);
+      }
+    });
+    req = m_reqGetSubscriptions;
+  }
+
+  MINIROS_INFO("%s::sendGetSubscriptions()", debugName().c_str());
+  m_activeRequests.insert(req);
+  return client->enqueueRequest(req);
 }
 
 size_t NodeRef::getQueuedRequests() const
@@ -567,6 +700,54 @@ int NodeRef::pid() const
   return m_pid;
 }
 
+void NodeRef::beginRestore(std::vector<std::pair<std::string, std::string>> services)
+{
+  std::unique_lock lock(m_guard);
+  m_pendingRestoreServices = std::move(services);
+  m_restoreQueriesLeft = 0;
+  updateState(State::Restoring, lock);
+}
+
+bool NodeRef::isRestoreInProgress() const
+{
+  std::unique_lock lock(m_guard);
+  return m_state.isRestoreInProgress();
+}
+
+int NodeRef::restoreQueriesLeft() const
+{
+  std::unique_lock lock(m_guard);
+  return m_restoreQueriesLeft;
+}
+
+void NodeRef::beginTopicRecovery(int queryCount)
+{
+  std::unique_lock lock(m_guard);
+  if (m_state != State::Recovering)
+    updateState(State::Recovering, lock);
+  m_restoreQueriesLeft = queryCount;
+}
+
+bool NodeRef::notifyRestoreQueryDone()
+{
+  std::unique_lock lock(m_guard);
+  if (m_restoreQueriesLeft > 0)
+    --m_restoreQueriesLeft;
+  if (m_restoreQueriesLeft > 0)
+    return false;
+  if (m_state == State::Recovering)
+    updateState(State::Verified, lock);
+  return true;
+}
+
+std::vector<std::pair<std::string, std::string>> NodeRef::takePendingRestoreServices()
+{
+  std::unique_lock lock(m_guard);
+  std::vector<std::pair<std::string, std::string>> out;
+  out.swap(m_pendingRestoreServices);
+  return out;
+}
+
 void NodeRef::markDead()
 {
   // Lock order matches activateConnection: m_clientGuard then m_guard.
@@ -576,6 +757,8 @@ void NodeRef::markDead()
     return;
   MINIROS_WARN("%s::markDead()", debugName().c_str());
   deactivateConnectionUnsafe(lock, clientLock);
+  m_pendingRestoreServices.clear();
+  m_restoreQueriesLeft = 0;
   updateState(State::Dead, lock);
 }
 

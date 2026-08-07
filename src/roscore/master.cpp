@@ -24,6 +24,7 @@
 #include "miniros/http/http_filters.h"
 #include "miniros/callback_queue.h"
 #include "miniros/rostime.h"
+#include "miniros/common.h"
 
 namespace miniros {
 
@@ -38,6 +39,7 @@ Master::Internal::Internal(const std::shared_ptr<RPCManager>& manager)
 {
   rpcManager = manager;
   resolver.scanAdapters();
+  cache.bind(&regManager, &handler);
 }
 
 Master::Internal::~Internal()
@@ -121,9 +123,24 @@ bool Master::start(PollSet* poll_set, int port)
   setupBindings(cb);
   internal_->callbackQueue = cb;
 
-  // It was done in roslaunch by calling generate_run_id() function.
-  // It should be uuid.uuid1()
-  internal_->uuid.generate();
+  // Prefer a persisted instance GUID when caching is enabled.
+  bool guidFromCache = false;
+  if (internal_->cache.enabled()) {
+    if (Error err = internal_->cache.load(port); !err) {
+      MINIROS_WARN("MasterCache: load failed: %s", err.toString());
+    } else if (!internal_->cache.guid().empty()) {
+      if (internal_->uuid.fromString(internal_->cache.guid())) {
+        guidFromCache = true;
+        MINIROS_INFO("Restored master GUID %s from cache", internal_->cache.guid().c_str());
+      } else {
+        MINIROS_WARN("Ignoring invalid GUID in cache: %s", internal_->cache.guid().c_str());
+      }
+    }
+  }
+  if (!guidFromCache) {
+    // It was done in roslaunch by calling generate_run_id() function.
+    internal_->uuid.generate();
+  }
   internal_->parameterStorage.setParam("master", "/run_id", internal_->uuid.toString());
 
   internal_->rpcManager->setPollSet(poll_set);
@@ -131,6 +148,12 @@ bool Master::start(PollSet* poll_set, int port)
 
   if (!internal_->rpcManager->start(cb, port)) {
     return false;
+  }
+
+  // Use the already-loaded snapshot; bound port only updates the save path.
+  const int boundPort = internal_->rpcManager->getServerPort();
+  if (internal_->cache.enabled()) {
+    internal_->cache.beginRestore(boundPort > 0 ? boundPort : port, internal_->uuid.toString());
   }
 
   if (internal_->discovery) {
@@ -156,7 +179,11 @@ bool Master::start(PollSet* poll_set, int port)
 
 void Master::stop()
 {
-  if (internal_ && internal_->rpcManager)
+  if (!internal_)
+    return;
+  const int port = internal_->rpcManager ? internal_->rpcManager->getServerPort() : 0;
+  internal_->cache.flush(port, internal_->uuid.toString());
+  if (internal_->rpcManager)
     internal_->rpcManager->shutdown();
 }
 
@@ -245,6 +272,13 @@ void Master::setNodeCheckPeriod(double seconds)
                seconds, seconds <= 0 ? " (disabled)" : "");
 }
 
+void Master::setCacheEnabled(bool enabled)
+{
+  if (!internal_)
+    return;
+  internal_->cache.setEnabled(enabled);
+}
+
 void Master::Internal::checkNodesAlive()
 {
   auto nodes = regManager.listAllNodes();
@@ -301,6 +335,7 @@ void Master::Internal::shutdownNode(const std::shared_ptr<NodeRef>& node, const 
   }
 
   node->markDead();
+  cache.markDirty();
 }
 
 void Master::update()
@@ -335,7 +370,11 @@ void Master::update()
     for (auto node: graveyard) {
       internal_->parameterStorage.dropSubscriptions(node);
     }
+    internal_->cache.markDirty();
   }
+
+  const int port = internal_->rpcManager ? internal_->rpcManager->getServerPort() : 0;
+  internal_->cache.update(port, internal_->uuid.toString());
 }
 
 Master::RpcValue Master::lookupService(
@@ -370,6 +409,8 @@ Master::RpcValue Master::registerService(const std::string& caller_id, const std
   requesterInfo.callerApi = caller_api;
 
   ReturnStruct r = internal_->handler.registerService(requesterInfo, service, service_api);
+  if (r.statusCode == 1)
+    internal_->cache.markDirty();
 
   RpcValue res = RpcValue::Array(3);
   res[0] = r.statusCode;
@@ -386,6 +427,8 @@ Master::RpcValue Master::unregisterService(const std::string& caller_id, const s
     MINIROS_WARN("Failed to read network address of caller %s", caller_id.c_str());
   }
   ReturnStruct r = internal_->handler.unregisterService(requesterInfo, service, service_api);
+  if (r.statusCode == 1)
+    internal_->cache.markDirty();
 
   RpcValue res = RpcValue::Array(3);
   res[0] = r.statusCode;
@@ -492,6 +535,8 @@ Master::RpcValue Master::registerPublisher(const std::string& caller_id, const s
   requesterInfo.callerApi = caller_api;
 
   ReturnStruct st = internal_->handler.registerPublisher(requesterInfo, topic, type);
+  if (st.statusCode == 1)
+    internal_->cache.markDirty();
   RpcValue res = RpcValue::Array(3);
   res[0] = st.statusCode;
   res[1] = st.statusMessage;
@@ -509,6 +554,8 @@ Master::RpcValue Master::unregisterPublisher(
   requesterInfo.callerApi = caller_api;
 
   ReturnStruct st = internal_->handler.unregisterPublisher(requesterInfo, topic);
+  if (st.statusCode == 1)
+    internal_->cache.markDirty();
   RpcValue res = RpcValue::Array(3);
   res[0] = st.statusCode;
   res[1] = st.statusMessage;
@@ -526,6 +573,8 @@ Master::RpcValue Master::registerSubscriber(const std::string& caller_id, const 
   requesterInfo.callerApi = caller_api;
 
   ReturnStruct st = internal_->handler.registerSubscriber(requesterInfo, topic, type);
+  if (st.statusCode == 1)
+    internal_->cache.markDirty();
   RpcValue res = RpcValue::Array(3);
   res[0] = st.statusCode;
   res[1] = st.statusMessage;
@@ -543,6 +592,8 @@ Master::RpcValue Master::unregisterSubscriber(const std::string& caller_id, cons
   requesterInfo.callerApi = caller_api;
 
   ReturnStruct st = internal_->handler.unregisterSubscriber(requesterInfo, topic);
+  if (st.statusCode == 1)
+    internal_->cache.markDirty();
   RpcValue res = RpcValue::Array(3);
   res[0] = st.statusCode;
   res[1] = st.statusMessage;

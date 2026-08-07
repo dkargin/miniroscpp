@@ -91,7 +91,11 @@ struct MINIROS_DECL UUID {
   /// Check if UUID is valid.
   bool valid() const;
 
+  /// Canonical string form: 8-4-4-4-12 lowercase hex.
   std::string toString() const;
+
+  /// Parse canonical UUID string (dashes optional). Returns false on failure.
+  bool fromString(const std::string& str);
 };
 
 MINIROS_DECL bool operator == (const UUID& a, const UUID& b);
@@ -99,6 +103,10 @@ MINIROS_DECL bool operator == (const UUID& a, const UUID& b);
 MINIROS_DECL Error makeDirectory(const std::string& path);
 
 MINIROS_DECL Error changeCurrentDirectory(const std::string& path);
+
+/// Best-effort check whether a process with the given PID is still alive.
+/// @param pid - OS process id; values <= 0 are treated as unknown and return true.
+MINIROS_DECL bool isProcessAlive(int pid);
 
 /// Enable printing backtrace during crash.
 /// For internal usage only.
