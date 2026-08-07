@@ -100,17 +100,18 @@ void StatisticsLogger::callback(const std::shared_ptr<M_string>& connection_head
     try
     {
       std_msgs::Header header;
-      miniros::serialization::IStream stream(m.message_start, m.num_bytes - (m.message_start - m.buf.get()));
+      const uint32_t message_len = static_cast<uint32_t>(m.num_bytes - (m.message_start - m.buf.get()));
+      miniros::serialization::IStream stream(m.message_start, message_len);
       miniros::serialization::deserialize(stream, header);
       if (!header.stamp.isZero())
       {
         stats.age_list.push_back(received_time - header.stamp);
       }
     }
-    catch (miniros::serialization::StreamOverrunException& e)
+    catch (miniros::serialization::StreamOverrunException&)
     {
-      long int messageLen = m.num_bytes - (m.message_start - m.buf.get());
-      MINIROS_DEBUG("Error during header extraction for statistics (topic=%s, message_length=%li)", topic.c_str(), messageLen);
+      const uint32_t message_len = static_cast<uint32_t>(m.num_bytes - (m.message_start - m.buf.get()));
+      MINIROS_DEBUG("Error during header extraction for statistics (topic=%s, message_length=%u)", topic.c_str(), message_len);
       hasHeader_ = false;
     }
   }
@@ -129,7 +130,7 @@ void StatisticsLogger::callback(const std::shared_ptr<M_string>& connection_head
     msg.node_sub = miniros::this_node::getName();
     msg.window_start = window_start;
     msg.window_stop = received_time;
-    msg.delivered_msgs = stats.arrival_time_list.size();
+    msg.delivered_msgs = static_cast<int32_t>(stats.arrival_time_list.size());
     msg.dropped_msgs = stats.dropped_msgs;
     msg.traffic = bytes_sent - stats.stat_bytes_last;
 

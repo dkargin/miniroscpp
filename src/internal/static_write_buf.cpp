@@ -28,12 +28,12 @@ void StaticWriteBuf::reset() {
 }
 
 int StaticWriteBuf::left() const {
-  return m_data + m_size - m_ptr - 1;
+  return static_cast<int>(m_data + m_size - m_ptr - 1);
 }
 
 int StaticWriteBuf::puts(const char* str) {
   size_t len = str ? strlen(str) : 0;
-  size_t available = left();
+  size_t available = static_cast<size_t>(left());
 
   if (len > available) {
     len = available;
@@ -43,12 +43,12 @@ int StaticWriteBuf::puts(const char* str) {
     m_ptr += len;
     *m_ptr = '\0';
   }
-  return len;
+  return static_cast<int>(len);
 }
 
 int StaticWriteBuf::putsq(const char* str) {
   size_t len = str ? strlen(str) : 0;
-  size_t available = left();
+  size_t available = static_cast<size_t>(left());
 
   if (len + 2> available) {
     return 0;
@@ -61,7 +61,7 @@ int StaticWriteBuf::putsq(const char* str) {
     *m_ptr = '\0';
   }
   putc('\"');
-  return len + 2;
+  return static_cast<int>(len + 2);
 }
 
 int StaticWriteBuf::puti(int val)
@@ -71,7 +71,7 @@ int StaticWriteBuf::puti(int val)
     *m_ptr = '\0';
     return 0;
   }
-  int len = r.ptr - m_ptr;
+  const int len = static_cast<int>(r.ptr - m_ptr);
   m_ptr = r.ptr;
   *m_ptr = '\0';
   return len;
@@ -84,7 +84,7 @@ int StaticWriteBuf::putui64(uint64_t val)
     *m_ptr = '\0';
     return 0;
   }
-  int len = r.ptr - m_ptr;
+  const int len = static_cast<int>(r.ptr - m_ptr);
   m_ptr = r.ptr;
   *m_ptr = '\0';
   return len;
@@ -92,7 +92,7 @@ int StaticWriteBuf::putui64(uint64_t val)
 
 
 int StaticWriteBuf::putc(char val) {
-  size_t available = left();
+  size_t available = static_cast<size_t>(left());
   if (available > 0) {
     *m_ptr = val;
     m_ptr++;
@@ -114,7 +114,7 @@ int StaticWriteBuf::putd(double val)
     return 0;
   }
 
-  int len = r.ptr - m_ptr;
+  const int len = static_cast<int>(r.ptr - m_ptr);
   m_ptr = r.ptr;
   *m_ptr = '\0';
   return len;
