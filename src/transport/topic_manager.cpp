@@ -43,6 +43,9 @@
 #include "miniros/transport/transport_tcp.h"
 #include "miniros/transport/transport_udp.h"
 
+#include <algorithm>
+#include <sstream>
+
 #include <miniros/console.h>
 #include <sstream>
 
@@ -417,7 +420,26 @@ bool TopicManager::advertise(const AdvertiseOptions& ops, const SubscriberCallba
   args[1] = ops.topic;
   args[2] = ops.datatype;
   args[3] = rpc_manager_->getServerUrlStr();
-  return master_link_->execute("registerPublisher", args, result, payload, true);
+  Error err = master_link_->execute("registerPublisher", args, result, payload, true);
+  if (!err) {
+    MINIROS_ERROR("Failed to register publisher on topic [%s]: %s", ops.topic.c_str(), err.toString());
+
+    // Roll back the local Publication so a later advertise can succeed cleanly.
+    {
+      std::scoped_lock<std::recursive_mutex> lock(advertised_topics_mutex_);
+      auto it = std::find(advertised_topics_.begin(), advertised_topics_.end(), pub);
+      if (it != advertised_topics_.end()) {
+        (*it)->drop();
+        advertised_topics_.erase(it);
+      }
+    }
+    {
+      std::scoped_lock<std::mutex> lock(advertised_topic_names_mutex_);
+      advertised_topic_names_.remove(ops.topic);
+    }
+    return false;
+  }
+  return true;
 }
 
 bool TopicManager::unadvertise(const std::string& topic, const SubscriberCallbacksPtr& callbacks)

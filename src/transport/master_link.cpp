@@ -51,6 +51,7 @@
 #include "rosconsole/local_log.h"
 
 #include <cassert>
+#include <limits>
 
 namespace miniros {
 
@@ -299,6 +300,7 @@ Error MasterLink::execute(const std::string& method, const RpcValue& request, Rp
   };
 
   if (!wait_for_master) {
+    // Drop the request on transport failure so we don't leave it dangling.
     req->setFailureCallback([wc = std::weak_ptr(c), wreq = std::weak_ptr(req)]()
     {
       if (auto req = wreq.lock()) {
@@ -307,12 +309,22 @@ Error MasterLink::execute(const std::string& method, const RpcValue& request, Rp
         }
       }
     });
+  } else {
+    // Keep the request queued across disconnects so HttpClient can reconnect
+    // until the master appears (classic wait_for_master behaviour).
+    req->setRetry(std::numeric_limits<int>::max());
   }
 
   if (Error err = c->enqueueRequest(req); err != Error::Ok) {
     LOCAL_ERROR("Failed to enqueue request %s", method.c_str());
     return err;
   }
+
+  // When wait_for_master is false and retry_timeout is unset (zero), use a short
+  // default so Connecting/Idle after connection refused cannot hang forever.
+  const WallDuration noMasterLimit = internal_->retry_timeout.isZero()
+    ? WallDuration(0.5)
+    : internal_->retry_timeout;
 
   do {
     WallDuration waitDuration;
@@ -322,10 +334,11 @@ Error MasterLink::execute(const std::string& method, const RpcValue& request, Rp
 #endif
       auto waitStart = SteadyTime::now();
       if (Error err = req->waitForState(http::HttpRequest::State::Done, WallDuration(0.3)); err == Error::Ok) {
-        // b is set to true in callback.
+        // Request finished (callback should have filled response).
       }
       else if (err != Error::Timeout) {
-        // Some serious error here.
+        LOCAL_ERROR("[%s] waitForState failed: %s", method.c_str(), err.toString());
+        return err;
       }
       waitDuration = SteadyTime::now() - waitStart;
     }
@@ -333,8 +346,24 @@ Error MasterLink::execute(const std::string& method, const RpcValue& request, Rp
     noShutdown = !manager->isShuttingDown();
 
     auto s = req->state();
+    if (s == http::HttpRequest::State::Done || state->b.load()) {
+      if (!xml::XmlCodec::validateXmlrpcResponse(method, response, payload)) {
+        // Malformed response, or master returned status_code != 1.
+        LOCAL_ERROR("[%s] Invalid XML-RPC response from master at [%s:%d]",
+          method.c_str(), master_host.c_str(), master_port);
+        return Error::InvalidResponse;
+      }
+      break;
+    }
+
+    // Transport dropped the request without completing it (Idle after refuse).
+    if (!wait_for_master && s == http::HttpRequest::State::Idle) {
+      LOCAL_ERROR("[%s] Failed to contact master at [%s:%d]", method.c_str(), master_host.c_str(), master_port);
+      return Error::NoMaster;
+    }
+
     if (s == http::HttpRequest::State::ClientQueued && noShutdown) {
-      // Not initiated connection.
+      // Not initiated connection / waiting for reconnect.
       if (!printed && wait_for_master) {
         LOCAL_ERROR("[%s] Failed to contact master at [%s:%d].  %s", method.c_str(), master_host.c_str(), master_port,
           wait_for_master ? "Retrying..." : "");
@@ -342,29 +371,36 @@ Error MasterLink::execute(const std::string& method, const RpcValue& request, Rp
       }
 
       if (!wait_for_master) {
-        // TODO: Do we need to drop request?
-        LOCAL_ERROR("[%s] Timed out trying to connect to the master after [%f] seconds", method.c_str(), internal_->retry_timeout.toSec());
-        auto elapsed = state->elapsed();
+        LOCAL_ERROR("[%s] Timed out trying to connect to the master after [%f] seconds",
+          method.c_str(), noMasterLimit.toSec());
         return Error::NoMaster;
       }
 
       if (!internal_->retry_timeout.isZero() && state->elapsed() >= internal_->retry_timeout) {
         LOCAL_ERROR("[%s] Timed out trying to connect to the master after [%f] seconds", method.c_str(), internal_->retry_timeout.toSec());
-        // TODO: Do we need to drop request?
         return Error::NoMaster;
+      }
+
+      // A prior wait_for_master=false call (e.g. start()/param) can leave the client
+      // Disconnected with an empty queue, so RPCManager's disconnect handler never
+      // schedules reconnect. Kick it when we still have a queued wait_for_master request.
+      if (c->getState() == http::HttpClient::State::Disconnected) {
+        if (Error err = c->reconnect(500); !err) {
+          LOCAL_DEBUG("[%s] reconnect while ClientQueued failed: %s", method.c_str(), err.toString());
+        }
       }
 
       (void)miniros::WallDuration(0.05).sleep();
       slept = true;
-    } else {
-      if (!xml::XmlCodec::validateXmlrpcResponse(method, response, payload)) {
-        // It is either malformed response, or fault response from server.
-        return Error::InvalidResponse;
-      }
-      break;
+      continue;
     }
 
-    noShutdown = !miniros::isShuttingDown() && !manager->isShuttingDown();
+    // Still connecting / sending / waiting for the HTTP response — keep polling.
+    if (!wait_for_master && state->elapsed() >= noMasterLimit) {
+      LOCAL_ERROR("[%s] Timed out waiting for master at [%s:%d] after [%f] seconds",
+        method.c_str(), master_host.c_str(), master_port, noMasterLimit.toSec());
+      return Error::NoMaster;
+    }
   } while (noShutdown);
 
   if (noShutdown && slept) {

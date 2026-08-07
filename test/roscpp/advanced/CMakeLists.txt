@@ -38,6 +38,9 @@ endfunction()
 
 set(TEST_GROUP advanced)
 
+# MasterLink::execute against a fake HttpServer peer (own PollSet); no real master.
+miniros_advanced_test(${TEST_GROUP}-test_master_link_execute SOURCES test_master_link_execute.cpp)
+
 miniros_advanced_test(${TEST_GROUP}-handles SOURCES handles.cpp WITH_MASTER)
 
 miniros_advanced_test(${TEST_GROUP}-timer_callbacks SOURCES timer_callbacks.cpp WITH_MASTER)

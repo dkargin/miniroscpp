@@ -34,6 +34,17 @@ target_compile_definitions(${TEST_GROUP}-test_launcher PRIVATE
   MINIROS_NOTIFY_CHILD="$<TARGET_FILE:${TEST_GROUP}-notify_child>")
 add_dependencies(${TEST_GROUP}-test_launcher ${TEST_GROUP}-notify_child)
 
+# Node starts before master; connects once its own miniroscore appears (no global master).
+add_executable(${TEST_GROUP}-test_late_master_node test_late_master_node.cpp)
+target_link_libraries(${TEST_GROUP}-test_late_master_node roscxx)
+target_include_directories(${TEST_GROUP}-test_late_master_node PRIVATE ${MINIROS_GENERATED_INCLUDE_DIRS})
+set_target_properties(${TEST_GROUP}-test_late_master_node PROPERTIES FOLDER "Tests")
+
+miniros_add_test(${TEST_GROUP}-test_late_master SOURCES test_late_master.cpp)
+target_compile_definitions(${TEST_GROUP}-test_late_master PRIVATE
+  MINIROS_TEST_BIN_DIR="${CMAKE_BINARY_DIR}/bin")
+add_dependencies(${TEST_GROUP}-test_late_master miniroscore ${TEST_GROUP}-test_late_master_node)
+
 if(catkin_FOUND AND CATKIN_ENABLE_TESTING)
   message(STATUS "Trying to find rostest for more complex testing")
   find_package(rostest REQUIRED)

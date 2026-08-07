@@ -382,6 +382,35 @@ bool Launcher::valid() const
   return internal_ != nullptr && internal_->isPidValid();
 }
 
+bool Launcher::running()
+{
+  if (!valid())
+    return false;
+
+#ifdef WIN32
+  DWORD exitCode = 0;
+  if (!GetExitCodeProcess(internal_->process, &exitCode))
+    return false;
+  if (exitCode == STILL_ACTIVE)
+    return true;
+  CloseHandle(internal_->process);
+  internal_->process = INVALID_HANDLE_VALUE;
+  internal_->closeNotify();
+  return false;
+#else
+  int status = 0;
+  const pid_t r = waitpid(internal_->pid, &status, WNOHANG);
+  if (r == 0)
+    return true;
+  if (r == internal_->pid || (r < 0 && errno == ECHILD)) {
+    internal_->pid = -1;
+    internal_->closeNotify();
+    return false;
+  }
+  return false;
+#endif
+}
+
 Launcher& Launcher::env(const char* name, const char* value)
 {
   if (internal_ && name && value) {
@@ -574,7 +603,16 @@ int Launcher::waitExit()
   return static_cast<int>(exitCode);
 #else
   int status = 0;
-  waitpid(internal_->pid, &status, 0);
+  for (;;) {
+    const pid_t r = waitpid(internal_->pid, &status, 0);
+    if (r == internal_->pid)
+      break;
+    if (r < 0 && errno == EINTR)
+      continue;
+    internal_->pid = -1;
+    internal_->closeNotify();
+    return -1;
+  }
   internal_->pid = -1;
   internal_->closeNotify();
   if (WIFEXITED(status))
@@ -583,6 +621,87 @@ int Launcher::waitExit()
     return 128 + WTERMSIG(status);
   return -1;
 #endif
+}
+
+Error Launcher::waitExit(const WallDuration& timeout, int* exitCode)
+{
+  if (!valid())
+    return Error::InvalidValue;
+
+  const SteadyTime deadline = SteadyTime::now() + timeout;
+
+  auto finish = [&](int code) -> Error {
+    if (exitCode)
+      *exitCode = code;
+    return Error::Ok;
+  };
+
+#ifdef WIN32
+  for (;;) {
+    const double remainSec = (deadline - SteadyTime::now()).toSec();
+    const DWORD ms = remainSec <= 0.0 ? 0 : static_cast<DWORD>(std::min(remainSec * 1000.0, 50.0));
+    const DWORD wr = WaitForSingleObject(internal_->process, ms);
+    if (wr == WAIT_OBJECT_0) {
+      DWORD code = 1;
+      if (!GetExitCodeProcess(internal_->process, &code))
+        return Error::SystemError;
+      CloseHandle(internal_->process);
+      internal_->process = INVALID_HANDLE_VALUE;
+      internal_->closeNotify();
+      return finish(static_cast<int>(code));
+    }
+    if (wr == WAIT_TIMEOUT) {
+      if (SteadyTime::now() >= deadline)
+        return Error::Timeout;
+      continue;
+    }
+    return Error::SystemError;
+  }
+#else
+  for (;;) {
+    int status = 0;
+    const pid_t r = waitpid(internal_->pid, &status, WNOHANG);
+    if (r == internal_->pid) {
+      internal_->pid = -1;
+      internal_->closeNotify();
+      if (WIFEXITED(status))
+        return finish(WEXITSTATUS(status));
+      if (WIFSIGNALED(status))
+        return finish(128 + WTERMSIG(status));
+      return finish(-1);
+    }
+    if (r < 0) {
+      if (errno == EINTR)
+        continue;
+      if (errno == ECHILD) {
+        internal_->pid = -1;
+        internal_->closeNotify();
+        return finish(-1);
+      }
+      return Error::SystemError;
+    }
+    // r == 0: still running
+    if (SteadyTime::now() >= deadline)
+      return Error::Timeout;
+    const double remain = (deadline - SteadyTime::now()).toSec();
+    const int ms = static_cast<int>(std::min(std::max(remain * 1000.0, 1.0), 50.0));
+    usleep(static_cast<useconds_t>(ms * 1000));
+  }
+#endif
+}
+
+int Launcher::stopAndWait(const WallDuration& grace)
+{
+  if (!valid())
+    return -1;
+
+  (void)stop();
+  int code = -1;
+  if (waitExit(grace, &code) == Error::Ok)
+    return code;
+
+  (void)terminate();
+  return waitExit();
 }
 
 int64_t Launcher::myPid()
