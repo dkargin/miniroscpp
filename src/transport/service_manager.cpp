@@ -81,25 +81,32 @@ void ServiceManager::start(PollManagerPtr pm, MasterLinkPtr master_link, Connect
 
 void ServiceManager::shutdown()
 {
-  std::scoped_lock<std::recursive_mutex> shutdown_lock(shutting_down_mutex_);
-  if (shutting_down_)
   {
-    return;
+    std::scoped_lock<std::recursive_mutex> shutdown_lock(shutting_down_mutex_);
+    if (shutting_down_)
+    {
+      return;
+    }
+
+    shutting_down_ = true;
   }
 
-  shutting_down_ = true;
-
+  // Do not hold shutting_down_mutex_ across master RPC or connection drops.
+  // MasterLink::execute waits on PollManager, and drop callbacks may run on
+  // that same thread (unlike classic ros_comm XmlRpcClient, which blocks the
+  // caller with its own I/O).
   MINIROS_DEBUG("ServiceManager::shutdown(): unregistering our advertised services");
+  std::list<ServicePublicationPtr> local_publications;
   {
     std::scoped_lock<std::mutex> ss_lock(service_publications_mutex_);
+    local_publications.swap(service_publications_);
+  }
 
-    for (auto i = service_publications_.begin(); i != service_publications_.end(); ++i)
-    {
-      unregisterService((*i)->getName());
-      MINIROS_DEBUG( "shutting down service %s", (*i)->getName().c_str());
-      (*i)->drop();
-    }
-    service_publications_.clear();
+  for (const auto& pub: local_publications)
+  {
+    unregisterService(pub->getName());
+    MINIROS_DEBUG( "shutting down service %s", pub->getName().c_str());
+    pub->drop();
   }
 
   std::list<ServiceServerLinkPtr> local_service_clients;
@@ -117,13 +124,13 @@ void ServiceManager::shutdown()
 
 bool ServiceManager::advertiseService(const AdvertiseServiceOptions& ops)
 {
-  std::scoped_lock<std::recursive_mutex> shutdown_lock(shutting_down_mutex_);
-  if (shutting_down_ || !master_link_)
   {
-    return false;
-  }
+    std::scoped_lock<std::recursive_mutex> shutdown_lock(shutting_down_mutex_);
+    if (shutting_down_ || !master_link_)
+    {
+      return false;
+    }
 
-  {
     std::scoped_lock<std::mutex> lock(service_publications_mutex_);
 
     if (isServiceAdvertised(ops.service))
@@ -152,14 +159,14 @@ bool ServiceManager::advertiseService(const AdvertiseServiceOptions& ops)
 
 bool ServiceManager::unadvertiseService(const string &serv_name)
 {
-  std::scoped_lock<std::recursive_mutex> shutdown_lock(shutting_down_mutex_);
-  if (shutting_down_)
-  {
-    return false;
-  }
-
   ServicePublicationPtr pub;
   {
+    std::scoped_lock<std::recursive_mutex> shutdown_lock(shutting_down_mutex_);
+    if (shutting_down_)
+    {
+      return false;
+    }
+
     std::scoped_lock<std::mutex> lock(service_publications_mutex_);
 
     for (auto i = service_publications_.begin(); i != service_publications_.end(); ++i)
@@ -227,16 +234,24 @@ ServiceServerLinkPtr ServiceManager::createServiceServerLink(const std::string& 
                                              const std::string& request_md5sum, const std::string& response_md5sum,
                                              const M_string& header_values)
 {
+  {
+    std::scoped_lock<std::recursive_mutex> shutdown_lock(shutting_down_mutex_);
+    if (shutting_down_)
+    {
+      return ServiceServerLinkPtr();
+    }
+  }
 
-  std::scoped_lock<std::recursive_mutex> shutdown_lock(shutting_down_mutex_);
-  if (shutting_down_)
+  // lookupService -> MasterLink::execute needs PollManager; do not hold
+  // shutting_down_mutex_ across it.
+  uint32_t serv_port;
+  std::string serv_host;
+  if (!lookupService(service, serv_host, serv_port))
   {
     return ServiceServerLinkPtr();
   }
 
-  uint32_t serv_port;
-  std::string serv_host;
-  if (!lookupService(service, serv_host, serv_port))
+  if (shutting_down_)
   {
     return ServiceServerLinkPtr();
   }
@@ -254,6 +269,13 @@ ServiceServerLinkPtr ServiceManager::createServiceServerLink(const std::string& 
     ServiceServerLinkPtr client(std::make_shared<ServiceServerLink>(service, persistent, request_md5sum, response_md5sum, header_values));
 
     {
+      std::scoped_lock<std::recursive_mutex> shutdown_lock(shutting_down_mutex_);
+      if (shutting_down_)
+      {
+        connection->drop(Connection::Destructing);
+        return ServiceServerLinkPtr();
+      }
+
       std::scoped_lock<std::mutex> lock(service_server_links_mutex_);
       service_server_links_.push_back(client);
     }
@@ -270,20 +292,21 @@ ServiceServerLinkPtr ServiceManager::createServiceServerLink(const std::string& 
 
 void ServiceManager::removeServiceServerLink(const ServiceServerLinkPtr& client)
 {
-  // Guard against this getting called as a result of shutdown() dropping all connections (where shutting_down_mutex_ is already locked)
-  if (shutting_down_)
-  {
-    return;
-  }
-
-  std::scoped_lock<std::recursive_mutex> shutdown_lock(shutting_down_mutex_);
-  // Now check again, since the state may have changed between pre-lock/now
+  // Called from PollManager on connection drop. Must not take
+  // shutting_down_mutex_: advertise/unadvertise/create may wait on
+  // MasterLink::execute (also PollManager) while holding that mutex.
+  // shutdown() sets shutting_down_ before swapping the client list, so
+  // an early return here is enough when we are tearing down.
   if (shutting_down_)
   {
     return;
   }
 
   std::scoped_lock<std::mutex> lock(service_server_links_mutex_);
+  if (shutting_down_)
+  {
+    return;
+  }
 
   auto it = std::find(service_server_links_.begin(), service_server_links_.end(), client);
   if (it != service_server_links_.end())

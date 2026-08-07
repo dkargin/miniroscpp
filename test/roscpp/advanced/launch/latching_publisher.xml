@@ -1,3 +1,0 @@
-<launch>
-  <test test-name="latching_publisher" pkg="miniros" type="advanced-latching_publisher"/>
-</launch>

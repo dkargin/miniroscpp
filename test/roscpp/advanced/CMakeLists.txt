@@ -45,7 +45,7 @@ miniros_advanced_test(${TEST_GROUP}-handles SOURCES handles.cpp WITH_MASTER)
 
 miniros_advanced_test(${TEST_GROUP}-timer_callbacks SOURCES timer_callbacks.cpp WITH_MASTER)
 
-miniros_add_test(${TEST_GROUP}-latching_publisher SOURCES latching_publisher.cpp WITH_MASTER DISABLED)
+miniros_advanced_test(${TEST_GROUP}-latching_publisher SOURCES latching_publisher.cpp WITH_MASTER)
 
 miniros_add_test(${TEST_GROUP}-publish_n_fast SOURCES publish_n_fast.cpp WITH_MASTER DISABLED)
 
@@ -75,8 +75,7 @@ miniros_add_test(${TEST_GROUP}-publish_constantly SOURCES publish_constantly.cpp
 
 miniros_add_test(${TEST_GROUP}-param_update_test SOURCES param_update_test.cpp WITH_MASTER DISABLED)
 
-miniros_add_test(${TEST_GROUP}-real_time_test SOURCES real_time_test.cpp WITH_MASTER DISABLED)
-#add_dependencies(${TEST_GROUP}-real_time_test ${rosgraph_msgs_EXPORTED_TARGETS})
+miniros_advanced_test(${TEST_GROUP}-real_time_test SOURCES real_time_test.cpp WITH_MASTER)
 
 miniros_add_test(${TEST_GROUP}-sim_time_test SOURCES sim_time_test.cpp WITH_MASTER DISABLED)
 #add_dependencies(${TEST_GROUP}-sim_time_test ${rosgraph_msgs_EXPORTED_TARGETS})
@@ -92,8 +91,7 @@ miniros_add_test(${TEST_GROUP}-service_call SOURCES service_call.cpp WITH_MASTER
 
 miniros_add_test(${TEST_GROUP}-service_call_zombie SOURCES service_call_zombie.cpp WITH_MASTER DISABLED)
 
-miniros_add_test(${TEST_GROUP}-service_deadlock SOURCES service_deadlock.cpp WITH_MASTER DISABLED)
-#add_dependencies(${TEST_GROUP}-service_deadlock ${std_srvs_EXPORTED_TARGETS})
+miniros_advanced_test(${TEST_GROUP}-service_deadlock SOURCES service_deadlock.cpp WITH_MASTER)
 
 miniros_add_test(${TEST_GROUP}-service_call_repeatedly SOURCES service_call_repeatedly.cpp WITH_MASTER DISABLED)
 
@@ -112,7 +110,7 @@ miniros_add_test(${TEST_GROUP}-missing_call_to_shutdown SOURCES missing_call_to_
 miniros_advanced_test(${TEST_GROUP}-inspection SOURCES inspection.cpp WITH_MASTER)
 
 # Test that advertising a service multiple times fails
-miniros_add_test(${TEST_GROUP}-service_adv_multiple SOURCES service_adv_multiple.cpp WITH_MASTER DISABLED)
+miniros_advanced_test(${TEST_GROUP}-service_adv_multiple SOURCES service_adv_multiple.cpp WITH_MASTER)
 
 # Test that the second node to advertise a service "wins"
 miniros_add_test(${TEST_GROUP}-service_adv_a SOURCES service_adv_a.cpp WITH_MASTER DISABLED)
@@ -137,17 +135,17 @@ miniros_add_test(${TEST_GROUP}-namespaces SOURCES namespaces.cpp WITH_MASTER DIS
 miniros_advanced_test(${TEST_GROUP}-params SOURCES params.cpp WITH_MASTER)
 
 # Test spinners
-miniros_add_test(${TEST_GROUP}-spinners SOURCES spinners.cpp WITH_MASTER DISABLED)
+miniros_advanced_test(${TEST_GROUP}-spinners SOURCES spinners.cpp WITH_MASTER)
 
 # Test getting information from the master
-miniros_advanced_test(${TEST_GROUP}-get_master_information SOURCES get_master_information.cpp WITH_MASTER DISABLED)
+miniros_advanced_test(${TEST_GROUP}-get_master_information SOURCES get_master_information.cpp WITH_MASTER)
 
 # Test multiple subscriptions
 miniros_add_test(${TEST_GROUP}-multiple_subscriptions SOURCES multiple_subscriptions.cpp WITH_MASTER DISABLED)
 
 miniros_add_test(${TEST_GROUP}-check_master SOURCES check_master.cpp WITH_MASTER DISABLED)
 
-miniros_add_test(${TEST_GROUP}-wait_for_message SOURCES wait_for_message.cpp WITH_MASTER DISABLED)
+miniros_advanced_test(${TEST_GROUP}-wait_for_message SOURCES wait_for_message.cpp WITH_MASTER)
 
 miniros_add_test(${TEST_GROUP}-loads_of_publishers SOURCES loads_of_publishers.cpp WITH_MASTER DISABLED)
 
@@ -159,7 +157,7 @@ miniros_advanced_test(${TEST_GROUP}-service_callback_types SOURCES service_callb
 
 miniros_advanced_test(${TEST_GROUP}-intraprocess_subscriptions SOURCES intraprocess_subscriptions.cpp WITH_MASTER)
 
-miniros_add_test(${TEST_GROUP}-nonconst_subscriptions SOURCES nonconst_subscriptions.cpp WITH_MASTER DISABLED)
+miniros_advanced_test(${TEST_GROUP}-nonconst_subscriptions SOURCES nonconst_subscriptions.cpp WITH_MASTER)
 
 miniros_add_test(${TEST_GROUP}-subscribe_retry_tcp SOURCES subscribe_retry_tcp.cpp WITH_MASTER DISABLED)
 
@@ -169,7 +167,7 @@ miniros_add_test(${TEST_GROUP}-subscribe_star SOURCES subscribe_star.cpp WITH_MA
 miniros_add_test(${TEST_GROUP}-publisher_for_star_subscriber SOURCES publisher_for_star_subscriber.cpp WITH_MASTER DISABLED)
 #add_dependencies(${TEST_GROUP}-publisher_for_star_subscriber ${std_srvs_EXPORTED_TARGETS})
 
-miniros_add_test(${TEST_GROUP}-parameter_validation SOURCES parameter_validation.cpp WITH_MASTER DISABLED)
+miniros_advanced_test(${TEST_GROUP}-parameter_validation SOURCES parameter_validation.cpp WITH_MASTER)
 
 miniros_add_test(${TEST_GROUP}-param_locale_avoidance_test SOURCES param_locale_avoidance_test.cpp WITH_MASTER DISABLED)
 
@@ -179,9 +177,9 @@ miniros_add_test(${TEST_GROUP}-test_remapping SOURCES test_remapping.cpp WITH_MA
 
 miniros_add_test(${TEST_GROUP}-name_not_remappable SOURCES name_not_remappable.cpp WITH_MASTER DISABLED)
 
-miniros_add_test(${TEST_GROUP}-test_ns_node_remapping SOURCES test_ns_node_remapping.cpp WITH_MASTER DISABLED)
+miniros_advanced_test(${TEST_GROUP}-test_ns_node_remapping SOURCES test_ns_node_remapping.cpp WITH_MASTER)
 
-miniros_add_test(${TEST_GROUP}-test_search_param SOURCES test_search_param.cpp WITH_MASTER DISABLED)
+miniros_advanced_test(${TEST_GROUP}-test_search_param SOURCES test_search_param.cpp WITH_MASTER)
 
 miniros_add_test(${TEST_GROUP}-left_right SOURCES left_right.cpp WITH_MASTER DISABLED)
 #add_dependencies(${TEST_GROUP}-left_right ${std_msgs_EXPORTED_TARGETS})

@@ -1,3 +1,0 @@
-<launch>
-  <test test-name="timer_callbacks" pkg="miniros" type="advanced-timer_callbacks" time-limit="120"/>
-</launch>
