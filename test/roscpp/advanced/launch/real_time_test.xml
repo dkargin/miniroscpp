@@ -1,4 +1,0 @@
-<launch>
-  <test test-name="timetest_real" pkg="miniros" type="advanced-real_time_test" args=""/>
-</launch>
-
