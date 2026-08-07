@@ -171,6 +171,7 @@ bool ServiceServerLink::initialize(const ConnectionPtr& connection)
 void ServiceServerLink::onHeaderWritten(const ConnectionPtr& conn)
 {
   (void)conn;
+  std::scoped_lock<std::mutex> lock(call_queue_mutex_);
   header_written_ = true;
 }
 
@@ -199,6 +200,7 @@ bool ServiceServerLink::onHeaderReceived(const ConnectionPtr& conn, const Header
   {
     processNextCall();
 
+    std::scoped_lock<std::mutex> lock(call_queue_mutex_);
     header_read_ = true;
   }
 
