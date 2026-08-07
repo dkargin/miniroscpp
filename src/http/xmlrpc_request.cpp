@@ -213,14 +213,14 @@ std::tuple<int, std::string, XmlRpc::XmlRpcValue> XmlRpcRequest::parseResponse(c
   return {res, msg, data};
 }
 
-bool XmlRpcRequest::parseXmlResponseImpl(const std::string_view& responseView, XmlRpc::XmlRpcValue& result, bool& isFault)
+bool XmlRpcRequest::parseXmlResponseImpl(const std::string_view& responseView, XmlRpc::XmlRpcValue& result, bool& isFault) const
 {
   std::string response(responseView);
-
   // Parse response xml into result
   int offset = 0;
   if ( ! XmlRpc::XmlRpcUtil::findTag(METHODRESPONSE_TAG, response, &offset)) {
-    XmlRpc::XmlRpcUtil::error("Error in XmlRpcRequest::parseResponse: Invalid response - no methodResponse. Response:\n%s", response.c_str());
+    XmlRpc::XmlRpcUtil::error("Error in XmlRpcRequest(%s)::parseResponse: Invalid response - no methodResponse. Response:\n%s",
+      method_name_.c_str(), response.c_str());
     return false;
   }
 
@@ -232,12 +232,14 @@ bool XmlRpcRequest::parseXmlResponseImpl(const std::string_view& responseView, X
     size_t offsetCopy = offset;
     if ( !codec.parseXmlRpcValue(result, responseView, offsetCopy))
     {
-      XmlRpc::XmlRpcUtil::error("Error in XmlRpcRequest::parseResponse: Invalid response value. Response:\n%s", response.c_str());
+      XmlRpc::XmlRpcUtil::error("Error in XmlRpcRequest(%s)::parseResponse: Invalid response value. Response:\n%s",
+        method_name_.c_str(), response.c_str());
       return false;
     }
     offset = static_cast<int>(offsetCopy);
   } else {
-    XmlRpc::XmlRpcUtil::error("Error in XmlRpcRequest::parseResponse: Invalid response - no param or fault tag. Response:\n%s", response.c_str());
+    XmlRpc::XmlRpcUtil::error("Error in XmlRpcRequest(%s)::parseResponse: Invalid response - no param or fault tag. Response:\n%s",
+      method_name_.c_str(), response.c_str());
     return false;
   }
       
