@@ -83,7 +83,8 @@ jobs:
 
     - name: Build
       # Build your program with the given configuration. Note that --config is needed because the default Windows generator is a multi-config generator (Visual Studio generator).
-      run: cmake --build ${{ steps.strings.outputs.build-output-dir }} --config ${{ matrix.build_type }} -- --ignore-errors
+      # Do not pass make --ignore-errors: that lets compile/link failures exit 0 and CI proceeds to tests with missing binaries.
+      run: cmake --build ${{ steps.strings.outputs.build-output-dir }} --config ${{ matrix.build_type }}
     - uses: actions/upload-artifact@v4
       if: ${{ failure() }}  # Run only if something went wrong
       with:
