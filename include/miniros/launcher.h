@@ -34,6 +34,7 @@ struct MINIROS_DECL ChildReady {
  * to receive MAINPID / X_MINIROS_RPC_PORT / X_MINIROS_URI.
  *
  * Prefer stop() for a cooperative interrupt and terminate() for a forceful kill.
+ * Prefer stopAndWait() when tearing down so a stuck child cannot hang the parent forever.
  */
 class MINIROS_DECL Launcher {
 public:
@@ -74,11 +75,24 @@ public:
   /// Wait for the child to exit; returns process exit status (or 128+signum if killed by signal).
   int waitExit();
 
+  /// Wait for the child to exit up to \p timeout.
+  /// On success reaps the child (same as waitExit()) and optionally writes the status to \p exitCode.
+  /// Returns Error::Timeout if the child is still running when the deadline hits.
+  Error waitExit(const WallDuration& timeout, int* exitCode = nullptr);
+
+  /// Cooperative stop(), wait up to \p grace, then terminate() if still alive, then reap.
+  /// Returns the process exit status (same convention as waitExit()), or -1 if nothing was started.
+  int stopAndWait(const WallDuration& grace = WallDuration(5.0));
+
   /// Get PID of a process.
   int64_t pid() const;
 
-  /// Check if app is running / was started.
+  /// True if start() succeeded and the child handle is still tracked.
   bool valid() const;
+
+  /// True if the child process is still running.
+  /// If the child has already exited, reaps it (clears the handle) and returns false.
+  bool running();
 
   static int64_t myPid();
 
