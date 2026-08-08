@@ -55,6 +55,9 @@ void MasterHandler::notifyTopicSubscribers(const std::string& topic, const std::
 ReturnStruct MasterHandler::registerService(const RequesterInfo& requesterInfo, const std::string& service,
     const std::string& service_api)
 {
+  MINIROS_INFO_NAMED("handler", "registerService(\"%s\") caller_id=%s caller_api=%s service_api=%s",
+    service.c_str(), requesterInfo.callerId.c_str(), requesterInfo.callerApi.c_str(), service_api.c_str());
+
   std::shared_ptr<NodeRef> ref = m_regManager->register_service(service, requesterInfo.callerId, requesterInfo.callerApi, service_api);
   if (!ref)
     return ReturnStruct(0, "Internal error");
@@ -80,6 +83,8 @@ std::string MasterHandler::lookupService(const RequesterInfo& requesterInfo, con
 ReturnStruct MasterHandler::unregisterService(const RequesterInfo& requesterInfo, const std::string& service,
   const std::string& service_api)
 {
+  MINIROS_INFO_NAMED("handler", "unregisterService(\"%s\") caller_id=%s caller_api=%s service_api=%s",
+    service.c_str(), requesterInfo.callerId.c_str(), requesterInfo.callerApi.c_str(), service_api.c_str());
   return m_regManager->unregister_service(service, requesterInfo.callerId, service_api);
 }
 
