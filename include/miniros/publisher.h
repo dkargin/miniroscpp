@@ -29,6 +29,7 @@
 #define ROSCPP_PUBLISHER_HANDLE_H
 
 #include <functional>
+#include <mutex>
 
 #include "miniros/internal/forwards.h"
 #include "miniros/common.h"
@@ -151,6 +152,14 @@ namespace miniros
      */
     bool isLatched() const;
 
+    std::function<void(const SubscriberLinkPtr&)> getLastMessageCallback() {
+      return [impl = impl_](const SubscriberLinkPtr& sub_link) {
+        if (impl) {
+          impl->pushLastMessage(sub_link);
+        }
+      };
+    }
+
     operator void*() const { return (impl_ && isValid()) ? (void*)1 : (void*)0; }
 
     bool operator<(const Publisher& rhs) const
@@ -170,8 +179,8 @@ namespace miniros
 
   private:
 
-    Publisher(const std::string& topic, const std::string& md5sum, 
-              const std::string& datatype, const NodeHandle& node_handle, 
+    Publisher(const std::string& topic, const std::string& md5sum,
+              const std::string& datatype, bool latch, const NodeHandle& node_handle,
               const SubscriberCallbacksPtr& callbacks);
 
     void publishImpl(const std::function<SerializedMessage(void)>& serfunc, SerializedMessage& m) const;
@@ -187,6 +196,7 @@ namespace miniros
 
       void unadvertise();
       bool isValid() const;
+      void pushLastMessage(const SubscriberLinkPtr& sub_link);
 
       std::string topic_;
       std::string md5sum_;
@@ -194,6 +204,9 @@ namespace miniros
       NodeHandlePtr node_handle_;
       SubscriberCallbacksPtr callbacks_;
       bool unadvertised_;
+      bool latch_;
+      SerializedMessage last_message_;
+      std::mutex last_message_mutex_;
     };
     typedef std::shared_ptr<Impl> ImplPtr;
     typedef std::weak_ptr<Impl> ImplWPtr;

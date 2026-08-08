@@ -382,7 +382,7 @@ bool TopicManager::advertise(const AdvertiseOptions& ops, const SubscriberCallba
     }
 
     pub = PublicationPtr(std::make_shared<Publication>(
-      ops.topic, ops.datatype, ops.md5sum, ops.message_definition, ops.queue_size, ops.latch, ops.has_header));
+      ops.topic, ops.datatype, ops.md5sum, ops.message_definition, ops.queue_size, false, ops.has_header));
     pub->addCallbacks(callbacks);
     advertised_topics_.push_back(pub);
   }

@@ -52,6 +52,7 @@ XML. They are registered with CTest today.
 | `advanced-parameter_validation` | `parameter_validation.cpp` | Former `parameter_validation.xml` removed |
 | `advanced-test_ns_node_remapping` | `test_ns_node_remapping.cpp` | Former `ns_node_remapping.xml` removed |
 | `advanced-test_search_param` | `test_search_param.cpp` | Former `search_param.xml` removed |
+| `advanced-service_deadlock` | `service_deadlock.cpp` | Former `service_deadlock.xml` removed; fixed MiniROS deadlock (see below) |
 
 ---
 
@@ -146,7 +147,6 @@ manual UDP-drop script).
 
 | Item | Status |
 | --- | --- |
-| `service_deadlock` | Built `DISABLED`; hangs under CTest (120s timeout). Intended ~30s stress loop; saw `Invalid XML-RPC response` from master. Binary kept for manual runs; `service_deadlock.xml` retained |
 | `missing_call_to_shutdown` | Still calls `system("rosrun test_roscpp …")`; `missing_call_to_shutdown_impl` is not built. Needs rewrite with `Launcher` + absolute paths |
 | `service_exception` | Not built (`# No support for Log4xx`) |
 | `multiple_latched_publishers` | Commented out; needs primitive `bool` publish support |
@@ -169,7 +169,8 @@ manual UDP-drop script).
   `get_master_information.xml`, `latching_publisher.xml`,
   `real_time_test.xml`, `service_adv_multiple.xml`, `spinners.xml`,
   `wait_for_message.xml`, `nonconst_subscriptions.xml`,
-  `parameter_validation.xml`, `ns_node_remapping.xml`, `search_param.xml`.
+  `parameter_validation.xml`, `ns_node_remapping.xml`, `search_param.xml`,
+  `service_deadlock.xml`.
 
 ---
 
@@ -180,4 +181,4 @@ manual UDP-drop script).
 2. Introduce C++ scenario drivers with `miniros::Launcher` for section 3,
    starting with simple pairs (`service_call`, `pubsub_once`) before
    large graphs (`loads_of_publishers`, `topic_statistic_frequency`).
-3. Investigate / rewrite `service_deadlock` and `missing_call_to_shutdown`.
+3. Rewrite `missing_call_to_shutdown` last (process lifecycle).

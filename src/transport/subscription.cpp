@@ -228,20 +228,28 @@ void Subscription::dropAllConnections()
 
 void Subscription::addLocalConnection(const RPCManagerPtr& rpcManager, const PublicationPtr& pub)
 {
-  std::scoped_lock<std::mutex> lock(publisher_links_mutex_);
-  if (dropped_)
+  IntraProcessSubscriberLinkPtr sub_link;
   {
-    return;
+    std::scoped_lock<std::mutex> lock(publisher_links_mutex_);
+    if (dropped_)
+    {
+      return;
+    }
+
+    MINIROS_DEBUG("Creating intraprocess link for topic [%s]", name_.c_str());
+
+    auto pub_link = std::make_shared<IntraProcessPublisherLink>(shared_from_this(), rpcManager->getServerUrlStr(), transport_hints_);
+    sub_link = std::make_shared<IntraProcessSubscriberLink>(pub);
+    pub_link->setPublisher(sub_link);
+    sub_link->setSubscriber(pub_link);
+
+    addPublisherLink(pub_link);
   }
 
-  MINIROS_DEBUG("Creating intraprocess link for topic [%s]", name_.c_str());
-
-  auto pub_link = std::make_shared<IntraProcessPublisherLink>(shared_from_this(), rpcManager->getServerUrlStr(), transport_hints_);
-  auto sub_link = std::make_shared<IntraProcessSubscriberLink>(pub);
-  pub_link->setPublisher(sub_link);
-  sub_link->setSubscriber(pub_link);
-
-  addPublisherLink(pub_link);
+  // Do not hold publisher_links_mutex_ across addSubscriberLink: latched
+  // delivery calls handleMessage() which takes callbacks_mutex_, and
+  // addCallback nests those locks in the opposite order (TSan
+  // lock-order-inversion in latchingMultipleSubscriptions).
   pub->addSubscriberLink(sub_link);
 }
 
@@ -758,6 +766,10 @@ bool Subscription::addCallback(const SubscriptionCallbackHelperPtr& helper, cons
   }
 
   {
+    // Lock publisher_links before callbacks so we never invert the order used
+    // when intraprocess latch delivery runs handleMessage (callbacks only)
+    // after addLocalConnection touched publisher_links.
+    std::scoped_lock<std::mutex> pub_lock(publisher_links_mutex_);
     std::scoped_lock<std::mutex> lock(callbacks_mutex_);
 
     CallbackInfoPtr info(std::make_shared<CallbackInfo>());
@@ -782,8 +794,6 @@ bool Subscription::addCallback(const SubscriptionCallbackHelperPtr& helper, cons
     // if we have any latched links, we need to immediately schedule callbacks
     if (!latched_messages_.empty())
     {
-      std::scoped_lock<std::mutex> lock(publisher_links_mutex_);
-
       for (const PublisherLinkPtr& link: publisher_links_)
       {
         if (!link->isLatched())
