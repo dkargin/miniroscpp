@@ -17,16 +17,16 @@ void call(miniros::ServiceClient &client)
 {
   if (client && client.exists() && client.isValid())
   {
-    MINIROS_INFO("Calling service");
+    MINIROS_DEBUG("Calling service");
     std_srvs::Empty srv;
     // these will alternate successful and failed.
     if (client.call(srv))
-      MINIROS_INFO("  Successful call");
+      MINIROS_DEBUG("  Successful call");
     else
-      MINIROS_INFO("  Failed to call");
+      MINIROS_DEBUG("  Failed to call");
   }
   else
-    MINIROS_INFO("Persistent client is invalid");
+    MINIROS_DEBUG("Persistent client is invalid");
 }
 
 // this only verifies that it doesn't deadlock.  Should run about 60 seconds.
