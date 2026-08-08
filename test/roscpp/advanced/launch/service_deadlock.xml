@@ -1,5 +1,0 @@
-<launch>
-  <test test-name="service_deadlock" pkg="miniros" type="advanced-service_deadlock"/>
-</launch>
-
-

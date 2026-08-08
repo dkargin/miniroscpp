@@ -29,11 +29,12 @@
 #include "miniros/transport/publication.h"
 #include "miniros/node_handle.h"
 #include "miniros/transport/topic_manager.h"
+#include "miniros/transport/subscriber_link.h"
 
 namespace miniros
 {
 
-Publisher::Impl::Impl() : unadvertised_(false) { }
+Publisher::Impl::Impl() : unadvertised_(false), latch_(false) { }
 
 Publisher::Impl::~Impl()
 {
@@ -58,12 +59,23 @@ void Publisher::Impl::unadvertise()
   }
 }
 
-Publisher::Publisher(const std::string& topic, const std::string& md5sum, const std::string& datatype, const NodeHandle& node_handle, const SubscriberCallbacksPtr& callbacks)
+void Publisher::Impl::pushLastMessage(const SubscriberLinkPtr& sub_link)
+{
+  std::scoped_lock<std::mutex> lock(last_message_mutex_);
+  if (last_message_.buf)
+  {
+    sub_link->enqueueMessage(last_message_, true, true);
+  }
+}
+
+Publisher::Publisher(const std::string& topic, const std::string& md5sum, const std::string& datatype, bool latch,
+                     const NodeHandle& node_handle, const SubscriberCallbacksPtr& callbacks)
 : impl_(std::make_shared<Impl>())
 {
   impl_->topic_ = topic;
   impl_->md5sum_ = md5sum;
   impl_->datatype_ = datatype;
+  impl_->latch_ = latch;
   impl_->node_handle_ = std::make_shared<NodeHandle>(node_handle);
   impl_->callbacks_ = callbacks;
 }
@@ -106,6 +118,12 @@ void Publisher::publishImpl(const std::function<SerializedMessage(void)>& serfun
   TopicManagerPtr tm = getTopicManager();
   if (tm)
     tm->publish(impl_->topic_, serfunc, m);
+
+  if (isLatched())
+  {
+    std::scoped_lock<std::mutex> lock(impl_->last_message_mutex_);
+    impl_->last_message_ = m;
+  }
 }
 
 void Publisher::incrementSequence() const
@@ -150,17 +168,8 @@ uint32_t Publisher::getNumSubscribers() const
 }
 
 bool Publisher::isLatched() const {
-  PublicationPtr publication_ptr;
   if (impl_ && impl_->isValid()) {
-    TopicManagerPtr tm = getTopicManager();
-    if (tm)
-      publication_ptr = tm->lookupPublication(impl_->topic_);
-  } else {
-    MINIROS_ASSERT_MSG(false, "Call to isLatched() on an invalid Publisher");
-    throw miniros::Exception("Call to isLatched() on an invalid Publisher");
-  }
-  if (publication_ptr) {
-    return publication_ptr->isLatched();
+    return impl_->latch_;
   } else {
     MINIROS_ASSERT_MSG(false, "Call to isLatched() on an invalid Publisher");
     throw miniros::Exception("Call to isLatched() on an invalid Publisher");

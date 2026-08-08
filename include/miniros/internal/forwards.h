@@ -110,6 +110,7 @@ struct SubscriberCallbacks
   }
   SubscriberStatusCallback connect_;
   SubscriberStatusCallback disconnect_;
+  std::function<void(const SubscriberLinkPtr&)> push_latched_message_;
 
   bool has_tracked_object_;
   VoidConstWPtr tracked_object_;

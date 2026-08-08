@@ -57,7 +57,7 @@ public:
             const std::string& _md5sum,
             const std::string& message_definition,
             size_t max_queue,
-            bool latch,
+            bool /* unused */,
             bool has_header);
 
   ~Publication();
@@ -114,7 +114,7 @@ public:
    */
   uint32_t getSequence() { return seq_; }
 
-  bool isLatched() { return latch_; }
+  bool isLatched();
 
   /**
    * \brief Adds a publisher to our list
@@ -138,7 +138,7 @@ public:
 
   size_t getNumCallbacks();
 
-  bool isLatching() { return latch_; }
+  bool isLatching() { return isLatched(); }
 
   void publish(SerializedMessage& m);
   void processPublishQueue();
@@ -177,7 +177,6 @@ private:
 
   bool latch_;
   bool has_header_;
-  SerializedMessage last_message_;
 
   uint32_t intraprocess_subscriber_count_;
 

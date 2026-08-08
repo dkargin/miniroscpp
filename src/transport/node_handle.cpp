@@ -308,10 +308,14 @@ Publisher NodeHandle::advertise(AdvertiseOptions& ops)
   SubscriberCallbacksPtr callbacks(std::make_shared<SubscriberCallbacks>(ops.connect_cb, ops.disconnect_cb, 
                                                                            ops.tracked_object, ops.callback_queue));
 
+  Publisher pub(ops.topic, ops.md5sum, ops.datatype, ops.latch, *this, callbacks);
+
+  if (ops.latch) {
+    callbacks->push_latched_message_ = pub.getLastMessageCallback();
+  }
+
   if (getTopicManager()->advertise(ops, callbacks))
   {
-    Publisher pub(ops.topic, ops.md5sum, ops.datatype, *this, callbacks);
-
     {
       std::scoped_lock<std::mutex> lock(collection_->mutex_);
       collection_->pubs_.push_back(pub.impl_);
