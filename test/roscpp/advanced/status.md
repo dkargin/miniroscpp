@@ -54,7 +54,12 @@ XML. They are registered with CTest today.
 | `advanced-test_search_param` | `test_search_param.cpp` | Former `search_param.xml` removed |
 | `advanced-service_deadlock` | `service_deadlock.cpp` | Former `service_deadlock.xml` removed; fixed MiniROS deadlock (see below) |
 
----
+ROS1 holds `shutting_down_mutex_` across `master::execute` too, but classic
+XmlRpcClient blocks the **caller** with its own I/O. MiniROS
+`MasterLink::execute` waits on **PollManager**, so holding that mutex across
+execute deadlocked with `removeServiceServerLink` on the poll thread. Fix in
+`service_manager.cpp`: do not take `shutting_down_mutex_` from the poll path,
+and do not hold it across master RPC.
 
 ## 2. Single-process candidates (still `DISABLED`)
 

@@ -6,6 +6,8 @@
 #include <miniros/console.h>
 #include <miniros/io/poll_manager.h>
 
+#include "../../require_master.h"
+
 bool dummyService(std_srvs::Empty::Request &, std_srvs::Empty::Request &)
 {
   return true;
@@ -67,5 +69,6 @@ int main(int argc, char **argv)
 {
   testing::InitGoogleTest(&argc, argv);
   miniros::init(argc, argv, "service_deadlock");
+  miniros::test::requireMasterOrExit("service_deadlock");
   return RUN_ALL_TESTS();
 }

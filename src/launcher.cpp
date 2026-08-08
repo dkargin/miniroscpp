@@ -365,6 +365,26 @@ Error Launcher::start(const std::filesystem::path& appPath, const std::vector<st
       close(STDIN_FILENO);
       close(STDOUT_FILENO);
       close(STDERR_FILENO);
+      // Optional console capture for detached masters (CI debug). Path comes from
+      // Launcher::env("MINIROS_MASTER_CONSOLE_LOG", ...) — getenv still sees the
+      // pre-exec parent environment here, so read the override list directly.
+      std::string consoleLog;
+      constexpr const char kPrefix[] = "MINIROS_MASTER_CONSOLE_LOG=";
+      for (const std::string& e : envOverrides) {
+        if (e.compare(0, sizeof(kPrefix) - 1, kPrefix) == 0) {
+          consoleLog = e.substr(sizeof(kPrefix) - 1);
+          break;
+        }
+      }
+      if (!consoleLog.empty()) {
+        const int fd = ::open(consoleLog.c_str(), O_WRONLY | O_CREAT | O_APPEND, 0644);
+        if (fd >= 0) {
+          dup2(fd, STDOUT_FILENO);
+          dup2(fd, STDERR_FILENO);
+          if (fd > STDERR_FILENO)
+            ::close(fd);
+        }
+      }
     }
     if (execve(appPath.c_str(), pargs.data(), penv.data()) != 0)
       _exit(EXIT_FAILURE);

@@ -10,6 +10,7 @@
 
 #include <gtest/gtest.h>
 
+#include "../../require_master.h"
 
 class MasterFixture : public testing::Test
 {
@@ -19,6 +20,8 @@ protected:
   void SetUp() override
   {
     master = miniros::getMasterLink();
+    ASSERT_TRUE(master);
+    ASSERT_TRUE(miniros::test::assertMasterAlive("MasterFixture"));
   }
 };
 
