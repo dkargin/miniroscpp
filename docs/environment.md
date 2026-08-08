@@ -14,6 +14,14 @@ Here is the list of different envorinment variables, which can influence behavio
 
 **HOME** - the last choice for picking ROS log folder.
 
+**MINIROS_MASTER_LOG_DIR** - preferred log directory for CI/`manage-master` (also exported as `ROS_LOG_DIR` to miniroscore). Contains `rosout.log` from the master's Rosout aggregator.
+
+**MINIROS_MASTER_DEBUG** - if `1`/`true`, `manage-master start` raises `--xmlrpc_log=4` and redirects miniroscore stdout/stderr to `$MINIROS_MASTER_LOG_DIR/miniroscore.console.log` (detached masters normally discard stdio).
+
+**MINIROS_MASTER_CONSOLE_LOG** - internal path used by `Launcher` when `MINIROS_MASTER_DEBUG` is on; usually set by `manage-master`.
+
+Tests that need a live master should call `miniros::test::requireMasterOrExit()` from `test/require_master.h` right after `miniros::init()` (exits **90** on failure). `MasterLink::check()` uses XML-RPC `getPid`. Creating a `NodeHandle` afterwards also registers `/rosout`, which is easy to spot in miniroscore logs. `launch_test.sh` dumps master stacks + rosout when a test exits 90.
+
 **ROSCONSOLE_FORMAT** - specifies format for logging messages. More details can be found at [logging.md](logging.md)
 
 **ROSCONSOLE_STDOUT_LINE_BUFFERED** - forces buffering of stdout writer. Takes values 0 or 1.
