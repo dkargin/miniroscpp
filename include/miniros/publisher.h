@@ -153,8 +153,13 @@ namespace miniros
     bool isLatched() const;
 
     std::function<void(const SubscriberLinkPtr&)> getLastMessageCallback() {
-      return [impl = impl_](const SubscriberLinkPtr& sub_link) {
-        if (impl) {
+      // Must not capture impl_ by shared_ptr: SubscriberCallbacks is owned by
+      // Impl and also held by Publication, so a shared capture would leak the
+      // publisher (never unadvertise) after all Publisher handles are gone.
+      // ros_comm binds a raw Impl*; weak_ptr is equivalent and a bit safer.
+      std::weak_ptr<Impl> weak_impl = impl_;
+      return [weak_impl](const SubscriberLinkPtr& sub_link) {
+        if (ImplPtr impl = weak_impl.lock()) {
           impl->pushLastMessage(sub_link);
         }
       };
