@@ -29,6 +29,7 @@
 #include "miniros/ros.h"
 #include "miniros/callback_queue.h"
 
+#include <atomic>
 #include <thread>
 #include <mutex>
 
@@ -175,7 +176,8 @@ private:
   uint32_t thread_count_;
   CallbackQueue* callback_queue_;
 
-  volatile bool continue_;
+  // Written under mutex_ in start()/stop(); read without lock in threadFunc().
+  std::atomic<bool> continue_;
 
   miniros::NodeHandle nh_;
 };
@@ -215,7 +217,7 @@ void AsyncSpinnerImpl::start()
 {
   std::scoped_lock<std::mutex> lock(mutex_);
 
-  if (continue_)
+  if (continue_.load(std::memory_order_relaxed))
     return; // already spinning
 
   if (!spinner_monitor.add(callback_queue_, false))
@@ -225,7 +227,7 @@ void AsyncSpinnerImpl::start()
     throw std::runtime_error(errorMessage);
   }
 
-  continue_ = true;
+  continue_.store(true, std::memory_order_release);
 
   for (uint32_t i = 0; i < thread_count_; ++i)
   {
@@ -236,10 +238,10 @@ void AsyncSpinnerImpl::start()
 void AsyncSpinnerImpl::stop()
 {
   std::scoped_lock<std::mutex> lock(mutex_);
-  if (!continue_)
+  if (!continue_.load(std::memory_order_relaxed))
     return;
 
-  continue_ = false;
+  continue_.store(false, std::memory_order_release);
   for (auto& thread: threads_)
       thread.join();
 
@@ -254,7 +256,7 @@ void AsyncSpinnerImpl::threadFunc()
   bool use_call_available = thread_count_ == 1;
   WallDuration timeout(0.1);
 
-  while (continue_ && nh_.ok())
+  while (continue_.load(std::memory_order_acquire) && nh_.ok())
   {
     if (use_call_available)
     {
