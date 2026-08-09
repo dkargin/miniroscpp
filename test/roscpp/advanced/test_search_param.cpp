@@ -60,6 +60,7 @@ int main(int argc, char** argv)
 {
   testing::InitGoogleTest(&argc, argv);
   miniros::init(argc, argv, "search_param_tester");
+  miniros::test::requireMasterOrExit("advanced-test_search_param");
   argc_ = argc;
   argv_ = argv;
   return RUN_ALL_TESTS();

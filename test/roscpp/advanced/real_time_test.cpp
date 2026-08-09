@@ -44,6 +44,7 @@
 #include <stdlib.h>
 #include "miniros/ros.h"
 #include <rosgraph_msgs/Clock.hxx>
+#include "../../require_master.h"
 
 int g_argc;
 char** g_argv;
@@ -107,6 +108,7 @@ int main(int argc, char** argv)
 {
   testing::InitGoogleTest(&argc, argv);
   miniros::init(argc, argv, "real_time_test");
+  miniros::test::requireMasterOrExit("advanced-real_time_test");
   g_argc = argc;
   g_argv = argv;
   return RUN_ALL_TESTS();

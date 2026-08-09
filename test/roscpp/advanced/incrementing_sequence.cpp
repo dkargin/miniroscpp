@@ -40,6 +40,7 @@
 
 #include "miniros/ros.h"
 #include <test_roscpp/TestWithHeader.hxx>
+#include "../../require_master.h"
 
 using namespace miniros;
 using namespace test_roscpp;
@@ -77,6 +78,7 @@ int main(int argc, char** argv)
 {
   testing::InitGoogleTest(&argc, argv);
   miniros::init(argc, argv, "incrementing_sequence");
+  miniros::test::requireMasterOrExit("advanced-incrementing_sequence");
 
   miniros::NodeHandle nh;
 

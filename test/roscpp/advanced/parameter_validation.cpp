@@ -32,6 +32,7 @@
 #include <miniros/ros.h>
 
 #include <test_roscpp/TestEmpty.hxx>
+#include "../../require_master.h"
 
 #define ASSERT_THROWS(expr) \
   try \
@@ -106,6 +107,7 @@ int main(int argc, char** argv)
 {
   testing::InitGoogleTest(&argc, argv);
   miniros::init(argc, argv, "parameter_validation");
+  miniros::test::requireMasterOrExit("advanced-parameter_validation");
 
   miniros::NodeHandle nh;
 

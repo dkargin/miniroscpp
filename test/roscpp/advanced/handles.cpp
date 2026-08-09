@@ -49,6 +49,8 @@
 #include <test_roscpp/TestArray.hxx>
 #include <test_roscpp/TestStringString.hxx>
 
+#include "../../require_master.h"
+
 
 
 using namespace miniros;
@@ -632,6 +634,7 @@ int main(int argc, char** argv)
 
   miniros::handleCrashes();
   miniros::init(argc, argv, "test_handles");
+  miniros::test::requireMasterOrExit("advanced-handles");
 
   return RUN_ALL_TESTS();
 }

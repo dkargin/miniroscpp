@@ -46,6 +46,7 @@
 #include "miniros/callback_queue.h"
 #include <test_roscpp/TestArray.hxx>
 #include <test_roscpp/TestStringString.hxx>
+#include "../../require_master.h"
 
 
 using namespace miniros;
@@ -951,6 +952,7 @@ int main(int argc, char** argv)
 {
   testing::InitGoogleTest(&argc, argv);
   miniros::init(argc, argv, g_node_name);
+  miniros::test::requireMasterOrExit("advanced-timer_callbacks");
 
   return RUN_ALL_TESTS();
 }

@@ -48,6 +48,7 @@
 #include "miniros/spinner.h"
 #include "miniros/init.h"
 #include "miniros/node_handle.h"
+#include "../../require_master.h"
 
 using namespace miniros;
 
@@ -170,5 +171,10 @@ int main(int argc, char** argv)
   testing::InitGoogleTest(&argc, argv);
   argc_ = argc;
   argv_ = argv;
+  // Probe once before tests; each TEST re-inits via DOIT() after the previous
+  // test's shutdown(), so requireMasterOrExit must not live inside DOIT().
+  miniros::init(argc, argv, "test_spinners");
+  miniros::test::requireMasterOrExit("advanced-spinners");
+  miniros::shutdown();
   return RUN_ALL_TESTS();
 }
