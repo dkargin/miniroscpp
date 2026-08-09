@@ -41,6 +41,7 @@
 #include <stdlib.h>
 
 #include "miniros/ros.h"
+#include "../../require_master.h"
 
 uint32_t g_msg_constructor = 0;
 uint32_t g_msg2_constructor = 0;
@@ -290,6 +291,7 @@ int main(int argc, char** argv)
 {
   testing::InitGoogleTest(&argc, argv);
   miniros::init(argc, argv, "intraprocess_subscriptions");
+  miniros::test::requireMasterOrExit("advanced-intraprocess_subscriptions");
 
   miniros::NodeHandle nh;
 

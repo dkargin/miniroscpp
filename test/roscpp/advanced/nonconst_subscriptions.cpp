@@ -42,6 +42,7 @@
 #include "miniros/ros.h"
 
 #include "test_roscpp/TestEmpty.hxx"
+#include "../../require_master.h"
 
 
 struct ConstHelper
@@ -136,6 +137,7 @@ int main(int argc, char** argv)
 {
   testing::InitGoogleTest(&argc, argv);
   miniros::init(argc, argv, "intraprocess_subscriptions");
+  miniros::test::requireMasterOrExit("advanced-nonconst_subscriptions");
 
   miniros::NodeHandle nh;
 

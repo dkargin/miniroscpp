@@ -40,6 +40,7 @@
 
 #include "miniros/ros.h"
 #include <test_roscpp/TestArray.hxx>
+#include "../../require_master.h"
 
 using namespace miniros;
 using namespace test_roscpp;
@@ -121,6 +122,7 @@ int main(int argc, char** argv)
 {
   testing::InitGoogleTest(&argc, argv);
   miniros::init(argc, argv, g_node_name);
+  miniros::test::requireMasterOrExit("advanced-latching_publisher");
 
   miniros::NodeHandle nh;
 

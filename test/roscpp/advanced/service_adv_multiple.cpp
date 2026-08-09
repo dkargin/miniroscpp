@@ -40,6 +40,7 @@
 #include "miniros/ros.h"
 #include "miniros/service.h"
 #include <test_roscpp/TestStringString.hxx>
+#include "../../require_master.h"
 
 bool srvCallback(test_roscpp::TestStringString::Request &,
                  test_roscpp::TestStringString::Response &)
@@ -60,6 +61,7 @@ int main(int argc, char** argv)
 {
   testing::InitGoogleTest(&argc, argv);
   miniros::init(argc, argv, "service_adv_multiple");
+  miniros::test::requireMasterOrExit("advanced-service_adv_multiple");
   miniros::NodeHandle nh;
 
   return RUN_ALL_TESTS();

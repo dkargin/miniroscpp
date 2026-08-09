@@ -39,6 +39,7 @@
 #include "std_msgs/String.hxx"
 
 #include <vector>
+#include "../../require_master.h"
 
 /**
  * This tutorial demonstrates simple receipt of messages over the ROS system.
@@ -191,6 +192,7 @@ int main(int argc, char **argv)
 
   miniros::handleCrashes();
   miniros::init( argc, argv, "subscription_callback_types" );
+  miniros::test::requireMasterOrExit("advanced-subscription_callback_types");
   miniros::NodeHandle nh;
 
   return RUN_ALL_TESTS();

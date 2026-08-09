@@ -588,6 +588,7 @@ int main(int argc, char** argv)
   miniros::console::set_logger_level("miniros.net", console::Level::Debug);
 
   miniros::init(argc, argv, "params");
+  miniros::test::requireMasterOrExit("advanced-params");
 
   // These parameters were set by a rostest/roslaunch.
   // We set these manually to mimic behaviour of original test without roslaunch.

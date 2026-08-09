@@ -42,6 +42,7 @@
 #include <test_roscpp/TestArray.hxx>
 #include <test_roscpp/TestStringInt.hxx>
 #include <test_roscpp/TestEmpty.hxx>
+#include "../../require_master.h"
 
 const char* g_node_name = "inspection_test";
 
@@ -114,6 +115,7 @@ main(int argc, char** argv)
   g_argv[7] = strdup("--bangbang");
 
   miniros::init( g_argc, g_argv, "inspection" );
+  miniros::test::requireMasterOrExit("advanced-inspection");
   miniros::NodeHandle nh;
 
   return RUN_ALL_TESTS();

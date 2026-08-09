@@ -40,6 +40,7 @@
 
 #include "miniros/ros.h"
 #include <test_roscpp/TestArray.hxx>
+#include "../../require_master.h"
 
 using namespace miniros;
 using namespace test_roscpp;
@@ -69,6 +70,7 @@ int main(int argc, char** argv)
 {
   testing::InitGoogleTest(&argc, argv);
   miniros::init(argc, argv, "wait_for_message");
+  miniros::test::requireMasterOrExit("advanced-wait_for_message");
 
   miniros::NodeHandle nh;
 

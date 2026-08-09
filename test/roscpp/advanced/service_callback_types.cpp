@@ -39,6 +39,7 @@
 #include "test_roscpp/TestStringString.hxx"
 
 #include <vector>
+#include "../../require_master.h"
 
 bool add(test_roscpp::TestStringString::Request &,
          test_roscpp::TestStringString::Response &)
@@ -106,6 +107,7 @@ int main(int argc, char **argv)
   testing::InitGoogleTest(&argc, argv);
 
   miniros::init( argc, argv, "subscription_callback_types" );
+  miniros::test::requireMasterOrExit("advanced-service_callback_types");
   miniros::NodeHandle nh;
 
   return RUN_ALL_TESTS();

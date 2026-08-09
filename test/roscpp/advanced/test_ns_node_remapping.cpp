@@ -29,6 +29,7 @@
 
 #include <miniros/ros.h>
 #include <gtest/gtest.h>
+#include "../../require_master.h"
 
 static int argc_;
 static char** argv_;
@@ -100,6 +101,7 @@ int main(int argc, char** argv)
 {
   testing::InitGoogleTest(&argc, argv);
   miniros::init(argc, argv, "remapping_tester");
+  miniros::test::requireMasterOrExit("advanced-test_ns_node_remapping");
   argc_ = argc;
   argv_ = argv;
   return RUN_ALL_TESTS();
