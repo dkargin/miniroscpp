@@ -36,7 +36,7 @@ void MasterCache::setEnabled(bool enabled)
 
 void MasterCache::markDirty()
 {
-  dirty_ = true;
+  dirty_.store(true, std::memory_order_release);
 }
 
 std::filesystem::path MasterCache::pathForPort(const std::filesystem::path& dir, int port)
@@ -70,16 +70,16 @@ void MasterCache::beginRestore(int port, const std::string& runtimeGuid)
     path_ = pathForPort(".", port);
 
   if (!loaded_) {
-    dirty_ = true;
+    dirty_.store(true, std::memory_order_relaxed);
     return;
   }
 
   if (data_.guid.empty() || data_.guid != runtimeGuid)
-    dirty_ = true;
+    dirty_.store(true, std::memory_order_relaxed);
 
   if (data_.nodes.empty()) {
     MINIROS_INFO("MasterCache: no nodes to restore from \"%s\"", path_.string().c_str());
-    dirty_ = true;
+    dirty_.store(true, std::memory_order_relaxed);
     saveIfNeeded(port, runtimeGuid);
     return;
   }
@@ -138,7 +138,7 @@ void MasterCache::update(int port, const std::string& guid)
 
 void MasterCache::flush(int port, const std::string& guid)
 {
-  dirty_ = true;
+  dirty_.store(true, std::memory_order_release);
   saveIfNeeded(port, guid);
 }
 
@@ -309,7 +309,7 @@ void MasterCache::finalizeRestore()
   }
 
   MINIROS_INFO("MasterCache: restore complete");
-  dirty_ = true;
+  dirty_.store(true, std::memory_order_relaxed);
 }
 
 MasterCacheData MasterCache::collect(int port, const std::string& guid) const
@@ -352,7 +352,12 @@ MasterCacheData MasterCache::collect(int port, const std::string& guid) const
 
 void MasterCache::saveIfNeeded(int port, const std::string& guid)
 {
-  if (!dirty_ || !enabled_ || restoring_)
+  // Skip while disabled or mid-restore; leave dirty_ set so a later update flushes.
+  if (!enabled_ || restoring_)
+    return;
+
+  // Clear the flag before IO so concurrent markDirty() during save is not lost.
+  if (!dirty_.exchange(false, std::memory_order_acq_rel))
     return;
 
   if (port <= 0 && !path_.empty()) {
@@ -361,11 +366,13 @@ void MasterCache::saveIfNeeded(int port, const std::string& guid)
     path_ = pathForPort(".", port);
   }
 
-  if (path_.empty())
+  if (path_.empty()) {
+    dirty_.store(true, std::memory_order_relaxed);
     return;
+  }
 
-  if (saveFile(path_, collect(port, guid)))
-    dirty_ = false;
+  if (!saveFile(path_, collect(port, guid)))
+    dirty_.store(true, std::memory_order_relaxed);
 }
 
 Error MasterCache::loadFile(const std::filesystem::path& path, MasterCacheData& out)
