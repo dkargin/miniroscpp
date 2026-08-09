@@ -96,7 +96,7 @@ std::shared_ptr<NodeRef> RegistrationManager::_register(Registrations& r, const 
 void RegistrationManager::dropRegistrations(const NodeRef& node)
 {
   std::string name = node.id();
-  MINIROS_INFO("Unregistering everything from superseded node \"%s\" at %s", name.c_str(), node.getApi().c_str());
+  MINIROS_INFO("Unregistering everything from node \"%s\" at %s", name.c_str(), node.getApi().c_str());
   publishers.unregisterAll(name);
   subscribers.unregisterAll(name);
   services.unregisterAll(name);
@@ -208,6 +208,19 @@ RegistrationManager::registerNodeApi(const std::string& nodeName, const std::str
       return report;
     }
 
+    // A surviving node may re-advertise while MasterCache is still restoring it,
+    // often with a differently spelled URI (hostname vs IP). Superseding would
+    // abort restore (drop getPublications) and drop the only live peer.
+    if (report.node->isRestoreInProgress()) {
+      MINIROS_WARN_NAMED("reg",
+        "Keeping restoring node \"%s\" (cached api=%s, live api=%s)",
+        nodeName.c_str(), report.node->getApi().c_str(), nodeApi.c_str());
+      if (flags & NodeRef::NODE_LOCAL)
+        report.node->setLocal();
+      report.node->setNodeFlags(flags);
+      return report;
+    }
+
     // TODO: Need to check PID of the new node and verify that it has changed.
     // TODO: Need to check some alternative IP addresses to verify this node is really new.
     NodeRefPtr prevNode;
@@ -274,6 +287,11 @@ std::vector<NodeRefPtr> RegistrationManager::checkNodesForRemoval()
 
     for (auto& [key, node]: m_nodes) {
       assert(node);
+      // Cache-restored nodes start with no topic/service registrations until
+      // getPublications / service restore finishes. Do not treat that empty
+      // window as "gone" or restore never completes.
+      if (node->isRestoreInProgress())
+        continue;
       if (node->getState() == NodeRef::State::Dead || node->isEmpty()) {
         graveyard.push_back(node);
       }
