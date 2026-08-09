@@ -45,6 +45,18 @@ target_compile_definitions(${TEST_GROUP}-test_late_master PRIVATE
   MINIROS_TEST_BIN_DIR="${CMAKE_BINARY_DIR}/bin")
 add_dependencies(${TEST_GROUP}-test_late_master miniroscore ${TEST_GROUP}-test_late_master_node)
 
+# Master killed + restarted from cache; surviving publisher is rediscovered by a new subscriber.
+add_executable(${TEST_GROUP}-test_master_cache_pub test_master_cache_pub.cpp)
+target_link_libraries(${TEST_GROUP}-test_master_cache_pub roscxx)
+target_include_directories(${TEST_GROUP}-test_master_cache_pub PRIVATE ${MINIROS_GENERATED_INCLUDE_DIRS})
+set_target_properties(${TEST_GROUP}-test_master_cache_pub PROPERTIES FOLDER "Tests")
+
+miniros_add_test(${TEST_GROUP}-test_master_cache SOURCES test_master_cache.cpp)
+target_compile_definitions(${TEST_GROUP}-test_master_cache PRIVATE
+  MINIROS_TEST_BIN_DIR="${CMAKE_BINARY_DIR}/bin")
+target_include_directories(${TEST_GROUP}-test_master_cache PRIVATE ${MINIROS_GENERATED_INCLUDE_DIRS})
+add_dependencies(${TEST_GROUP}-test_master_cache miniroscore ${TEST_GROUP}-test_master_cache_pub)
+
 if(catkin_FOUND AND CATKIN_ENABLE_TESTING)
   message(STATUS "Trying to find rostest for more complex testing")
   find_package(rostest REQUIRED)

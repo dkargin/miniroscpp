@@ -364,6 +364,11 @@ void Master::update()
     internal_->shutdownNode(nr, ss.str());
   }
 
+  // Drive cache restore before empty-node GC: restored NodeRefs are empty until
+  // getPublications / services are reapplied.
+  const int port = internal_->rpcManager ? internal_->rpcManager->getServerPort() : 0;
+  internal_->cache.update(port, internal_->uuid.toString());
+
   auto graveyard = internal_->regManager.checkNodesForRemoval();
   if (!graveyard.empty()) {
     MINIROS_INFO("Dropping parameter subscriptions from %d nodes", static_cast<int>(graveyard.size()));
@@ -372,9 +377,6 @@ void Master::update()
     }
     internal_->cache.markDirty();
   }
-
-  const int port = internal_->rpcManager ? internal_->rpcManager->getServerPort() : 0;
-  internal_->cache.update(port, internal_->uuid.toString());
 }
 
 Master::RpcValue Master::lookupService(

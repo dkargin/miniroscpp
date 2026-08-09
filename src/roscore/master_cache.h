@@ -95,10 +95,14 @@ private:
   };
 
   static Error loadFile(const std::filesystem::path& path, MasterCacheData& out);
-  static Error saveFile(const std::filesystem::path& path, const MasterCacheData& data);
+  /// Atomically write via `path.tmp` + fsync + rename. Safe against power loss mid-write
+  /// when the filesystem honors POSIX rename semantics; reports disk-full / read-only.
+  static Error saveFile(const std::filesystem::path& path, const MasterCacheData& data,
+                        std::string* detail = nullptr);
 
   MasterCacheData collect(int port, const std::string& guid) const;
   void saveIfNeeded(int port, const std::string& guid);
+  void noteSaveResult(Error err, const std::string& detail);
   void processRestore();
   void finalizeRestore();
   void queueTopicList(const std::string& nodeName, const std::string& nodeApi,
@@ -119,6 +123,11 @@ private:
   SteadyTime restoreDeadline_;
   std::filesystem::path path_;
   MasterCacheData data_;
+
+  /// Persist-failure tracking (main / update thread only).
+  int saveFailCount_ = 0;
+  SteadyTime lastSaveErrorLog_;
+  std::string lastSaveError_;
 
   mutable std::mutex restoreMutex_;
   std::vector<PendingTopicRestore> pendingTopicRestores_;

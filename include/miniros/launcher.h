@@ -43,6 +43,11 @@ public:
   /// Create launcher for specific PID.
   explicit Launcher(int64_t pid);
 
+  Launcher(const Launcher&) = delete;
+  Launcher& operator=(const Launcher&) = delete;
+  Launcher(Launcher&&) = delete;
+  Launcher& operator=(Launcher&&) = delete;
+
   ~Launcher();
 
   enum Flags {

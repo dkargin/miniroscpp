@@ -12,10 +12,17 @@
 #include "miniros/console.h"
 #include "miniros/internal/nlohmann_json.hpp"
 
+#include <cerrno>
+#include <cstring>
 #include <fstream>
 #include <memory>
 #include <system_error>
 #include <utility>
+
+#if !defined(_WIN32)
+#include <fcntl.h>
+#include <unistd.h>
+#endif
 
 namespace miniros {
 namespace master {
@@ -368,11 +375,50 @@ void MasterCache::saveIfNeeded(int port, const std::string& guid)
 
   if (path_.empty()) {
     dirty_.store(true, std::memory_order_relaxed);
+    noteSaveResult(Error::InvalidValue, "empty cache path");
     return;
   }
 
-  if (!saveFile(path_, collect(port, guid)))
+  std::string detail;
+  const Error err = saveFile(path_, collect(port, guid), &detail);
+  if (!err) {
+    // Keep dirty so we retry after disk-full / read-only / power-loss style failures.
     dirty_.store(true, std::memory_order_relaxed);
+    noteSaveResult(err, detail.empty() ? std::string(err.toString()) : detail);
+    return;
+  }
+  noteSaveResult(Error::Ok, detail);
+}
+
+void MasterCache::noteSaveResult(Error err, const std::string& detail)
+{
+  if (err) {
+    if (saveFailCount_ > 0) {
+      MINIROS_INFO("MasterCache: save recovered after %d failure(s)%s%s",
+                   saveFailCount_,
+                   detail.empty() ? "" : ": ",
+                   detail.c_str());
+    }
+    saveFailCount_ = 0;
+    lastSaveError_.clear();
+    return;
+  }
+
+  ++saveFailCount_;
+  lastSaveError_ = detail;
+
+  // Log the first failure immediately, then at most once every 30s while it persists.
+  const SteadyTime now = SteadyTime::now();
+  const bool first = (saveFailCount_ == 1);
+  const bool due = first || (now - lastSaveErrorLog_ > WallDuration(30.0));
+  if (!due)
+    return;
+
+  lastSaveErrorLog_ = now;
+  MINIROS_ERROR("MasterCache: failed to persist state (attempt %d): %s — will retry; "
+                "graph updates may be lost across an unclean master restart",
+                saveFailCount_,
+                detail.empty() ? err.toString() : detail.c_str());
 }
 
 Error MasterCache::loadFile(const std::filesystem::path& path, MasterCacheData& out)
@@ -380,13 +426,33 @@ Error MasterCache::loadFile(const std::filesystem::path& path, MasterCacheData& 
   out = MasterCacheData{};
 
   std::error_code ec;
+  const std::filesystem::path tmpPath = path.string() + ".tmp";
+  if (std::filesystem::exists(tmpPath, ec) && !ec) {
+    MINIROS_WARN("MasterCache: found leftover \"%s\" (previous save may have been "
+                 "interrupted by power loss or a full/read-only disk); ignoring it",
+                 tmpPath.string().c_str());
+  }
+
   if (!std::filesystem::exists(path, ec) || ec) {
     return Error::Ok;
   }
 
+  const auto fileSize = std::filesystem::file_size(path, ec);
+  if (ec) {
+    MINIROS_ERROR("MasterCache: cannot stat \"%s\": %s", path.string().c_str(), ec.message().c_str());
+    return Error::SystemError;
+  }
+  if (fileSize == 0) {
+    MINIROS_ERROR("MasterCache: \"%s\" is empty (truncated or interrupted write?); starting without cache",
+                  path.string().c_str());
+    return Error::InvalidValue;
+  }
+
   std::ifstream in(path);
   if (!in.is_open()) {
-    MINIROS_WARN("MasterCache: failed to open \"%s\" for reading", path.string().c_str());
+    const int saved = errno;
+    MINIROS_ERROR("MasterCache: failed to open \"%s\" for reading: %s (errno=%d)",
+                  path.string().c_str(), std::strerror(saved), saved);
     return Error::SystemError;
   }
 
@@ -394,12 +460,15 @@ Error MasterCache::loadFile(const std::filesystem::path& path, MasterCacheData& 
   try {
     in >> root;
   } catch (const json::exception& e) {
-    MINIROS_WARN("MasterCache: failed to parse \"%s\": %s", path.string().c_str(), e.what());
+    MINIROS_ERROR("MasterCache: corrupt/incomplete \"%s\" (%zu bytes): %s — "
+                  "starting without cache (power loss mid-write?)",
+                  path.string().c_str(), static_cast<size_t>(fileSize), e.what());
     return Error::InvalidValue;
   }
 
   if (!root.is_object()) {
-    MINIROS_WARN("MasterCache: root is not an object in \"%s\"", path.string().c_str());
+    MINIROS_ERROR("MasterCache: root is not an object in \"%s\"; starting without cache",
+                  path.string().c_str());
     return Error::InvalidValue;
   }
 
@@ -444,14 +513,138 @@ Error MasterCache::loadFile(const std::filesystem::path& path, MasterCacheData& 
   return Error::Ok;
 }
 
-Error MasterCache::saveFile(const std::filesystem::path& path, const MasterCacheData& data)
+namespace {
+
+std::string errnoDetail(const char* op, const std::filesystem::path& path, int err)
 {
+  std::string msg = std::string(op) + " \"" + path.string() + "\": " + std::strerror(err)
+                    + " (errno=" + std::to_string(err) + ")";
+  if (err == ENOSPC
+#ifdef EDQUOT
+      || err == EDQUOT
+#endif
+  ) {
+    msg += " [disk full or quota exceeded]";
+  } else if (err == EROFS) {
+    msg += " [filesystem is read-only]";
+  } else if (err == EACCES || err == EPERM) {
+    msg += " [permission denied]";
+  }
+  return msg;
+}
+
+Error writeAtomically(const std::filesystem::path& path, const std::string& payload, std::string* detail)
+{
+  auto setDetail = [&](std::string msg) {
+    if (detail)
+      *detail = std::move(msg);
+  };
+
+  const std::filesystem::path tmp = path.string() + ".tmp";
+  std::error_code ec;
+  // Drop a stale temp from a previous interrupted attempt before rewriting.
+  std::filesystem::remove(tmp, ec);
+
+#if defined(_WIN32)
+  {
+    std::ofstream out(tmp, std::ios::binary | std::ios::trunc);
+    if (!out.is_open()) {
+      setDetail("open \"" + tmp.string() + "\" for writing failed");
+      return Error::SystemError;
+    }
+    out.write(payload.data(), static_cast<std::streamsize>(payload.size()));
+    out.flush();
+    if (!out.good()) {
+      setDetail("write \"" + tmp.string() + "\" failed");
+      out.close();
+      std::filesystem::remove(tmp, ec);
+      return Error::SystemError;
+    }
+  }
+#else
+  // POSIX: open/write/fsync/close so a power cut cannot leave a half-written final file
+  // (final replace is rename below). ENOSPC/EROFS surface with clear errno tags.
+  const int fd = ::open(tmp.c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0644);
+  if (fd < 0) {
+    setDetail(errnoDetail("open", tmp, errno));
+    return Error::SystemError;
+  }
+
+  const char* buf = payload.data();
+  size_t remaining = payload.size();
+  while (remaining > 0) {
+    const ssize_t n = ::write(fd, buf, remaining);
+    if (n < 0) {
+      if (errno == EINTR)
+        continue;
+      const int saved = errno;
+      ::close(fd);
+      std::filesystem::remove(tmp, ec);
+      setDetail(errnoDetail("write", tmp, saved));
+      return Error::SystemError;
+    }
+    buf += n;
+    remaining -= static_cast<size_t>(n);
+  }
+
+  if (::fsync(fd) != 0) {
+    const int saved = errno;
+    ::close(fd);
+    std::filesystem::remove(tmp, ec);
+    setDetail(errnoDetail("fsync", tmp, saved));
+    return Error::SystemError;
+  }
+  if (::close(fd) != 0) {
+    const int saved = errno;
+    std::filesystem::remove(tmp, ec);
+    setDetail(errnoDetail("close", tmp, saved));
+    return Error::SystemError;
+  }
+#endif
+
+  std::filesystem::rename(tmp, path, ec);
+  if (ec) {
+#if defined(_WIN32)
+    setDetail("rename \"" + tmp.string() + "\" → \"" + path.string() + "\": " + ec.message());
+#else
+    // Prefer errno-tagged message when the generic category carries an errno value.
+    const int err = (ec.category() == std::system_category()) ? ec.value() : EIO;
+    setDetail(errnoDetail("rename", path, err) + " (from \"" + tmp.string() + "\")");
+#endif
+    std::filesystem::remove(tmp, ec);
+    return Error::SystemError;
+  }
+
+#if !defined(_WIN32)
+  // Best-effort: durable directory entry for the rename itself.
+  const auto parent = path.parent_path().empty() ? std::filesystem::path(".") : path.parent_path();
+  const int dirfd = ::open(parent.c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+  if (dirfd >= 0) {
+    if (::fsync(dirfd) != 0) {
+      MINIROS_WARN("MasterCache: %s", errnoDetail("fsync(dir)", parent, errno).c_str());
+    }
+    ::close(dirfd);
+  }
+#endif
+
+  return Error::Ok;
+}
+
+} // namespace
+
+Error MasterCache::saveFile(const std::filesystem::path& path, const MasterCacheData& data,
+                            std::string* detail)
+{
+  auto setDetail = [&](std::string msg) {
+    if (detail)
+      *detail = std::move(msg);
+  };
+
   std::error_code ec;
   const auto parent = path.parent_path();
   if (!parent.empty() && !std::filesystem::exists(parent, ec)) {
     if (!std::filesystem::create_directories(parent, ec) && ec) {
-      MINIROS_WARN("MasterCache: failed to create \"%s\": %s",
-                   parent.string().c_str(), ec.message().c_str());
+      setDetail("create_directories \"" + parent.string() + "\": " + ec.message());
       return Error::SystemError;
     }
   }
@@ -476,29 +669,12 @@ Error MasterCache::saveFile(const std::filesystem::path& path, const MasterCache
     root["nodes"].push_back(std::move(nodeJson));
   }
 
-  const std::filesystem::path tmp = path.string() + ".tmp";
-  {
-    std::ofstream out(tmp, std::ios::trunc);
-    if (!out.is_open()) {
-      MINIROS_WARN("MasterCache: failed to open \"%s\" for writing", tmp.string().c_str());
-      return Error::SystemError;
-    }
-    out << root.dump(2) << '\n';
-    if (!out.good()) {
-      MINIROS_WARN("MasterCache: write failed for \"%s\"", tmp.string().c_str());
-      return Error::SystemError;
-    }
-  }
-
-  std::filesystem::rename(tmp, path, ec);
-  if (ec) {
-    MINIROS_WARN("MasterCache: rename \"%s\" → \"%s\" failed: %s",
-                 tmp.string().c_str(), path.string().c_str(), ec.message().c_str());
-    std::filesystem::remove(tmp, ec);
-    return Error::SystemError;
-  }
+  const std::string payload = root.dump(2) + "\n";
+  if (Error err = writeAtomically(path, payload, detail); !err)
+    return err;
 
   MINIROS_DEBUG("MasterCache: saved \"%s\" (nodes=%zu)", path.string().c_str(), data.nodes.size());
+  setDetail("saved " + path.string());
   return Error::Ok;
 }
 
