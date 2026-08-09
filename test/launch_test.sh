@@ -13,13 +13,16 @@
 #   On SIGTERM/SIGINT (ctest soft kill), dump stacks of the test and its children.
 #
 # Master diagnostics:
-#   Tests should call miniros::test::requireMasterOrExit() after miniros::init
+#   Prefer miniros::test::requireMasterOrExit() after miniros::init
 #   (see test/require_master.h). That exits with code 90 when the master is down.
-#   On exit 90 / hang / signal, this script dumps miniroscore stacks and copies
-#   rosout logs from MINIROS_MASTER_LOG_DIR / ROS_LOG_DIR / $bindir/master-logs.
+#   This script also fail-fasts when $bindir/miniroscore.pid names a dead process
+#   (before the test, and periodically while waiting), so a dead shared master
+#   does not burn HANG_TIMEOUT on every subsequent binary.
+#   On exit 90 / hang / signal, dumps miniroscore stacks and copies rosout logs
+#   from MINIROS_MASTER_LOG_DIR / ROS_LOG_DIR / $bindir/master-logs.
 #
 # Exit codes:
-#   90  - MASTER_UNAVAILABLE (from test helper or manage-master start)
+#   90  - MASTER_UNAVAILABLE (from test helper, precheck, or manage-master start)
 #   124 - hang / timeout / signalled watchdog kill
 #
 # Examples:
@@ -48,6 +51,51 @@ resolve_log_dir() {
     echo "$ROS_LOG_DIR"
   else
     echo "$bindir/master-logs"
+  fi
+}
+
+# Echo master pid from $bindir/miniroscore.pid, or empty if missing/blank.
+read_master_pid() {
+  local bindir=$1
+  local pidfile="$bindir/miniroscore.pid"
+  if [[ ! -f "$pidfile" ]]; then
+    return 0
+  fi
+  tr -d '[:space:]' <"$pidfile" || true
+}
+
+# 0 = running, 1 = no pid expected, 2 = pidfile present but process dead.
+master_status() {
+  local bindir=$1
+  local master_pid
+  master_pid=$(read_master_pid "$bindir")
+  if [[ -z "${master_pid:-}" ]]; then
+    return 1
+  fi
+  if kill -0 "$master_pid" 2>/dev/null; then
+    return 0
+  fi
+  return 2
+}
+
+fail_master_unavailable() {
+  local bindir=$1
+  local reason=$2
+  local master_pid
+  master_pid=$(read_master_pid "$bindir")
+  echo "launch_test.sh: MASTER_UNAVAILABLE ($reason): miniroscore pid='${master_pid:-}' not running" >&2
+  dump_master_diagnostics "$bindir" "$reason" >/dev/null || true
+  exit "$EXIT_MASTER_UNAVAILABLE"
+}
+
+# If a shared master was started (non-empty pidfile) but is dead, abort with 90.
+require_shared_master_alive() {
+  local bindir=$1
+  local reason=$2
+  master_status "$bindir"
+  local st=$?
+  if (( st == 2 )); then
+    fail_master_unavailable "$bindir" "$reason"
   fi
 }
 
@@ -146,9 +194,13 @@ run_with_hang_watchdog() {
   local bindir=$1
   shift
 
+  # Shared-master suite: do not start another 280s hang if miniroscore is already gone.
+  require_shared_master_alive "$bindir" "precheck-dead"
+
   "$@" &
   local child=$!
   local timed_out=0
+  local master_died=0
 
   on_signal() {
     echo "launch_test.sh: caught signal, dumping stacks before exit" >&2
@@ -169,9 +221,28 @@ run_with_hang_watchdog() {
         timed_out=1
         break
       fi
+      # Every 5s: if the shared master died mid-test, fail fast (exit 90).
+      if (( elapsed > 0 && elapsed % 5 == 0 )); then
+        master_status "$bindir"
+        if (( $? == 2 )); then
+          master_died=1
+          break
+        fi
+      fi
       sleep 1
       elapsed=$((elapsed + 1))
     done
+
+    if (( master_died )); then
+      echo "launch_test.sh: shared master died while test pid=$child was running" >&2
+      dump_process_tree "$child"
+      kill -TERM "$child" 2>/dev/null || true
+      sleep 2
+      kill -KILL "$child" 2>/dev/null || true
+      wait "$child" 2>/dev/null || true
+      trap - TERM INT
+      fail_master_unavailable "$bindir" "master-died-mid-test"
+    fi
 
     if (( timed_out )); then
       echo "launch_test.sh: HANG_TIMEOUT=${HANG_TIMEOUT}s exceeded for pid $child" >&2
