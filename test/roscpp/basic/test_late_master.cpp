@@ -5,6 +5,8 @@
 
 #include <chrono>
 #include <filesystem>
+#include <fstream>
+#include <iostream>
 #include <string>
 
 #include <gtest/gtest.h>
@@ -29,8 +31,67 @@ std::filesystem::path executable(const char* name)
   return binDir() / name;
 }
 
+std::filesystem::path lateMasterLogDir()
+{
+  return binDir() / "late-master-logs";
+}
+
+/// Print crash/console excerpts to stderr so they appear in the CI job log.
+void dumpLateMasterLogs(const char* reason)
+{
+  const auto logDir = lateMasterLogDir();
+  std::cerr << "=== LATE MASTER DIAGNOSTICS (" << reason << ") dir=" << logDir << " ===\n";
+
+  const auto printFile = [](const std::filesystem::path& path, bool whole_if_small) {
+    std::error_code ec;
+    if (!std::filesystem::is_regular_file(path, ec)) {
+      std::cerr << "=== missing " << path << " ===\n";
+      return;
+    }
+    const auto sz = std::filesystem::file_size(path, ec);
+    if (ec || sz == 0) {
+      std::cerr << "=== empty " << path << " ===\n";
+      return;
+    }
+    std::cerr << "=== " << path.filename().string() << " (" << sz << " bytes) ===\n";
+    std::ifstream in(path);
+    if (!in) {
+      std::cerr << "(failed to open)\n";
+      return;
+    }
+    // Crash files are short; console may include TSan stacks — print up to ~64KiB from the end.
+    constexpr std::uintmax_t kMax = 64 * 1024;
+    if (whole_if_small || sz <= kMax) {
+      std::cerr << in.rdbuf();
+    } else {
+      in.seekg(static_cast<std::streamoff>(sz - kMax));
+      std::string line;
+      std::getline(in, line); // discard partial first line
+      std::cerr << in.rdbuf();
+    }
+    std::cerr << "\n=== end " << path.filename().string() << " ===\n";
+  };
+
+  printFile(logDir / "miniroscore.crash", true);
+  printFile(logDir / "miniroscore.console.log", false);
+}
+
 miniros::Error startMaster(int port, miniros::Launcher& launcher)
 {
+  // Point crash/console dumps at the test bin dir so CI artifacts / job logs can
+  // show stacks if this private master dies (not the shared advanced-suite master).
+  const auto logDir = lateMasterLogDir();
+  std::error_code ec;
+  std::filesystem::create_directories(logDir, ec);
+  const auto crashLog = (logDir / "miniroscore.crash").string();
+  const auto consoleLog = (logDir / "miniroscore.console.log").string();
+  // Truncate previous run so failure dumps are not stale.
+  std::ofstream(crashLog, std::ios::trunc);
+  std::ofstream(consoleLog, std::ios::trunc);
+  launcher.env("MINIROS_MASTER_LOG_DIR", logDir.string().c_str())
+          .env("MINIROS_CRASH_LOG", crashLog.c_str())
+          .env("MINIROS_MASTER_CONSOLE_LOG", consoleLog.c_str());
+
   const std::vector<std::string> args = {
     "-p", std::to_string(port),
     "--rosout", "false",
@@ -54,6 +115,12 @@ class LateMasterTest : public ::testing::Test {
 protected:
   void TearDown() override
   {
+    if (HasFailure()) {
+      const bool masterAlive = master_.running();
+      std::cerr << "late_master TearDown: master_running=" << masterAlive
+                << " node_running=" << node_.running() << std::endl;
+      dumpLateMasterLogs(masterAlive ? "test-failed-master-still-up" : "test-failed-master-dead");
+    }
     node_.stopAndWait(miniros::WallDuration(5.0));
     master_.stopAndWait(miniros::WallDuration(5.0));
   }
@@ -83,12 +150,20 @@ TEST_F(LateMasterTest, NodeStartsBeforeMasterThenConnects)
   const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(20);
   miniros::Error waitErr = miniros::Error::Timeout;
   while (std::chrono::steady_clock::now() < deadline) {
+    if (!master_.running()) {
+      dumpLateMasterLogs("master-exited-during-wait");
+      FAIL() << "miniroscore exited while waiting for node to connect on " << masterUri;
+    }
     waitErr = node_.waitReady(&ready, miniros::WallDuration(1.0));
     if (waitErr == miniros::Error::Ok)
       break;
     if (!node_.running()) {
+      dumpLateMasterLogs("node-exited-during-wait");
       FAIL() << "basic-test_late_master_node exited without notifying (still waiting for master connect)";
     }
+  }
+  if (waitErr != miniros::Error::Ok) {
+    dumpLateMasterLogs("node-never-connected");
   }
   ASSERT_EQ(waitErr, miniros::Error::Ok)
       << "Node should finish init/advertise once the master appears on " << masterUri;

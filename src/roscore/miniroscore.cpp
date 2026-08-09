@@ -78,6 +78,8 @@ protected:
 };
 
 int main(int argc, const char ** argv) {
+  // Install early so a crash during option parsing / init still dumps a stack.
+  handleCrashes();
   std::signal(SIGINT, systemSignalHandler);
 
   SteadyTime timeStart = SteadyTime::now();

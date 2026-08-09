@@ -113,7 +113,10 @@ jobs:
       run: |
         ctest --output-on-failure --test-dir test -V --timeout ${{ steps.strings.outputs.test-timeout }} -E advanced -C ${{ matrix.build_type }}
 
+    # Still run when Test-basic fails: advanced is where shared miniroscore
+    # death shows up, and we need master-logs/crash dumps in the artifact.
     - name: Test-advanced
+      if: ${{ success() || failure() }}
       working-directory: ${{ steps.strings.outputs.build-output-dir }}
       env:
         ROS_MASTER_URI: "http://localhost:11311"
@@ -122,17 +125,68 @@ jobs:
         HANG_TIMEOUT: ${{ steps.strings.outputs.hang-timeout }}
         TSAN_OPTIONS: "halt_on_error=1:second_deadlock_stack=1:history_size=7"
         # Shared miniroscore for advanced suite. Tests call requireMasterOrExit() after init
-        # (exit 90 → launch_test.sh dumps master stacks + rosout).
+        # (exit 90 → launch_test.sh dumps master stacks + rosout/crash/cores).
+        # Console + crash dumps always go under MINIROS_MASTER_LOG_DIR (uploaded on failure).
         MINIROS_MASTER_DEBUG: ${{ env.MINIROS_MASTER_DEBUG }}
         MINIROS_MASTER_LOG_DIR: ${{ steps.strings.outputs.build-output-dir }}/master-logs
         ROS_LOG_DIR: ${{ steps.strings.outputs.build-output-dir }}/master-logs
       run: |
         mkdir -p "$MINIROS_MASTER_LOG_DIR"
+        # Core pattern is relative to the process cwd (bin/); keep a copy path under build too.
+        mkdir -p cores "${{ github.workspace }}/cores"
         ./bin/manage-master start
         ctest --output-on-failure --test-dir test -V --timeout ${{ steps.strings.outputs.test-timeout }} -R advanced -C ${{ matrix.build_type }}
         ls -alh .
         ls -alh "$MINIROS_MASTER_LOG_DIR" || true
+        ls -alh cores "${{ github.workspace }}/cores" 2>/dev/null || true
         ./bin/manage-master stop
+
+    # Echo crash stacks into the job log so investigation does not require the zip.
+    - name: Dump-master-crash-logs
+      if: ${{ failure() }}
+      working-directory: ${{ steps.strings.outputs.build-output-dir }}
+      run: |
+        set +e
+        echo "======== MASTER CRASH / CONSOLE (job log excerpt) ========"
+        for f in \
+          bin/late-master-logs/miniroscore.crash \
+          bin/late-master-logs/miniroscore.console.log \
+          master-logs/miniroscore.crash \
+          master-logs/miniroscore.console.log \
+          master-logs/master-fail-*/miniroscore.crash \
+          master-logs/master-fail-*/miniroscore.console.log \
+          master-logs/master-fail-*/*.bt.txt
+        do
+          for path in $f; do
+            [ -f "$path" ] || continue
+            sz=$(wc -c <"$path" | tr -d ' ')
+            echo "----- $path ($sz bytes) -----"
+            if [ "$sz" = "0" ]; then
+              echo "(empty)"
+              continue
+            fi
+            case "$path" in
+              *.crash|*.bt.txt)
+                cat "$path"
+                ;;
+              *)
+                if command -v rg >/dev/null 2>&1; then
+                  if rg -n "fatalSignalHandler|ThreadSanitizer|AddressSanitizer|SUMMARY:|DEADLYSIGNAL|ABORTING|SIGSEGV|signal=" "$path"; then
+                    :
+                  else
+                    echo "(no sanitizer/crash markers; last 120 lines)"
+                    tail -n 120 "$path"
+                  fi
+                else
+                  grep -nE 'fatalSignalHandler|ThreadSanitizer|AddressSanitizer|SUMMARY:|DEADLYSIGNAL|ABORTING|SIGSEGV|signal=' "$path" \
+                    || { echo "(no sanitizer/crash markers; last 120 lines)"; tail -n 120 "$path"; }
+                fi
+                ;;
+            esac
+          done
+        done
+        echo "======== END MASTER CRASH / CONSOLE ========"
+        ls -la bin/late-master-logs master-logs cores bin/cores 2>/dev/null || true
 
     - name: Test-memcheck
       working-directory: ${{ steps.strings.outputs.build-output-dir }}
@@ -153,5 +207,10 @@ jobs:
           name: cores-${{ matrix.os }}-${{ matrix.build_type }}-${{ matrix.c_compiler }}
           path: |
             cores/
+            ${{ github.workspace }}/cores/
+            ${{ steps.strings.outputs.build-output-dir }}/cores/
+            ${{ steps.strings.outputs.build-output-dir }}/bin/cores/
             ${{ steps.strings.outputs.build-output-dir }}/master-logs/
+            ${{ steps.strings.outputs.build-output-dir }}/bin/late-master-logs/
+            ${{ steps.strings.outputs.build-output-dir }}/bin/master-fail-*/
           if-no-files-found: ignore
