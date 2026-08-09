@@ -30,20 +30,18 @@
 /* Author: Josh Faust */
 
 /*
- * Test namespaces
+ * Test namespaces.  Formerly: ROS_NAMESPACE=ROS_NAMESPACE, name=NODE_NAME,
+ * plus four master params from namespaces.xml.
  */
 
+#include <cstdlib>
 #include <string>
-#include <sstream>
-#include <fstream>
 
 #include <gtest/gtest.h>
 
-#include <time.h>
-#include <stdlib.h>
-
 #include <miniros/ros.h>
 #include "master_fixture.h"
+#include "../../require_master.h"
 
 TEST_F(MasterFixture, param)
 {
@@ -92,7 +90,27 @@ TEST_F(MasterFixture, name)
 int main(int argc, char** argv)
 {
   testing::InitGoogleTest(&argc, argv);
-  miniros::init( argc, argv, "namespaces" );
 
+#ifndef _WIN32
+  setenv("ROS_NAMESPACE", "ROS_NAMESPACE", 1);
+#else
+  _putenv_s("ROS_NAMESPACE", "ROS_NAMESPACE");
+#endif
+
+  miniros::init(argc, argv, "NODE_NAME");
+  miniros::test::requireMasterOrExit("advanced-namespaces");
+
+  miniros::MasterLinkPtr master = miniros::getMasterLink();
+  if (!master ||
+      !master->set("/ROS_NAMESPACE/parent", std::string(":ROS_NAMESPACE:parent")) ||
+      !master->set("/ROS_NAMESPACE/NODE_NAME/local", std::string(":ROS_NAMESPACE:NODE_NAME:local")) ||
+      !master->set("/global", std::string(":global")) ||
+      !master->set("/other_namespace/param", std::string(":other_namespace:param"))) {
+    return EXIT_FAILURE;
+  }
+
+  // Keep a NodeHandle for the process lifetime so TEST_F NodeHandles do not
+  // trigger miniros::shutdown() when they go out of scope.
+  miniros::NodeHandle nh;
   return RUN_ALL_TESTS();
 }

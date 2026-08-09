@@ -125,11 +125,11 @@ add_executable(${TEST_GROUP}-service_call_expect_b service_call_expect_b.cpp)
 target_link_libraries(${TEST_GROUP}-service_call_expect_b roscxx ${GTEST_LIBRARIES})
 
 # Test command-line name remapping
-miniros_add_test(${TEST_GROUP}-name_remapping SOURCES name_remapping.cpp WITH_MASTER DISABLED)
-miniros_add_test(${TEST_GROUP}-name_remapping_with_ns SOURCES name_remapping_with_ns.cpp WITH_MASTER DISABLED)
+miniros_advanced_test(${TEST_GROUP}-name_remapping SOURCES name_remapping.cpp WITH_MASTER)
+miniros_advanced_test(${TEST_GROUP}-name_remapping_with_ns SOURCES name_remapping_with_ns.cpp WITH_MASTER)
 
 # Test namespaces
-miniros_add_test(${TEST_GROUP}-namespaces SOURCES namespaces.cpp WITH_MASTER DISABLED)
+miniros_advanced_test(${TEST_GROUP}-namespaces SOURCES namespaces.cpp WITH_MASTER)
 
 # Test params
 miniros_advanced_test(${TEST_GROUP}-params SOURCES params.cpp WITH_MASTER)
@@ -173,9 +173,20 @@ miniros_add_test(${TEST_GROUP}-param_locale_avoidance_test SOURCES param_locale_
 
 miniros_add_test(${TEST_GROUP}-crashes_under_gprof SOURCES crashes_under_gprof.cpp WITH_MASTER DISABLED)
 
-miniros_add_test(${TEST_GROUP}-test_remapping SOURCES test_remapping.cpp WITH_MASTER DISABLED)
+# GTest binary only — scenarios are driven by launch_* remapping launchers below.
+miniros_advanced_test(${TEST_GROUP}-test_remapping SOURCES test_remapping.cpp DISABLED)
 
-miniros_add_test(${TEST_GROUP}-name_not_remappable SOURCES name_not_remappable.cpp WITH_MASTER DISABLED)
+# C++ stand-ins for former no_remappings.xml / local_remappings.xml / global_remappings.xml
+foreach(_remap_launch no_remappings local_remappings global_remappings)
+  miniros_advanced_test(${TEST_GROUP}-launch_${_remap_launch}
+    SOURCES launch_${_remap_launch}.cpp
+    WITH_MASTER)
+  target_compile_definitions(${TEST_GROUP}-launch_${_remap_launch} PRIVATE
+    MINIROS_TEST_BIN_DIR="${CMAKE_BINARY_DIR}/bin")
+  add_dependencies(${TEST_GROUP}-launch_${_remap_launch} ${TEST_GROUP}-test_remapping)
+endforeach()
+
+miniros_advanced_test(${TEST_GROUP}-name_not_remappable SOURCES name_not_remappable.cpp WITH_MASTER)
 
 miniros_advanced_test(${TEST_GROUP}-test_ns_node_remapping SOURCES test_ns_node_remapping.cpp WITH_MASTER)
 

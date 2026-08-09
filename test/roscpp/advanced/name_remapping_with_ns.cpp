@@ -30,21 +30,21 @@
 /* Author: Josh Faust */
 
 /*
- * Test name remapping.  Assumes the parameter "test" is remapped to "test_remap", and the node name is remapped to "name_remapped"
+ * Formerly launched with ns="a" and remaps:
+ *   /a/test_full:=/b/test_full
+ *   /a/test_local:=test_local2
+ *   test_relative:=/b/test_relative
  */
 
 #include <string>
-#include <sstream>
-#include <fstream>
 
 #include <gtest/gtest.h>
-
-#include <time.h>
-#include <stdlib.h>
 
 #include "miniros/ros.h"
 #include <miniros/names.h>
 #include <miniros/master_link.h>
+
+#include "../../require_master.h"
 
 class MasterLink : public testing::Test
 {
@@ -52,6 +52,8 @@ public:
   void SetUp() override
   {
     master = miniros::getMasterLink();
+    ASSERT_TRUE(master);
+    ASSERT_TRUE(miniros::test::assertMasterAlive("name_remapping_with_ns"));
   }
 
   miniros::MasterLinkPtr master;
@@ -86,8 +88,23 @@ TEST_F(MasterLink, nodeNameRemapping)
 int main(int argc, char** argv)
 {
   testing::InitGoogleTest(&argc, argv);
-  miniros::init( argc, argv, "name_remapping_with_ns" );
-  miniros::NodeHandle nh;
 
+  miniros::M_string remappings;
+  remappings["__ns"] = "a";
+  remappings["/a/test_full"] = "/b/test_full";
+  remappings["/a/test_local"] = "test_local2";
+  remappings["test_relative"] = "/b/test_relative";
+  miniros::init(remappings, "name_remapped_with_ns");
+  miniros::test::requireMasterOrExit("advanced-name_remapping_with_ns");
+
+  miniros::MasterLinkPtr master = miniros::getMasterLink();
+  if (!master ||
+      !master->set("/b/test_full", std::string("asdf")) ||
+      !master->set("/a/test_local2", std::string("asdf")) ||
+      !master->set("/b/test_relative", std::string("asdf"))) {
+    return EXIT_FAILURE;
+  }
+
+  miniros::NodeHandle nh;
   return RUN_ALL_TESTS();
 }
