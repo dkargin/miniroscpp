@@ -5,6 +5,7 @@
 #ifndef MINIROS_MASTER_CACHE_H
 #define MINIROS_MASTER_CACHE_H
 
+#include <atomic>
 #include <filesystem>
 #include <memory>
 #include <mutex>
@@ -110,7 +111,9 @@ private:
   MasterHandler* handler_ = nullptr;
 
   bool enabled_ = false;
-  bool dirty_ = false;
+  /// Written from RPC/callback threads via markDirty(); read/cleared on the
+  /// master update thread in saveIfNeeded(). Must be atomic for TSan/correctness.
+  std::atomic<bool> dirty_{false};
   bool restoring_ = false;
   bool loaded_ = false;
   SteadyTime restoreDeadline_;
