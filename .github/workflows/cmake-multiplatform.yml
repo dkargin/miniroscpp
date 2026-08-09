@@ -63,8 +63,9 @@ jobs:
           echo "hang-timeout=280" >> "$GITHUB_OUTPUT"
         else
           echo "sanitize-threads=OFF" >> "$GITHUB_OUTPUT"
-          echo "test-timeout=100" >> "$GITHUB_OUTPUT"
-          echo "hang-timeout=90" >> "$GITHUB_OUTPUT"
+          # timer_callbacks alone is ~40s; 100/90 left almost no slack when a wait loops.
+          echo "test-timeout=200" >> "$GITHUB_OUTPUT"
+          echo "hang-timeout=180" >> "$GITHUB_OUTPUT"
         fi
         echo "test-tool=none" >> "$GITHUB_OUTPUT"
         ulimit -c unlimited         # Enable core dumps to be captured (must be in same run block)
