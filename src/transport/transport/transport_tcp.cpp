@@ -723,7 +723,8 @@ void TransportTCP::socketUpdate(int events)
 
     auto self = shared_from_this();
     // Handle read events before err/hup/nval, since there may be data left on the wire.
-    // Callbacks run unlocked (hybrid): read/write hold the mutex across their syscalls.
+    // Callbacks run unlocked. Copy std::function under the lock first so closeLocked()
+    // clearing read/write/accept_cb_ cannot race with operator() (TSan).
     if ((events & POLLIN) && expecting_read_)
     {
       if (is_server_)
@@ -734,14 +735,19 @@ void TransportTCP::socketUpdate(int events)
         if (transport)
         {
           MINIROS_ASSERT(accept_cb_);
+          AcceptCallback accept_cb = accept_cb_;
           ScopedUnlock ulock(lock);
-          accept_cb_(transport);
+          if (accept_cb)
+          {
+            accept_cb(transport);
+          }
         }
       }
       else if (read_cb_)
       {
+        Callback read_cb = read_cb_;
         ScopedUnlock ulock(lock);
-        read_cb_(self);
+        read_cb(self);
       }
     }
 
@@ -752,8 +758,9 @@ void TransportTCP::socketUpdate(int events)
 
     if ((events & POLLOUT) && expecting_write_ && write_cb_)
     {
+      Callback write_cb = write_cb_;
       ScopedUnlock ulock(lock);
-      write_cb_(self);
+      write_cb(self);
     }
 
     if (closed_)
