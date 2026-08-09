@@ -131,6 +131,50 @@ dump_process_tree() {
   done
 }
 
+# Echo a file (or interesting excerpts) to stderr so GitHub Actions job logs
+# show the master crash stack without downloading artifacts.
+print_master_log_excerpt() {
+  local label=$1
+  local file=$2
+  local max_lines=${3:-200}
+
+  if [[ ! -f "$file" ]]; then
+    echo "=== $label: missing ($file) ===" >&2
+    return
+  fi
+  local sz
+  sz=$(wc -c <"$file" | tr -d ' ')
+  if [[ "$sz" == "0" ]]; then
+    echo "=== $label: empty ($file) ===" >&2
+    return
+  fi
+
+  echo "=== $label ($file, ${sz} bytes) ===" >&2
+  # Crash dumps and gdb bt files are short — print whole file.
+  if [[ "$label" == *crash* || "$label" == *backtrace* || "$label" == *.bt* ]]; then
+    cat "$file" >&2 || true
+    echo "=== end $label ===" >&2
+    return
+  fi
+
+  # Console / rosout can be huge; prefer sanitizer/crash markers, else tail.
+  local matched=0
+  if command -v rg >/dev/null 2>&1; then
+    if rg -n "fatalSignalHandler|ThreadSanitizer|AddressSanitizer|SUMMARY:|DEADLYSIGNAL|ABORTING|SIGSEGV|signal=" "$file" >&2; then
+      matched=1
+    fi
+  elif grep -nE 'fatalSignalHandler|ThreadSanitizer|AddressSanitizer|SUMMARY:|DEADLYSIGNAL|ABORTING|SIGSEGV|signal=' "$file" >&2; then
+    matched=1
+  fi
+  if (( matched )); then
+    echo "=== end $label (matched crash/sanitizer lines) ===" >&2
+  else
+    echo "(no sanitizer/crash markers; last ${max_lines} lines)" >&2
+    tail -n "$max_lines" "$file" >&2 || true
+    echo "=== end $label ===" >&2
+  fi
+}
+
 dump_master_diagnostics() {
   local bindir=$1
   local reason=$2
@@ -164,18 +208,51 @@ dump_master_diagnostics() {
     echo "master process not running (pid='$master_pid')" | tee -a "$outdir/master-stacks.txt" >&2
   fi
 
-  for f in "$logdir/rosout.log" "$bindir/rosout.log" "$logdir/miniroscore.console.log"; do
+  for f in "$logdir/rosout.log" "$bindir/rosout.log" "$logdir/miniroscore.console.log" \
+           "$logdir/miniroscore.crash" "$bindir/miniroscore.crash" \
+           "$bindir/late-master-logs/miniroscore.crash" \
+           "$bindir/late-master-logs/miniroscore.console.log"; do
     if [[ -f "$f" ]]; then
       cp -f "$f" "$outdir/" 2>/dev/null || true
       echo "copied $f" >&2
     fi
   done
 
+  # Core dumps (workflow sets core_pattern to $PWD/cores/...).
+  local core_copied=0
+  for f in cores/corefile-miniroscore-* "$bindir"/core* core*; do
+    [[ -f "$f" ]] || continue
+    cp -f "$f" "$outdir/" 2>/dev/null || true
+    echo "copied core $f" >&2
+    core_copied=1
+    # Best-effort offline backtrace if the process is already gone.
+    if command -v gdb >/dev/null 2>&1 && [[ -x "$bindir/miniroscore" ]]; then
+      local btfile="$outdir/$(basename "$f").bt.txt"
+      gdb -batch -ex "set pagination off" -ex "bt" -ex "thread apply all bt" \
+        "$bindir/miniroscore" "$f" >"$btfile" 2>&1 || true
+    fi
+  done
+  if (( core_copied == 0 )); then
+    echo "no core dumps found for miniroscore" >&2
+  fi
+
   local b
   for b in "$logdir"/rosout.log.[0-9]*; do
     [[ -f "$b" ]] || continue
     cp -f "$b" "$outdir/" 2>/dev/null || true
   done
+
+  # Surface stacks in the CI job log (ctest captures stderr).
+  print_master_log_excerpt "miniroscore.crash" "$outdir/miniroscore.crash"
+  print_master_log_excerpt "miniroscore.console.log" "$outdir/miniroscore.console.log" 120
+  local bt
+  for bt in "$outdir"/*.bt.txt; do
+    [[ -f "$bt" ]] || continue
+    print_master_log_excerpt "core backtrace $(basename "$bt")" "$bt"
+  done
+  if [[ -f "$outdir/master-stacks.txt" ]]; then
+    print_master_log_excerpt "live master stacks" "$outdir/master-stacks.txt"
+  fi
 
   ls -la "$outdir" >&2 || true
   echo "$outdir"

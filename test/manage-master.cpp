@@ -100,11 +100,18 @@ int main(int argc, char** argv)
       std::string("--rosout=true"),
     };
 
+    // Always keep a console capture under the log dir so a crash still leaves
+    // stderr (and handleCrashes() output) in the CI artifact tree.
+    const std::string consoleLog = (logDir / "miniroscore.console.log").string();
+    const std::string crashLog = (logDir / "miniroscore.crash").string();
+    launcher.env("MINIROS_MASTER_CONSOLE_LOG", consoleLog.c_str());
+    launcher.env("MINIROS_CRASH_LOG", crashLog.c_str());
+    std::cout << "miniroscore console -> " << consoleLog << std::endl;
+    std::cout << "miniroscore crash log -> " << crashLog << std::endl;
+
     if (envTruthy("MINIROS_MASTER_DEBUG")) {
       args.emplace_back("--xmlrpc_log=4");
-      const std::string consoleLog = (logDir / "miniroscore.console.log").string();
-      launcher.env("MINIROS_MASTER_CONSOLE_LOG", consoleLog.c_str());
-      std::cout << "MINIROS_MASTER_DEBUG: console -> " << consoleLog << std::endl;
+      std::cout << "MINIROS_MASTER_DEBUG: xmlrpc_log=4" << std::endl;
     }
 
     // DETACHED: master survives after this process exits.

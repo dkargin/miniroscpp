@@ -108,8 +108,9 @@ MINIROS_DECL Error changeCurrentDirectory(const std::string& path);
 /// @param pid - OS process id; values <= 0 are treated as unknown and return true.
 MINIROS_DECL bool isProcessAlive(int pid);
 
-/// Enable printing backtrace during crash.
-/// For internal usage only.
+/// Enable printing backtrace during crash (stderr + optional crash log file).
+/// Opens `$MINIROS_CRASH_LOG`, or `$MINIROS_MASTER_LOG_DIR/miniroscore.crash`,
+/// or `./miniroscore.crash`. For internal / CI usage.
 MINIROS_DECL Error handleCrashes();
 
 

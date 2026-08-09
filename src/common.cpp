@@ -474,46 +474,90 @@ bool isProcessAlive(int pid)
 #ifdef HAVE_GLIBC_BACKTRACE
 static constexpr size_t MAX_STACKTRACE_DEPTH = 64;
 
+/// Pre-opened crash dump fd (async-signal-safe target). -1 = none.
+static int g_crashLogFd = -1;
+
 static void writeStackTrace(int file_descriptor) {
   void* trace[MAX_STACKTRACE_DEPTH];
   size_t trace_depth = backtrace(trace, MAX_STACKTRACE_DEPTH);
   // Note that we skip the first frame here so this function won't show up in
   // the printed trace.
-  backtrace_symbols_fd(trace + 1, trace_depth - 1, file_descriptor);
+  backtrace_symbols_fd(trace + 1, static_cast<int>(trace_depth) - 1, file_descriptor);
 }
 
-/******************************************************************************/
+static void writeAll(int fd, const char* msg, size_t len)
+{
+  if (fd < 0 || !msg || len == 0)
+    return;
+  // Best-effort; ignore short writes in a signal handler.
+  (void)::write(fd, msg, len);
+}
+
 static void fatalSignalHandler(int signal) {
   // Restore the default signal handler for SIGSEGV in case another one
   // happens, and for the re-issue below.
   std::signal(signal, SIG_DFL);
 
-  // WriteStackTrace should theoretically be safe to call here.
-  static constexpr const char error_msg[] =
-      "*** fatalSignalHandler stack trace: ***\n";
-  // Write using safe `write` function. Skip null character.
-  if (write(fileno(stderr), error_msg, sizeof(error_msg) - 1) > 0) {
-    writeStackTrace(fileno(stderr));
+  char header[128];
+  // snprintf is not strictly async-signal-safe but widely used in crash handlers;
+  // keep it short and stack-local.
+  const int headerLen = std::snprintf(header, sizeof(header),
+    "*** fatalSignalHandler signal=%d pid=%d stack trace: ***\n", signal, static_cast<int>(::getpid()));
+
+  auto emit = [&](int fd) {
+    if (fd < 0)
+      return;
+    if (headerLen > 0)
+      writeAll(fd, header, static_cast<size_t>(headerLen));
+    writeStackTrace(fd);
+    ::fsync(fd);
+  };
+
+  emit(fileno(stderr));
+  if (g_crashLogFd >= 0 && g_crashLogFd != fileno(stderr))
+    emit(g_crashLogFd);
+
+  // Give I/O a moment, then re-raise so the default handler can dump core / exit.
+  sleep(1);
+  ::raise(signal);
+}
+
+static int openCrashLogFd()
+{
+  // Prefer an explicit path, then log dirs used by CI / manage-master.
+  const char* path = std::getenv("MINIROS_CRASH_LOG");
+  char buf[512];
+  if (!path || !*path) {
+    const char* dir = std::getenv("MINIROS_MASTER_LOG_DIR");
+    if (!dir || !*dir)
+      dir = std::getenv("ROS_LOG_DIR");
+    if (dir && *dir) {
+      std::snprintf(buf, sizeof(buf), "%s/miniroscore.crash", dir);
+      path = buf;
+    } else {
+      path = "miniroscore.crash";
+    }
   }
 
-  // Give dummy function time to run. Use "safe" sleep() function.
-  sleep(1);
-
-  // Now that the signal handler has been removed we can simply return. If
-  // SIGSEGV/SIGABRT was triggered by an instruction, it will occur again. This
-  // time it will be handled by the default handler which triggers a core dump.
-  return;
+  // O_APPEND so concurrent threads don't clobber each other; truncate on open.
+  const int fd = ::open(path, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0644);
+  if (fd < 0)
+    return -1;
+  return fd;
 }
 #endif
 
 Error handleCrashes()
 {
 #ifdef HAVE_GLIBC_BACKTRACE
-  // Use our function to handle segmentation faults.
-  // Could add additional signals like: SIGSEGV, SIGSYS, etc.
+  if (g_crashLogFd < 0)
+    g_crashLogFd = openCrashLogFd();
+
   std::signal(SIGSEGV, fatalSignalHandler);
   std::signal(SIGABRT, fatalSignalHandler);
   std::signal(SIGILL, fatalSignalHandler);
+  std::signal(SIGFPE, fatalSignalHandler);
+  std::signal(SIGBUS, fatalSignalHandler);
 #else
   return Error::NotSupported;
 #endif
