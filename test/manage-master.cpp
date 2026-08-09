@@ -13,6 +13,10 @@
 // Environment:
 //   MINIROS_MASTER_LOG_DIR / ROS_LOG_DIR - log directory for rosout.log
 //   MINIROS_MASTER_DEBUG=1              - --xmlrpc_log=4 + console log file
+//   TSAN_OPTIONS / ASAN_OPTIONS         - if set in the parent, overridden for
+//                                         the master child with halt_on_error=0
+//                                         so a sanitizer hit does not kill the
+//                                         shared process for the whole suite.
 //
 
 #include <csignal>
@@ -78,6 +82,18 @@ int main(int argc, char** argv)
 
     launcher.env("ROS_LOG_DIR", logDirStr.c_str());
     launcher.env("MINIROS_MASTER_LOG_DIR", logDirStr.c_str());
+
+    // miniroscore is built with the same sanitizer flags as the tests. CI sets
+    // TSAN_OPTIONS=halt_on_error=1 for the suite; if the shared master inherits
+    // that and hits a race, TSan aborts it and every later test hangs on
+    // wait_for_master. Keep reporting races, but do not kill the master.
+    if (std::getenv("TSAN_OPTIONS") || std::getenv("ASAN_OPTIONS")) {
+      launcher.env("TSAN_OPTIONS",
+                   "halt_on_error=0:abort_on_error=0:second_deadlock_stack=1:history_size=7");
+      launcher.env("ASAN_OPTIONS", "halt_on_error=0:abort_on_error=0");
+      std::cout << "Sanitizer options for master: halt_on_error=0 (shared process)"
+                << std::endl;
+    }
 
     std::vector<std::string> args = {
       std::string("--pidfile=") + pidFilePath.string(),
