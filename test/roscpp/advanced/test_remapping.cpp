@@ -27,8 +27,16 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+/*
+ * GTest binary for remapping scenarios.  Do not register this as a bare CTest
+ * entry — run it via launch_no_remappings / launch_local_remappings /
+ * launch_global_remappings, which replay the former rostest XML setup.
+ */
+
 #include <miniros/ros.h>
 #include <gtest/gtest.h>
+
+#include "../../require_master.h"
 
 static int argc_;
 static char** argv_;
@@ -44,7 +52,7 @@ TEST(RemappingTest, remapping_test)
   //miniros::NodeHandle pnh("~");
 
   bool use_local_remap = false;
-  EXPECT_TRUE(nh.getParam("use_local_remap", use_local_remap)) 
+  EXPECT_TRUE(nh.getParam("use_local_remap", use_local_remap))
     << "Param [~use_local_remap] must be defined\n";
 
   if (use_local_remap)
@@ -58,21 +66,21 @@ TEST(RemappingTest, remapping_test)
     local_remappings.insert(std::make_pair(remap_from, remap_to));
 
     miniros::NodeHandle base_nh(nh, "base_namespace", local_remappings);
-    EXPECT_TRUE(base_nh.getNamespace() == expected_base_ns) 
+    EXPECT_TRUE(base_nh.getNamespace() == expected_base_ns)
       << "Error: \"" << base_nh.getNamespace() << "\" != \""  << expected_base_ns << "\"\n";
 
     miniros::NodeHandle sub_nh(base_nh, "sub_namespace");
-    EXPECT_TRUE(sub_nh.getNamespace() == expected_sub_ns) 
+    EXPECT_TRUE(sub_nh.getNamespace() == expected_sub_ns)
       << "Error: \"" << sub_nh.getNamespace() << "\" != \""  << expected_sub_ns << "\"\n";
   }
   else
   {
     std::cout << "***********************************************************************\n";
     miniros::NodeHandle base_nh(nh, "base_namespace");
-    EXPECT_EQ(base_nh.getNamespace(), expected_base_ns); 
+    EXPECT_EQ(base_nh.getNamespace(), expected_base_ns);
 
     miniros::NodeHandle sub_nh(base_nh, "sub_namespace");
-    EXPECT_EQ(sub_nh.getNamespace(), expected_sub_ns); 
+    EXPECT_EQ(sub_nh.getNamespace(), expected_sub_ns);
   }
 }
 
@@ -80,6 +88,7 @@ int main(int argc, char** argv)
 {
   testing::InitGoogleTest(&argc, argv);
   miniros::init(argc, argv, "remapping_tester");
+  miniros::test::requireMasterOrExit("advanced-test_remapping");
   argc_ = argc;
   argv_ = argv;
   return RUN_ALL_TESTS();

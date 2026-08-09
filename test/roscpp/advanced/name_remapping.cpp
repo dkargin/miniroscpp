@@ -30,22 +30,19 @@
 /* Author: Josh Faust */
 
 /*
- * Test name remapping.  Assumes the parameter "test" is remapped to "test_remap", and the node name is remapped to "name_remapped"
+ * Test name remapping.  Formerly launched with:
+ *   args="mapfrom:=mapto", param mapto=mapto_value, node name name_remapped
  */
 
 #include <string>
-#include <sstream>
-#include <fstream>
 
 #include <gtest/gtest.h>
-
-#include <time.h>
-#include <stdlib.h>
 
 #include "miniros/ros.h"
 #include <miniros/names.h>
 
 #include "master_fixture.h"
+#include "../../require_master.h"
 
 TEST_F(MasterFixture, parameterRemapping)
 {
@@ -96,8 +93,17 @@ TEST(RoscppHandles, nodeHandleNameRemapping)
 int main(int argc, char** argv)
 {
   testing::InitGoogleTest(&argc, argv);
-  miniros::init( argc, argv, "name_remapping" );
-  miniros::NodeHandle nh;
 
+  miniros::M_string remappings;
+  remappings["mapfrom"] = "mapto";
+  miniros::init(remappings, "name_remapped");
+  miniros::test::requireMasterOrExit("advanced-name_remapping");
+
+  miniros::MasterLinkPtr master = miniros::getMasterLink();
+  if (!master || !master->set("/mapto", std::string("mapto_value"))) {
+    return EXIT_FAILURE;
+  }
+
+  miniros::NodeHandle nh;
   return RUN_ALL_TESTS();
 }

@@ -53,6 +53,14 @@ XML. They are registered with CTest today.
 | `advanced-test_ns_node_remapping` | `test_ns_node_remapping.cpp` | Former `ns_node_remapping.xml` removed |
 | `advanced-test_search_param` | `test_search_param.cpp` | Former `search_param.xml` removed |
 | `advanced-service_deadlock` | `service_deadlock.cpp` | Former `service_deadlock.xml` removed; fixed MiniROS deadlock (see below) |
+| `advanced-name_remapping` | `name_remapping.cpp` | Former `name_remapping.xml` (name_remapped case); remaps + param inlined |
+| `advanced-name_remapping_with_ns` | `name_remapping_with_ns.cpp` | Former `name_remapping*.xml` ns=`a` case; `__ns` + remaps + params inlined |
+| `advanced-name_not_remappable` | `name_not_remappable.cpp` | Former `name_not_remappable.xml`; `NAME:=…` must not change node name |
+| `advanced-namespaces` | `namespaces.cpp` | Former `namespaces.xml`; `ROS_NAMESPACE` + params inlined |
+| `advanced-test_remapping` | `test_remapping.cpp` | GTest child only (not a CTest entry); argv/params driven |
+| `advanced-launch_no_remappings` | `launch_no_remappings.cpp` | Former `no_remappings.xml` via `Launcher` |
+| `advanced-launch_local_remappings` | `launch_local_remappings.cpp` | Former `local_remappings.xml` via `Launcher` |
+| `advanced-launch_global_remappings` | `launch_global_remappings.cpp` | Former `global_remappings.xml` via `Launcher` |
 
 ROS1 holds `shutting_down_mutex_` across `master::execute` too, but classic
 XmlRpcClient blocks the **caller** with its own I/O. MiniROS
@@ -78,16 +86,7 @@ enabling them and inlining args/params — **without** `Launcher`.
 | `advanced-sim_time_test` | `sim_time_test.xml` | `/use_sim_time=true` |
 | `advanced-init_no_sim_time_test` | `init_no_sim_time.xml` | `/use_sim_time=true` + `NoSimTime` init |
 | `advanced-stamped_topic_statistics_empty_timestamp` | `stamped_topic_statistics_with_empty_timestamp.xml` | `enable_statistics=true` |
-| `advanced-name_remapping` | `name_remapping.xml` | remap args + params |
-| `advanced-name_remapping_with_ns` | `name_remapping.xml`, `name_remapping_ROS_NAMESPACE.xml` | remaps + params; latter also `ROS_NAMESPACE` |
-| `advanced-name_not_remappable` | `name_not_remappable.xml` | remap of `NAME` + param |
-| `advanced-namespaces` | `namespaces.xml` | params + `ROS_NAMESPACE` |
-| `advanced-test_remapping` | `no_remappings.xml`, `local_remappings.xml`, `global_remappings.xml` | three param/remap scenarios |
 | `advanced-param_locale_avoidance_test` | *(no XML in tree)* | locale edge case; confirm expected setup |
-
-Remapping / namespace cases can stay single-process if remaps are passed
-as `argv` to `miniros::init` (or set via API before init). They do not
-inherently need peer processes.
 
 ---
 
@@ -175,7 +174,10 @@ manual UDP-drop script).
   `real_time_test.xml`, `service_adv_multiple.xml`, `spinners.xml`,
   `wait_for_message.xml`, `nonconst_subscriptions.xml`,
   `parameter_validation.xml`, `ns_node_remapping.xml`, `search_param.xml`,
-  `service_deadlock.xml`.
+  `service_deadlock.xml`, `name_remapping.xml`,
+  `name_remapping_ROS_NAMESPACE.xml`, `name_not_remappable.xml`,
+  `namespaces.xml`, `no_remappings.xml`, `local_remappings.xml`,
+  `global_remappings.xml`.
 
 ---
 

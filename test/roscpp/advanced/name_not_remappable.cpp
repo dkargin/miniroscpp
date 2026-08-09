@@ -27,8 +27,15 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+/*
+ * Formerly: <remap from="NAME" to="something_else_entirely"/> with node
+ * name="NAME".  Remapping the unresolved node name must not change getName().
+ */
+
 #include <miniros/ros.h>
 #include <gtest/gtest.h>
+
+#include "../../require_master.h"
 
 TEST(RemappingTest, remapping_test)
 {
@@ -40,6 +47,10 @@ TEST(RemappingTest, remapping_test)
 int main(int argc, char** argv)
 {
   testing::InitGoogleTest(&argc, argv);
-  miniros::init(argc, argv, "remapping_tester");
+
+  miniros::M_string remappings;
+  remappings["NAME"] = "something_else_entirely";
+  miniros::init(remappings, "NAME");
+  miniros::test::requireMasterOrExit("advanced-name_not_remappable");
   return RUN_ALL_TESTS();
 }
