@@ -197,7 +197,13 @@ run_with_hang_watchdog() {
   # Shared-master suite: do not start another 280s hang if miniroscore is already gone.
   require_shared_master_alive "$bindir" "precheck-dead"
 
-  "$@" &
+  # Line-buffer stdout/stderr when possible so gtest RUN/OK lines are not stuck
+  # in a pipe buffer — otherwise hang dumps look like the *next* test failed.
+  if command -v stdbuf >/dev/null 2>&1; then
+    stdbuf -oL -eL "$@" &
+  else
+    "$@" &
+  fi
   local child=$!
   local timed_out=0
   local master_died=0
