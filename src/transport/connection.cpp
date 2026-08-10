@@ -340,13 +340,10 @@ void Connection::drop(DropReason reason)
 {
   MINIROS_DEBUG("Connection::drop(%u)", reason);
   bool did_drop = false;
-  {
-    if (!dropped_)
-    {
-      dropped_ = true;
-      did_drop = true;
-    }
-  }
+  // dropped_ is atomic; set before clearing buffers so concurrent I/O paths
+  // observe the drop and bail out once they take their path mutex.
+  if (!dropped_.exchange(true))
+    did_drop = true;
 
   if (did_drop)
   {
@@ -375,6 +372,10 @@ void Connection::drop(DropReason reason)
       has_read_callback_ = 0;
     }
     {
+      // writeTransport() holds write_mutex_ while reading write_buffer_/sizes.
+      // Take the same lock (then write_callback_mutex_) so shutdown cannot clear
+      // those fields under only write_callback_mutex_ while PollManager writes.
+      std::scoped_lock<std::recursive_mutex> wlock(write_mutex_);
       std::scoped_lock<std::mutex> lock(write_callback_mutex_);
       write_callback_ = {};
       write_buffer_ = {};

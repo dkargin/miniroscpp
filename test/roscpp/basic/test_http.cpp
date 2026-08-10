@@ -12,6 +12,7 @@
 
 #include "miniros/http/http_client.h"
 #include "miniros/http/http_request.h"
+#include "miniros/http/xmlrpc_request.h"
 #include "miniros/http/http_server.h"
 #include "miniros/http/http_tools.h"
 #include "miniros/http/http_endpoint.h"
@@ -582,6 +583,100 @@ TEST_F(HttpServerTest, MixedSyncAndAsyncEndpoints)
   // Verify handlers were called
   EXPECT_EQ(asyncHandler->getCallCount(), 1U);
   EXPECT_EQ(syncHandler->counter, 1);
+}
+
+// Blocks in the callback-queue thread so the TCP response is never written while
+// the client still has an in-flight (and possibly queued) request.
+class HangEndpointHandler : public http::EndpointHandler {
+public:
+  explicit HangEndpointHandler(std::shared_ptr<std::atomic<bool>> entered,
+                               std::shared_ptr<std::atomic<bool>> release)
+    : entered_(std::move(entered)), release_(std::move(release))
+  {}
+
+  Error handle(const network::ClientInfo&, std::shared_ptr<http::HttpRequest> request) override
+  {
+    if (entered_)
+      entered_->store(true);
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(30);
+    while (release_ && !release_->load() && std::chrono::steady_clock::now() < deadline) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    request->setResponseStatusOk();
+    request->setResponseBody("{}", "application/json");
+    return Error::Ok;
+  }
+
+private:
+  std::shared_ptr<std::atomic<bool>> entered_;
+  std::shared_ptr<std::atomic<bool>> release_;
+};
+
+TEST_F(HttpServerTest, PeerDisconnectFailsQueuedXmlRpcWithoutParse)
+{
+  // Regression: peer close with an in-flight request + queued follow-ups used to
+  // treat EOF as a successful empty HTTP body, so XmlRpcRequest::processResponse
+  // logged "no methodResponse" for every dropped request.
+  auto entered = std::make_shared<std::atomic<bool>>(false);
+  auto release = std::make_shared<std::atomic<bool>>(false);
+  auto hang = std::make_shared<HangEndpointHandler>(entered, release);
+  server_->registerEndpoint(
+    std::make_unique<http::SimpleFilter>(http::HttpMethod::Post, "/RPC2"),
+    hang, callback_queue_);
+
+  http::HttpClient client(&poll_manager_.getPollSet());
+  int port = getServerPort();
+  Error conErr = client.connect("127.0.0.1", port);
+  ASSERT_TRUE(conErr == Error::Ok || conErr == Error::Timeout);
+  ASSERT_EQ(client.waitConnected(WallDuration(connectionTimeoutSec)), Error::Ok);
+
+  std::atomic<int> fails{0};
+  std::atomic<int> completes{0};
+  std::atomic<int> invalidResponses{0};
+
+  const int numRequests = 3;
+  std::vector<std::shared_ptr<http::XmlRpcRequest>> requests;
+  requests.reserve(numRequests);
+  for (int i = 0; i < numRequests; ++i) {
+    auto req = http::makeRequest("/RPC2", "getPid");
+    req->setParams(std::string("/peer_disconnect_test"));
+    req->setRetry(0);
+    req->onCompleteRaw = [&](Error err, const XmlRpc::XmlRpcValue&, bool) {
+      completes.fetch_add(1);
+      if (err == Error::InvalidResponse)
+        invalidResponses.fetch_add(1);
+    };
+    req->setFailureCallback([&]() { fails.fetch_add(1); });
+    ASSERT_EQ(client.enqueueRequest(req), Error::Ok);
+    requests.push_back(req);
+  }
+
+  // Wait until the server has accepted the first request and is hanging before
+  // writing a response (so the client is in ReadResponse / has a queue).
+  const auto waitEntered = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+  while (!entered->load() && std::chrono::steady_clock::now() < waitEntered) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+  }
+  ASSERT_TRUE(entered->load()) << "hanging endpoint never received a request";
+
+  // Kill the peer while requests are still outstanding.
+  server_->stop();
+  server_.reset();
+
+  for (auto& req : requests) {
+    EXPECT_EQ(req->waitForState(http::HttpRequest::State::Idle, WallDuration(5.0)), Error::Ok)
+        << "request should fail to Idle after peer disconnect, state="
+        << req->state().toString();
+  }
+
+  EXPECT_EQ(fails.load(), numRequests);
+  EXPECT_EQ(client.getQueuedRequests(), 0u);
+  EXPECT_EQ(invalidResponses.load(), 0)
+      << "EOF must not be parsed as an empty XML-RPC methodResponse";
+  EXPECT_EQ(completes.load(), 0)
+      << "processResponse should not run for transport-failed requests";
+
+  release->store(true);  // unblock hang handler if the callback thread is still in it
 }
 
 int main(int argc, char** argv)

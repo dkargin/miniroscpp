@@ -385,26 +385,38 @@ void HttpClient::Internal::handleDisconnect(Lock& lock, Error disconnectError)
 
   // TODO: change state only if callback has not changed state anyhow.
   updateState(lock, State::Disconnected);
+  // Drop partial HTTP/XML parse state so a reconnect cannot finish a stale frame.
+  resetIntermediateBuffers();
 
-  std::deque<std::shared_ptr<HttpRequest>> requestsCopy;
+  // Non-retryable requests are failed and removed. Retryable ones stay queued
+  // (ClientQueued) for reconnect — do not call notifyFailToSend on those.
+  std::deque<std::shared_ptr<HttpRequest>> failedRequests;
 
-  // Copy of previous active request.
-  std::shared_ptr<HttpRequest> active_copy;
-
-  // Push active request back to queue.
   {
     std::scoped_lock reqLock(requests_guard);
-    if (active_request) {
-      std::swap(active_copy, active_request);
-      if (active_copy->shouldRetry()) {
-        requests.push_front(active_copy);
-        active_copy->updateState(HttpRequest::State::ClientQueued);
-        active_copy.reset();
+    std::deque<std::shared_ptr<HttpRequest>> keepRetrying;
+
+    auto classify = [&](std::shared_ptr<HttpRequest> req) {
+      if (!req)
+        return;
+      if (req->shouldRetry()) {
+        req->updateState(HttpRequest::State::ClientQueued);
+        keepRetrying.push_back(std::move(req));
       } else {
-        active_copy->updateState(HttpRequest::State::Idle);
+        req->updateState(HttpRequest::State::Idle);
+        failedRequests.push_back(std::move(req));
       }
+    };
+
+    if (active_request) {
+      classify(std::move(active_request));
+      active_request.reset();
     }
-    requestsCopy = requests;
+    while (!requests.empty()) {
+      classify(std::move(requests.front()));
+      requests.pop_front();
+    }
+    requests = std::move(keepRetrying);
   }
 
   // Copying all mutable data, which can be changed during callback.
@@ -415,18 +427,13 @@ void HttpClient::Internal::handleDisconnect(Lock& lock, Error disconnectError)
   }
   auto socketCopy = socket;
 
-  const bool hasAnyCallbacks = !requestsCopy.empty() || active_copy || (onDisconnectCopy && alive);
+  const bool hasAnyCallbacks = !failedRequests.empty() || (onDisconnectCopy && alive);
 
   // All the following callbacks must be called without holding either requests_guard or process_guard.
   // Keeping any of these mutexes locked will lead to potential deadlock caused by calling HttpClient methods in callback.
   if (hasAnyCallbacks) {
     ScopedUnlock unlock(lock);
-    if (active_copy) {
-      active_copy->notifyFailToSend();
-    }
-
-    // TODO: Do we need to drop them?
-    for (auto req: requestsCopy) {
+    for (auto& req : failedRequests) {
       req->notifyFailToSend();
     }
 
@@ -558,19 +565,26 @@ Error HttpClient::Internal::readResponse()
         LOCAL_DEBUG("HttpClient[%s]::readResponse: EOF while reading request", debugName().c_str());
         response_http_frame.finishResponse();
         return Error::EndOfFile;
-        // Either way we close the connection
       }
       LOCAL_DEBUG("HttpClient[%s]::readResponse got only %d/%d bytes.", debugName().c_str(), response_http_frame.bodyLength(), response_http_frame.contentLength());
       return Error::WouldBlock;
     }
 
     assert(response_http_frame.state() == HttpParserFrame::ParseComplete);
-    // Otherwise, parse and dispatch the request
     LOCAL_DEBUG("HttpClient[%s]::readResponse read %d/%d bytes.", debugName().c_str(), response_http_frame.bodyLength(), response_http_frame.contentLength());
-  } else if (readErr == Error::WouldBlock) {
+    return Error::Ok;
+  }
+
+  if (readErr == Error::WouldBlock) {
     return Error::WouldBlock;
   }
-  return Error::Ok;
+
+  // Peer closed (n==0 → EndOfFile) or hard error with no new bytes. Never treat
+  // that as a successful empty HTTP response — that used to run XmlRpc parse on
+  // an empty body ("no methodResponse") for every in-flight request.
+  if (readErr != Error::Ok)
+    return readErr;
+  return Error::EndOfFile;
 }
 
 HttpClient::HttpClient(PollSet* ps)
@@ -936,8 +950,10 @@ void HttpClient::handleSocketEvents(const std::shared_ptr<Internal>& I, int evtF
         // Can we actually be here?
         I->handleDisconnect(lock, Error::SystemError);
       } else if (evtFlags & PollSet::EventIn) {
-        // Not expecting to read anything. But we can get this event to call 'read' and receive 0 bytes.
-        // This is disconnect event.
+        // Idle clients do not expect inbound data; EventIn with a readable EOF
+        // means the peer closed. Drain via handleDisconnect (readResponse would
+        // also see EndOfFile once we leave Idle with a request in flight).
+        I->handleDisconnect(lock, Error::EndOfFile);
       } else if (evtFlags & PollSet::EventTimer) {
         // Got timeout waiting - call idle timeout handler
         TimeoutHandler callback;
