@@ -94,7 +94,7 @@ private:
 /// Initializes XMLRPC request to specified URL.
 /// @param path - path/endpoint part of URL.
 /// @param method - name of XMLRPC method.
-std::shared_ptr<XmlRpcRequest> makeRequest(const std::string& path, const std::string& method);
+MINIROS_DECL std::shared_ptr<XmlRpcRequest> makeRequest(const std::string& path, const std::string& method);
 
 } // namespace http
 } // namespace miniros
