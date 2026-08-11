@@ -36,6 +36,8 @@ HttpServerConnection::~HttpServerConnection()
   Lock lock(guard_, THIS_LOCATION);
   LOCAL_DEBUG("~HttpServerConnection(%d)", debugFd_);
   detachPollSet(lock);
+  if (socket_)
+    closeSocket();
 }
 
 void HttpServerConnection::setEndpointCollection(const std::shared_ptr<internal::EndpointCollection>& endpoints)
@@ -77,6 +79,11 @@ void HttpServerConnection::attachPollSet(PollSet* poll_set)
           // It resolves issues with lock order, reported by helgrind.
           std::swap(server_lifetime, self->server_lifetime_);
           self->detachPollSet(lock);
+          // Disconnect must FIN the peer so clients waiting in ReadResponse see EOF.
+          // Upgrade transfers socket ownership — do not close it here.
+          if (report.cmd == EventReport::Disconnect) {
+            self->closeSocket();
+          }
         }
         self->updateEventsForSocket(lock);
       }
@@ -140,7 +147,10 @@ Error HttpServerConnection::doReadRequest(Lock& lock)
 
 int HttpServerConnection::fd() const
 {
-  return socket_ ? socket_->fd() : MINIROS_INVALID_SOCKET;
+  // socket_ is cleared under guard_ by closeSocket() on the poll thread;
+  // HttpServer::stop() may call fd() from another thread for logging.
+  Lock lock(guard_, THIS_LOCATION);
+  return socket_ ? socket_->fd() : debugFd_;
 }
 
 bool HttpServerConnection::isDetachedFromParent() const
@@ -588,6 +598,8 @@ int HttpServerConnection::eventsForState(State state) const
 
 void HttpServerConnection::closeSocket()
 {
+  if (!socket_)
+    return;
   socket_->close();
   socket_.reset();
 }
