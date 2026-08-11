@@ -658,8 +658,10 @@ TEST_F(HttpServerTest, PeerDisconnectFailsQueuedXmlRpcWithoutParse)
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
   }
   ASSERT_TRUE(entered->load()) << "hanging endpoint never received a request";
+  ASSERT_EQ(requests[0]->state(), http::HttpRequest::State::ClientWaitResponse);
 
-  // Kill the peer while requests are still outstanding.
+  // Kill the peer while requests are still outstanding. HttpServer::stop() must
+  // FIN accepted sockets (not only the listen fd) so the client sees EOF.
   server_->stop();
   server_.reset();
 
