@@ -18,6 +18,7 @@
 #include <memory>
 #include <system_error>
 #include <utility>
+#include <vector>
 
 #if !defined(_WIN32)
 #include <fcntl.h>
@@ -342,14 +343,26 @@ MasterCacheData MasterCache::collect(int port, const std::string& guid) const
     cn.pid = node->pid();
     cn.state = node->getState().toString();
 
-    std::unique_lock nodeLock(*node);
-    const auto& services = node->getServicesUnsafe();
-    for (const std::string& svcName : services) {
-      CachedService svc;
-      svc.name = svcName;
-      svc.service_api = regs_->services.get_service_api(svcName);
-      if (!svc.service_api.empty())
-        cn.services.push_back(std::move(svc));
+    // Copy service names under the node lock, then resolve APIs under the
+    // RegistrationManager lock. Do not hold both at once (register takes
+    // m_guard then the node lock). Reading services.service_api_map without
+    // m_guard races with register/unregister and can yield torn UTF-8 strings
+    // that abort nlohmann::json::dump().
+    std::vector<std::string> serviceNames;
+    {
+      std::unique_lock nodeLock(*node);
+      const auto& services = node->getServicesUnsafe();
+      serviceNames.assign(services.begin(), services.end());
+    }
+    {
+      RegistrationManager::Lock regLock(*regs_);
+      for (const std::string& svcName : serviceNames) {
+        CachedService svc;
+        svc.name = svcName;
+        svc.service_api = regs_->services.get_service_api(svcName);
+        if (!svc.service_api.empty())
+          cn.services.push_back(std::move(svc));
+      }
     }
 
     data.nodes.push_back(std::move(cn));
@@ -669,7 +682,15 @@ Error MasterCache::saveFile(const std::filesystem::path& path, const MasterCache
     root["nodes"].push_back(std::move(nodeJson));
   }
 
-  const std::string payload = root.dump(2) + "\n";
+  std::string payload;
+  try {
+    // replace: never abort the master on a stray non-UTF-8 byte in a name/URI.
+    payload = root.dump(2, ' ', false, json::error_handler_t::replace) + "\n";
+  } catch (const json::exception& e) {
+    setDetail(std::string("json dump failed: ") + e.what());
+    return Error::InvalidValue;
+  }
+
   if (Error err = writeAtomically(path, payload, detail); !err)
     return err;
 
