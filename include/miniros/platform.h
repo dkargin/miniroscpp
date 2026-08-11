@@ -61,6 +61,44 @@ inline bool get_environment_variable(std::string &str, const char* environment_v
 	}
 }
 
+/**
+ * Cross-platform setenv: set (or optionally leave) an environment variable.
+ * @return true on success.
+ */
+inline bool set_environment_variable(const char* name, const char* value, bool overwrite = true) {
+	if (!name || !value) {
+		return false;
+	}
+#ifdef _WIN32
+	if (!overwrite) {
+		size_t envsize = 0;
+		const errno_t errcode = getenv_s(&envsize, NULL, 0, name);
+		if (errcode || envsize) {
+			return errcode == 0;
+		}
+	}
+	return _putenv_s(name, value) == 0;
+#else
+	return setenv(name, value, overwrite ? 1 : 0) == 0;
+#endif
+}
+
+/**
+ * Cross-platform unsetenv: remove an environment variable.
+ * @return true on success (including when the variable was already unset).
+ */
+inline bool unset_environment_variable(const char* name) {
+	if (!name) {
+		return false;
+	}
+#ifdef _WIN32
+	// Empty value removes the variable with the CRT putenv helpers.
+	return _putenv_s(name, "") == 0;
+#else
+	return unsetenv(name) == 0;
+#endif
+}
+
 } // namespace miniros
 
 #endif // MINIROS_PLATFORM_H
