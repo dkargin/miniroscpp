@@ -14,6 +14,7 @@
 
 #include "miniros/common.h"
 #include "miniros/launcher.h"
+#include "miniros/platform.h"
 
 #if !defined(WIN32)
 #include <unistd.h>
@@ -42,15 +43,9 @@ std::filesystem::path notifyChildPath()
 
 void clearNotifyEnv()
 {
-#if defined(WIN32)
-  _putenv("NOTIFY_SOCKET=");
-  _putenv("MINIROS_NOTIFY_HANDLE=");
-  _putenv("MINIROS_NOTIFY_FD=");
-#else
-  unsetenv("NOTIFY_SOCKET");
-  unsetenv("MINIROS_NOTIFY_FD");
-  unsetenv("MINIROS_NOTIFY_HANDLE");
-#endif
+  miniros::unset_environment_variable("NOTIFY_SOCKET");
+  miniros::unset_environment_variable("MINIROS_NOTIFY_HANDLE");
+  miniros::unset_environment_variable("MINIROS_NOTIFY_FD");
 }
 
 } // namespace
@@ -70,8 +65,8 @@ TEST(Notify, PipeDeliversPidAndPort)
 {
   int fds[2] = {-1, -1};
   ASSERT_EQ(pipe(fds), 0);
-  ASSERT_EQ(setenv("MINIROS_NOTIFY_FD", std::to_string(fds[1]).c_str(), 1), 0);
-  unsetenv("NOTIFY_SOCKET");
+  ASSERT_TRUE(miniros::set_environment_variable("MINIROS_NOTIFY_FD", std::to_string(fds[1]).c_str()));
+  miniros::unset_environment_variable("NOTIFY_SOCKET");
 
   miniros::NodeNotifyInfo info;
   info.rpcPort = 4242;
@@ -82,7 +77,7 @@ TEST(Notify, PipeDeliversPidAndPort)
   const ssize_t n = read(fds[0], buf, sizeof(buf) - 1);
   close(fds[0]);
   close(fds[1]);
-  unsetenv("MINIROS_NOTIFY_FD");
+  miniros::unset_environment_variable("MINIROS_NOTIFY_FD");
 
   ASSERT_GT(n, 0);
   const std::string msg(buf, static_cast<size_t>(n));

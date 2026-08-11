@@ -41,6 +41,7 @@
 #include "miniros/ros.h"
 
 #include "miniros/master_link.h"
+#include "miniros/platform.h"
 
 #include <miniros/transport/rpc_manager.h>
 #include <miniros/transport/topic_manager.h>
@@ -48,20 +49,6 @@
 using namespace XmlRpc;
 
 bool g_should_exist = true;
-
-#ifdef _WIN32
-int setenv(const char *name, const char *value, int overwrite)
-{
-  if(!overwrite)
-  {
-    size_t envsize = 0;
-    const errno_t errcode = getenv_s(&envsize, NULL, 0, name);
-    if(errcode || envsize)
-      return errcode;
-  }
-  return _putenv_s(name, value);
-}
-#endif
 
 TEST(CheckMaster, checkMaster)
 {
@@ -86,7 +73,8 @@ int main(int argc, char** argv)
   if (args[1] == "no")
   {
     g_should_exist = false;
-    setenv("ROS_MASTER_URI", "http://invalid_host_name_blahahahahahahahahahahaha:11311", 1);
+    miniros::set_environment_variable(
+        "ROS_MASTER_URI", "http://invalid_host_name_blahahahahahahahahahahaha:11311");
     std::cout << getenv("ROS_MASTER_URI") << std::endl;
   }
 

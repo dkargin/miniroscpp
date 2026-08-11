@@ -21,6 +21,7 @@
 #include <gtest/gtest.h>
 
 #include "miniros/launcher.h"
+#include "miniros/platform.h"
 #include "miniros/ros.h"
 #include "std_msgs/String.hxx"
 
@@ -176,8 +177,8 @@ TEST_F(MasterCacheTest, PublisherSurvivesMasterRestartFromCache)
 
   // Subscriber side in this process: discover the restored publisher and take
   // the latched message.
-  setenv("ROS_MASTER_URI", masterUri.c_str(), 1);
-  setenv("ROS_HOSTNAME", "127.0.0.1", 1);
+  ASSERT_TRUE(miniros::set_environment_variable("ROS_MASTER_URI", masterUri.c_str()));
+  ASSERT_TRUE(miniros::set_environment_variable("ROS_HOSTNAME", "127.0.0.1"));
   int argc = 1;
   char arg0[] = "basic-test_master_cache";
   char* argv[] = {arg0, nullptr};

@@ -40,6 +40,7 @@
 #include <gtest/gtest.h>
 
 #include <miniros/ros.h>
+#include <miniros/platform.h>
 #include "master_fixture.h"
 #include "../../require_master.h"
 
@@ -91,11 +92,9 @@ int main(int argc, char** argv)
 {
   testing::InitGoogleTest(&argc, argv);
 
-#ifndef _WIN32
-  setenv("ROS_NAMESPACE", "ROS_NAMESPACE", 1);
-#else
-  _putenv_s("ROS_NAMESPACE", "ROS_NAMESPACE");
-#endif
+  if (!miniros::set_environment_variable("ROS_NAMESPACE", "ROS_NAMESPACE")) {
+    return EXIT_FAILURE;
+  }
 
   miniros::init(argc, argv, "NODE_NAME");
   miniros::test::requireMasterOrExit("advanced-namespaces");
