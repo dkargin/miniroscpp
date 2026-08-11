@@ -208,15 +208,23 @@ dump_master_diagnostics() {
     echo "master process not running (pid='$master_pid')" | tee -a "$outdir/master-stacks.txt" >&2
   fi
 
-  for f in "$logdir/rosout.log" "$bindir/rosout.log" "$logdir/miniroscore.console.log" \
-           "$logdir/miniroscore.crash" "$bindir/miniroscore.crash" \
-           "$bindir/late-master-logs/miniroscore.crash" \
-           "$bindir/late-master-logs/miniroscore.console.log"; do
-    if [[ -f "$f" ]]; then
-      cp -f "$f" "$outdir/" 2>/dev/null || true
-      echo "copied $f" >&2
+  # Copy with unique basenames — late-master logs share names with the shared
+  # master console/crash files and must not overwrite them in $outdir.
+  copy_diag() {
+    local src=$1
+    local dest_name=$2
+    if [[ -f "$src" ]]; then
+      cp -f "$src" "$outdir/$dest_name" 2>/dev/null || true
+      echo "copied $src -> $dest_name" >&2
     fi
-  done
+  }
+  copy_diag "$logdir/rosout.log" "rosout.log"
+  copy_diag "$bindir/rosout.log" "bin-rosout.log"
+  copy_diag "$logdir/miniroscore.console.log" "miniroscore.console.log"
+  copy_diag "$logdir/miniroscore.crash" "miniroscore.crash"
+  copy_diag "$bindir/miniroscore.crash" "bin-miniroscore.crash"
+  copy_diag "$bindir/late-master-logs/miniroscore.crash" "late-master-miniroscore.crash"
+  copy_diag "$bindir/late-master-logs/miniroscore.console.log" "late-master-miniroscore.console.log"
 
   # Core dumps (workflow sets core_pattern to $PWD/cores/...).
   local core_copied=0
