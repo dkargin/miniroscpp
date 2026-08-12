@@ -271,13 +271,13 @@ void HttpClient::Internal::release(Lock& lock) REQUIRES(process_guard)
   {
     ScopedUnlock unlock(lock);
     if (activeReq) {
-      activeReq->updateState(http::HttpRequest::State::Idle);
       activeReq->notifyFailToSend();
+      activeReq->updateState(http::HttpRequest::State::Idle);
       activeReq.reset();
     }
     for (const auto& req: requestsCopy) {
-      req->updateState(http::HttpRequest::State::Idle);
       req->notifyFailToSend();
+      req->updateState(http::HttpRequest::State::Idle);
     }
   }
 }
@@ -403,7 +403,6 @@ void HttpClient::Internal::handleDisconnect(Lock& lock, Error disconnectError)
         req->updateState(HttpRequest::State::ClientQueued);
         keepRetrying.push_back(std::move(req));
       } else {
-        req->updateState(HttpRequest::State::Idle);
         failedRequests.push_back(std::move(req));
       }
     };
@@ -435,6 +434,7 @@ void HttpClient::Internal::handleDisconnect(Lock& lock, Error disconnectError)
     ScopedUnlock unlock(lock);
     for (auto& req : failedRequests) {
       req->notifyFailToSend();
+      req->updateState(HttpRequest::State::Idle);
     }
 
     if (onDisconnectCopy && alive) {
