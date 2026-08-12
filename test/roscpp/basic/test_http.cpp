@@ -671,6 +671,10 @@ TEST_F(HttpServerTest, PeerDisconnectFailsQueuedXmlRpcWithoutParse)
         << req->state().toString();
   }
 
+  const auto waitFails = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+  while (fails.load() < numRequests && std::chrono::steady_clock::now() < waitFails) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
   EXPECT_EQ(fails.load(), numRequests);
   EXPECT_EQ(client.getQueuedRequests(), 0u);
   EXPECT_EQ(invalidResponses.load(), 0)
