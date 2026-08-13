@@ -91,7 +91,7 @@ int main(int argc, const char ** argv) {
     ("port,p", po::value<int>()->default_value(11311), "Server port")
     ("xmlrpc_log", po::value<int>()->default_value(1), "Verbosity level of XmlRpc logging")
     ("rosout", po::value<bool>()->default_value(true), "Enable rosout log aggregator")
-    ("dir", po::value<std::string>(), "Path to working directory")
+    ("dir", po::value<std::string>(), "Path to working directory. This directory will be used for cache and other working files.")
     ("no-cache", "Disable persistent state cache (cache.<port> in cwd)")
     ("resolve", po::value<bool>()->default_value(false), "Resolve node IP address")
     ("dump_parameters", po::value<bool>()->default_value(false), "Dump all ROSParam values on every update")
@@ -110,14 +110,10 @@ int main(int argc, const char ** argv) {
               .options(desc)
               .run(), vm);
   }
-  catch (po::invalid_command_line_syntax& e)
+  catch (const po::error& e)
   {
-    std::cerr << e.what() << std::endl;
-    return EXIT_FAILURE;
-  }
-  catch (po::unknown_option& e)
-  {
-    std::cerr << e.what() << std::endl;
+    std::cerr << e.what() << std::endl << std::endl;
+    std::cerr << desc << std::endl;
     return EXIT_FAILURE;
   }
 
