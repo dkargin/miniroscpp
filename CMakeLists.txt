@@ -81,12 +81,14 @@ endif()
 
 if (MINIROS_SANITIZE_MEMORY)
   message(STATUS "Enabling AddressSanitizer + UndefinedBehaviorSanitizer")
+  set(MINIROS_USE_ASAN TRUE)
   add_compile_options(-fsanitize=address,undefined)
   add_link_options(-fsanitize=address,undefined)
 endif()
 
 if (MINIROS_SANITIZE_THREADS)
   message(STATUS "Enabling ThreadSanitizer")
+  set(MINIROS_USE_TSAN TRUE)
   # GCC's libtsan is often broken on Linux 6.6+ with default ASLR entropy
   # (SEGV / "unexpected memory mapping"). Prefer Clang 18+, or:
   #   sudo sysctl vm.mmap_rnd_bits=28
@@ -98,6 +100,41 @@ if (MINIROS_SANITIZE_THREADS)
   endif()
   add_compile_options(-fsanitize=thread)
   add_link_options(-fsanitize=thread)
+endif()
+
+# Git identity for BuildConfig (empty when built from a tarball / without git).
+set(MINIROS_GIT_COMMIT "")
+set(MINIROS_GIT_BRANCH "")
+find_package(Git QUIET)
+if (GIT_FOUND)
+  execute_process(
+    COMMAND ${GIT_EXECUTABLE} rev-parse --is-inside-work-tree
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    OUTPUT_VARIABLE _miniros_git_inside
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    ERROR_QUIET
+    RESULT_VARIABLE _miniros_git_inside_rv)
+  if (_miniros_git_inside_rv EQUAL 0 AND _miniros_git_inside STREQUAL "true")
+    execute_process(
+      COMMAND ${GIT_EXECUTABLE} rev-parse HEAD
+      WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+      OUTPUT_VARIABLE MINIROS_GIT_COMMIT
+      OUTPUT_STRIP_TRAILING_WHITESPACE
+      ERROR_QUIET)
+    execute_process(
+      COMMAND ${GIT_EXECUTABLE} rev-parse --abbrev-ref HEAD
+      WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+      OUTPUT_VARIABLE MINIROS_GIT_BRANCH
+      OUTPUT_STRIP_TRAILING_WHITESPACE
+      ERROR_QUIET)
+  endif()
+  unset(_miniros_git_inside)
+  unset(_miniros_git_inside_rv)
+endif()
+if (MINIROS_GIT_COMMIT)
+  message(STATUS "MiniROS ${PROJECT_VERSION}  ${MINIROS_GIT_BRANCH}@${MINIROS_GIT_COMMIT}")
+else()
+  message(STATUS "MiniROS ${PROJECT_VERSION}  (no git metadata)")
 endif()
 
 set(MINIROS_INCLUDE_DIRS ${CMAKE_CURRENT_BINARY_DIR})
@@ -147,13 +184,25 @@ else()
   endforeach()
 endif()
 
-# Generate external config for shared lib.
+# Public generated header: version macros + MINIROS_BUILD_SHARED_LIBS.
+# Shared and static trees differ only in that flag (Windows dllimport/dllexport).
+# ${BUILD}/miniros/version.h matches the library type that will be installed.
 set(MINIROS_BUILD_SHARED_LIBS ON)
-configure_file("${CMAKE_CURRENT_SOURCE_DIR}/include/miniros/config.h.in" "shared/miniros/config.h")
-
-# Generate external config for static lib.
+configure_file(
+  "${CMAKE_CURRENT_SOURCE_DIR}/include/miniros/version.h.in"
+  "${CMAKE_CURRENT_BINARY_DIR}/shared/miniros/version.h")
 set(MINIROS_BUILD_SHARED_LIBS OFF)
-configure_file("${CMAKE_CURRENT_SOURCE_DIR}/include/miniros/config.h.in" "static/miniros/config.h")
+configure_file(
+  "${CMAKE_CURRENT_SOURCE_DIR}/include/miniros/version.h.in"
+  "${CMAKE_CURRENT_BINARY_DIR}/static/miniros/version.h")
+if (MINIROS_BUILD_SHARED)
+  set(MINIROS_BUILD_SHARED_LIBS ON)
+else()
+  set(MINIROS_BUILD_SHARED_LIBS OFF)
+endif()
+configure_file(
+  "${CMAKE_CURRENT_SOURCE_DIR}/include/miniros/version.h.in"
+  "${CMAKE_CURRENT_BINARY_DIR}/miniros/version.h")
 
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/scripts/miniroscore.service.in" miniroscore.service @ONLY)
 
@@ -193,6 +242,8 @@ if (catkin_FOUND)
   install(DIRECTORY include/
     DESTINATION ${CATKIN_GLOBAL_INCLUDE_DESTINATION}
     FILES_MATCHING PATTERN "*.h")
+  install(FILES ${CMAKE_CURRENT_BINARY_DIR}/miniros/version.h
+    DESTINATION ${CATKIN_GLOBAL_INCLUDE_DESTINATION}/miniros)
   install(TARGETS ${MINIROS_EXPORT} EXPORT ${PROJECT_NAME}
     ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
     LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
@@ -224,9 +275,9 @@ else()
   install(DIRECTORY include/ DESTINATION include FILES_MATCHING PATTERN "*.hxx")
 
   if (MINIROS_BUILD_SHARED)
-    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/shared/miniros/config.h DESTINATION include/miniros)
+    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/shared/miniros/version.h DESTINATION include/miniros)
   else()
-    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/static/miniros/config.h DESTINATION include/miniros)
+    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/static/miniros/version.h DESTINATION include/miniros)
   endif()
 
   # Installing generated headers for message types

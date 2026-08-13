@@ -33,8 +33,11 @@
  * Test version macros
  */
 
+#include <cstring>
 #include <gtest/gtest.h>
-#include "miniros/config.h"
+
+#include "miniros/build_config.h"
+#include "miniros/version.h"
 
 TEST(version, minimum)
 {
@@ -55,6 +58,26 @@ TEST(version, minimum)
 #if !(MINIROS_VERSION_GE(0, 5, 0, 0, 4, 0))
   FAIL();
 #endif
+}
+
+TEST(version, buildConfig)
+{
+  ASSERT_STREQ(MINIROS_VERSION_STRING, miniros::BuildConfig::getApiVersionString());
+  ASSERT_STREQ(miniros::BuildConfig::getApiVersionString(),
+               miniros::BuildConfig::getBinaryVersionString());
+  ASSERT_STRNE("", miniros::BuildConfig::getApiVersionString());
+
+  ASSERT_NE(miniros::BuildConfig::getGitCommit(), nullptr);
+  ASSERT_NE(miniros::BuildConfig::getGitBranch(), nullptr);
+
+  const char* commit = miniros::BuildConfig::getGitCommit();
+  if (commit[0] != '\0') {
+    ASSERT_GE(std::strlen(commit), 7u);
+    ASSERT_STRNE("", miniros::BuildConfig::getGitBranch());
+  }
+
+  // ASan and TSan cannot be enabled together.
+  ASSERT_FALSE(miniros::BuildConfig::useASan() && miniros::BuildConfig::useTSan());
 }
 
 int
