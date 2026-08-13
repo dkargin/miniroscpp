@@ -522,6 +522,10 @@ void init(const M_string& remappings, const std::string& name, uint32_t options)
     check_ipv6_environment();
     network::init(remappings);
 
+    // Apply named logger levels before starting PollManager so background
+    // threads do not race set_logger_level() during initDefaultLogLevels().
+    initDefaultLogLevels(remappings);
+
     // Need to start
     PollManagerPtr pm = PollManager::instance();
     pm->start();
@@ -540,8 +544,6 @@ void init(const M_string& remappings, const std::string& name, uint32_t options)
 
     g_initialized = true;
   }
-
-  initDefaultLogLevels(remappings);
 }
 
 M_string extractRemappings(int& argc, char** argv, const std::string& name, uint32_t options)
