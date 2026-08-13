@@ -27,7 +27,7 @@
 
 #pragma once
 
-#include "miniros/config.h"
+#include "miniros/version.h"
 
 #if defined(__GNUC__)
 #define MINIROS_DEPRECATED __attribute__((deprecated))

@@ -69,6 +69,7 @@ set(cpp_common_SRC
     errors.cpp
     header.cpp
     common.cpp
+    build_config.cpp
     launcher.cpp
     names.cpp
     serialization.cpp
@@ -297,9 +298,9 @@ if (MINIROS_BUILD_SHARED)
       PRIVATE
       ${MINIROS_INCLUDE_ROOT}/miniros
       PUBLIC
+      $<BUILD_INTERFACE:${MINIROS_INCLUDE_BUILD}/shared>
       $<BUILD_INTERFACE:${MINIROS_INCLUDE_DIRS}>
       $<BUILD_INTERFACE:${MINIROS_INCLUDE_ROOT}>
-      $<BUILD_INTERFACE:${MINIROS_INCLUDE_BUILD}/shared>
       $<BUILD_INTERFACE:${MINIROS_INCLUDE_GENERATED_DIRS}>
       $<INSTALL_INTERFACE:include/generated>  # <prefix>/include/mylib
   )
@@ -314,9 +315,9 @@ if (MINIROS_BUILD_SHARED)
       PRIVATE
       ${MINIROS_INCLUDE_ROOT}/miniros
       PUBLIC
+      $<BUILD_INTERFACE:${MINIROS_INCLUDE_BUILD}/static>
       $<BUILD_INTERFACE:${MINIROS_INCLUDE_DIRS}>
       $<BUILD_INTERFACE:${MINIROS_INCLUDE_ROOT}>
-      $<BUILD_INTERFACE:${MINIROS_INCLUDE_BUILD}/static>
       $<BUILD_INTERFACE:${MINIROS_INCLUDE_GENERATED_DIRS}>
       $<INSTALL_INTERFACE:include/generated>  # <prefix>/include/mylib
   )
@@ -330,9 +331,9 @@ else()
       PRIVATE
       ${MINIROS_INCLUDE_ROOT}/miniros
       PUBLIC
+      $<BUILD_INTERFACE:${MINIROS_INCLUDE_BUILD}/static>
       $<BUILD_INTERFACE:${MINIROS_INCLUDE_DIRS}>
       $<BUILD_INTERFACE:${MINIROS_INCLUDE_ROOT}>
-      $<BUILD_INTERFACE:${MINIROS_INCLUDE_BUILD}/static>
       $<BUILD_INTERFACE:${MINIROS_INCLUDE_GENERATED_DIRS}>
       $<INSTALL_INTERFACE:include/generated>  # <prefix>/include/mylib
   )
