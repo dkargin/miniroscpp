@@ -90,10 +90,13 @@ error_with_option_name::error_with_option_name( const std::string& template_,
 
 const char* error_with_option_name::what() const throw()
 {
-    // will substitute tokens each time what is run()
-    substitute_placeholders(m_error_template);
-
-    return m_message.c_str();
+    // what() is noexcept; never let placeholder substitution escape.
+    try {
+        substitute_placeholders(m_error_template);
+        return m_message.c_str();
+    } catch (...) {
+        return m_error_template.c_str();
+    }
 }
 
 void error_with_option_name::replace_token(const std::string& from, const std::string& to) const
@@ -110,22 +113,17 @@ void error_with_option_name::replace_token(const std::string& from, const std::s
 
 std::string error_with_option_name::get_canonical_option_prefix() const
 {
-    switch (m_option_style)
-    {
-    case command_line_style::allow_dash_for_short:
-        return "-";
-    case command_line_style::allow_slash_for_short:
-        return "/";
-    case command_line_style::allow_long_disguise:
-        return "-";
-    case command_line_style::allow_long:
+    // m_option_style is a command_line_style bitmask, not necessarily a
+    // single enumerator. Prefer long `--` when that style is enabled.
+    if (m_option_style & command_line_style::allow_long)
         return "--";
-    case 0:
-        return "";
-    }
-    throw std::logic_error("error_with_option_name::m_option_style can only be "
-                           "one of [0, allow_dash_for_short, allow_slash_for_short, "
-                           "allow_long_disguise or allow_long]");
+    if (m_option_style & command_line_style::allow_long_disguise)
+        return "-";
+    if (m_option_style & command_line_style::allow_slash_for_short)
+        return "/";
+    if (m_option_style & command_line_style::allow_dash_for_short)
+        return "-";
+    return "";
 }
 
 
