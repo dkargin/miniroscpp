@@ -32,6 +32,7 @@
 #include <set>
 
 #include "miniros/console.h"
+#include "miniros/internal/threading.h"
 #include "console_impl.h"
 
 namespace miniros
@@ -46,7 +47,8 @@ struct Logger {
   /// Number of published messages into this topic.
   std::atomic_int messages = 0;
 
-  /// Log level for this  particular logger.
+  /// Log level for this particular logger.
+  /// Mutations and reads other than via a stable handle must hold LoggerConfig::mutex.
   Level level = Level::Info;
 
   explicit Logger(const std::string& name) : m_name(name) {}
@@ -73,14 +75,14 @@ struct LoggerCmp {
 };
 
 struct LoggerConfig {
-  std::set<Logger, LoggerCmp> loggers;
+  std::mutex mutex;
 
-  LogAppender* rosconsole_print_appender = nullptr;
+  std::set<Logger, LoggerCmp> loggers GUARDED_BY(mutex);
+
+  LogAppender* rosconsole_print_appender GUARDED_BY(mutex) = nullptr;
 
   /// Default logging level.
-  Level level = Level::Info;
-
-  std::mutex mutex;
+  Level level GUARDED_BY(mutex) = Level::Info;
 };
 
 LoggerConfig g_loggerConfig;
@@ -91,14 +93,19 @@ void initialize()
 void print(void* handle, Level level, const char* str, const char* file, const char* function, int line)
 {
   ::miniros::console::backend::print(0, level, str, file, function, line);
-  if (g_loggerConfig.rosconsole_print_appender)
+  LogAppender* appender = nullptr;
   {
-    g_loggerConfig.rosconsole_print_appender->log(level, str, file, function, line);
+    std::lock_guard<std::mutex> lock(g_loggerConfig.mutex);
+    appender = g_loggerConfig.rosconsole_print_appender;
+  }
+  if (appender) {
+    appender->log(level, str, file, function, line);
   }
 }
 
 bool isEnabledFor(void* handle, Level level)
 {
+  std::lock_guard<std::mutex> lock(g_loggerConfig.mutex);
   if (handle) {
     const Logger* logger = static_cast<const Logger*>(handle);
     return level >= logger->level;
@@ -108,6 +115,7 @@ bool isEnabledFor(void* handle, Level level)
 
 void* getHandle(const std::string& name)
 {
+  std::lock_guard<std::mutex> lock(g_loggerConfig.mutex);
   auto it = g_loggerConfig.loggers.find(name);
   if (it == g_loggerConfig.loggers.end()) {
     auto p = g_loggerConfig.loggers.emplace(name);
@@ -118,6 +126,8 @@ void* getHandle(const std::string& name)
 
 std::string getName(void* handle)
 {
+  // Handles point at Logger nodes that stay in g_loggerConfig.loggers for the
+  // process lifetime; m_name is immutable. No LoggerConfig mutex needed here.
   if (handle) {
     auto* logger = static_cast<const Logger*>(handle);
     return logger->name().c_str();
@@ -127,10 +137,12 @@ std::string getName(void* handle)
 
 void register_appender(LogAppender* appender)
 {
+  std::lock_guard<std::mutex> lock(g_loggerConfig.mutex);
   g_loggerConfig.rosconsole_print_appender = appender;
 }
 
 void deregister_appender(LogAppender* appender){
+  std::lock_guard<std::mutex> lock(g_loggerConfig.mutex);
   if (g_loggerConfig.rosconsole_print_appender == appender)
   {
     g_loggerConfig.rosconsole_print_appender = nullptr;
@@ -142,6 +154,7 @@ void shutdown()
 
 bool get_loggers(std::map<std::string, console::Level>& loggers)
 {
+  std::lock_guard<std::mutex> lock(g_loggerConfig.mutex);
   for (const Logger& l : g_loggerConfig.loggers) {
     loggers[l.name()] = l.level;
   }
@@ -150,6 +163,7 @@ bool get_loggers(std::map<std::string, console::Level>& loggers)
 
 bool set_logger_level(const std::string& name, console::Level level)
 {
+  std::lock_guard<std::mutex> lock(g_loggerConfig.mutex);
   auto it = g_loggerConfig.loggers.find(name);
   if (it == g_loggerConfig.loggers.end()) {
     g_loggerConfig.loggers.emplace(name, level);
