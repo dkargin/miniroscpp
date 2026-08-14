@@ -46,6 +46,8 @@
 #include <miniros/transport/rpc_manager.h>
 #include <miniros/transport/topic_manager.h>
 
+#include "../../require_master.h"
+
 using namespace XmlRpc;
 
 bool g_should_exist = true;
@@ -79,6 +81,9 @@ int main(int argc, char** argv)
   }
 
   miniros::init(argc, argv, "check_master");
+  if (g_should_exist) {
+    miniros::test::requireMasterOrExit("advanced-check_master");
+  }
 
   return RUN_ALL_TESTS();
 }

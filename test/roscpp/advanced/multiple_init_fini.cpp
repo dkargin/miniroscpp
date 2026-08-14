@@ -45,6 +45,8 @@
 
 #include <test_roscpp/TestArray.hxx>
 
+#include "../../require_master.h"
+
 int g_argc;
 char** g_argv;
 
@@ -57,7 +59,8 @@ void callback(const test_roscpp::TestArrayConstPtr&)
 
 TEST(roscpp, multipleInitAndFini)
 {
-  int try_count = 10;
+  // Former multiple_init_fini.xml: args="15". Optional argv still overrides.
+  int try_count = 15;
   if ( g_argc > 1 )
   {
     try_count = atoi(g_argv[1]);
@@ -91,5 +94,9 @@ main(int argc, char** argv)
   testing::InitGoogleTest(&argc, argv);
   g_argc = argc;
   g_argv = argv;
+  // Probe once before tests; each iteration re-inits after shutdown().
+  miniros::init(argc, argv, "multiple_init_fini");
+  miniros::test::requireMasterOrExit("advanced-multiple_init_fini");
+  miniros::shutdown();
   return RUN_ALL_TESTS();
 }

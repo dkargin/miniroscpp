@@ -38,11 +38,15 @@
  * Test miniros::init_options::NoSimTime.
  */
 
+#include <cstdlib>
+
 #include <gtest/gtest.h>
 
 #include "miniros/ros.h"
 #include "miniros/transport/topic_manager.h"
 #include "miniros/master_link.h"
+
+#include "../../require_master.h"
 
 TEST(NoSimTime, isTimeValid)
 {
@@ -64,7 +68,17 @@ int main(int argc, char** argv)
 {
   testing::InitGoogleTest(&argc, argv);
   miniros::init(argc, argv, "sim_time_test", miniros::init_options::NoSimTime);
+  miniros::test::requireMasterOrExit("advanced-init_no_sim_time_test");
+
+  // Former init_no_sim_time.xml: /use_sim_time=true, ignored because of NoSimTime.
+  miniros::MasterLinkPtr master = miniros::getMasterLink();
+  if (!master || !master->set("/use_sim_time", true)) {
+    return EXIT_FAILURE;
+  }
+
   miniros::NodeHandle nh;
-  return RUN_ALL_TESTS();
+  const int rc = RUN_ALL_TESTS();
+  master->set("/use_sim_time", false);
+  return rc;
 }
 

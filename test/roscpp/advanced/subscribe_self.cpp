@@ -42,7 +42,9 @@
 #include "miniros/ros.h"
 #include <test_roscpp/TestArray.hxx>
 
-int g_msg_count;
+#include "../../require_master.h"
+
+int g_msg_count = 100;
 miniros::Duration g_dt;
 uint32_t g_options = 0;
 bool g_success = false;
@@ -139,21 +141,15 @@ TEST(SelfSubscribe, advSub)
   ASSERT_FALSE(g_failure);
 }
 
-#define USAGE "USAGE: sub_pub <count> <time>"
-
 int main(int argc, char** argv)
 {
   testing::InitGoogleTest(&argc, argv);
   miniros::init(argc, argv, "subscribe_self");
+  miniros::test::requireMasterOrExit("advanced-subscribe_self");
 
-  if(argc != 3)
-  {
-    puts(USAGE);
-    return -1;
-  }
-
-  g_msg_count = atoi(argv[1]);
-  g_dt.fromSec(atof(argv[2]));
+  // Former subscribe_self.xml: args="100 1.0". Optional argv still overrides.
+  g_msg_count = (argc >= 2) ? atoi(argv[1]) : 100;
+  g_dt.fromSec((argc >= 3) ? atof(argv[2]) : 1.0);
 
   miniros::NodeHandle nh;
 

@@ -36,6 +36,8 @@
 #include <locale.h>
 #include <gtest/gtest.h>
 
+#include "../../require_master.h"
+
 TEST(Locale, push_pop)
 {
   int argc = 0;
@@ -76,6 +78,7 @@ int
 main(int argc, char** argv)
 {
   miniros::init(argc, argv, "locale_push_pop");
+  miniros::test::requireMasterOrExit("advanced-param_locale_avoidance_test");
   testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }
