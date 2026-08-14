@@ -1,5 +1,0 @@
-<launch>
-  <param name="enable_statistics" value="true" />
-  <test test-name="stamped_topic_statistics_with_empty_timestamp" pkg="miniros" type="advanced-stamped_topic_statistics_empty_timestamp"/>
-</launch>
-

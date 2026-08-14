@@ -1,4 +1,0 @@
-<launch>
-  <test test-name="check_master_false" pkg="miniros" type="advanced-check_master" args="no"/>
-</launch>
-

@@ -61,34 +61,17 @@ XML. They are registered with CTest today.
 | `advanced-launch_no_remappings` | `launch_no_remappings.cpp` | Former `no_remappings.xml` via `Launcher` |
 | `advanced-launch_local_remappings` | `launch_local_remappings.cpp` | Former `local_remappings.xml` via `Launcher` |
 | `advanced-launch_global_remappings` | `launch_global_remappings.cpp` | Former `global_remappings.xml` via `Launcher` |
+| `advanced-subscribe_self` | `subscribe_self.cpp` | Former `subscribe_self.xml`; args `100 1.0` inlined |
+| `advanced-multiple_init_fini` | `multiple_init_fini.cpp` | Former `multiple_init_fini.xml`; 15 iterations inlined |
+| `advanced-check_master` | `check_master.cpp` | GTest child only (not a CTest entry); argv `yes`/`no` |
+| `advanced-launch_check_master` | `launch_check_master.cpp` | Former `check_master.xml` via `Launcher` |
+| `advanced-launch_check_master_false` | `launch_check_master_false.cpp` | Former `check_master_false.xml` via `Launcher` |
+| `advanced-sim_time_test` | `sim_time_test.cpp` | Former `sim_time_test.xml`; `/use_sim_time=true` inlined |
+| `advanced-init_no_sim_time_test` | `init_no_sim_time_test.cpp` | Former `init_no_sim_time.xml`; `/use_sim_time=true` + `NoSimTime` |
+| `advanced-stamped_topic_statistics_empty_timestamp` | `stamped_topic_statistics_empty_timestamp.cpp` | Former XML; `/enable_statistics=true` inlined |
+| `advanced-param_locale_avoidance_test` | `param_locale_avoidance_test.cpp` | No XML; skips if `de_DE.utf8` is missing |
 
 ROS1 holds `shutting_down_mutex_` across `master::execute` too, but classic
-XmlRpcClient blocks the **caller** with its own I/O. MiniROS
-`MasterLink::execute` waits on **PollManager**, so holding that mutex across
-execute deadlocked with `removeServiceServerLink` on the poll thread. Fix in
-`service_manager.cpp`: do not take `shutting_down_mutex_` from the poll path,
-and do not hold it across master RPC.
-
-## 2. Single-process candidates (still `DISABLED`)
-
-Same shape as section 1: one gtest (or one node) process, no peer
-nodes. Rostest was only used to start the binary (and sometimes pass
-args / set params). These can become standalone CTest entries by
-enabling them and inlining args/params — **without** `Launcher`.
-
-### Need small inlining (args, params, or env) before enabling
-
-| Binary | Launch XML | What XML provided |
-| --- | --- | --- |
-| `advanced-subscribe_self` | `subscribe_self.xml` | `args="100 1.0"` |
-| `advanced-multiple_init_fini` | `multiple_init_fini.xml` | `args="15"` |
-| `advanced-check_master` | `check_master.xml` / `check_master_false.xml` | `args="yes"` / `args="no"` (two scenarios) |
-| `advanced-sim_time_test` | `sim_time_test.xml` | `/use_sim_time=true` |
-| `advanced-init_no_sim_time_test` | `init_no_sim_time.xml` | `/use_sim_time=true` + `NoSimTime` init |
-| `advanced-stamped_topic_statistics_empty_timestamp` | `stamped_topic_statistics_with_empty_timestamp.xml` | `enable_statistics=true` |
-| `advanced-param_locale_avoidance_test` | *(no XML in tree)* | locale edge case; confirm expected setup |
-
----
 
 ## 3. Multi-process scenarios — need `miniros::Launcher` (or equivalent)
 
@@ -163,9 +146,8 @@ manual UDP-drop script).
 
 ## 5. Launch XML inventory vs CMake
 
-- Remaining XMLs under `launch/` describe scenarios that are either
-  `DISABLED` single-process (section 2) or multi-process (section 3),
-  plus blocked cases in section 4.
+- Remaining XMLs under `launch/` describe multi-process scenarios
+  (section 3) plus blocked cases in section 4.
 - XMLs already dropped for section-1 standalone CTest ports:
   `handles.xml`, `timer_callbacks.xml`, `inspection.xml`, `params.xml`,
   `incrementing_sequence.xml`, `subscription_callback_types.xml`,
@@ -177,15 +159,15 @@ manual UDP-drop script).
   `service_deadlock.xml`, `name_remapping.xml`,
   `name_remapping_ROS_NAMESPACE.xml`, `name_not_remappable.xml`,
   `namespaces.xml`, `no_remappings.xml`, `local_remappings.xml`,
-  `global_remappings.xml`.
+  `global_remappings.xml`, `subscribe_self.xml`, `multiple_init_fini.xml`,
+  `check_master.xml`, `check_master_false.xml`, `sim_time_test.xml`,
+  `init_no_sim_time.xml`, `stamped_topic_statistics_with_empty_timestamp.xml`.
 
 ---
 
 ## 6. Suggested migration order
 
-1. Inline args/params for section 2; prefer setting master params in
-   `main` (as `params.cpp` does) over keeping XML.
-2. Introduce C++ scenario drivers with `miniros::Launcher` for section 3,
+1. Introduce C++ scenario drivers with `miniros::Launcher` for section 3,
    starting with simple pairs (`service_call`, `pubsub_once`) before
    large graphs (`loads_of_publishers`, `topic_statistic_frequency`).
-3. Rewrite `missing_call_to_shutdown` last (process lifecycle).
+2. Rewrite `missing_call_to_shutdown` last (process lifecycle).

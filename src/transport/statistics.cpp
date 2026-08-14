@@ -233,9 +233,10 @@ void StatisticsLogger::callback(const std::shared_ptr<M_string>& connection_head
 
     if (!pub_.getTopic().length())
     {
-      miniros::NodeHandle n("~");
-      // creating the publisher in the constructor results in a deadlock. so do it here.
-      pub_ = n.advertise<rosgraph_msgs::TopicStatistics>("/statistics", 1);
+      // ROS1 advertised lazily here to avoid a constructor-time deadlock.
+      // MiniROS cannot advertise from this callback either: it often runs on
+      // PollManager, and MasterLink::execute waits on that same thread.
+      return;
     }
 
     pub_.publish(msg);

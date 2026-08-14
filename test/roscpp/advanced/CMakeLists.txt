@@ -49,7 +49,7 @@ miniros_advanced_test(${TEST_GROUP}-latching_publisher SOURCES latching_publishe
 
 miniros_add_test(${TEST_GROUP}-publish_n_fast SOURCES publish_n_fast.cpp WITH_MASTER DISABLED)
 
-miniros_add_test(${TEST_GROUP}-subscribe_self SOURCES subscribe_self.cpp WITH_MASTER DISABLED)
+miniros_advanced_test(${TEST_GROUP}-subscribe_self SOURCES subscribe_self.cpp WITH_MASTER)
 
 miniros_add_test(${TEST_GROUP}-pub_sub SOURCES pub_sub.cpp WITH_MASTER DISABLED)
 
@@ -77,10 +77,9 @@ miniros_add_test(${TEST_GROUP}-param_update_test SOURCES param_update_test.cpp W
 
 miniros_advanced_test(${TEST_GROUP}-real_time_test SOURCES real_time_test.cpp WITH_MASTER)
 
-miniros_add_test(${TEST_GROUP}-sim_time_test SOURCES sim_time_test.cpp WITH_MASTER DISABLED)
-#add_dependencies(${TEST_GROUP}-sim_time_test ${rosgraph_msgs_EXPORTED_TARGETS})
+miniros_advanced_test(${TEST_GROUP}-sim_time_test SOURCES sim_time_test.cpp WITH_MASTER)
 
-miniros_add_test(${TEST_GROUP}-init_no_sim_time_test SOURCES init_no_sim_time_test.cpp WITH_MASTER DISABLED)
+miniros_advanced_test(${TEST_GROUP}-init_no_sim_time_test SOURCES init_no_sim_time_test.cpp WITH_MASTER)
 
 # Call a service
 miniros_add_test(${TEST_GROUP}-service_adv SOURCES service_adv.cpp WITH_MASTER DISABLED)
@@ -99,7 +98,7 @@ miniros_add_test(${TEST_GROUP}-service_call_repeatedly SOURCES service_call_repe
 #miniros_add_test(${TEST_GROUP}-service_exception SOURCES service_exception.cpp)
 
 # Repeatedly call miniros::init()
-miniros_add_test(${TEST_GROUP}-multiple_init_fini SOURCES multiple_init_fini.cpp WITH_MASTER DISABLED)
+miniros_advanced_test(${TEST_GROUP}-multiple_init_fini SOURCES multiple_init_fini.cpp WITH_MASTER)
 
 # This one tries to use exported boolean variable that no longer exits.
 # miniros_add_test(${TEST_GROUP}-missing_call_to_shutdown_impl SOURCES missing_call_to_shutdown_impl.cpp)
@@ -143,7 +142,17 @@ miniros_advanced_test(${TEST_GROUP}-get_master_information SOURCES get_master_in
 # Test multiple subscriptions
 miniros_add_test(${TEST_GROUP}-multiple_subscriptions SOURCES multiple_subscriptions.cpp WITH_MASTER DISABLED)
 
-miniros_add_test(${TEST_GROUP}-check_master SOURCES check_master.cpp WITH_MASTER DISABLED)
+# GTest binary only — scenarios are driven by launch_check_master{,_false}.
+miniros_advanced_test(${TEST_GROUP}-check_master SOURCES check_master.cpp DISABLED)
+
+foreach(_check_launch check_master check_master_false)
+  miniros_advanced_test(${TEST_GROUP}-launch_${_check_launch}
+    SOURCES launch_${_check_launch}.cpp
+    WITH_MASTER)
+  target_compile_definitions(${TEST_GROUP}-launch_${_check_launch} PRIVATE
+    MINIROS_TEST_BIN_DIR="${CMAKE_BINARY_DIR}/bin")
+  add_dependencies(${TEST_GROUP}-launch_${_check_launch} ${TEST_GROUP}-check_master)
+endforeach()
 
 miniros_advanced_test(${TEST_GROUP}-wait_for_message SOURCES wait_for_message.cpp WITH_MASTER)
 
@@ -169,7 +178,7 @@ miniros_add_test(${TEST_GROUP}-publisher_for_star_subscriber SOURCES publisher_f
 
 miniros_advanced_test(${TEST_GROUP}-parameter_validation SOURCES parameter_validation.cpp WITH_MASTER)
 
-miniros_add_test(${TEST_GROUP}-param_locale_avoidance_test SOURCES param_locale_avoidance_test.cpp WITH_MASTER DISABLED)
+miniros_advanced_test(${TEST_GROUP}-param_locale_avoidance_test SOURCES param_locale_avoidance_test.cpp WITH_MASTER)
 
 miniros_add_test(${TEST_GROUP}-crashes_under_gprof SOURCES crashes_under_gprof.cpp WITH_MASTER DISABLED)
 
@@ -198,7 +207,7 @@ miniros_add_test(${TEST_GROUP}-left_right SOURCES left_right.cpp WITH_MASTER DIS
 miniros_add_test(${TEST_GROUP}-string_msg_expect SOURCES string_msg_expect.cpp WITH_MASTER DISABLED)
 #add_dependencies(${TEST_GROUP}-string_msg_expect ${std_msgs_EXPORTED_TARGETS})
 
-miniros_add_test(${TEST_GROUP}-stamped_topic_statistics_empty_timestamp SOURCES stamped_topic_statistics_empty_timestamp.cpp WITH_MASTER DISABLED)
+miniros_advanced_test(${TEST_GROUP}-stamped_topic_statistics_empty_timestamp SOURCES stamped_topic_statistics_empty_timestamp.cpp WITH_MASTER)
 
 miniros_add_test(${TEST_GROUP}-topic_statistic_frequency SOURCES topic_statistic_frequency.cpp WITH_MASTER DISABLED)
 

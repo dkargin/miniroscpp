@@ -27,11 +27,16 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <cstdlib>
+
 #include <gtest/gtest.h>
 
 #include <miniros/ros.h>
+#include "miniros/master_link.h"
 
 #include <test_roscpp/TestWithHeader.hxx>
+
+#include "../../require_master.h"
 
 void callback(const test_roscpp::TestWithHeaderConstPtr&)
 {
@@ -66,6 +71,15 @@ int main(int argc, char **argv)
   testing::InitGoogleTest(&argc, argv);
 
   miniros::init(argc, argv, "stamped_topic_statistics_empty_timestamp");
+  miniros::test::requireMasterOrExit("advanced-stamped_topic_statistics_empty_timestamp");
 
-  return RUN_ALL_TESTS();
+  // Former stamped_topic_statistics_with_empty_timestamp.xml: enable_statistics=true
+  miniros::MasterLinkPtr master = miniros::getMasterLink();
+  if (!master || !master->set("/enable_statistics", true)) {
+    return EXIT_FAILURE;
+  }
+
+  const int rc = RUN_ALL_TESTS();
+  master->set("/enable_statistics", false);
+  return rc;
 }

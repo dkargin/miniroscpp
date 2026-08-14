@@ -44,7 +44,10 @@
 #include <stdlib.h>
 #include <thread>
 #include "miniros/ros.h"
+#include "miniros/master_link.h"
 #include <rosgraph_msgs/Clock.hxx>
+
+#include "../../require_master.h"
 
 int g_argc;
 char** g_argv;
@@ -117,6 +120,7 @@ TEST(Clock, sleepFromZero)
     miniros::WallTime now = miniros::WallTime::now();
     miniros::Time::setNow(miniros::Time(now.sec, now.nsec));
   }
+  t.join();
   miniros::WallTime end = miniros::WallTime::now();
   EXPECT_GE(end - start, miniros::WallDuration(1.0));
 }
@@ -149,20 +153,31 @@ TEST(Clock, waitForValid)
   std::thread t(waitThread, &done);
 
   miniros::WallDuration(1.0).sleep();
-  ASSERT_FALSE(done);
+  EXPECT_FALSE(done);
   miniros::Time::setNow(miniros::TIME_MIN);
   while (!done)
   {
     miniros::WallDuration(0.01).sleep();
   }
+  t.join();
 }
 
 int main(int argc, char** argv)
 {
   testing::InitGoogleTest(&argc, argv);
   miniros::init(argc, argv, "sim_time_test");
+  miniros::test::requireMasterOrExit("advanced-sim_time_test");
+
+  // Former sim_time_test.xml: /use_sim_time=true. Set before start() (first NodeHandle).
+  miniros::MasterLinkPtr master = miniros::getMasterLink();
+  if (!master || !master->set("/use_sim_time", true)) {
+    return EXIT_FAILURE;
+  }
+
   miniros::NodeHandle nh;
   g_argc = argc;
   g_argv = argv;
-  return RUN_ALL_TESTS();
+  const int rc = RUN_ALL_TESTS();
+  master->set("/use_sim_time", false);
+  return rc;
 }
