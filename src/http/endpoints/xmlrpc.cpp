@@ -26,7 +26,7 @@ constexpr char FAULTSTRING[] = "faultString";
 namespace miniros {
 namespace http {
 
-using namespace XmlRpc;
+using namespace miniros::XmlRpc;
 
 // Create a response from results xml
 void generateResponseBody(std::string const& resultXml, std::string& outBuf)

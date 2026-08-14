@@ -4,7 +4,7 @@
 #include <string>
 #include <sstream>
 
-#include "xmlrpcpp/XmlRpcValue.h"
+#include "miniros/xmlrpcpp/XmlRpcValue.h"
 #include "miniros/internal/xml_tools.h"
 
 int main(int argc, char **argv)

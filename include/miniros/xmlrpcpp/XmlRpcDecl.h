@@ -37,10 +37,30 @@
  * Cross platform macros.
  *
  */
-#ifndef XMLRPCPP_DECL_H_INCLUDED
-#define XMLRPCPP_DECL_H_INCLUDED
+#ifndef MINIROS_XMLRPCPP_DECL_H
+#define MINIROS_XMLRPCPP_DECL_H
 
 #include <miniros/macros.h>
+
+// Stock/ROS xmlrpc++ uses the same header names under <xmlrpcpp/> and
+// declares ::XmlRpc. Mixing that with MiniROS produces runtime errors
+// such as undefined symbol XmlRpc::setVerbosity.
+#if defined(_XMLRPC_H_) || defined(_XMLRPCUTIL_H_) || defined(_XMLRPCCLIENT_H_) || \
+    defined(_XMLRPCVALUE_H_) || defined(_XMLRPCSERVER_H_) || defined(XMLRPCPP_DECL_H_INCLUDED)
+#error "System/ROS xmlrpc++ was included before MiniROS. Use \"miniros/xmlrpcpp/...\" only; do not include <xmlrpcpp/...>."
+#endif
+#define XMLRPCPP_DECL_H_INCLUDED
+#define _XMLRPC_H_
+#define _XMLRPCUTIL_H_
+#define _XMLRPCCLIENT_H_
+#define _XMLRPCVALUE_H_
+#define _XMLRPCSERVER_H_
+#define _XMLRPCDISPATCH_H_
+#define _XMLRPCEXCEPTION_H_
+#define _XMLRPCSERVERCONNECTION_H_
+#define _XMLRPCSERVERMETHOD_H_
+#define _XMLRPCSOCKET_H_
+#define _XMLRPCSOURCE_H_
 
 #define XMLRPCPP_DECL MINIROS_HELPER_EXPORT
 
@@ -56,4 +76,4 @@
 #endif
 */
 
-#endif /* XMLRPCPP_DECL_H_INCLUDED */
+#endif /* MINIROS_XMLRPCPP_DECL_H */

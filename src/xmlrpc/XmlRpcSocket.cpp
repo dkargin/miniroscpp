@@ -2,8 +2,8 @@
 // added features: server can be opened on port 0 and you can read back
 // what port the OS gave you
 
-#include "xmlrpcpp/XmlRpcSocket.h"
-#include "xmlrpcpp/XmlRpcUtil.h"
+#include "miniros/xmlrpcpp/XmlRpcSocket.h"
+#include "miniros/xmlrpcpp/XmlRpcUtil.h"
 
 #ifndef MAKEDEPEND
 
@@ -62,7 +62,7 @@ extern "C" {
 
 
 namespace miniros {
-using namespace XmlRpc;
+namespace XmlRpc {
 
 
 bool XmlRpcSocket::s_use_ipv6_ = false;
@@ -395,5 +395,6 @@ int XmlRpcSocket::get_port(int socket)
   return 0;
 }
 
+} // namespace XmlRpc
 } // namespace miniros
 

@@ -1,6 +1,6 @@
 
-#ifndef _XMLRPCEXCEPTION_H_
-#define _XMLRPCEXCEPTION_H_
+#ifndef MINIROS_XMLRPCEXCEPTION_H_
+#define MINIROS_XMLRPCEXCEPTION_H_
 //
 // XmlRpc++ Copyright (c) 2002-2003 by Chris Morley
 //
@@ -12,7 +12,7 @@
 # include <string>
 #endif
 
-#include "XmlRpcDecl.h"
+#include "miniros/xmlrpcpp/XmlRpcDecl.h"
 
 
 namespace miniros {
@@ -43,4 +43,4 @@ namespace XmlRpc {
 }
 } // namespace miniros
 
-#endif	// _XMLRPCEXCEPTION_H_
+#endif	// MINIROS_XMLRPCEXCEPTION_H_

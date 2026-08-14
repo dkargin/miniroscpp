@@ -1,6 +1,6 @@
 
-#ifndef _XMLRPCVALUE_H_
-#define _XMLRPCVALUE_H_
+#ifndef MINIROS_XMLRPCVALUE_H_
+#define MINIROS_XMLRPCVALUE_H_
 //
 // XmlRpc++ Copyright (c) 2002-2003 by Chris Morley
 //
@@ -8,7 +8,7 @@
 # pragma warning(disable:4786)    // identifier was truncated in debug info
 #endif
 
-#include "XmlRpcDecl.h"
+#include "miniros/xmlrpcpp/XmlRpcDecl.h"
 
 #include "miniros/internal/json_tools.h"
 
@@ -240,4 +240,4 @@ namespace XmlRpc {
 XMLRPCPP_DECL std::ostream& operator<<(std::ostream& os, const miniros::XmlRpc::XmlRpcValue& v);
 
 
-#endif // _XMLRPCVALUE_H_
+#endif // MINIROS_XMLRPCVALUE_H_

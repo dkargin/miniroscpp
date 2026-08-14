@@ -1,5 +1,5 @@
-#ifndef _XMLRPCSERVERCONNECTION_H_
-#define _XMLRPCSERVERCONNECTION_H_
+#ifndef MINIROS_XMLRPCSERVERCONNECTION_H_
+#define MINIROS_XMLRPCSERVERCONNECTION_H_
 //
 // XmlRpc++ Copyright (c) 2002-2003 by Chris Morley
 //
@@ -9,12 +9,12 @@
 
 #include <string>
 
-#include "../network/net_address.h"
+#include "miniros/network/net_address.h"
 #include "miniros/http/http_tools.h"
 
-#include "xmlrpcpp/XmlRpcDecl.h"
-#include "xmlrpcpp/XmlRpcSource.h"
-#include "xmlrpcpp/XmlRpcValue.h"
+#include "miniros/xmlrpcpp/XmlRpcDecl.h"
+#include "miniros/xmlrpcpp/XmlRpcSource.h"
+#include "miniros/xmlrpcpp/XmlRpcValue.h"
 
 namespace miniros {
 namespace XmlRpc {
@@ -99,4 +99,4 @@ protected:
 } // namespace XmlRpc
 } // namespace miniros
 
-#endif // _XMLRPCSERVERCONNECTION_H_
+#endif // MINIROS_XMLRPCSERVERCONNECTION_H_

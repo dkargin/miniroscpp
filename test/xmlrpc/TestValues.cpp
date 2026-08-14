@@ -28,8 +28,8 @@
 #include <string>
 
 #include "miniros/internal/xml_tools.h"
-#include "xmlrpcpp/XmlRpcValue.h"
-#include "xmlrpcpp/XmlRpcException.h"
+#include "miniros/xmlrpcpp/XmlRpcValue.h"
+#include "miniros/xmlrpcpp/XmlRpcException.h"
 
 #include <gtest/gtest.h>
 

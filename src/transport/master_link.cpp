@@ -863,7 +863,7 @@ template <> bool xml_castable<bool>(int XmlType)
 
 template <> double xml_cast(MasterLink::RpcValue xml_value)
 {
-  using namespace XmlRpc;
+  using namespace miniros::XmlRpc;
   switch (xml_value.getType()) {
     case XmlRpcValue::TypeDouble:
       return static_cast<double>(xml_value);
@@ -878,7 +878,7 @@ template <> double xml_cast(MasterLink::RpcValue xml_value)
 
 template <> float xml_cast(MasterLink::RpcValue xml_value)
 {
-  using namespace XmlRpc;
+  using namespace miniros::XmlRpc;
   switch (xml_value.getType()) {
     case XmlRpcValue::TypeDouble:
       return static_cast<float>(static_cast<double>(xml_value));
@@ -893,7 +893,7 @@ template <> float xml_cast(MasterLink::RpcValue xml_value)
 
 template <> int xml_cast(MasterLink::RpcValue xml_value)
 {
-  using namespace XmlRpc;
+  using namespace miniros::XmlRpc;
   switch (xml_value.getType()) {
     case XmlRpcValue::TypeDouble:
       return static_cast<int>(static_cast<double>(xml_value));
@@ -908,7 +908,7 @@ template <> int xml_cast(MasterLink::RpcValue xml_value)
 
 template <> bool xml_cast(MasterLink::RpcValue xml_value)
 {
-  using namespace XmlRpc;
+  using namespace miniros::XmlRpc;
   switch (xml_value.getType()) {
     case XmlRpcValue::TypeDouble:
       return static_cast<bool>(static_cast<double>(xml_value));

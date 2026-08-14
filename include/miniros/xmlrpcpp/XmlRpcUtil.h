@@ -1,5 +1,5 @@
-#ifndef _XMLRPCUTIL_H_
-#define _XMLRPCUTIL_H_
+#ifndef MINIROS_XMLRPCUTIL_H_
+#define MINIROS_XMLRPCUTIL_H_
 //
 // XmlRpc++ Copyright (c) 2002-2003 by Chris Morley
 //
@@ -12,7 +12,7 @@
 # include <string>
 #endif
 
-#include "XmlRpcDecl.h"
+#include "miniros/xmlrpcpp/XmlRpcDecl.h"
 
 #if defined(_MSC_VER)
 # define strcasecmp	  _stricmp
@@ -118,4 +118,4 @@ namespace XmlRpc {
 } // namespace XmlRpc
 } // namespace miniros
 
-#endif // _XMLRPCUTIL_H_
+#endif // MINIROS_XMLRPCUTIL_H_

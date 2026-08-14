@@ -16,9 +16,9 @@
 
 #include "miniros/http/http_tools.h"
 
-#include "XmlRpcDecl.h"
-#include "XmlRpcDispatch.h"
-#include "XmlRpcSource.h"
+#include "miniros/xmlrpcpp/XmlRpcDecl.h"
+#include "miniros/xmlrpcpp/XmlRpcDispatch.h"
+#include "miniros/xmlrpcpp/XmlRpcSource.h"
 
 #include <chrono>
 

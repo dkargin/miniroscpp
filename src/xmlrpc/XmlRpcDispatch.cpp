@@ -3,9 +3,9 @@
 #include <errno.h>
 #include <sys/timeb.h>
 
-#include "xmlrpcpp/XmlRpcDispatch.h"
-#include "xmlrpcpp/XmlRpcSource.h"
-#include "xmlrpcpp/XmlRpcUtil.h"
+#include "miniros/xmlrpcpp/XmlRpcDispatch.h"
+#include "miniros/xmlrpcpp/XmlRpcSource.h"
+#include "miniros/xmlrpcpp/XmlRpcUtil.h"
 
 #include "miniros/rostime.h"
 #include "miniros/io/io.h"
@@ -30,7 +30,7 @@ static inline int poll( struct pollfd *pfd, int nfds, int timeout)
 
 
 namespace miniros {
-using namespace XmlRpc;
+namespace XmlRpc {
 
 
 XmlRpcDispatch::XmlRpcDispatch()
@@ -239,6 +239,7 @@ double XmlRpcDispatch::getTime()
   return ((double)sec + (double)nsec / 1e9);
 }
 
+} // namespace XmlRpc
 } // namespace miniros
 
 

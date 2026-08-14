@@ -61,7 +61,7 @@
 // Needed to set IPv6 flag inside XmlRpcSocket.
 #include "internal/profiling.h"
 #include "rosconsole/local_log.h"
-#include "xmlrpcpp/XmlRpcSocket.h"
+#include "miniros/xmlrpcpp/XmlRpcSocket.h"
 
 #include <miniros/console.h>
 #include <miniros/rostime.h>

@@ -15,7 +15,7 @@
 #include "miniros/http/http_server.h"
 #include "miniros/http/http_server_connection.h"
 #include "miniros/io/poll_set.h"
-#include "xmlrpcpp/XmlRpcException.h"
+#include "miniros/xmlrpcpp/XmlRpcException.h"
 
 namespace miniros {
 namespace http {

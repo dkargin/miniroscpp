@@ -22,10 +22,10 @@
  *
  */
 
-#include "xmlrpcpp/XmlRpc.h"
-#include "xmlrpcpp/XmlRpcClient.h"
-#include "xmlrpcpp/XmlRpcServer.h"
-#include "xmlrpcpp/XmlRpcServerMethod.h"
+#include "miniros/xmlrpcpp/XmlRpc.h"
+#include "miniros/xmlrpcpp/XmlRpcClient.h"
+#include "miniros/xmlrpcpp/XmlRpcServer.h"
+#include "miniros/xmlrpcpp/XmlRpcServerMethod.h"
 
 #include <atomic>
 #include <iostream>
