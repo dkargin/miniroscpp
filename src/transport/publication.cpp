@@ -133,34 +133,43 @@ void Publication::addCallbacks(const SubscriberCallbacksPtr& callbacks)
 
 void Publication::removeCallbacks(const SubscriberCallbacksPtr& callbacks)
 {
-  std::scoped_lock<std::mutex> lock(callbacks_mutex_);
-
-  V_Callback::iterator it = std::find(callbacks_.begin(), callbacks_.end(), callbacks);
-  if (it != callbacks_.end())
+  CallbackQueueInterface* queue = nullptr;
   {
-    const SubscriberCallbacksPtr& cb = *it;
-    if (cb->callback_queue_)
+    std::scoped_lock<std::mutex> lock(callbacks_mutex_);
+
+    auto it = std::find(callbacks_.begin(), callbacks_.end(), callbacks);
+    if (it != callbacks_.end())
     {
-      cb->callback_queue_->removeByID((uint64_t)cb.get());
+      const SubscriberCallbacksPtr& cb = *it;
+      if (cb->callback_queue_)
+        queue = cb->callback_queue_;
+      callbacks_.erase(it);
     }
-    callbacks_.erase(it);
-  }
 
-  // IF the removed callbacks was latched, check for remaining latched callbacks,
-  // and if none remain, clear the latch status on the publication singleton.
-  if (callbacks->push_latched_message_)
-  {
-    V_Callback::iterator it = callbacks_.begin();
-    V_Callback::iterator end = callbacks_.end();
-    for (; it != end; ++it)
+    // IF the removed callbacks was latched, check for remaining latched callbacks,
+    // and if none remain, clear the latch status on the publication singleton.
+    if (callbacks->push_latched_message_)
     {
-      if ((*it)->push_latched_message_)
+      bool any_latch = false;
+      for (const SubscriberCallbacksPtr& remaining : callbacks_)
       {
-        return;
+        if (remaining->push_latched_message_)
+        {
+          any_latch = true;
+          break;
+        }
       }
+      if (!any_latch)
+        latch_ = false;
     }
-    latch_ = false;
   }
+
+  // removeByID waits on calling_rw_mutex. Do not hold callbacks_mutex_ across
+  // that: advertise() takes advertised_topics_mutex_ then callbacks_mutex_,
+  // and connect callbacks can publish() while CallbackQueue holds
+  // calling_rw_mutex (TSan lock-order-inversion in subscribe_self).
+  if (queue)
+    queue->removeByID((uint64_t)callbacks.get());
 }
 
 void Publication::drop()
@@ -329,15 +338,11 @@ void Publication::dropAllConnections()
 
   {
     std::scoped_lock<std::mutex> lock(subscriber_links_mutex_);
-
     local_publishers.swap(subscriber_links_);
   }
 
-  for (V_SubscriberLink::iterator i = local_publishers.begin();
-           i != local_publishers.end(); ++i)
-  {
-    (*i)->drop();
-  }
+  for (SubscriberLinkPtr sub: local_publishers)
+    sub->drop();
 }
 
 void Publication::peerConnect(const SubscriberLinkPtr& sub_link)
@@ -346,7 +351,7 @@ void Publication::peerConnect(const SubscriberLinkPtr& sub_link)
   // can deliver intraprocess traffic into Subscription::handleMessage; holding
   // callbacks_mutex_ across that risks lock-order issues / re-entrancy
   // (e.g. isLatched() also takes this mutex).
-  V_Callback local_callbacks;
+  std::vector<SubscriberCallbacksPtr> local_callbacks;
   {
     std::scoped_lock<std::mutex> lock(callbacks_mutex_);
     local_callbacks = callbacks_;
@@ -370,11 +375,8 @@ void Publication::peerDisconnect(const SubscriberLinkPtr& sub_link)
 {
   std::scoped_lock<std::mutex> lock(callbacks_mutex_);
 
-  V_Callback::iterator it = callbacks_.begin();
-  V_Callback::iterator end = callbacks_.end();
-  for (; it != end; ++it)
+  for (const SubscriberCallbacksPtr& cbs: callbacks_)
   {
-    const SubscriberCallbacksPtr& cbs = *it;
     if (cbs->disconnect_ && cbs->callback_queue_)
     {
       CallbackInterfacePtr cb(std::make_shared<PeerConnDisconnCallback>(cbs->disconnect_, sub_link, cbs->has_tracked_object_, cbs->tracked_object_));

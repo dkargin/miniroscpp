@@ -33,6 +33,7 @@
 #include "miniros/serialized_message.h"
 
 #include "miniros/xmlrpcpp/XmlRpcValue.h"
+#include "miniros/internal/threading.h"
 
 #include <mutex>
 #include <vector>
@@ -162,14 +163,13 @@ private:
   std::string md5sum_;
   std::string message_definition_;
   size_t max_queue_;
-  uint32_t seq_;
+  uint32_t seq_ GUARDED_BY(seq_mutex_);
   std::mutex seq_mutex_;
 
-  typedef std::vector<SubscriberCallbacksPtr> V_Callback;
-  V_Callback callbacks_;
+  std::vector<SubscriberCallbacksPtr> callbacks_ GUARDED_BY(callbacks_mutex_);
   std::mutex callbacks_mutex_;
 
-  V_SubscriberLink subscriber_links_;
+  V_SubscriberLink subscriber_links_ GUARDED_BY(subscriber_links_mutex_);
   // We use a recursive mutex here for the rare case that a publish call causes another one (like in the case of a rosconsole call)
   std::mutex subscriber_links_mutex_;
 
@@ -181,7 +181,7 @@ private:
   uint32_t intraprocess_subscriber_count_;
 
   typedef std::vector<SerializedMessage> V_SerializedMessage;
-  V_SerializedMessage publish_queue_;
+  V_SerializedMessage publish_queue_ GUARDED_BY(publish_queue_mutex_);
   std::mutex publish_queue_mutex_;
 };
 
