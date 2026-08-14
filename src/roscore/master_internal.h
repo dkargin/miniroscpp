@@ -26,6 +26,7 @@ class PublishedTopicsEndpoint;
 class TopicTypesEndpoint;
 class MultimasterApiEndpoint;
 class DebugApiEndpoint;
+class MasterLogEndpoint;
 
 struct Master::Internal {
   std::shared_ptr<RPCManager> rpcManager;
@@ -61,6 +62,9 @@ struct Master::Internal {
   /// Endpoint for accessing /debugAPI/... (only when debugApiEnabled).
   std::shared_ptr<DebugApiEndpoint> httpDebugApiEndpoint;
 
+  /// Endpoint for accessing GET /log (rosout.log).
+  std::shared_ptr<MasterLogEndpoint> httpLogEndpoint;
+
   /// Multimaster discovery + registration sync over UDP.
   std::unique_ptr<MultimasterManager> multimaster;
 
@@ -78,6 +82,9 @@ struct Master::Internal {
   /// Timestamp of the last periodic node liveness check.
   SteadyTime lastNodeCheck;
 
+  /// Process/master start time (for uptime on the status page).
+  SteadyTime startTime{SteadyTime::now()};
+
   /// When true, /api2/debug/* endpoints are registered.
   bool debugApiEnabled = false;
 
@@ -86,6 +93,15 @@ struct Master::Internal {
 
   Internal(const std::shared_ptr<RPCManager>& manager);
   ~Internal();
+
+  /// Local hostname used in the status-page caption.
+  std::string localHostname() const;
+
+  /// Absolute path of rosout.log, or empty if the log directory is unknown.
+  std::string rosoutLogPath() const;
+
+  /// True when rosout.log exists on disk.
+  bool rosoutLogConfigured() const;
 
   /// Render status of master as HTML page.
   void renderMasterStatus(std::string& output) const;

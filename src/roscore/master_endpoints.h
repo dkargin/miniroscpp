@@ -62,7 +62,18 @@ class MasterFaviconEndpoint : public http::EndpointHandler {
   Error handle(const network::ClientInfo& clientInfo, std::shared_ptr<http::HttpRequest> request) override;
 };
 
-/// Multimaster HTTP API root. Handles GET /api2/multimaster/<command> (JSON).
+/// Serves GET /log — the rosout.log file, or 404 if file logging is off.
+class MasterLogEndpoint : public http::EndpointHandler {
+public:
+  MasterLogEndpoint(Master::Internal* internal) : internal(internal) {}
+
+  Error handle(const network::ClientInfo& clientInfo, std::shared_ptr<http::HttpRequest> request) override;
+
+  Master::Internal* internal = nullptr;
+};
+
+/// Multimaster HTTP API. GET /api2/multimaster/<command>
+/// Browser form posts get an HTML status page; other clients get JSON.
 class MultimasterApiEndpoint : public http::EndpointHandler {
 public:
   MultimasterApiEndpoint(Master::Internal* internal) : internal(internal) {}

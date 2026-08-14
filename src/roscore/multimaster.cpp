@@ -79,6 +79,10 @@ struct MultimasterManager::Internal {
   std::string multicastHost = kDefaultMulticastAddr;
   int multicastPort = kDefaultMulticastPort;
   bool multicastEnabled = true;
+  std::string multicastError;
+  /// Subnet broadcast addresses (IPv4, port = sync UDP port) used when multicast is down
+  /// or as a LAN fallback alongside multicast.
+  std::vector<network::NetAddress> subnetBroadcasts;
 
   std::set<std::string> localOnlyTopics{"/rosout", "/rosout_agg"};
   /// IPv4 addresses of local adapters (to distinguish multicast echo from a cloned GUID).
@@ -220,11 +224,13 @@ struct MultimasterManager::Internal {
       return error;
     boundPort = port == 0 ? syncSocket.port() : port;
     broadcastAddr = network::NetAddress::fromIp4String("255.255.255.255", boundPort);
+    refreshLocalIps();
     return attachReadable(syncSocket, &Internal::onSyncReadable);
   }
 
   Error initDiscoverySocket()
   {
+    multicastError.clear();
     if (!multicastEnabled || multicastHost.empty() || multicastPort <= 0)
       return Error::Ok;
 
@@ -244,22 +250,77 @@ struct MultimasterManager::Internal {
     error = discoverySocket.bind(multicastPort);
     if (!error)
       return error;
-    error = discoverySocket.joinMulticastGroup(multicastGroup, /*loop=*/true);
-    if (!error)
-      return error;
+
+    int joined = 0;
+    Error lastJoin = Error::Ok;
+    for (const auto& adapter : localAdapters()) {
+      if (!adapter.isUp() || adapter.isLoopback() || !adapter.isIPv4())
+        continue;
+      Error e = discoverySocket.joinMulticastGroup(multicastGroup, adapter.address, /*loop=*/true);
+      if (e)
+        ++joined;
+      else
+        lastJoin = e;
+    }
+    if (joined == 0) {
+      lastJoin = discoverySocket.joinMulticastGroup(multicastGroup, /*loop=*/true);
+      if (lastJoin)
+        ++joined;
+    }
+    if (joined == 0) {
+      if (lastJoin.code != Error::Ok)
+        return lastJoin;
+      return Error::SystemError;
+    }
     return attachReadable(discoverySocket, &Internal::onDiscoveryReadable);
+  }
+
+  std::vector<network::NetAdapter> localAdapters() const
+  {
+    std::vector<network::NetAdapter> adapters;
+    (void)network::scanAdapters(adapters);
+    return adapters;
   }
 
   void refreshLocalIps()
   {
     localIps.clear();
-    std::vector<network::NetAdapter> adapters;
-    if (Error e = network::scanAdapters(adapters); !e)
-      return;
-    for (const auto& a : adapters) {
+    subnetBroadcasts.clear();
+    for (const auto& a : localAdapters()) {
       if (!a.address.address.empty())
         localIps.insert(a.address.address);
+      if (!a.isUp() || a.isLoopback() || !a.isIPv4())
+        continue;
+      if (a.broadcastAddress.valid()) {
+        network::NetAddress bcast = a.broadcastAddress;
+        if (boundPort > 0)
+          (void)bcast.setPort(boundPort);
+        subnetBroadcasts.push_back(bcast);
+      }
     }
+  }
+
+  Error sendDiscoverUnlocked()
+  {
+    Error last = Error::Ok;
+    if (multicastEnabled && multicastGroup.valid()) {
+      MINIROS_DEBUG_NAMED("multimaster", "Sending DISCOVER multicast to %s",
+        multicastGroup.str().c_str());
+      last = sendOp(mm::Header::OP_DISCOVER, {}, multicastGroup, false, true);
+    }
+    if (broadcastAddr.valid()) {
+      MINIROS_DEBUG_NAMED("multimaster", "Sending DISCOVER limited-broadcast on UDP %d", boundPort);
+      last = sendOp(mm::Header::OP_DISCOVER, {}, broadcastAddr, false);
+    }
+    for (const network::NetAddress& bcast : subnetBroadcasts) {
+      MINIROS_DEBUG_NAMED("multimaster", "Sending DISCOVER subnet-broadcast to %s", bcast.str().c_str());
+      last = sendOp(mm::Header::OP_DISCOVER, {}, bcast, false);
+    }
+    for (const network::NetAddress& peer : peerProbes) {
+      MINIROS_DEBUG_NAMED("multimaster", "Sending DISCOVER probe to %s", peer.str().c_str());
+      last = sendOp(mm::Header::OP_DISCOVER, {}, peer, false);
+    }
+    return last;
   }
 
   bool senderLooksLocal(const network::NetAddress& sender) const
@@ -1028,8 +1089,9 @@ Error MultimasterManager::start(PollSet* pollSet, const UUID& uuid, const networ
   if (Error e = internal_->initDiscoverySocket(); !e) {
     // Keep unicast sync + --peer probes working when multicast is unavailable
     // (restricted environments, no multicast route, Windows edge cases).
+    internal_->multicastError = e.toString();
     MINIROS_WARN_NAMED("multimaster",
-      "Failed to join multicast discovery: %s (continuing without multicast)", e.toString());
+      "Failed to join multicast discovery: %s (continuing with UDP broadcast)", e.toString());
     internal_->detachSocket(internal_->discoverySocket);
     internal_->multicastEnabled = false;
     internal_->multicastGroup = {};
@@ -1075,23 +1137,7 @@ Error MultimasterManager::sendDiscover()
   std::lock_guard lock(internal_->guard);
   if (!internal_->discoveryEnabled)
     return Error::Ok;
-
-  Error last = Error::Ok;
-  if (internal_->multicastEnabled && internal_->multicastGroup.valid()) {
-    MINIROS_DEBUG_NAMED("multimaster", "Sending DISCOVER multicast to %s",
-      internal_->multicastGroup.str().c_str());
-    last = internal_->sendOp(mm::Header::OP_DISCOVER, {}, internal_->multicastGroup, false, true);
-  } else if (internal_->broadcastAddr.valid()) {
-    MINIROS_DEBUG_NAMED("multimaster", "Sending DISCOVER broadcast on UDP %d", internal_->boundPort);
-    last = internal_->sendOp(mm::Header::OP_DISCOVER, {}, internal_->broadcastAddr, false);
-  }
-  for (const network::NetAddress& peer : internal_->peerProbes) {
-    MINIROS_DEBUG_NAMED("multimaster", "Sending DISCOVER probe to %s", peer.str().c_str());
-    Error e = internal_->sendOp(mm::Header::OP_DISCOVER, {}, peer, false);
-    if (!e)
-      last = e;
-  }
-  return last;
+  return internal_->sendDiscoverUnlocked();
 }
 
 Error MultimasterManager::addPeerProbe(const network::NetAddress& addr)
@@ -1151,6 +1197,8 @@ Error MultimasterManager::requestPairByNodeName(const std::string& nodeName, con
   auto node = internal_->regs->getNodeByName(nodeName);
   if (!node)
     return Error::FileNotFound;
+  if (node->getNodeFlags() & NodeRef::NODE_LOCAL)
+    return Error::PermissionDenied;
 
   std::vector<UUID> toDrop;
   DropPeerFn dropFn;
@@ -1177,6 +1225,8 @@ Error MultimasterManager::requestPairByNodeName(const std::string& nodeName, con
   }
   if (!found) {
     network::URL url = node->getUrl();
+    if (url.host == internal_->rpcUrl.host && url.port == internal_->rpcUrl.port)
+      return Error::PermissionDenied;
     network::NetAddress addr = network::NetAddress::fromURL(url);
     if (!addr.valid()) {
       addr = network::NetAddress::fromIp4String(url.host, internal_->boundPort);
@@ -1326,12 +1376,7 @@ void MultimasterManager::update()
   const SteadyTime now = SteadyTime::now();
 
   if (internal_->discoveryEnabled && now >= internal_->nextDiscover) {
-    if (internal_->multicastEnabled && internal_->multicastGroup.valid())
-      internal_->sendOp(mm::Header::OP_DISCOVER, {}, internal_->multicastGroup, false, true);
-    else if (internal_->broadcastAddr.valid())
-      internal_->sendOp(mm::Header::OP_DISCOVER, {}, internal_->broadcastAddr, false);
-    for (const network::NetAddress& peer : internal_->peerProbes)
-      internal_->sendOp(mm::Header::OP_DISCOVER, {}, peer, false);
+    internal_->sendDiscoverUnlocked();
     // DHCP-like: rediscover on backoff when unpaired; rare keep-alive search when paired.
     bool anyPaired = false;
     for (const auto& [k, p] : internal_->peers) {
@@ -1438,6 +1483,13 @@ std::string MultimasterManager::multicastEndpoint() const
   if (!internal_ || !internal_->multicastEnabled)
     return {};
   return internal_->multicastHost + ":" + std::to_string(internal_->multicastPort);
+}
+
+std::string MultimasterManager::multicastError() const
+{
+  if (!internal_ || internal_->multicastEnabled)
+    return {};
+  return internal_->multicastError;
 }
 
 const char* MultimasterManager::peerStateName(PeerState s)
