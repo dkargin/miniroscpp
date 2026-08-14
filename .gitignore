@@ -1,4 +1,13 @@
 include/generated/*/*.h
 
+# No CLion project data 
+.idea
+
+# Ignore miniroscore caches
+cache.*
+
+build-linux/
 # Android NDK out-of-tree builds
 build-android/
+
+
