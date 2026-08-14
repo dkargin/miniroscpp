@@ -1,6 +1,6 @@
 
-#ifndef _XMLRPCDISPATCH_H_
-#define _XMLRPCDISPATCH_H_
+#ifndef MINIROS_XMLRPCDISPATCH_H_
+#define MINIROS_XMLRPCDISPATCH_H_
 //
 // XmlRpc++ Copyright (c) 2002-2003 by Chris Morley
 //
@@ -8,7 +8,7 @@
 # pragma warning(disable:4786)    // identifier was truncated in debug info
 #endif
 
-#include "XmlRpcDecl.h"
+#include "miniros/xmlrpcpp/XmlRpcDecl.h"
 
 # include <list>
 # include <vector>
@@ -87,4 +87,4 @@ namespace XmlRpc {
 } // namespace XmlRpc
 } // namespace miniros
 
-#endif  // _XMLRPCDISPATCH_H_
+#endif  // MINIROS_XMLRPCDISPATCH_H_

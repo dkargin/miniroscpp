@@ -1,6 +1,6 @@
 
-#ifndef _XMLRPCSERVERMETHOD_H_
-#define _XMLRPCSERVERMETHOD_H_
+#ifndef MINIROS_XMLRPCSERVERMETHOD_H_
+#define MINIROS_XMLRPCSERVERMETHOD_H_
 //
 // XmlRpc++ Copyright (c) 2002-2003 by Chris Morley
 //
@@ -8,7 +8,7 @@
 # pragma warning(disable:4786)    // identifier was truncated in debug info
 #endif
 
-#include "XmlRpcDecl.h"
+#include "miniros/xmlrpcpp/XmlRpcDecl.h"
 
 #ifndef MAKEDEPEND
 # include <string>
@@ -57,4 +57,4 @@ namespace XmlRpc {
 } // namespace XmlRpc
 } // namespace miniros
 
-#endif // _XMLRPCSERVERMETHOD_H_
+#endif // MINIROS_XMLRPCSERVERMETHOD_H_

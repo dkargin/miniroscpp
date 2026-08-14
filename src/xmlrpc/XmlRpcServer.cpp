@@ -2,12 +2,12 @@
 // added features: server can be opened on port 0 and you can read back
 // what port the OS gave you
 
-#include "xmlrpcpp/XmlRpcServer.h"
-#include "xmlrpcpp/XmlRpcServerConnection.h"
-#include "xmlrpcpp/XmlRpcServerMethod.h"
-#include "xmlrpcpp/XmlRpcSocket.h"
-#include "xmlrpcpp/XmlRpcUtil.h"
-#include "xmlrpcpp/XmlRpcException.h"
+#include "miniros/xmlrpcpp/XmlRpcServer.h"
+#include "miniros/xmlrpcpp/XmlRpcServerConnection.h"
+#include "miniros/xmlrpcpp/XmlRpcServerMethod.h"
+#include "miniros/xmlrpcpp/XmlRpcSocket.h"
+#include "miniros/xmlrpcpp/XmlRpcUtil.h"
+#include "miniros/xmlrpcpp/XmlRpcException.h"
 
 #include <errno.h>
 #include <string.h>
@@ -18,7 +18,7 @@
 #endif
 
 namespace miniros {
-using namespace XmlRpc;
+namespace XmlRpc {
 
 XmlRpcMethods::XmlRpcMethods()
 :_introspectionEnabled(false),
@@ -383,5 +383,6 @@ XmlRpcServer::shutdown()
   _disp.clear();
 }
 
+} // namespace XmlRpc
 } // namespace miniros
 

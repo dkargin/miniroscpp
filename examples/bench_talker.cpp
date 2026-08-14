@@ -18,7 +18,7 @@ int main(int argc, char **argv)
 {
   std::cout << "Starting listener node" << std::endl;
 
-  //XmlRpc::setVerbosity(4);
+  //miniros::XmlRpc::setVerbosity(4);
   auto timeStart = std::chrono::high_resolution_clock::now();
   /**
    * The miniros::init() function needs to see argc and argv so that it can perform

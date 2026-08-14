@@ -4,10 +4,10 @@
 
 #include "miniros/network/net_address.h"
 #include "miniros/internal/xml_tools.h"
-#include "xmlrpcpp/XmlRpcServerConnection.h"
+#include "miniros/xmlrpcpp/XmlRpcServerConnection.h"
 
-#include "xmlrpcpp/XmlRpc.h"
-#include "xmlrpcpp/XmlRpcSocket.h"
+#include "miniros/xmlrpcpp/XmlRpc.h"
+#include "miniros/xmlrpcpp/XmlRpcSocket.h"
 
 #ifndef MAKEDEPEND
 # include <stdio.h>
@@ -17,7 +17,7 @@
 #endif
 
 namespace miniros {
-using namespace XmlRpc;
+namespace XmlRpc {
 
 // Static data
 const char XmlRpcServerConnection::SYSTEM_MULTICALL[] = "system.multicall";
@@ -349,4 +349,5 @@ const miniros::network::NetAddress& XmlRpcServerConnection::getHostAddress() con
   return _hostAddress;
 }
 
+} // namespace XmlRpc
 } // namespace miniros

@@ -2,6 +2,11 @@
 // a std::exception-derived class
 #ifndef MINIROS_XMLRPC_H_
 #define MINIROS_XMLRPC_H_
+
+// Bundled xmlrpc++ is namespaced as miniros::XmlRpc. Never include
+// <xmlrpcpp/...> or "xmlrpcpp/..." — those resolve to ROS/system xmlrpc++
+// (::XmlRpc) when it is installed, and produce runtime errors such as
+// undefined symbol XmlRpc::setVerbosity.
 //
 // XmlRpc++ Copyright (c) 2002-2003 by Chris Morley
 // This library is free software; you can redistribute it and/or
@@ -27,12 +32,12 @@
 # include <string>
 #endif
 
-#include "XmlRpcClient.h"
-#include "XmlRpcException.h"
-#include "XmlRpcServer.h"
-#include "XmlRpcServerMethod.h"
-#include "XmlRpcValue.h"
-#include "XmlRpcUtil.h"
+#include "miniros/xmlrpcpp/XmlRpcClient.h"
+#include "miniros/xmlrpcpp/XmlRpcException.h"
+#include "miniros/xmlrpcpp/XmlRpcServer.h"
+#include "miniros/xmlrpcpp/XmlRpcServerMethod.h"
+#include "miniros/xmlrpcpp/XmlRpcValue.h"
+#include "miniros/xmlrpcpp/XmlRpcUtil.h"
 #include <stdexcept>
 
 #endif // MINIROS_XMLRPC_H_

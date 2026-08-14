@@ -22,7 +22,7 @@
  *
  */
 
-#include "xmlrpcpp/XmlRpc.h"
+#include "miniros/xmlrpcpp/XmlRpc.h"
 
 #include <errno.h>
 #include <fcntl.h>

@@ -1,6 +1,6 @@
 
-#include "xmlrpcpp/XmlRpcServerMethod.h"
-#include "xmlrpcpp/XmlRpcServer.h"
+#include "miniros/xmlrpcpp/XmlRpcServerMethod.h"
+#include "miniros/xmlrpcpp/XmlRpcServer.h"
 
 namespace miniros {
 namespace XmlRpc {

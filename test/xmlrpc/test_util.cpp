@@ -21,7 +21,7 @@
  *
  */
 
-#include "xmlrpcpp/XmlRpcUtil.h"
+#include "miniros/xmlrpcpp/XmlRpcUtil.h"
 
 #include <gtest/gtest.h>
 

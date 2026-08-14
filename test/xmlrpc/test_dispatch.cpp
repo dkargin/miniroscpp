@@ -21,9 +21,9 @@
  *
  */
 
-#include "xmlrpcpp/XmlRpcDispatch.h"
-#include "xmlrpcpp/XmlRpcSource.h"
-#include "xmlrpcpp/XmlRpcSocket.h"
+#include "miniros/xmlrpcpp/XmlRpcDispatch.h"
+#include "miniros/xmlrpcpp/XmlRpcSource.h"
+#include "miniros/xmlrpcpp/XmlRpcSocket.h"
 #include <fcntl.h>
 
 #include "../xmlrpc/mock_socket.h"

@@ -21,8 +21,8 @@
  *
  */
 
-#include "xmlrpcpp/XmlRpcUtil.h"
-#include "xmlrpcpp/XmlRpcSocket.h"
+#include "miniros/xmlrpcpp/XmlRpcUtil.h"
+#include "miniros/xmlrpcpp/XmlRpcSocket.h"
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <errno.h>

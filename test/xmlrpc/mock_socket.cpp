@@ -22,10 +22,10 @@
  */
 
 #define xmlrpcpp_EXPORTS  // we are mocking XmlRpcSocket, define the symbol in order to export XmlRpcSocket class
-# include "xmlrpcpp/XmlRpcSocket.h"
+# include "miniros/xmlrpcpp/XmlRpcSocket.h"
 #undef xmlrpcpp_EXPORTS
 
-#include "xmlrpcpp/XmlRpcUtil.h"
+#include "miniros/xmlrpcpp/XmlRpcUtil.h"
 #include "../xmlrpc/mock_socket.h"
 
 #include <deque>

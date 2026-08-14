@@ -21,7 +21,7 @@
  *
  */
 
-#include "xmlrpcpp/XmlRpc.h"
+#include "miniros/xmlrpcpp/XmlRpc.h"
 
 #include <atomic>
 #include <mutex>

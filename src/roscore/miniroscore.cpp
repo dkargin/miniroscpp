@@ -147,7 +147,7 @@ int main(int argc, const char ** argv) {
   bool useRosout = vm.count("rosout") && vm["rosout"].as<bool>();
   if (vm.count("xmlrpc_log")) {
     int level = vm["xmlrpc_log"].as<int>();
-    XmlRpc::setVerbosity(level);
+    miniros::XmlRpc::setVerbosity(level);
   }
 
   bool dumpParameters = vm["dump_parameters"].as<bool>();

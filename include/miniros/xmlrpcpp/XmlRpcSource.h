@@ -1,6 +1,6 @@
 
-#ifndef _XMLRPCSOURCE_H_
-#define _XMLRPCSOURCE_H_
+#ifndef MINIROS_XMLRPCSOURCE_H_
+#define MINIROS_XMLRPCSOURCE_H_
 //
 // XmlRpc++ Copyright (c) 2002-2003 by Chris Morley
 //
@@ -8,7 +8,7 @@
 # pragma warning(disable:4786)    // identifier was truncated in debug info
 #endif
 
-#include "XmlRpcDecl.h"
+#include "miniros/xmlrpcpp/XmlRpcDecl.h"
 
 namespace miniros {
 namespace XmlRpc {
@@ -56,4 +56,4 @@ namespace XmlRpc {
 } // namespace XmlRpc
 } // namespace miniros
 
-#endif //_XMLRPCSOURCE_H_
+#endif //MINIROS_XMLRPCSOURCE_H_

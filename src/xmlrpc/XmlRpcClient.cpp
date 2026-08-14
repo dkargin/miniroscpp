@@ -3,16 +3,16 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "xmlrpcpp/XmlRpcClient.h"
-#include "xmlrpcpp/XmlRpcSocket.h"
-#include "xmlrpcpp/XmlRpcUtil.h"
-#include "xmlrpcpp/XmlRpcValue.h"
+#include "miniros/xmlrpcpp/XmlRpcClient.h"
+#include "miniros/xmlrpcpp/XmlRpcSocket.h"
+#include "miniros/xmlrpcpp/XmlRpcUtil.h"
+#include "miniros/xmlrpcpp/XmlRpcValue.h"
 
 #include "miniros/internal/xml_tools.h"
 #include "miniros/io/poll_set.h"
 
 namespace miniros {
-using namespace XmlRpc;
+namespace XmlRpc {
 
 // Static data
 const char XmlRpcClient::REQUEST_BEGIN[] = 
@@ -109,22 +109,22 @@ int convertEventsToXmlRpc(int flags)
 {
   int oflags = 0;
   if (flags & miniros::PollSet::EventIn)
-    oflags |= XmlRpc::XmlRpcDispatch::ReadableEvent;
+    oflags |= XmlRpcDispatch::ReadableEvent;
   if (flags & miniros::PollSet::EventOut)
-    oflags |= XmlRpc::XmlRpcDispatch::WritableEvent;
+    oflags |= XmlRpcDispatch::WritableEvent;
   if (flags & miniros::PollSet::EventError)
-    oflags |= XmlRpc::XmlRpcDispatch::Exception;
+    oflags |= XmlRpcDispatch::Exception;
   return oflags;
 }
 
 int convertEventsToPollSet(int flags)
 {
   int oflags = 0;
-  if (flags & XmlRpc::XmlRpcDispatch::ReadableEvent)
+  if (flags & XmlRpcDispatch::ReadableEvent)
     oflags |= miniros::PollSet::EventIn;
-  if (flags & XmlRpc::XmlRpcDispatch::WritableEvent)
+  if (flags & XmlRpcDispatch::WritableEvent)
     oflags |= miniros::PollSet::EventOut;
-  if (flags & XmlRpc::XmlRpcDispatch::Exception)
+  if (flags & XmlRpcDispatch::Exception)
     oflags |= miniros::PollSet::EventError;
   if (oflags == 0)
     return miniros::PollSet::ResultDropFD;
@@ -529,5 +529,6 @@ bool XmlRpcClient::parseResponse(const std::string_view& responseView, XmlRpcVal
   return result.valid();
 }
 
+} // namespace XmlRpc
 } // namespace miniros
 

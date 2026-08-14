@@ -17,7 +17,7 @@
 #include "miniros/internal/at_exit.h"
 #include "miniros/transport/rpc_manager.h"
 
-#include <xmlrpcpp/XmlRpcServerConnection.h>
+#include "miniros/xmlrpcpp/XmlRpcServerConnection.h"
 
 namespace miniros {
 namespace master {

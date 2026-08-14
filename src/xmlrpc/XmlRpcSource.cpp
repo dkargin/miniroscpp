@@ -1,7 +1,7 @@
 
-#include "xmlrpcpp/XmlRpcSource.h"
-#include "xmlrpcpp/XmlRpcSocket.h"
-#include "xmlrpcpp/XmlRpcUtil.h"
+#include "miniros/xmlrpcpp/XmlRpcSource.h"
+#include "miniros/xmlrpcpp/XmlRpcSocket.h"
+#include "miniros/xmlrpcpp/XmlRpcUtil.h"
 
 namespace miniros {
 namespace XmlRpc {

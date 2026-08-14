@@ -1,10 +1,10 @@
 
-#include "xmlrpcpp/XmlRpcValue.h"
-#include "xmlrpcpp/XmlRpcException.h"
-#include "xmlrpcpp/XmlRpcUtil.h"
+#include "miniros/xmlrpcpp/XmlRpcValue.h"
+#include "miniros/xmlrpcpp/XmlRpcException.h"
+#include "miniros/xmlrpcpp/XmlRpcUtil.h"
 
-#include "b64/encode.h"
-#include "b64/decode.h"
+#include "miniros/b64/encode.h"
+#include "miniros/b64/decode.h"
 
 #ifndef MAKEDEPEND
 # include <ostream>

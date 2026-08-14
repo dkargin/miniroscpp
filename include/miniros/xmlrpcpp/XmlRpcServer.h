@@ -2,8 +2,8 @@
 // added features: server can be opened on port 0 and you can read back
 // what port the OS gave you
 
-#ifndef _XMLRPCSERVER_H_
-#define _XMLRPCSERVER_H_
+#ifndef MINIROS_XMLRPCSERVER_H_
+#define MINIROS_XMLRPCSERVER_H_
 //
 // XmlRpc++ Copyright (c) 2002-2003 by Chris Morley
 //
@@ -20,9 +20,9 @@
 # endif
 #endif
 
-#include "XmlRpcDispatch.h"
-#include "XmlRpcSource.h"
-#include "XmlRpcDecl.h"
+#include "miniros/xmlrpcpp/XmlRpcDispatch.h"
+#include "miniros/xmlrpcpp/XmlRpcSource.h"
+#include "miniros/xmlrpcpp/XmlRpcDecl.h"
 
 namespace miniros {
 namespace XmlRpc {
@@ -144,4 +144,4 @@ namespace XmlRpc {
 } // namespace XmlRpc
 } // namespace miniros
 
-#endif //_XMLRPCSERVER_H_
+#endif //MINIROS_XMLRPCSERVER_H_

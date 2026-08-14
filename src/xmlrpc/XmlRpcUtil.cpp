@@ -1,5 +1,5 @@
 
-#include "xmlrpcpp/XmlRpcUtil.h"
+#include "miniros/xmlrpcpp/XmlRpcUtil.h"
 
 #include <mutex>
 
@@ -11,10 +11,10 @@
 # include <string.h>
 #endif
 
-#include "xmlrpcpp/XmlRpc.h"
+#include "miniros/xmlrpcpp/XmlRpc.h"
 
 namespace miniros {
-using namespace XmlRpc;
+namespace XmlRpc {
 
 
 //#define USE_WINDOWS_DEBUG // To make the error and log messages go to VC++ debug output
@@ -24,7 +24,7 @@ using namespace XmlRpc;
 #endif
 
 // Version id
-const char XmlRpc::XMLRPC_VERSION[] = "XMLRPC++ 0.7";
+const char XMLRPC_VERSION[] = "miniros-XMLRPC++ 0.7";
 
 // Default log verbosity: 0 for no messages through 5 (writes everything)
 std::atomic<int> XmlRpcLogHandler::_verbosity{0};
@@ -79,8 +79,8 @@ XmlRpcErrorHandler* XmlRpcErrorHandler::_errorHandler = &defaultErrorHandler;
 
 
 // Easy API for log verbosity
-int XmlRpc::getVerbosity() { return XmlRpcLogHandler::getVerbosity(); }
-void XmlRpc::setVerbosity(int level) { XmlRpcLogHandler::setVerbosity(level); }
+int getVerbosity() { return XmlRpcLogHandler::getVerbosity(); }
+void setVerbosity(int level) { XmlRpcLogHandler::setVerbosity(level); }
 
  
 
@@ -269,6 +269,7 @@ XmlRpcUtil::xmlEncode(const std::string& raw)
   return encoded;
 }
 
+} // namespace XmlRpc
 } // namespace miniros
 
 

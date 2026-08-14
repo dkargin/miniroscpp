@@ -56,8 +56,8 @@
 #include "miniros/xmlrpcpp/XmlRpcServerConnection.h"
 #include "miniros/xmlrpcpp/XmlRpcServerMethod.h"
 #include "network/url.h"
-#include "xmlrpcpp/XmlRpcException.h"
-#include "xmlrpcpp/XmlRpcServer.h"
+#include "miniros/xmlrpcpp/XmlRpcException.h"
+#include "miniros/xmlrpcpp/XmlRpcServer.h"
 
 #include "miniros/callback_queue.h"
 

@@ -10,7 +10,7 @@ For details, see http://sourceforge.net/projects/libb64
 
 #include <iostream>
 
-#include "xmlrpcpp/XmlRpcDecl.h"
+#include "miniros/xmlrpcpp/XmlRpcDecl.h"
 
 namespace base64 {
 

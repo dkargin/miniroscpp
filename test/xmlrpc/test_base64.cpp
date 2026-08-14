@@ -23,8 +23,8 @@
 
 #include <gtest/gtest.h>
 
-#include "b64/encode.h"
-#include "b64/decode.h"
+#include "miniros/b64/encode.h"
+#include "miniros/b64/decode.h"
 
 // Test Data for a Base64 encode/decode test
 class Base64TestData {
