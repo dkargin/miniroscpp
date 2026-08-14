@@ -42,6 +42,7 @@
 #include <gtest/gtest.h>
 #include <time.h>
 #include <stdlib.h>
+#include <atomic>
 #include <thread>
 #include "miniros/ros.h"
 #include "miniros/master_link.h"
@@ -95,26 +96,26 @@ TEST_F(RosClockTest, SimClockTest)
   ASSERT_EQ(42.0, miniros::Time::now().toSec());
 }
 
-void sleepThread(bool* done)
+void sleepThread(std::atomic<bool>* done)
 {
   bool ok = miniros::Duration(1.0).sleep();
   if (!ok)
   {
     MINIROS_ERROR("!OK");
   }
-  *done = true;
+  done->store(true, std::memory_order_release);
 }
 
 TEST(Clock, sleepFromZero)
 {
   miniros::Time::setNow(miniros::Time());
-  bool done = false;
+  std::atomic<bool> done{false};
   std::thread t(sleepThread, &done);
 
   miniros::WallDuration(1.0).sleep();
   miniros::WallTime start = miniros::WallTime::now();
   miniros::Time::setNow(miniros::Time(miniros::WallTime::now().sec, miniros::WallTime::now().nsec));
-  while (!done)
+  while (!done.load(std::memory_order_acquire))
   {
     miniros::WallDuration(0.001).sleep();
     miniros::WallTime now = miniros::WallTime::now();
@@ -133,10 +134,10 @@ TEST(Clock, isTimeValid)
   ASSERT_TRUE(miniros::Time::isValid());
 }
 
-void waitThread(bool* done)
+void waitThread(std::atomic<bool>* done)
 {
   miniros::Time::waitForValid();
-  *done = true;
+  done->store(true, std::memory_order_release);
 }
 
 TEST(Clock, waitForValid)
@@ -149,13 +150,13 @@ TEST(Clock, waitForValid)
   miniros::WallTime end = miniros::WallTime::now();
   ASSERT_GT(end - start, miniros::WallDuration(1.0));
 
-  bool done = false;
+  std::atomic<bool> done{false};
   std::thread t(waitThread, &done);
 
   miniros::WallDuration(1.0).sleep();
-  EXPECT_FALSE(done);
+  EXPECT_FALSE(done.load(std::memory_order_acquire));
   miniros::Time::setNow(miniros::TIME_MIN);
-  while (!done)
+  while (!done.load(std::memory_order_acquire))
   {
     miniros::WallDuration(0.01).sleep();
   }

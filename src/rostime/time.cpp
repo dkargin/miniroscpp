@@ -363,7 +363,12 @@ namespace miniros
 
   bool Time::isValid()
   {
-    return (!g_use_sim_time) || !g_sim_time.isZero();
+    if (!g_use_sim_time)
+      return true;
+    std::scoped_lock<std::mutex> lock(g_sim_time_mutex);
+    if (!g_use_sim_time)
+      return true;
+    return !g_sim_time.isZero();
   }
 
   bool Time::waitForValid()
