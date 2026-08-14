@@ -33,7 +33,7 @@
 
 #include <gtest/gtest.h>
 
-using namespace XmlRpc;
+using namespace miniros::XmlRpc;
 
 XmlRpcValue parse(const std::string& xml)
 {

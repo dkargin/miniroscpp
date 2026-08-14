@@ -47,7 +47,7 @@
 
 #include "miniros/console.h"
 
-using namespace XmlRpc; // A battle to be fought later
+using namespace miniros::XmlRpc; // A battle to be fought later
 using namespace std; // sigh
 
 namespace miniros

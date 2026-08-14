@@ -10,6 +10,7 @@
 
 #include "XmlRpcDecl.h"
 
+namespace miniros {
 namespace XmlRpc {
 
   //! An RPC source represents a file descriptor to monitor
@@ -53,5 +54,6 @@ namespace XmlRpc {
     bool _keepOpen;
   };
 } // namespace XmlRpc
+} // namespace miniros
 
 #endif //_XMLRPCSOURCE_H_

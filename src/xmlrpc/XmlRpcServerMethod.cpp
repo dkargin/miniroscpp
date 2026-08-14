@@ -2,6 +2,7 @@
 #include "xmlrpcpp/XmlRpcServerMethod.h"
 #include "xmlrpcpp/XmlRpcServer.h"
 
+namespace miniros {
 namespace XmlRpc {
 
   XmlRpcServerMethod::XmlRpcServerMethod(std::string const& name, XmlRpcMethods* server)
@@ -18,3 +19,4 @@ namespace XmlRpc {
 
 
 } // namespace XmlRpc
+} // namespace miniros

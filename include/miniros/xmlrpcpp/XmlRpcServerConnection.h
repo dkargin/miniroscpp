@@ -16,6 +16,7 @@
 #include "xmlrpcpp/XmlRpcSource.h"
 #include "xmlrpcpp/XmlRpcValue.h"
 
+namespace miniros {
 namespace XmlRpc {
 
 // The server waits for client connections and provides methods
@@ -96,5 +97,6 @@ protected:
 };
 
 } // namespace XmlRpc
+} // namespace miniros
 
 #endif // _XMLRPCSERVERCONNECTION_H_

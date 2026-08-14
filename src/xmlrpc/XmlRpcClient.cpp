@@ -11,6 +11,7 @@
 #include "miniros/internal/xml_tools.h"
 #include "miniros/io/poll_set.h"
 
+namespace miniros {
 using namespace XmlRpc;
 
 // Static data
@@ -527,4 +528,6 @@ bool XmlRpcClient::parseResponse(const std::string_view& responseView, XmlRpcVal
       
   return result.valid();
 }
+
+} // namespace miniros
 

@@ -39,12 +39,10 @@
 
 #include "miniros/xmlrpcpp/XmlRpcValue.h"
 
+namespace miniros {
 namespace XmlRpc {
 class XmlRpcServerConnection;
 }
-
-namespace miniros
-{
 
 class Message;
 struct SubscribeOptions;

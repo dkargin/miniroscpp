@@ -116,7 +116,7 @@ void Expect_poll(std::vector<pollfd> fds, int timeout, int _errno, int ret) {
   poll_fds = fds;
 }
 
-using namespace XmlRpc;
+using namespace miniros::XmlRpc;
 
 class MockSource : public XmlRpcSource {
 public:

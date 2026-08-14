@@ -16,10 +16,10 @@
 #include "requester_info.h"
 #include "resolver.h"
 
+namespace miniros {
 namespace XmlRpc {
 class XmlRpcServerConnection;
 }
-namespace miniros {
 
 namespace master {
 

@@ -22,6 +22,7 @@
 # define strncasecmp strnicmp
 #endif
 
+namespace miniros {
 namespace XmlRpc {
 
   //! An interface allowing custom handling of error message reporting.
@@ -115,5 +116,6 @@ namespace XmlRpc {
 
   };
 } // namespace XmlRpc
+} // namespace miniros
 
 #endif // _XMLRPCUTIL_H_

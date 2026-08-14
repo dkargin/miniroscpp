@@ -17,6 +17,7 @@
 # include <winsock2.h>
 #endif
 
+namespace miniros {
 using namespace XmlRpc;
 
 XmlRpcMethods::XmlRpcMethods()
@@ -381,4 +382,6 @@ XmlRpcServer::shutdown()
   // This closes and destroys all connections as well as closing this socket
   _disp.clear();
 }
+
+} // namespace miniros
 

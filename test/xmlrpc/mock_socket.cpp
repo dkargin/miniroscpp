@@ -35,7 +35,7 @@
 
 #include <gtest/gtest.h>
 
-using namespace XmlRpc;
+using namespace miniros::XmlRpc;
 
 bool XmlRpcSocket::s_use_ipv6_ = false;
 

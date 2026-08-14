@@ -21,6 +21,7 @@
 # include <time.h>
 #endif
 
+namespace miniros {
 namespace XmlRpc {
 
   //! RPC method arguments and results are represented by Values
@@ -233,9 +234,10 @@ namespace XmlRpc {
     
   };
 } // namespace XmlRpc
+} // namespace miniros
 
 
-XMLRPCPP_DECL std::ostream& operator<<(std::ostream& os, const XmlRpc::XmlRpcValue& v);
+XMLRPCPP_DECL std::ostream& operator<<(std::ostream& os, const miniros::XmlRpc::XmlRpcValue& v);
 
 
 #endif // _XMLRPCVALUE_H_

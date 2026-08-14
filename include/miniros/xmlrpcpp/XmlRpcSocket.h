@@ -17,6 +17,7 @@
 
 #include "xmlrpcpp/XmlRpcDecl.h"
 
+namespace miniros {
 namespace XmlRpc {
 
   //! A platform-independent socket API.
@@ -76,5 +77,6 @@ namespace XmlRpc {
   };
 
 } // namespace XmlRpc
+} // namespace miniros
 
 #endif

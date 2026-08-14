@@ -29,6 +29,7 @@ static inline int poll( struct pollfd *pfd, int nfds, int timeout)
 #endif  // _WIN32
 
 
+namespace miniros {
 using namespace XmlRpc;
 
 
@@ -237,5 +238,7 @@ double XmlRpcDispatch::getTime()
   miniros::clock::steadytime(sec, nsec);
   return ((double)sec + (double)nsec / 1e9);
 }
+
+} // namespace miniros
 
 

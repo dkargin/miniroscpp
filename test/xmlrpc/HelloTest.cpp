@@ -36,10 +36,10 @@
 
 #include <gtest/gtest.h>
 
-using XmlRpc::XmlRpcServerMethod;
-using XmlRpc::XmlRpcServer;
-using XmlRpc::XmlRpcClient;
-using XmlRpc::XmlRpcValue;
+using miniros::XmlRpc::XmlRpcServerMethod;
+using miniros::XmlRpc::XmlRpcServer;
+using miniros::XmlRpc::XmlRpcClient;
+using miniros::XmlRpc::XmlRpcValue;
 
 // No arguments, result is "Hello".
 class Hello : public XmlRpcServerMethod
@@ -104,7 +104,7 @@ protected:
 
   virtual void SetUp()
   {
-    // XmlRpc::setVerbosity(5);
+    // miniros::XmlRpc::setVerbosity(5);
 
     // Create the server socket. Passing 0 for the port number requests that
     // the OS randomly select an available port.

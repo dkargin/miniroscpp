@@ -41,7 +41,7 @@
 
 #include "../xmlrpc/test_fixtures.h"
 
-using namespace XmlRpc;
+using namespace miniros::XmlRpc;
 
 TEST_F(XmlRpcTest, Hello)
 {
@@ -134,7 +134,7 @@ TEST_F(XmlRpcTest, ServerDisconnect)
   XmlRpcClient c("localhost", port);
   XmlRpcValue noArgs, result;
 
-  XmlRpc::setVerbosity(3);
+  miniros::XmlRpc::setVerbosity(3);
 
   // Stop calling the work method on the server
   server_done = true;

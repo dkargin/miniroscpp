@@ -9,11 +9,11 @@
 
 #include "miniros/macros.h"
 
+namespace miniros {
 namespace XmlRpc {
 class XmlRpcValue;
 }
 
-namespace miniros {
 namespace xml {
 
 struct MINIROS_DECL XmlCodec {

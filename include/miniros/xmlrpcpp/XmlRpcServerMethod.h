@@ -10,15 +10,14 @@
 
 #include "XmlRpcDecl.h"
 
+#ifndef MAKEDEPEND
+# include <string>
+#endif
+
 namespace miniros {
 namespace network {
 struct ClientInfo;
 }
-}
-
-#ifndef MAKEDEPEND
-# include <string>
-#endif
 
 namespace XmlRpc {
 
@@ -56,5 +55,6 @@ namespace XmlRpc {
     XmlRpcMethods* _server;
   };
 } // namespace XmlRpc
+} // namespace miniros
 
 #endif // _XMLRPCSERVERMETHOD_H_

@@ -35,13 +35,11 @@
 #include "miniros/xmlrpcpp/XmlRpcValue.h"
 #include "miniros/network/url.h"
 
+namespace miniros {
 namespace XmlRpc {
 class XmlRpcServerConnection;
 class XmlRpcClient;
 }
-
-namespace miniros
-{
 
 namespace network {
 struct ClientInfo;

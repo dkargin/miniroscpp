@@ -10,12 +10,12 @@
 
 #include "miniros/network/net_address.h"
 
+namespace miniros {
 namespace XmlRpc {
 class XmlRpcMethods;
 class XmlRpcValue;
 }
 
-namespace miniros {
 namespace http {
 
 /// Handler for XMLRPC endpoints.

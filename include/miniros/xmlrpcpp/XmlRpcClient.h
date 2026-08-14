@@ -24,7 +24,7 @@
 
 namespace miniros {
 class PollSet;
-}
+
 namespace XmlRpc {
 
   // Arguments and results are represented by XmlRpcValues
@@ -176,5 +176,6 @@ namespace XmlRpc {
     miniros::PollSet* _pollSet = nullptr;
   };
 }	// namespace XmlRpc
+} // namespace miniros
 
 #endif	// MINIROS_XMLRPCCLIENT_H_
