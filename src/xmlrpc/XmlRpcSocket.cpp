@@ -61,6 +61,7 @@ extern "C" {
 #endif
 
 
+namespace miniros {
 using namespace XmlRpc;
 
 
@@ -393,4 +394,6 @@ int XmlRpcSocket::get_port(int socket)
   }
   return 0;
 }
+
+} // namespace miniros
 

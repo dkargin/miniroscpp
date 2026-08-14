@@ -37,7 +37,7 @@
 
 #include <gtest/gtest.h>
 
-using namespace XmlRpc;
+using namespace miniros::XmlRpc;
 
 TEST(XmlRpc, BasicXml) {
   // Basic tests

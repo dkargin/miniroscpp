@@ -49,7 +49,7 @@
 #include <miniros/console.h>
 #include <sstream>
 
-using namespace XmlRpc; // A battle to be fought later
+using namespace miniros::XmlRpc; // A battle to be fought later
 
 /// \todo Locking can be significantly simplified here once the Node API goes away.
 

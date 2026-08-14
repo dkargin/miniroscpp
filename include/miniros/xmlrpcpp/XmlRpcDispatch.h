@@ -13,6 +13,7 @@
 # include <list>
 # include <vector>
 
+namespace miniros {
 namespace XmlRpc {
 
   // An RPC source represents a file descriptor to monitor
@@ -84,5 +85,6 @@ namespace XmlRpc {
 
   };
 } // namespace XmlRpc
+} // namespace miniros
 
 #endif  // _XMLRPCDISPATCH_H_

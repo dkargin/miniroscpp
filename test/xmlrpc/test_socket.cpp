@@ -42,7 +42,7 @@
   int var[] = {__VA_ARGS__};                                                   \
   for (size_t itr = 0; itr < sizeof(var) / sizeof(int); itr++)
 
-using XmlRpc::XmlRpcSocket;
+using miniros::XmlRpc::XmlRpcSocket;
 
 class XmlRpcSocketTest : public ::testing::Test {
 protected:
@@ -58,7 +58,7 @@ protected:
     socket_calls = 0;
     write_calls = 0;
 
-    XmlRpc::setVerbosity(5);
+    miniros::XmlRpc::setVerbosity(5);
     XmlRpcSocket::s_use_ipv6_ = false;
   }
 
@@ -991,8 +991,8 @@ int test_connect(int sockfd, const struct sockaddr* addr, socklen_t addrlen) {
 }
 
 class XmlRpcConnectTest : public XmlRpcSocketTest,
-                          XmlRpc::XmlRpcLogHandler,
-                          XmlRpc::XmlRpcErrorHandler {
+                          miniros::XmlRpc::XmlRpcLogHandler,
+                          miniros::XmlRpc::XmlRpcErrorHandler {
 public:
   virtual void log(int level, const char* msg) {
     last_level = level;
@@ -1027,8 +1027,8 @@ protected:
     fake_freeaddrinfo = test_freeaddrinfo;
     fake_connect = test_connect;
 
-    XmlRpc::XmlRpcLogHandler::setLogHandler(this);
-    XmlRpc::XmlRpcErrorHandler::setErrorHandler(this);
+    miniros::XmlRpc::XmlRpcLogHandler::setLogHandler(this);
+    miniros::XmlRpc::XmlRpcErrorHandler::setErrorHandler(this);
 
     // Set up address data structures for testing use.
     addr_ip4_22.sin_family = AF_INET;

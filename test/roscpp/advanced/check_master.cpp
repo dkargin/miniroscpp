@@ -48,7 +48,7 @@
 
 #include "../../require_master.h"
 
-using namespace XmlRpc;
+using namespace miniros::XmlRpc;
 
 bool g_should_exist = true;
 

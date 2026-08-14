@@ -31,10 +31,10 @@ Current status codes:
     1: SUCCESS: Method completed successfully.
 */
 
+namespace miniros {
 namespace XmlRpc {
 class XmlRpcValue;
 }
-namespace miniros {
 
 class PollSet;
 class RPCManager;

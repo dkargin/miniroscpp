@@ -15,6 +15,7 @@
 #include "XmlRpcDecl.h"
 
 
+namespace miniros {
 namespace XmlRpc {
 
   //! A class representing an error.
@@ -40,5 +41,6 @@ namespace XmlRpc {
   };
 
 }
+} // namespace miniros
 
 #endif	// _XMLRPCEXCEPTION_H_

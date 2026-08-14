@@ -16,6 +16,7 @@
 #endif
 #endif
 
+namespace miniros {
 using namespace XmlRpc;
 
 // Static data
@@ -347,3 +348,5 @@ const miniros::network::NetAddress& XmlRpcServerConnection::getHostAddress() con
 {
   return _hostAddress;
 }
+
+} // namespace miniros

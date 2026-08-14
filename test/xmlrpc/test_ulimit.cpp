@@ -27,7 +27,7 @@
 # include <sys/resource.h>
 #endif
 
-using namespace XmlRpc;
+using namespace miniros::XmlRpc;
 
 TEST_F(XmlRpcTest, Ulimit)
 {

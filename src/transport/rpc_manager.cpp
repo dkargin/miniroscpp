@@ -61,7 +61,7 @@
 
 #include "miniros/callback_queue.h"
 
-using namespace XmlRpc;
+using namespace miniros::XmlRpc;
 
 namespace miniros
 {

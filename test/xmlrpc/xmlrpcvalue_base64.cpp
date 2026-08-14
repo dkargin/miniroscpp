@@ -13,6 +13,7 @@ int main(int argc, char **argv)
   return RUN_ALL_TESTS();
 }
 
+namespace miniros {
 namespace XmlRpc
 {
 
@@ -153,3 +154,4 @@ namespace XmlRpc
     );
   }
 }
+} // namespace miniros

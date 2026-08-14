@@ -13,10 +13,10 @@
 #include "miniros/errors.h"
 #include "miniros/xmlrpcpp/XmlRpcValue.h"
 
+namespace miniros {
 namespace XmlRpc {
 class XmlRpcClient;
 }
-namespace miniros {
 namespace master {
 
 struct ReturnStruct

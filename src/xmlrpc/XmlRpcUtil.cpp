@@ -13,6 +13,7 @@
 
 #include "xmlrpcpp/XmlRpc.h"
 
+namespace miniros {
 using namespace XmlRpc;
 
 
@@ -267,6 +268,8 @@ XmlRpcUtil::xmlEncode(const std::string& raw)
   }
   return encoded;
 }
+
+} // namespace miniros
 
 
 

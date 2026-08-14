@@ -46,13 +46,12 @@
 #include "miniros/spinner.h"
 #include "miniros/init.h"
 
+namespace miniros
+{
 namespace XmlRpc
 {
     class XmlRpcValue;
 }
-
-namespace miniros
-{
 
   class NodeHandleBackingCollection;
 

@@ -25,7 +25,7 @@
 #include "../xmlrpc/test_fixtures.h"
 // No arguments, result is "Hello".
 
-using namespace XmlRpc;
+using namespace miniros::XmlRpc;
 
 void Hello::execute(const XmlRpcValue& params, XmlRpcValue& result, const miniros::network::ClientInfo&)
 {
@@ -46,7 +46,7 @@ void XmlRpcTest::work()
 
 void XmlRpcTest::SetUp()
 {
-  // XmlRpc::setVerbosity(5);
+  // miniros::XmlRpc::setVerbosity(5);
 
   // Create the server socket on the specified port
   s.bindAndListen(0);
@@ -71,5 +71,5 @@ void XmlRpcTest::TearDown()
   s.shutdown();
 
   // Reset verbosity in case a test raises the verbosity.
-  XmlRpc::setVerbosity(0);
+  miniros::XmlRpc::setVerbosity(0);
 }

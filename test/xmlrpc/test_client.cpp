@@ -29,8 +29,8 @@
 #include <gtest/gtest.h>
 #include "../xmlrpc/mock_socket.h"
 
-using XmlRpc::XmlRpcClient;
-using XmlRpc::XmlRpcValue;
+using miniros::XmlRpc::XmlRpcClient;
+using miniros::XmlRpc::XmlRpcValue;
 
 // Helper class to change the accessibility of protected members of the class under test so we can test them
 class XmlRpcClientForTest : public XmlRpcClient
@@ -58,17 +58,19 @@ public:
   using XmlRpcClient::_connectionState;
   using XmlRpcClient::connectionStateStr;
 };
+namespace miniros {
 namespace XmlRpc {
 void PrintTo(const XmlRpcClientForTest::ClientConnectionState& state,
              ::std::ostream* os) {
   *os << XmlRpcClientForTest::connectionStateStr(state);
 }
-}; // namespace XmlRpc
+} // namespace XmlRpc
+} // namespace miniros
 
 // Helper function to check if our source is in the dispatch source list or not.
-bool sourceInList(XmlRpc::XmlRpcSource* source,
-                  const XmlRpc::XmlRpcDispatch::SourceList& list) {
-  XmlRpc::XmlRpcDispatch::SourceList::const_iterator itr;
+bool sourceInList(miniros::XmlRpc::XmlRpcSource* source,
+                  const miniros::XmlRpc::XmlRpcDispatch::SourceList& list) {
+  miniros::XmlRpc::XmlRpcDispatch::SourceList::const_iterator itr;
   for (itr = list.begin(); itr != list.end(); itr++) {
     if (itr->getSource() == source) {
       return true;

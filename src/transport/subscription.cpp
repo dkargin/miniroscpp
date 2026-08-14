@@ -67,7 +67,7 @@
 
 #include "miniros/xmlrpcpp/XmlRpcClient.h"
 
-using XmlRpc::XmlRpcValue;
+using miniros::XmlRpc::XmlRpcValue;
 
 namespace miniros
 {

@@ -33,11 +33,10 @@
 #include "miniros/macros.h"
 #include "miniros/errors.h"
 
+namespace miniros {
 namespace XmlRpc {
 class XmlRpcValue;
 }
-
-namespace miniros {
 
 class RPCManager;
 

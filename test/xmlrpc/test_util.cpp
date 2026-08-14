@@ -25,7 +25,7 @@
 
 #include <gtest/gtest.h>
 
-using namespace XmlRpc;
+using namespace miniros::XmlRpc;
 
 class FakeLogHandler : public XmlRpcLogHandler {
 public:
@@ -49,7 +49,7 @@ TEST(XmlRpc, Log) {
 
   // Check default verbosity.
   ASSERT_EQ(0, XmlRpcLogHandler::getVerbosity());
-  EXPECT_EQ(0, XmlRpc::getVerbosity());
+  EXPECT_EQ(0, miniros::XmlRpc::getVerbosity());
 
   // Test all messages masked at default verbosity.
   for (int i = 1; i < 6; i++) {
@@ -60,7 +60,7 @@ TEST(XmlRpc, Log) {
 
   // Test masking at levels below maximum verbosity.
   for (int i = 1; i < 5; i++) {
-    XmlRpc::setVerbosity(i);
+    miniros::XmlRpc::setVerbosity(i);
 
     for (int j = 1; j <= i; j++) {
       XmlRpcUtil::log(j, "Hello1");
@@ -77,7 +77,7 @@ TEST(XmlRpc, Log) {
   }
 
   // Test no messages masked at max verbosity.
-  XmlRpc::setVerbosity(5);
+  miniros::XmlRpc::setVerbosity(5);
   for (int i = 1; i < 5; i++) {
     XmlRpcUtil::log(i, "Hello3");
     EXPECT_EQ(i, fakelog.last_level);

@@ -551,20 +551,20 @@ bool Recorder::doCheckMaster(miniros::TimerEvent const& e, miniros::NodeHandle& 
   }
 
   if (options_.node != std::string("")) {
-    XmlRpc::XmlRpcValue req;
+    miniros::XmlRpc::XmlRpcValue req;
     req[0] = miniros::this_node::getName();
     req[1] = options_.node;
-    XmlRpc::XmlRpcValue resp;
-    XmlRpc::XmlRpcValue payload;
+    miniros::XmlRpc::XmlRpcValue resp;
+    miniros::XmlRpc::XmlRpcValue payload;
 
     if (master->execute("lookupNode", req, resp, payload, true)) {
       miniros::network::URL peer;
       if (!peer.fromString(static_cast<std::string>(resp[2]), false) || peer.host.empty() || peer.port == 0) {
         MINIROS_ERROR("Bad xml-rpc URI trying to inspect node at: [%s]", static_cast<std::string>(resp[2]).c_str());
       } else {
-        XmlRpc::XmlRpcClient c(peer.host.c_str(), peer.port, "/");
-        XmlRpc::XmlRpcValue req2;
-        XmlRpc::XmlRpcValue resp2;
+        miniros::XmlRpc::XmlRpcClient c(peer.host.c_str(), peer.port, "/");
+        miniros::XmlRpc::XmlRpcValue req2;
+        miniros::XmlRpc::XmlRpcValue resp2;
         req2[0] = miniros::this_node::getName();
         c.execute("getSubscriptions", req2, resp2);
 

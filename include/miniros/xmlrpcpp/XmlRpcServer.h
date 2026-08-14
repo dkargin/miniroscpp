@@ -24,6 +24,7 @@
 #include "XmlRpcSource.h"
 #include "XmlRpcDecl.h"
 
+namespace miniros {
 namespace XmlRpc {
 
 
@@ -141,5 +142,6 @@ namespace XmlRpc {
 #endif
   };
 } // namespace XmlRpc
+} // namespace miniros
 
 #endif //_XMLRPCSERVER_H_

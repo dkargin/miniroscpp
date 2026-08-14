@@ -75,9 +75,9 @@ TEST_F(MasterFixture, setThenGetString)
   ASSERT_TRUE( master->get( "test_set_param", param ) );
   ASSERT_STREQ( "asdf", param.c_str() );
   
-  XmlRpc::XmlRpcValue v;
+  miniros::XmlRpc::XmlRpcValue v;
   master->get("test_set_param", v);
-  ASSERT_EQ(v.getType(), XmlRpc::XmlRpcValue::TypeString);
+  ASSERT_EQ(v.getType(), miniros::XmlRpc::XmlRpcValue::TypeString);
 }
 
 TEST_F(MasterFixture, setThenGetStringCached)
@@ -106,7 +106,7 @@ TEST_F(MasterFixture, setThenGetStringCachedNodeHandle)
 TEST_F(MasterFixture, setThenGetNamespaceCached)
 {
   std::string stringParam;
-  XmlRpc::XmlRpcValue structParam;
+  miniros::XmlRpc::XmlRpcValue structParam;
   const std::string ns = "test_set_param_setThenGetStringCached2";
   ASSERT_FALSE(master->getCached(ns, stringParam));
 
@@ -136,9 +136,9 @@ TEST_F(MasterFixture, setThenGetInt)
   int param;
   ASSERT_TRUE( master->get( "test_set_param", param ) );
   ASSERT_EQ( 42, param );
-  XmlRpc::XmlRpcValue v;
+  miniros::XmlRpc::XmlRpcValue v;
   master->get("test_set_param", v);
-  ASSERT_EQ(v.getType(), XmlRpc::XmlRpcValue::TypeInt);
+  ASSERT_EQ(v.getType(), miniros::XmlRpc::XmlRpcValue::TypeInt);
 }
 
 TEST_F(MasterFixture, unknownParam)
@@ -262,7 +262,7 @@ TEST_F(MasterFixture, searchParamNodeHandleWithRemapping)
 // See ROS ticket #2381
 TEST_F(MasterFixture, getMissingXmlRpcValueParameterCachedTwice)
 {
-  XmlRpc::XmlRpcValue v;
+  miniros::XmlRpc::XmlRpcValue v;
   ASSERT_FALSE(master->getCached("invalid_xmlrpcvalue_param", v));
   ASSERT_FALSE(master->getCached("invalid_xmlrpcvalue_param", v));
 }

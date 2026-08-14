@@ -13,6 +13,7 @@
 
 #include <sstream>
 
+namespace miniros {
 namespace XmlRpc {
 
   static const char VALUE_TAG[]     = "<value>";
@@ -709,10 +710,11 @@ namespace XmlRpc {
     }
   }
 } // namespace XmlRpc
+} // namespace miniros
 
 
 // ostream
-std::ostream& operator<<(std::ostream& os, const XmlRpc::XmlRpcValue& v)
+std::ostream& operator<<(std::ostream& os, const miniros::XmlRpc::XmlRpcValue& v)
 {
   // If you want to output in xml format:
   //return os << v.toXml();

@@ -29,14 +29,14 @@
 #include <gtest/gtest.h>
 
 // No arguments, result is "Hello".
-class Hello : public XmlRpc::XmlRpcServerMethod
+class Hello : public miniros::XmlRpc::XmlRpcServerMethod
 {
 public:
-  Hello(XmlRpc::XmlRpcServer* s) : XmlRpc::XmlRpcServerMethod("Hello", s) {}
+  Hello(miniros::XmlRpc::XmlRpcServer* s) : miniros::XmlRpc::XmlRpcServerMethod("Hello", s) {}
 
   virtual ~Hello() {}
 
-  void execute(const XmlRpc::XmlRpcValue& params, XmlRpc::XmlRpcValue& result, const miniros::network::ClientInfo&) override;
+  void execute(const miniros::XmlRpc::XmlRpcValue& params, miniros::XmlRpc::XmlRpcValue& result, const miniros::network::ClientInfo&) override;
 
   std::mutex hello_mutex;
 };
@@ -53,7 +53,7 @@ protected:
   virtual void TearDown();
 
   // The server and its methods
-  XmlRpc::XmlRpcServer s;
+  miniros::XmlRpc::XmlRpcServer s;
   Hello hello;
 
   // Server port number (for clients)

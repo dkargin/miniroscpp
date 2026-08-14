@@ -3,6 +3,7 @@
 #include "xmlrpcpp/XmlRpcSocket.h"
 #include "xmlrpcpp/XmlRpcUtil.h"
 
+namespace miniros {
 namespace XmlRpc {
 
   XmlRpcSource::XmlRpcSource(int fd /*= -1*/, bool deleteOnClose /*= false*/) 
@@ -31,3 +32,4 @@ namespace XmlRpc {
   }
 
 } // namespace XmlRpc
+} // namespace miniros
