@@ -495,28 +495,41 @@ Error NetSocket::setReusePort(bool reuse)
 
 Error NetSocket::joinMulticastGroup(const NetAddress& group, bool loop)
 {
+  return joinMulticastGroup(group, NetAddress(), loop);
+}
+
+Error NetSocket::joinMulticastGroup(const NetAddress& group, const NetAddress& iface, bool loop)
+{
   if (!internal_)
     return Error::InternalError;
   if (internal_->fd < 0)
     return Error::InvalidHandle;
-
 
   if (group.type() == NetAddress::AddressIPv4) {
     if (!isDatagram() || !isIpv4()) {
       return Error::NotSupported;
     }
 
-
     struct ip_mreq mreq;
     memset(&mreq, 0, sizeof(mreq));
 
     const sockaddr_in* addr = static_cast<const sockaddr_in*>(group.rawAddress());
     mreq.imr_multiaddr.s_addr = addr->sin_addr.s_addr;
-    mreq.imr_interface.s_addr = htonl(INADDR_ANY);
+    if (iface.valid() && iface.type() == NetAddress::AddressIPv4) {
+      const sockaddr_in* ifaddr = static_cast<const sockaddr_in*>(iface.rawAddress());
+      mreq.imr_interface.s_addr = ifaddr->sin_addr.s_addr;
+    } else {
+      mreq.imr_interface.s_addr = htonl(INADDR_ANY);
+    }
     int fd = internal_->fd;
     if (setsockopt(fd, IPPROTO_IP, IP_ADD_MEMBERSHIP, (char*) &mreq, sizeof(mreq)) < 0) {
+#ifdef EADDRINUSE
+      if (last_socket_error() == EADDRINUSE)
+        return Error::Ok;
+#endif
       const char* err = last_socket_error_string();
-      MINIROS_ERROR_NAMED("socket", "NetSocket[%d]::joinMulticastGroup() failed to join multicast group \"%s\": %s", fd, group.str().c_str(), err);
+      MINIROS_ERROR_NAMED("socket", "NetSocket[%d]::joinMulticastGroup() failed to join multicast group \"%s\" iface=%s: %s",
+        fd, group.str().c_str(), iface.valid() ? iface.str().c_str() : "any", err);
       return Error::SystemError;
     }
 
@@ -524,6 +537,11 @@ Error NetSocket::joinMulticastGroup(const NetAddress& group, bool loop)
     if (setsockopt(fd, IPPROTO_IP, IP_MULTICAST_LOOP, (char*) &iLoop, sizeof(iLoop)) != 0) {
       const char* err = last_socket_error_string();
       MINIROS_ERROR_NAMED("socket", "NetSocket[%d]::joinMulticastGroup() failed to set loop to %d: %s", fd, iLoop, err);
+    }
+    int ttl = 1;
+    if (setsockopt(fd, IPPROTO_IP, IP_MULTICAST_TTL, (char*) &ttl, sizeof(ttl)) != 0) {
+      const char* err = last_socket_error_string();
+      MINIROS_DEBUG_NAMED("socket", "NetSocket[%d]::joinMulticastGroup() failed to set TTL: %s", fd, err);
     }
   } else {
     return Error::NotImplemented;

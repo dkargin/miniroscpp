@@ -120,9 +120,10 @@ public:
   /// Get current peer address.
   NetAddress peerAddress() const;
 
-  /// Join to multicast group on any interface.
-  /// Only IP address is taken from `group`. Port value is ignored.
+  /// Join a multicast group. \p iface selects the local IPv4 interface; if invalid, uses INADDR_ANY.
+  /// Only the IP address is taken from \p group (port is ignored).
   Error joinMulticastGroup(const NetAddress& group, bool loop);
+  Error joinMulticastGroup(const NetAddress& group, const NetAddress& iface, bool loop);
 
   int fd() const;
 

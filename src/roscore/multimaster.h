@@ -144,6 +144,8 @@ public:
   bool hasPairedPeers() const;
   int udpPort() const;
   std::string multicastEndpoint() const;
+  /// Empty when multicast is active. Otherwise a short reason (join/bind failure).
+  std::string multicastError() const;
 
   static const char* peerStateName(PeerState s);
 

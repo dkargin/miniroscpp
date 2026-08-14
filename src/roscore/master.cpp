@@ -26,6 +26,10 @@
 #include "miniros/callback_queue.h"
 #include "miniros/rostime.h"
 #include "miniros/common.h"
+#include "miniros/rosconsole/file_log.h"
+#include "miniros/network/network.h"
+
+#include <filesystem>
 
 namespace miniros {
 
@@ -52,6 +56,33 @@ Master::Internal::Internal(const std::shared_ptr<RPCManager>& manager)
 }
 
 Master::Internal::~Internal() = default;
+
+std::string Master::Internal::localHostname() const
+{
+  std::string host = resolver.getHost();
+  if (host.empty())
+    host = network::getHost();
+  if (host.empty())
+    host = "unknown";
+  return host;
+}
+
+std::string Master::Internal::rosoutLogPath() const
+{
+  const std::string& dir = file_log::getLogDirectory();
+  if (dir.empty())
+    return {};
+  return dir + "/rosout.log";
+}
+
+bool Master::Internal::rosoutLogConfigured() const
+{
+  const std::string path = rosoutLogPath();
+  if (path.empty())
+    return false;
+  std::error_code ec;
+  return std::filesystem::is_regular_file(path, ec);
+}
 
 Master::Master(std::shared_ptr<RPCManager> manager)
 {
@@ -224,6 +255,7 @@ void Master::setupBindings(const std::shared_ptr<CallbackQueue>& cb)
     internal_->httpPublishedTopicsEndpoint.reset(new PublishedTopicsEndpoint(internal_.get()));
     internal_->httpTopicTypesEndpoint.reset(new TopicTypesEndpoint(internal_.get()));
     internal_->httpMultimasterApiEndpoint.reset(new MultimasterApiEndpoint(internal_.get()));
+    internal_->httpLogEndpoint.reset(new MasterLogEndpoint(internal_.get()));
 
     server->registerEndpoint(std::make_unique<http::SimpleFilter>(http::HttpMethod::Get, "/"), internal_->httpRootEndpoint, cb);
     server->registerEndpoint(
@@ -245,6 +277,8 @@ void Master::setupBindings(const std::shared_ptr<CallbackQueue>& cb)
         internal_->httpDebugApiEndpoint, cb);
       MINIROS_WARN("Debug HTTP API enabled (GET /debugAPI/...)");
     }
+    server->registerEndpoint(std::make_unique<http::SimpleFilter>(http::HttpMethod::Get, "/log"),
+      internal_->httpLogEndpoint, cb);
     server->registerEndpoint(std::make_unique<http::SimpleFilter>(http::HttpMethod::Get, "/favicon.ico"),
       std::make_shared<MasterFaviconEndpoint>(), cb);
 

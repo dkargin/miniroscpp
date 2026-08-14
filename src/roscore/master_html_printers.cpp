@@ -6,6 +6,7 @@
 
 #include "miniros/network/host_info.h"
 #include "miniros/http/http_printers.h"
+#include "miniros/rostime.h"
 #include "node_ref.h"
 
 #include <set>
@@ -17,20 +18,70 @@ namespace master {
 
 using namespace http;
 
+namespace {
+
+std::string formatUptime(const WallDuration& d)
+{
+  int64_t sec = d.sec;
+  if (sec < 0)
+    sec = 0;
+  const int64_t days = sec / 86400;
+  sec %= 86400;
+  const int hours = static_cast<int>(sec / 3600);
+  sec %= 3600;
+  const int mins = static_cast<int>(sec / 60);
+  const int secs = static_cast<int>(sec % 60);
+  std::ostringstream os;
+  if (days > 0)
+    os << days << "d ";
+  os << hours << "h " << mins << "m " << secs << "s";
+  return os.str();
+}
+
+}
+
 void Master::Internal::renderMasterStatus(std::string& output) const
 {
   std::stringstream ss;
-  ss << "<p>GUID: <code>" << uuid.toString() << "</code></p>\n";
+  const std::string host = localHostname();
+  ss << "<h1>MiniROS master at " << host << "</h1>\n";
+  ss << "<p>GUID: <code>" << uuid.toString() << "</code>";
+  ss << " | uptime: " << formatUptime(SteadyTime::now() - startTime);
+  ss << " | " << print::Url("/log", "log");
+  if (!rosoutLogConfigured())
+    ss << " <em>(not configured)</em>";
+  ss << "</p>\n";
+
+  if (multimaster) {
+    const bool localHasToken = multimaster->hasToken();
+    ss << "<details>\n<summary>Config</summary>\n";
+    ss << "<p>UDP sync port: " << multimaster->udpPort();
+    ss << " | discovery: on";
+    const std::string mc = multimaster->multicastEndpoint();
+    ss << " | multicast: " << (mc.empty() ? "off" : mc);
+    const std::string mcErr = multimaster->multicastError();
+    if (mc.empty() && !mcErr.empty())
+      ss << " <small>(" << mcErr << "; LAN discovery uses UDP broadcast on port "
+         << multimaster->udpPort() << ")</small>";
+    ss << " | token: " << (localHasToken ? "set" : "none") << "</p>\n";
+    ss << "<p><small>Token is required only when joining a mesh that already has one. "
+          "Open masters (no token) can pair without entering a token.</small></p>\n";
+    ss << "</details>\n";
+  }
+
   ss << print::HB("Nodes:");
   ss << "<ul>";
   for (const std::shared_ptr<NodeRef>& r : regManager.listAllNodes()) {
+    const int flags = r->getNodeFlags();
+    // Peer masters belong in Discovery, not the ROS1 node graph.
+    if ((flags & NodeRef::NODE_MASTER) && !(flags & NodeRef::NODE_LOCAL))
+      continue;
     const std::string& name = r->id();
     std::string url = r->getApi();
-    const int flags = r->getNodeFlags();
     ss << "<li>";
     ss << print::PrefixUrl("node", name, name) << ": " << print::Url(url, url);
-    if (flags & NodeRef::NODE_MASTER)
-      ss << " <em>[peer master]</em>";
+    if (flags & NodeRef::NODE_LOCAL)
+      ss << " <em>It's me</em>";
     else if (flags & NodeRef::NODE_FOREIGN)
       ss << " <em>[foreign]</em>";
     ss << "</li>";
@@ -67,15 +118,7 @@ void Master::Internal::renderMasterStatus(std::string& output) const
 
   if (multimaster) {
     const bool localHasToken = multimaster->hasToken();
-    ss << print::HB("Multimaster:");
-    ss << "<p>GUID: <code>" << uuid.toString() << "</code>";
-    ss << " | UDP sync port: " << multimaster->udpPort();
-    ss << " | discovery: on";
-    const std::string mc = multimaster->multicastEndpoint();
-    ss << " | multicast: " << (mc.empty() ? "off" : mc);
-    ss << " | token: " << (localHasToken ? "set" : "none") << "</p>";
-    ss << "<p><small>Token is required only when joining a mesh that already has one. "
-          "Open masters (no token) can pair without entering a token.</small></p>";
+    ss << print::HB("Discovery:");
 
     if (multimaster->hasPairedPeers()) {
       ss << "<form method=\"GET\" action=\"/api2/multimaster/disconnect\" style=\"margin:0.5em 0;\">";
@@ -107,18 +150,23 @@ void Master::Internal::renderMasterStatus(std::string& output) const
           ss << "<li style=\"color:#c62828;\">";
         else
           ss << "<li>";
-        ss << peer.uuid.toString() << " — <b>" << MultimasterManager::peerStateName(peer.state) << "</b>";
-        if (!peer.masterUri.empty())
-          ss << " @ " << print::Url(peer.masterUri.str(), peer.masterUri.str());
-        if (peer.lastAddress.valid())
-          ss << " from " << peer.lastAddress.str();
-        ss << " (remote_token=" << (peer.remoteHasToken ? "yes" : "no");
-        ss << ", match=" << (peer.tokenMatch ? "yes" : "no") << ")";
-        ss << " pubs=" << peer.foreignPubs << " subs=" << peer.foreignSubs << " srvs=" << peer.foreignSrvs;
+
+        const std::string uri = peer.masterUri.empty() ? std::string() : peer.masterUri.str();
+        if (!uri.empty()) {
+          ss << print::Url(uri, uri);
+          if (peer.lastAddress.valid() && peer.masterUri.host != peer.lastAddress.address)
+            ss << " (" << peer.lastAddress.address << ")";
+        } else if (peer.lastAddress.valid()) {
+          ss << peer.lastAddress.str();
+        } else {
+          ss << "<em>(no URI yet)</em>";
+        }
+
+        ss << " <b>" << MultimasterManager::peerStateName(peer.state) << "</b>";
+
         if (collision) {
-          ss << " — pairing forbidden (same GUID)";
+          ss << " (pairing forbidden)";
         } else if (peer.state != PeerState::Paired && peer.state != PeerState::Requesting) {
-          // Need a token only when the remote advertises one and we do not already match.
           const bool tokenRequired = peer.remoteHasToken && !peer.tokenMatch;
           ss << "<form method=\"GET\" action=\"/api2/multimaster/connect\" style=\"display:inline;margin-left:0.5em;\">";
           ss << "<input type=\"hidden\" name=\"uuid\" value=\"" << peer.uuid.toString() << "\"/>";
@@ -136,6 +184,17 @@ void Master::Internal::renderMasterStatus(std::string& output) const
           ss << "<button type=\"submit\">pair</button>";
           ss << "</form>";
         }
+
+        ss << "<details style=\"margin:0.25em 0 0.5em 1em;\">";
+        ss << "<summary>details</summary>";
+        ss << "<p>GUID: <code>" << peer.uuid.toString() << "</code></p>";
+        if (peer.lastAddress.valid())
+          ss << "<p>from " << peer.lastAddress.str() << "</p>";
+        ss << "<p>remote_token=" << (peer.remoteHasToken ? "yes" : "no");
+        ss << ", match=" << (peer.tokenMatch ? "yes" : "no") << "</p>";
+        ss << "<p>pubs=" << peer.foreignPubs << " subs=" << peer.foreignSubs
+           << " srvs=" << peer.foreignSrvs << "</p>";
+        ss << "</details>";
         ss << "</li>";
       }
       ss << "</ul>\n";
@@ -252,8 +311,8 @@ Error Master::Internal::renderNodeInfo(const std::string_view& name, std::string
     }
   }
 
-  // Add pair form if node has NODE_MASTER flag
-  if (flags & NodeRef::NODE_MASTER) {
+  // Pair form only for remote peer masters — not this process's /miniroscore.
+  if ((flags & NodeRef::NODE_MASTER) && !(flags & NodeRef::NODE_LOCAL)) {
     const bool localHasToken = multimaster && multimaster->hasToken();
     bool remoteHasToken = false;
     bool tokenMatch = false;
