@@ -49,7 +49,7 @@
 
 #include <miniros/topic_tools/shape_shifter.h>
 
-#include "miniros/network/network.h"
+#include "miniros/network/url.h"
 #include "miniros/transport/rpc_manager.h"
 #include "miniros/xmlrpcpp/XmlRpcClient.h"
 
@@ -558,13 +558,11 @@ bool Recorder::doCheckMaster(miniros::TimerEvent const& e, miniros::NodeHandle& 
     XmlRpc::XmlRpcValue payload;
 
     if (master->execute("lookupNode", req, resp, payload, true)) {
-      std::string peer_host;
-      uint32_t peer_port;
-
-      if (!miniros::network::splitURI(static_cast<std::string>(resp[2]), peer_host, peer_port)) {
+      miniros::network::URL peer;
+      if (!peer.fromString(static_cast<std::string>(resp[2]), false) || peer.host.empty() || peer.port == 0) {
         MINIROS_ERROR("Bad xml-rpc URI trying to inspect node at: [%s]", static_cast<std::string>(resp[2]).c_str());
       } else {
-        XmlRpc::XmlRpcClient c(peer_host.c_str(), peer_port, "/");
+        XmlRpc::XmlRpcClient c(peer.host.c_str(), peer.port, "/");
         XmlRpc::XmlRpcValue req2;
         XmlRpc::XmlRpcValue resp2;
         req2[0] = miniros::this_node::getName();

@@ -14,8 +14,11 @@ namespace miniros {
 namespace network {
 
 /// Annotated URL.
+///
+/// `host` is stored without RFC 3986 brackets (ready for getaddrinfo).
+/// `str()` wraps IPv6 literals in `[]`.
 struct MINIROS_DECL URL {
-  /// Network address.
+  /// Network address (unbracketed hostname or IP).
   std::string host;
 
   uint32_t port = 0;
@@ -29,6 +32,9 @@ struct MINIROS_DECL URL {
 
   URL();
 
+  /// Parse a URI. Bracketed IPv6 (`http://[fd00::1]:11311/`) is supported.
+  /// Unbracketed IPv6 is rejected. `file:///etc/hosts` has an empty host
+  /// and path `/etc/hosts`.
   bool fromString(const std::string& urlStr, bool defaultPort);
 
   void reset();

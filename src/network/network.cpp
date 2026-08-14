@@ -53,26 +53,6 @@ const std::string& getHost()
   return g_host;
 }
 
-bool splitURI(const std::string& uri, std::string& host, uint32_t& port)
-{
-  // skip over the protocol if it's there
-  if (uri.substr(0, 7) == std::string("http://"))
-    host = uri.substr(7);
-  else if (uri.substr(0, 9) == std::string("rosrpc://"))
-    host = uri.substr(9);
-  // split out the port
-  std::string::size_type colon_pos = host.find_first_of(":");
-  if (colon_pos == std::string::npos)
-    return false;
-  std::string port_str = host.substr(colon_pos + 1);
-  std::string::size_type slash_pos = port_str.find_first_of("/");
-  if (slash_pos != std::string::npos)
-    port_str = port_str.erase(slash_pos);
-  port = atoi(port_str.c_str());
-  host = host.erase(colon_pos);
-  return true;
-}
-
 uint16_t getTCPROSPort()
 {
   return g_tcpros_server_port;

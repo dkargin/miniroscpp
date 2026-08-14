@@ -31,6 +31,7 @@
 #define MINIROS_PACKAGE_NAME "master_link"
 
 #include "miniros/network/network.h"
+#include "miniros/network/url.h"
 #include "miniros/init.h"
 #include "miniros/master_link.h"
 
@@ -120,11 +121,13 @@ Error MasterLink::initLink(const M_string& remappings, const std::shared_ptr<RPC
 #endif
     }
 
-    // Split URI into
-    if (!network::splitURI(internal_->uri, internal_->host, internal_->port)) {
+    network::URL parsed;
+    if (!parsed.fromString(internal_->uri, false) || parsed.host.empty() || parsed.port == 0) {
       MINIROS_FATAL("Couldn't parse the master URI [%s] into a host:port pair.", internal_->uri.c_str());
       return Error::InvalidURI;
     }
+    internal_->host = parsed.host;
+    internal_->port = parsed.port;
   }
 
   internal_->rpcManager = rpcManager;
