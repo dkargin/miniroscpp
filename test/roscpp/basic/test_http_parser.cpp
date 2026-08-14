@@ -51,6 +51,65 @@ TEST(net, parseProblematicURL)
   EXPECT_STREQ(url.path.c_str(), "/RPC2");
 }
 
+TEST(net, parseFileURL)
+{
+  network::URL url;
+  ASSERT_TRUE(url.fromString("file:///etc/hosts", false));
+  EXPECT_EQ(url.scheme, "file://");
+  EXPECT_TRUE(url.host.empty());
+  EXPECT_EQ(url.port, 0u);
+  EXPECT_EQ(url.path, "/etc/hosts");
+  EXPECT_TRUE(url.query.empty());
+  EXPECT_EQ(url.str(), "file:///etc/hosts");
+
+  ASSERT_TRUE(url.fromString("file://localhost/etc/hosts", false));
+  EXPECT_EQ(url.scheme, "file://");
+  EXPECT_EQ(url.host, "localhost");
+  EXPECT_EQ(url.port, 0u);
+  EXPECT_EQ(url.path, "/etc/hosts");
+  EXPECT_EQ(url.str(), "file://localhost/etc/hosts");
+
+  // Colon in the path must not be treated as a port (Windows-style file URI).
+  ASSERT_TRUE(url.fromString("file:///C:/Windows/System32/drivers/etc/hosts", false));
+  EXPECT_TRUE(url.host.empty());
+  EXPECT_EQ(url.port, 0u);
+  EXPECT_EQ(url.path, "/C:/Windows/System32/drivers/etc/hosts");
+  EXPECT_EQ(url.str(), "file:///C:/Windows/System32/drivers/etc/hosts");
+}
+
+TEST(net, parseIPv6URL)
+{
+  network::URL url;
+  ASSERT_TRUE(url.fromString("http://[fd00:a::10]:11311/RPC2", false));
+  EXPECT_EQ(url.scheme, "http://");
+  EXPECT_EQ(url.host, "fd00:a::10");
+  EXPECT_EQ(url.port, 11311u);
+  EXPECT_EQ(url.path, "/RPC2");
+  EXPECT_EQ(url.str(), "http://[fd00:a::10]:11311/RPC2");
+
+  ASSERT_TRUE(url.fromString("rosrpc://[::1]:1234", false));
+  EXPECT_EQ(url.host, "::1");
+  EXPECT_EQ(url.port, 1234u);
+  EXPECT_EQ(url.str(), "rosrpc://[::1]:1234");
+
+  ASSERT_TRUE(url.fromString("http://[fe80::1%wlan0]:8080?x=1:2:3", false));
+  EXPECT_EQ(url.host, "fe80::1%wlan0");
+  EXPECT_EQ(url.port, 8080u);
+  EXPECT_EQ(url.query, "x=1:2:3");
+  EXPECT_EQ(url.str(), "http://[fe80::1%wlan0]:8080?x=1:2:3");
+
+  ASSERT_TRUE(url.fromString("http://[::1]/RPC2", false));
+  EXPECT_EQ(url.host, "::1");
+  EXPECT_EQ(url.port, 0u);
+  EXPECT_EQ(url.path, "/RPC2");
+  EXPECT_EQ(url.str(), "http://[::1]/RPC2");
+
+  // Unbracketed IPv6 is ambiguous; refuse rather than split on the first ':'.
+  EXPECT_FALSE(url.fromString("http://fd00::10:11311/", false));
+  EXPECT_FALSE(url.fromString("http://[fd00::10:11311/", false));
+  EXPECT_FALSE(url.fromString("http://[::1]garbage", false));
+}
+
 const char* request1 = "POST /RPC2 HTTP/1.1\r\n" \
   "Host: localhost:11311\r\n" \
   "Accept-Encoding: gzip\r\n" \

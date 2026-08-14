@@ -12,6 +12,7 @@
 #include "miniros/console.h"
 #include "miniros/internal/nlohmann_json.hpp"
 #include "miniros/network/network.h"
+#include "miniros/network/url.h"
 
 #include <cctype>
 #include <cerrno>
@@ -59,11 +60,10 @@ std::string recordedCacheHost(const MasterCacheData& data)
   if (!data.host.empty())
     return data.host;
   for (const CachedNode& node : data.nodes) {
-    std::string host;
-    uint32_t port = 0;
-    if (!network::splitURI(node.api, host, port) || host.empty() || looksLikeLoopbackHost(host))
+    network::URL url;
+    if (!url.fromString(node.api, false) || url.host.empty() || looksLikeLoopbackHost(url.host))
       continue;
-    return host;
+    return url.host;
   }
   return {};
 }

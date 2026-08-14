@@ -42,6 +42,7 @@
 #include <typeinfo>
 
 #include "miniros/network/network.h"
+#include "miniros/network/url.h"
 #include "miniros/this_node.h"
 #include "miniros/io/poll_manager.h"
 
@@ -255,11 +256,10 @@ void Subscription::addLocalConnection(const RPCManagerPtr& rpcManager, const Pub
 
 bool urisEqual(const std::string& uri1, const std::string& uri2)
 {
-  std::string host1, host2;
-  uint32_t port1 = 0, port2 = 0;
-  network::splitURI(uri1, host1, port1);
-  network::splitURI(uri2, host2, port2);
-  return port1 == port2 && host1 == host2;
+  network::URL a, b;
+  a.fromString(uri1, false);
+  b.fromString(uri2, false);
+  return a.port == b.port && a.host == b.host;
 }
 
 bool Subscription::pubUpdate(const RPCManagerPtr& rpcManager, const V_string& new_pubs)

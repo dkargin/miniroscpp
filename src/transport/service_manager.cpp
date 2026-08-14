@@ -28,9 +28,9 @@
 #define MINIROS_PACKAGE_NAME "service_manager"
 
 #include <algorithm>
-#include <cstdio>
 
 #include "miniros/network/network.h"
+#include "miniros/network/url.h"
 #include "miniros/master_link.h"
 #include "miniros/this_node.h"
 #include "miniros/transport/connection.h"
@@ -147,10 +147,11 @@ bool ServiceManager::advertiseService(const AdvertiseServiceOptions& ops)
   XmlRpcValue args, result, payload;
   args[0] = this_node::getName();
   args[1] = ops.service;
-  char uri_buf[1024];
-  std::snprintf(uri_buf, sizeof(uri_buf), "rosrpc://%s:%d",
-           network::getHost().c_str(), connection_manager_->getTCPPort());
-  args[2] = string(uri_buf);
+  network::URL serviceUri;
+  serviceUri.scheme = "rosrpc://";
+  serviceUri.host = network::getHost();
+  serviceUri.port = static_cast<uint32_t>(connection_manager_->getTCPPort());
+  args[2] = serviceUri.str();
   args[3] = xmlrpc_manager_->getServerUrlStr();
   master_link_->execute("registerService", args, result, payload, true);
 
@@ -198,10 +199,11 @@ bool ServiceManager::unregisterService(const std::string& service)
   XmlRpcValue args, result, payload;
   args[0] = this_node::getName();
   args[1] = service;
-  char uri_buf[1024];
-  std::snprintf(uri_buf, sizeof(uri_buf), "rosrpc://%s:%d",
-           network::getHost().c_str(), connection_manager_->getTCPPort());
-  args[2] = string(uri_buf);
+  network::URL serviceUri;
+  serviceUri.scheme = "rosrpc://";
+  serviceUri.host = network::getHost();
+  serviceUri.port = static_cast<uint32_t>(connection_manager_->getTCPPort());
+  args[2] = serviceUri.str();
 
   return master_link_->execute("unregisterService", args, result, payload, false);
 }
@@ -331,13 +333,16 @@ bool ServiceManager::lookupService(const string &name, string &serv_host, uint32
     return false;
   }
 
-  if (!network::splitURI(serv_uri, serv_host, serv_port))
+  network::URL url;
+  if (!url.fromString(serv_uri, false) || url.host.empty() || url.port == 0)
   {
     MINIROS_ERROR("lookupService: Bad service uri [%s]", serv_uri.c_str());
 
     return false;
   }
 
+  serv_host = url.host;
+  serv_port = url.port;
   return true;
 }
 
