@@ -44,6 +44,12 @@ switches to `robot2` (leave robot1, join robot2).
 | `--discovery <port>` | Override **sync** UDP port (defaults to RPC port). |
 | `--peer host:udpPort` | Explicit DISCOVER probe to a peer’s **sync** UDP port (repeatable). Fallback when multicast is blocked. |
 
+If `miniroscore` starts before ethernet is up (typical with systemd on SBCs), multicast join
+may fail with `No such device` / `Network is unreachable`. With `MINIROS_USE_NETLINK` (default
+on Linux), RTNETLINK notifies when links/addresses appear and discovery rejoins immediately;
+otherwise NICs are polled every few seconds. Prefer `After=network-online.target` in the unit
+file so the first join usually succeeds.
+
 Discovery does **not** require `--token`. Auto-pair requires a shared non-empty token. Manual pairing:
 pass `--token` up front, enter the remote collective’s token in the web UI when joining a
 tokenized mesh, or leave the field empty to pair two open (no-token) masters.
@@ -125,7 +131,7 @@ the extra 4-byte length prefix used by `serializeMessage`.
 
 | Op | Name | Payload |
 |----|------|---------|
-| 1 | `Discover` | *(empty)* |
+| 1 | `Discover` | `miniros_msgs/MasterOffer` (optional; empty still accepted) |
 | 2 | `Offer` | `miniros_msgs/MasterOffer` |
 | 3 | `Request` | *(empty)* |
 | 4 | `Ack` | *(empty)* |
@@ -161,8 +167,10 @@ cp -v devel/include/miniros_msgs/*.hxx \
 ```
   A (searching)                         B (up, same or other token)
   --------------------                  -------------------------
-  DISCOVER (multicast / probe) ------->
+  DISCOVER (+ MasterOffer) ----------->
+       [B lists A from offer / UDP src]
                         <-------------- OFFER (MasterOffer)
+       [A lists B]
   [if tokens match]
   REQUEST (unicast sync port) -------->
                         <-------------- ACK
