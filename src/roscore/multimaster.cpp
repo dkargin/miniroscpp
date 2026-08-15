@@ -8,6 +8,7 @@
 #include "miniros/io/poll_set.h"
 #include "miniros/network/socket.h"
 #include "miniros/network/net_adapter.h"
+#include "miniros/network/network_monitor.h"
 
 #include "registration_manager.h"
 #include "resolver.h"
@@ -78,6 +79,7 @@ struct MultimasterManager::Internal {
 
   std::string multicastHost = kDefaultMulticastAddr;
   int multicastPort = kDefaultMulticastPort;
+  /// User/config wants multicast discovery (false only for --multicast off).
   bool multicastEnabled = true;
   std::string multicastError;
   /// Subnet broadcast addresses (IPv4, port = sync UDP port) used when multicast is down
@@ -87,14 +89,19 @@ struct MultimasterManager::Internal {
   std::set<std::string> localOnlyTopics{"/rosout", "/rosout_agg"};
   /// IPv4 addresses of local adapters (to distinguish multicast echo from a cloned GUID).
   std::set<std::string> localIps;
+  /// Interfaces already joined for multicast (adapter IPv4 address strings).
+  std::set<std::string> joinedMulticastIfaces;
 
   /// Unicast sync (+ broadcast fallback when multicast disabled).
+  /// After initSyncSocket(): either fully attached to PollSet, or invalid.
   network::NetSocket syncSocket;
   /// Shared-port multicast discovery (optional).
+  /// After initDiscoverySocket(): either fully attached to PollSet, or invalid.
   network::NetSocket discoverySocket;
   network::NetAddress broadcastAddr;
   network::NetAddress multicastGroup;
   std::vector<network::NetAddress> peerProbes;
+  network::NetworkMonitor networkMonitor;
 
   CollectSnapshotFn collectSnapshot;
   ApplyRecordsFn applyRecords;
@@ -106,6 +113,7 @@ struct MultimasterManager::Internal {
 
   uint32_t next_control_seq = 1;
   SteadyTime nextDiscover;
+  SteadyTime nextNetworkRefresh;
 
   /// Bumped on every local registration announce; snapshot collect loops until stable.
   uint64_t localRegGen = 0;
@@ -177,6 +185,7 @@ struct MultimasterManager::Internal {
     return p;
   }
 
+  /// Tear down a socket that was successfully attached (or is already invalid).
   void detachSocket(network::NetSocket& sock)
   {
     if (pollSet && sock.valid())
@@ -207,72 +216,82 @@ struct MultimasterManager::Internal {
 
   Error initSyncSocket(int port)
   {
+    auto dispose = [this](Error e) {
+      syncSocket.close();
+      return e;
+    };
+
     Error error = syncSocket.initUDP(false);
     if (!error)
-      return error;
+      return dispose(error);
     error = syncSocket.setReuseAddr(true);
     if (!error)
-      return error;
+      return dispose(error);
     error = syncSocket.setReusePort(true);
     if (!error)
-      return error;
+      return dispose(error);
     error = syncSocket.setBroadcast(true);
     if (!error)
-      return error;
+      return dispose(error);
     error = syncSocket.bind(port);
     if (!error)
-      return error;
+      return dispose(error);
     boundPort = port == 0 ? syncSocket.port() : port;
     broadcastAddr = network::NetAddress::fromIp4String("255.255.255.255", boundPort);
     refreshLocalIps();
-    return attachReadable(syncSocket, &Internal::onSyncReadable);
+    if (Error e = attachReadable(syncSocket, &Internal::onSyncReadable); !e)
+      return dispose(e);
+    return Error::Ok;
   }
 
+  /// On success: discoverySocket is bound, joined, and in PollSet.
+  /// On failure: discoverySocket is closed/invalid (never left half-registered).
   Error initDiscoverySocket()
   {
+    auto dispose = [this](Error e) {
+      discoverySocket.close();
+      multicastGroup = {};
+      joinedMulticastIfaces.clear();
+      return e;
+    };
+
     multicastError.clear();
+    joinedMulticastIfaces.clear();
     if (!multicastEnabled || multicastHost.empty() || multicastPort <= 0)
       return Error::Ok;
 
     multicastGroup = network::NetAddress::fromIp4String(multicastHost, multicastPort);
     if (!multicastGroup.valid())
-      return Error::InvalidAddress;
+      return dispose(Error::InvalidAddress);
 
     Error error = discoverySocket.initUDP(false);
     if (!error)
-      return error;
+      return dispose(error);
     error = discoverySocket.setReuseAddr(true);
     if (!error)
-      return error;
+      return dispose(error);
     error = discoverySocket.setReusePort(true);
     if (!error)
-      return error;
+      return dispose(error);
     error = discoverySocket.bind(multicastPort);
     if (!error)
-      return error;
+      return dispose(error);
 
-    int joined = 0;
-    Error lastJoin = Error::Ok;
-    for (const auto& adapter : localAdapters()) {
-      if (!adapter.isUp() || adapter.isLoopback() || !adapter.isIPv4())
-        continue;
-      Error e = discoverySocket.joinMulticastGroup(multicastGroup, adapter.address, /*loop=*/true);
-      if (e)
-        ++joined;
-      else
-        lastJoin = e;
-    }
+    const int joined = joinMulticastOnNewAdapters();
     if (joined == 0) {
-      lastJoin = discoverySocket.joinMulticastGroup(multicastGroup, /*loop=*/true);
-      if (lastJoin)
-        ++joined;
+      // No usable NIC yet (common when master starts before ethernet is up).
+      // Join INADDR_ANY so membership can attach when a route appears, and keep
+      // retrying per-iface joins from refreshNetworkUnlocked().
+      Error anyJoin = discoverySocket.joinMulticastGroup(multicastGroup, /*loop=*/true);
+      if (!anyJoin)
+        return dispose(anyJoin);
+      MINIROS_WARN_NAMED("multimaster",
+        "No up IPv4 interface for multicast yet; joined %s on INADDR_ANY (will rejoin per-iface when NICs appear)",
+        multicastGroup.str().c_str());
     }
-    if (joined == 0) {
-      if (lastJoin.code != Error::Ok)
-        return lastJoin;
-      return Error::SystemError;
-    }
-    return attachReadable(discoverySocket, &Internal::onDiscoveryReadable);
+    if (Error e = attachReadable(discoverySocket, &Internal::onDiscoveryReadable); !e)
+      return dispose(e);
+    return Error::Ok;
   }
 
   std::vector<network::NetAdapter> localAdapters() const
@@ -280,6 +299,32 @@ struct MultimasterManager::Internal {
     std::vector<network::NetAdapter> adapters;
     (void)network::scanAdapters(adapters);
     return adapters;
+  }
+
+  /// Join multicast on adapters not yet in joinedMulticastIfaces. @return new joins.
+  int joinMulticastOnNewAdapters()
+  {
+    if (!discoverySocket.valid() || !multicastGroup.valid())
+      return 0;
+    int newly = 0;
+    for (const auto& adapter : localAdapters()) {
+      if (!adapter.isUp() || adapter.isLoopback() || !adapter.isIPv4())
+        continue;
+      const std::string key = adapter.address.address;
+      if (key.empty() || joinedMulticastIfaces.count(key))
+        continue;
+      Error e = discoverySocket.joinMulticastGroup(multicastGroup, adapter.address, /*loop=*/true);
+      if (e) {
+        joinedMulticastIfaces.insert(key);
+        ++newly;
+        MINIROS_INFO_NAMED("multimaster", "Joined multicast %s on %s (%s)",
+          multicastGroup.str().c_str(), adapter.name.c_str(), key.c_str());
+      } else {
+        MINIROS_WARN_NAMED("multimaster", "Multicast join on %s (%s) failed: %s",
+          adapter.name.c_str(), key.c_str(), e.toString());
+      }
+    }
+    return newly;
   }
 
   void refreshLocalIps()
@@ -300,10 +345,74 @@ struct MultimasterManager::Internal {
     }
   }
 
+  /// Re-scan NICs: update broadcasts / localIps, retry multicast if it failed at boot,
+  /// join newly appeared ethernet interfaces.
+  void refreshNetworkUnlocked()
+  {
+    refreshLocalIps();
+
+    if (resolver)
+      (void)resolver->scanAdapters();
+
+    if (!multicastEnabled || multicastHost.empty() || multicastPort <= 0)
+      return;
+
+    if (!discoverySocket.valid()) {
+      if (Error e = initDiscoverySocket(); !e) {
+        multicastError = e.toString();
+        MINIROS_DEBUG_NAMED("multimaster",
+          "Multicast discovery still unavailable after NIC refresh: %s", e.toString());
+      } else {
+        multicastError.clear();
+        MINIROS_INFO_NAMED("multimaster",
+          "Multicast discovery came up after network appeared (%s:%d)",
+          multicastHost.c_str(), multicastPort);
+        nextDiscover = SteadyTime::now();
+      }
+      return;
+    }
+
+    if (joinMulticastOnNewAdapters() > 0)
+      nextDiscover = SteadyTime::now();
+  }
+
+  void onNetworkEvent(const network::NetworkMonitor::Event& ev)
+  {
+    std::lock_guard lock(guard);
+    if (!started)
+      return;
+    MINIROS_DEBUG_NAMED("multimaster", "Network event on %s — refreshing discovery",
+      ev.ifname.empty() ? "?" : ev.ifname.c_str());
+    refreshNetworkUnlocked();
+    // Kick an immediate DISCOVER once the new address/link is usable.
+    if (ev.kind == network::NetworkMonitor::EventKind::LinkUp ||
+        ev.kind == network::NetworkMonitor::EventKind::AddressAdded) {
+      nextDiscover = SteadyTime::now();
+    }
+  }
+
   Error sendDiscoverUnlocked()
   {
+    refreshNetworkUnlocked();
+
+    // No usable IPv4 yet — avoid ENETUNREACH spam on every discover tick.
+    bool haveLan = !subnetBroadcasts.empty();
+    if (!haveLan) {
+      for (const auto& a : localAdapters()) {
+        if (a.isUp() && a.isIPv4() && !a.isLoopback()) {
+          haveLan = true;
+          break;
+        }
+      }
+    }
+    if (!haveLan && peerProbes.empty()) {
+      MINIROS_DEBUG_NAMED("multimaster",
+        "Skipping DISCOVER: no up IPv4 interface yet");
+      return Error::Ok;
+    }
+
     Error last = Error::Ok;
-    if (multicastEnabled && multicastGroup.valid()) {
+    if (multicastEnabled && multicastGroup.valid() && discoverySocket.valid()) {
       MINIROS_DEBUG_NAMED("multimaster", "Sending DISCOVER multicast to %s",
         multicastGroup.str().c_str());
       last = sendOp(mm::Header::OP_DISCOVER, {}, multicastGroup, false, true);
@@ -458,10 +567,9 @@ void MultimasterManager::Internal::handlePacket(const uint8_t* data, size_t size
 
   UUID peerUuid = UUID::fromBytes(h.uuid);
   if (peerUuid == uuid) {
-    if (!senderLooksLocal(sender)) {
-      std::lock_guard lock(guard);
+    std::lock_guard lock(guard);
+    if (!senderLooksLocal(sender))
       noteGuidCollision(h, payload, payload_len, sender);
-    }
     return; // echo or cloned identity — do not OFFER / REQUEST / sync
   }
 
@@ -1087,29 +1195,46 @@ Error MultimasterManager::start(PollSet* pollSet, const UUID& uuid, const networ
   }
 
   if (Error e = internal_->initDiscoverySocket(); !e) {
-    // Keep unicast sync + --peer probes working when multicast is unavailable
-    // (restricted environments, no multicast route, Windows edge cases).
+    // Keep the configured multicast endpoint; retry from refreshNetworkUnlocked()
+    // once ethernet (or another NIC) comes up. Until then fall back to UDP broadcast.
+    // initDiscoverySocket() already closed discoverySocket on failure.
     internal_->multicastError = e.toString();
     MINIROS_WARN_NAMED("multimaster",
-      "Failed to join multicast discovery: %s (continuing with UDP broadcast)", e.toString());
-    internal_->detachSocket(internal_->discoverySocket);
-    internal_->multicastEnabled = false;
-    internal_->multicastGroup = {};
+      "Failed to join multicast discovery: %s (continuing with UDP broadcast; will retry when NICs appear)",
+      e.toString());
   }
 
   internal_->refreshLocalIps();
   internal_->started = true;
+
+  if (Error e = internal_->networkMonitor.start(pollSet,
+        [this](const network::NetworkMonitor::Event& ev) {
+          if (internal_)
+            internal_->onNetworkEvent(ev);
+        }); !e) {
+    if (e == Error::NotSupported) {
+      MINIROS_DEBUG_NAMED("multimaster",
+        "Netlink network monitor unavailable; using periodic NIC polling");
+    } else {
+      MINIROS_WARN_NAMED("multimaster",
+        "Failed to start netlink network monitor: %s (using periodic NIC polling)",
+        e.toString());
+    }
+  }
+
   MINIROS_INFO_NAMED("multimaster",
-    "Listening sync UDP %d, multicast=%s (token=%s, discovery=on, guid=%s)",
+    "Listening sync UDP %d, multicast=%s (token=%s, discovery=on, guid=%s, netlink=%s)",
     internal_->boundPort,
     internal_->multicastEnabled
       ? (internal_->multicastHost + ":" + std::to_string(internal_->multicastPort)).c_str()
       : "off",
     internal_->token.empty() ? "none" : "set",
-    internal_->uuid.toString().c_str());
+    internal_->uuid.toString().c_str(),
+    internal_->networkMonitor.running() ? "on" : "off");
 
   internal_->discoveryEnabled = true;
   internal_->nextDiscover = SteadyTime::now();
+  internal_->nextNetworkRefresh = SteadyTime::now();
   return Error::Ok;
 }
 
@@ -1125,6 +1250,7 @@ void MultimasterManager::stop()
       internal_->sendOp(mm::Header::OP_BYE, {}, peer.info.lastAddress, false);
     }
   }
+  internal_->networkMonitor.stop();
   internal_->detachSockets();
   internal_->peers.clear();
   internal_->started = false;
@@ -1375,6 +1501,15 @@ void MultimasterManager::update()
   std::unique_lock lock(internal_->guard);
   const SteadyTime now = SteadyTime::now();
 
+  // Masters often start before ethernet is configured (embedded boards). Re-scan NICs
+  // so multicast membership and subnet broadcasts catch up without a restart.
+  // With netlink, events drive refresh; keep a slow poll as a safety net.
+  if (now >= internal_->nextNetworkRefresh) {
+    internal_->refreshNetworkUnlocked();
+    const double period = internal_->networkMonitor.running() ? 30.0 : 5.0;
+    internal_->nextNetworkRefresh = now + WallDuration(period);
+  }
+
   if (internal_->discoveryEnabled && now >= internal_->nextDiscover) {
     internal_->sendDiscoverUnlocked();
     // DHCP-like: rediscover on backoff when unpaired; rare keep-alive search when paired.
@@ -1487,7 +1622,13 @@ std::string MultimasterManager::multicastEndpoint() const
 
 std::string MultimasterManager::multicastError() const
 {
-  if (!internal_ || internal_->multicastEnabled)
+  if (!internal_)
+    return {};
+  std::lock_guard lock(internal_->guard);
+  if (!internal_->multicastEnabled)
+    return {};
+  // Sticky boot-time / no-NIC error until discovery socket is actually up.
+  if (internal_->discoverySocket.valid() && internal_->multicastGroup.valid())
     return {};
   return internal_->multicastError;
 }

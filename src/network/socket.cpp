@@ -650,6 +650,16 @@ std::pair<size_t, Error> NetSocket::send(const void* rawData, size_t size, const
     } else if (err == EPIPE || err == ECONNRESET) {
       LOCAL_WARN("NetSocket[%d]::send() connection closed: %s", internal_->fd, strerror(errno));
       return {written, Error::EndOfFile};
+#ifdef ENETUNREACH
+    } else if (err == ENETUNREACH || err == EHOSTUNREACH
+#ifdef EADDRNOTAVAIL
+               || err == EADDRNOTAVAIL
+#endif
+               ) {
+      // Common when UDP discovery runs before ethernet has an address/route.
+      LOCAL_DEBUG("NetSocket[%d]::send() network unreachable: %s", internal_->fd, strerror(errno));
+      return {written, Error::NetworkUnreachable};
+#endif
     } else {
       LOCAL_ERROR("NetSocket[%d]::send() unexpected error: %s", internal_->fd, strerror(errno));
       return {written, Error::SystemError};

@@ -390,6 +390,17 @@ void Master::update()
     }
   }
 
+  // Peers / local addresses on the status page come from AddressResolver, which
+  // used to scan only at construction — too early for ethernet-on-boot boards.
+  {
+    const SteadyTime now = SteadyTime::now();
+    if (internal_->lastAdapterScan.isZero() ||
+        (now - internal_->lastAdapterScan) >= WallDuration(5.0)) {
+      internal_->lastAdapterScan = now;
+      (void)internal_->resolver.scanAdapters();
+    }
+  }
+
   auto shutdownNodes = internal_->regManager.pullShutdownNodes();
   for (std::shared_ptr<NodeRef> nr : shutdownNodes) {
     if (!nr)

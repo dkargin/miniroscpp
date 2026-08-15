@@ -82,6 +82,9 @@ struct Master::Internal {
   /// Timestamp of the last periodic node liveness check.
   SteadyTime lastNodeCheck;
 
+  /// Timestamp of the last AddressResolver adapter rescan (late NIC bring-up).
+  SteadyTime lastAdapterScan;
+
   /// Process/master start time (for uptime on the status page).
   SteadyTime startTime{SteadyTime::now()};
 

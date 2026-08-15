@@ -36,6 +36,7 @@ option(MINIROS_SANITIZE_MEMORY "Use ASan to find memory errors" OFF)
 option(MINIROS_SANITIZE_THREADS "Use TSan to find potential data races" OFF)
 option(MINIROS_THREAD_SAFETY_ANALYSIS  "Use static thread checking from clang" OFF)
 option(MINIROS_PORTABLE_TOOLS "Make miniroscore and minibag portable. Forces linking to static library" OFF)
+option(MINIROS_USE_NETLINK "Use Linux netlink for NIC / address change notifications" ON)
 
 # NDK / Android toolchain builds (CMAKE_TOOLCHAIN_FILE=android.toolchain.cmake).
 # Requires NDK r22+: libc++ ships std::filesystem there; miniros uses it in the core library.
