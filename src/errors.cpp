@@ -58,6 +58,8 @@ const char* Error::toString() const {
       return "Address is unknown";
     case Error::PermissionDenied:
       return "Permission denied";
+    case Error::NetworkUnreachable:
+      return "Network unreachable";
   }
   return "Unknown error";
 }

@@ -65,6 +65,8 @@ struct MINIROS_DECL Error {
     AddressIsUnknown,
     /// Permission denied during some OS action.
     PermissionDenied,
+    /// No route to host / network unreachable (ENETUNREACH / EHOSTUNREACH).
+    NetworkUnreachable,
   };
 
   Error() :code(Ok)

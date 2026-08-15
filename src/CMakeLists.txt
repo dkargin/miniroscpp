@@ -35,6 +35,18 @@ CHECK_CXX_SYMBOL_EXISTS(epoll_wait "sys/epoll.h" HAVE_EPOLL)
 # Not everybody has poll (e.g., Windows, BSD, embedded arm-linux)
 CHECK_CXX_SYMBOL_EXISTS(poll "poll.h" HAVE_POLL)
 
+# Optional Linux netlink for live NIC / address updates (multimaster discovery).
+set(HAVE_NETLINK FALSE)
+if (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND MINIROS_USE_NETLINK)
+  CHECK_INCLUDE_FILES("linux/netlink.h;linux/rtnetlink.h" HAVE_LINUX_NETLINK_HEADERS)
+  if (HAVE_LINUX_NETLINK_HEADERS)
+    set(HAVE_NETLINK TRUE)
+    message(STATUS "Will enable Linux netlink network monitor")
+  else()
+    message(STATUS "MINIROS_USE_NETLINK requested but linux/netlink.h not found")
+  endif()
+endif()
+
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/internal_config.h.in" internal_config.h)
 
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
@@ -210,6 +222,7 @@ set(transport_SRC
     network/network.cpp
     network/net_adapter.cpp
     network/net_address.cpp
+    network/network_monitor.cpp
     network/socket.cpp
     network/url.cpp
 

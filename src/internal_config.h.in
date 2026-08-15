@@ -8,6 +8,9 @@
 #cmakedefine HAVE_EPOLL
 #cmakedefine HAVE_POLL
 
+#cmakedefine HAVE_NETLINK
+#cmakedefine MINIROS_USE_NETLINK
+
 #cmakedefine MINIROS_USE_LIBSYSTEMD
 #cmakedefine HAVE_LIBSYSTEMD
 
