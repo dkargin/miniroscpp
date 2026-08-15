@@ -411,23 +411,31 @@ struct MultimasterManager::Internal {
       return Error::Ok;
     }
 
+    // Advertise host + RPC/sync port in DISCOVER so the receiver can list us
+    // in its discovery table without waiting for a later OFFER exchange.
+    std::vector<uint8_t> discoverPayload;
+    if (Error e = buildLocalOfferPayload(discoverPayload); !e) {
+      MINIROS_WARN_NAMED("multimaster", "Failed to serialize DISCOVER offer payload: %s", e.toString());
+      discoverPayload.clear();
+    }
+
     Error last = Error::Ok;
     if (multicastEnabled && multicastGroup.valid() && discoverySocket.valid()) {
       MINIROS_DEBUG_NAMED("multimaster", "Sending DISCOVER multicast to %s",
         multicastGroup.str().c_str());
-      last = sendOp(mm::Header::OP_DISCOVER, {}, multicastGroup, false, true);
+      last = sendOp(mm::Header::OP_DISCOVER, discoverPayload, multicastGroup, false, true);
     }
     if (broadcastAddr.valid()) {
       MINIROS_DEBUG_NAMED("multimaster", "Sending DISCOVER limited-broadcast on UDP %d", boundPort);
-      last = sendOp(mm::Header::OP_DISCOVER, {}, broadcastAddr, false);
+      last = sendOp(mm::Header::OP_DISCOVER, discoverPayload, broadcastAddr, false);
     }
     for (const network::NetAddress& bcast : subnetBroadcasts) {
       MINIROS_DEBUG_NAMED("multimaster", "Sending DISCOVER subnet-broadcast to %s", bcast.str().c_str());
-      last = sendOp(mm::Header::OP_DISCOVER, {}, bcast, false);
+      last = sendOp(mm::Header::OP_DISCOVER, discoverPayload, bcast, false);
     }
     for (const network::NetAddress& peer : peerProbes) {
       MINIROS_DEBUG_NAMED("multimaster", "Sending DISCOVER probe to %s", peer.str().c_str());
-      last = sendOp(mm::Header::OP_DISCOVER, {}, peer, false);
+      last = sendOp(mm::Header::OP_DISCOVER, discoverPayload, peer, false);
     }
     return last;
   }
@@ -439,6 +447,55 @@ struct MultimasterManager::Internal {
     return localIps.count(sender.address) != 0;
   }
 
+  /// True when @p addr looks like a usable sync endpoint (not the shared mcast port).
+  bool isUsableSyncAddress(const network::NetAddress& addr) const
+  {
+    if (!addr.valid() || addr.address.empty())
+      return false;
+    if (multicastEnabled && multicastPort > 0 && addr.port() == multicastPort)
+      return false;
+    return addr.port() > 0;
+  }
+
+  Error buildLocalOfferPayload(std::vector<uint8_t>& payload) const
+  {
+    miniros_msgs::MasterOffer offer;
+    offer.master_port = static_cast<uint16_t>(rpcUrl.port ? rpcUrl.port : boundPort);
+    offer.host = rpcUrl.host;
+    return mm::serializePayload(offer, payload);
+  }
+
+  /// Apply MasterOffer (or UDP sender fallback) into peer URI / sync address.
+  void applyOfferInfo(Peer& peer, const miniros_msgs::MasterOffer* offer, const network::NetAddress& sender)
+  {
+    network::NetAddress syncAddr = sender;
+    if (offer)
+      syncAddr = syncAddressFromOffer(*offer, sender);
+
+    // Do not overwrite a known sync address with the multicast discovery source port.
+    if (isUsableSyncAddress(syncAddr))
+      peer.info.lastAddress = syncAddr;
+    else if (!peer.info.lastAddress.valid() && sender.valid()) {
+      // Keep IP for UI even when UDP source port is the shared discovery port.
+      network::NetAddress ipOnly = network::NetAddress::fromIp4String(sender.address, 0);
+      if (ipOnly.valid())
+        peer.info.lastAddress = ipOnly;
+      else
+        peer.info.lastAddress = sender;
+    }
+
+    if (offer) {
+      peer.info.masterUri.scheme = "http://";
+      peer.info.masterUri.host = offer->host.empty() ? sender.address : offer->host;
+      peer.info.masterUri.port = offer->master_port ? offer->master_port : sender.port();
+    } else if (peer.info.masterUri.empty() && !sender.address.empty()) {
+      peer.info.masterUri.scheme = "http://";
+      peer.info.masterUri.host = sender.address;
+      if (isUsableSyncAddress(sender))
+        peer.info.masterUri.port = sender.port();
+    }
+  }
+
   void onSyncReadable();
   void onDiscoveryReadable();
   void recvFrom(network::NetSocket& sock);
@@ -446,7 +503,8 @@ struct MultimasterManager::Internal {
   /// Record a remote sender that advertised this master's GUID. Caller holds guard.
   void noteGuidCollision(const mm::Header& h, const uint8_t* payload, size_t payload_len,
     const network::NetAddress& sender);
-  void handleDiscover(const mm::Header& h, const network::NetAddress& sender);
+  void handleDiscover(const mm::Header& h, const uint8_t* payload, size_t len,
+    const network::NetAddress& sender);
   void handleOffer(const mm::Header& h, const uint8_t* payload, size_t len, const network::NetAddress& sender);
   void handleRequest(const mm::Header& h, const network::NetAddress& sender, std::unique_lock<std::mutex>& lock);
   void handleAck(const mm::Header& h, const network::NetAddress& sender, std::unique_lock<std::mutex>& lock);
@@ -577,7 +635,7 @@ void MultimasterManager::Internal::handlePacket(const uint8_t* data, size_t size
 
   switch (h.op) {
   case mm::Header::OP_DISCOVER:
-    handleDiscover(h, sender);
+    handleDiscover(h, payload, payload_len, sender);
     break;
   case mm::Header::OP_OFFER:
     handleOffer(h, payload, payload_len, sender);
@@ -646,30 +704,48 @@ void MultimasterManager::Internal::noteGuidCollision(const mm::Header& h, const 
   }
 }
 
-void MultimasterManager::Internal::handleDiscover(const mm::Header& h, const network::NetAddress& sender)
+void MultimasterManager::Internal::handleDiscover(const mm::Header& h, const uint8_t* payload, size_t len,
+  const network::NetAddress& sender)
 {
-  // Always answer DISCOVER so peers appear on the status page even without a shared token.
-  // Do not treat the discovery source port as the sync address — OFFER carries master_port.
+  // Register the probing master so it appears in our discovery table (symmetric to
+  // the probe side, which learns about us from the OFFER reply). Prefer MasterOffer
+  // in the DISCOVER payload; fall back to the UDP sender address.
+  const bool match = tokenAccepts(h.token_hash);
   UUID peerUuid = UUID::fromBytes(h.uuid);
+
+  miniros_msgs::MasterOffer offer;
+  const miniros_msgs::MasterOffer* offerPtr = nullptr;
+  if (payload && len > 0 && mm::deserializePayload(payload, len, offer) &&
+      (offer.master_port != 0 || !offer.host.empty())) {
+    offerPtr = &offer;
+  }
+
   Peer& peer = peers[uuidKey(peerUuid)];
   if (!peer.info.uuid.valid())
     peer.info.uuid = peerUuid;
   peer.info.lastSeen = SteadyTime::now();
   peer.info.remoteHasToken = !mm::tokenHashEmpty(h.token_hash);
-  peer.info.tokenMatch = tokenAccepts(h.token_hash);
+  peer.info.tokenMatch = match;
+  applyOfferInfo(peer, offerPtr, sender);
+
+  // Always answer DISCOVER so the probe side learns our MasterOffer.
+  sendOfferTo(sender, /*viaDiscovery=*/discoverySocket.valid());
+
   if (peer.info.state == PeerState::Paired)
     return;
-  peer.info.state = PeerState::Offering;
-  sendOfferTo(sender, /*viaDiscovery=*/discoverySocket.valid());
+
+  if (peer.info.state != PeerState::Requesting)
+    peer.info.state = PeerState::Discovered;
+
+  // Auto-pair when we already share a non-empty collective token (same as OFFER path).
+  if (match && !token.empty() && isUsableSyncAddress(peer.info.lastAddress))
+    sendRequestTo(peer);
 }
 
 Error MultimasterManager::Internal::sendOfferTo(const network::NetAddress& dest, bool viaDiscovery)
 {
-  miniros_msgs::MasterOffer offer;
-  offer.master_port = static_cast<uint16_t>(rpcUrl.port ? rpcUrl.port : boundPort);
-  offer.host = rpcUrl.host;
   std::vector<uint8_t> payload;
-  if (Error e = mm::serializePayload(offer, payload); !e)
+  if (Error e = buildLocalOfferPayload(payload); !e)
     return e;
   return sendOp(mm::Header::OP_OFFER, payload, dest, false, viaDiscovery);
 }
@@ -681,46 +757,29 @@ void MultimasterManager::Internal::handleOffer(const mm::Header& h, const uint8_
   UUID peerUuid = UUID::fromBytes(h.uuid);
 
   miniros_msgs::MasterOffer offer;
-  network::NetAddress syncAddr = sender;
-  if (mm::deserializePayload(payload, len, offer)) {
-    syncAddr = syncAddressFromOffer(offer, sender);
-    Peer& peer = ensurePeer(peerUuid, syncAddr);
-    peer.info.remoteHasToken = !mm::tokenHashEmpty(h.token_hash);
-    peer.info.tokenMatch = match;
-    peer.info.masterUri.scheme = "http://";
-    peer.info.masterUri.host = offer.host.empty() ? sender.address : offer.host;
-    peer.info.masterUri.port = offer.master_port ? offer.master_port : sender.port();
-
-    if (peer.info.state == PeerState::Paired)
-      return;
-
-    if (peer.info.state == PeerState::Discovered || peer.info.state == PeerState::Stale ||
-        peer.info.state == PeerState::Offering)
-      peer.info.state = PeerState::Discovered;
-
-    // Auto-pair only when a non-empty collective token is configured.
-    if (match && !token.empty()) {
-      peer.info.state = PeerState::Requesting;
-      sendRequestTo(peer);
-    }
-    return;
+  const miniros_msgs::MasterOffer* offerPtr = nullptr;
+  if (payload && len > 0 && mm::deserializePayload(payload, len, offer) &&
+      (offer.master_port != 0 || !offer.host.empty())) {
+    offerPtr = &offer;
   }
 
-  Peer& peer = ensurePeer(peerUuid, syncAddr);
+  Peer& peer = peers[uuidKey(peerUuid)];
+  if (!peer.info.uuid.valid())
+    peer.info.uuid = peerUuid;
+  peer.info.lastSeen = SteadyTime::now();
   peer.info.remoteHasToken = !mm::tokenHashEmpty(h.token_hash);
   peer.info.tokenMatch = match;
+  applyOfferInfo(peer, offerPtr, sender);
 
   if (peer.info.state == PeerState::Paired)
     return;
 
-  if (peer.info.state == PeerState::Discovered || peer.info.state == PeerState::Stale ||
-      peer.info.state == PeerState::Offering)
+  if (peer.info.state != PeerState::Requesting)
     peer.info.state = PeerState::Discovered;
 
-  if (match && !token.empty()) {
-    peer.info.state = PeerState::Requesting;
+  // Auto-pair only when a non-empty collective token is configured.
+  if (match && !token.empty() && isUsableSyncAddress(peer.info.lastAddress))
     sendRequestTo(peer);
-  }
 }
 
 Error MultimasterManager::Internal::sendRequestTo(Peer& peer)
