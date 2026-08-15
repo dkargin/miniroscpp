@@ -102,15 +102,31 @@ void Master::Internal::renderMasterStatus(std::string& output) const
 
   for (const std::shared_ptr<network::HostInfo> host : resolver.getHosts()) {
     ss << "<li><div><dl>";
-    ss << "<dt>" << host->hostname << "</dt>";
-    host->iterate([&ss](const network::NetAddress& address) {
-      // Skip boring addresses.
-            if (address.isLoopback())
-              return;
-            if (address.isUnspecified())
-              return;
-            ss << "<dd>" << address.str() << "</dd>" << std::endl;
-    });
+    ss << "<dt>" << host->hostname;
+    if (host->local)
+      ss << " <em>It's me</em>";
+    ss << "</dt>";
+
+    if (host->local) {
+      // Local host: show interface name + address (not just the IP list).
+      resolver.iterateAdapters([&ss](const network::NetAdapter* adapter) {
+        if (!adapter || !adapter->isUp() || !adapter->isValid())
+          return;
+        if (adapter->isLoopback())
+          return;
+        if (adapter->address.isUnspecified())
+          return;
+        ss << "<dd><code>" << adapter->name << "</code>: " << adapter->address.str() << "</dd>\n";
+      });
+    } else {
+      host->iterate([&ss](const network::NetAddress& address) {
+        if (address.isLoopback())
+          return;
+        if (address.isUnspecified())
+          return;
+        ss << "<dd>" << address.str() << "</dd>\n";
+      });
+    }
 
     ss << "</dl></div></li>";
   }
@@ -151,10 +167,17 @@ void Master::Internal::renderMasterStatus(std::string& output) const
         else
           ss << "<li>";
 
-        const std::string uri = peer.masterUri.empty() ? std::string() : peer.masterUri.str();
+        // Prefer MasterOffer URI; if port was not filled yet, borrow from last UDP sync address.
+        network::URL displayUri = peer.masterUri;
+        if (!displayUri.host.empty() && displayUri.port == 0 && peer.lastAddress.valid() && peer.lastAddress.port() > 0)
+          displayUri.port = static_cast<uint32_t>(peer.lastAddress.port());
+        if (displayUri.scheme.empty() && !displayUri.host.empty())
+          displayUri.scheme = "http://";
+
+        const std::string uri = displayUri.empty() ? std::string() : displayUri.str();
         if (!uri.empty()) {
           ss << print::Url(uri, uri);
-          if (peer.lastAddress.valid() && peer.masterUri.host != peer.lastAddress.address)
+          if (peer.lastAddress.valid() && displayUri.host != peer.lastAddress.address)
             ss << " (" << peer.lastAddress.address << ")";
         } else if (peer.lastAddress.valid()) {
           ss << peer.lastAddress.str();

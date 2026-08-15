@@ -484,16 +484,24 @@ struct MultimasterManager::Internal {
         peer.info.lastAddress = sender;
     }
 
-    if (offer) {
-      peer.info.masterUri.scheme = "http://";
-      peer.info.masterUri.host = offer->host.empty() ? sender.address : offer->host;
-      peer.info.masterUri.port = offer->master_port ? offer->master_port : sender.port();
-    } else if (peer.info.masterUri.empty() && !sender.address.empty()) {
-      peer.info.masterUri.scheme = "http://";
+    if (offer && !offer->host.empty())
+      peer.info.masterUri.host = offer->host;
+    else if (peer.info.masterUri.host.empty() && !sender.address.empty())
       peer.info.masterUri.host = sender.address;
-      if (isUsableSyncAddress(sender))
-        peer.info.masterUri.port = sender.port();
+
+    // Prefer explicit offer port; otherwise fill in once we know a usable sync port.
+    // (Early multicast DISCOVER can set host before port is known.)
+    if (offer && offer->master_port)
+      peer.info.masterUri.port = offer->master_port;
+    else if (peer.info.masterUri.port == 0) {
+      if (isUsableSyncAddress(syncAddr))
+        peer.info.masterUri.port = static_cast<uint32_t>(syncAddr.port());
+      else if (isUsableSyncAddress(peer.info.lastAddress))
+        peer.info.masterUri.port = static_cast<uint32_t>(peer.info.lastAddress.port());
     }
+
+    if (!peer.info.masterUri.host.empty() && peer.info.masterUri.scheme.empty())
+      peer.info.masterUri.scheme = "http://";
   }
 
   void onSyncReadable();

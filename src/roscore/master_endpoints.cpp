@@ -239,7 +239,12 @@ Error MultimasterApiEndpoint::handle(const network::ClientInfo& clientInfo, std:
       RpcValue p;
       p["uuid"] = peer.uuid.toString();
       p["state"] = MultimasterManager::peerStateName(peer.state);
-      p["uri"] = peer.masterUri.str();
+      network::URL uri = peer.masterUri;
+      if (!uri.host.empty() && uri.port == 0 && peer.lastAddress.valid() && peer.lastAddress.port() > 0)
+        uri.port = static_cast<uint32_t>(peer.lastAddress.port());
+      if (uri.scheme.empty() && !uri.host.empty())
+        uri.scheme = "http://";
+      p["uri"] = uri.str();
       p["address"] = peer.lastAddress.valid() ? peer.lastAddress.str() : std::string();
       p["pairable"] = peer.state != PeerState::GuidCollision &&
                       peer.state != PeerState::Paired &&

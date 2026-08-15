@@ -152,6 +152,25 @@ TEST(Address, ip4)
   EXPECT_EQ(address3.type(), NetAddress::AddressInvalid);
 }
 
+TEST(Address, isLoopback)
+{
+  EXPECT_TRUE(NetAddress::fromIp4String("127.0.0.1", 0).isLoopback());
+  EXPECT_TRUE(NetAddress::fromIp4String("127.1.2.3", 0).isLoopback());
+  EXPECT_FALSE(NetAddress::fromIp4String("192.168.1.10", 0).isLoopback());
+  EXPECT_FALSE(NetAddress::fromIp4String("10.0.0.1", 0).isLoopback());
+
+  EXPECT_TRUE(NetAddress::fromIp6String("::1", 0).isLoopback());
+  // Deprecated IPv4-compatible form reported on some hosts (e.g. orangepi).
+  EXPECT_TRUE(NetAddress::fromIp6String("::127.0.0.1", 0).isLoopback());
+  EXPECT_TRUE(NetAddress::fromIp6String("::ffff:127.0.0.1", 0).isLoopback());
+  EXPECT_FALSE(NetAddress::fromIp6String("::ffff:192.168.1.10", 0).isLoopback());
+  EXPECT_FALSE(NetAddress::fromIp6String("fe80::1", 0).isLoopback());
+
+  NetAddress named;
+  named.address = "localhost";
+  EXPECT_TRUE(named.isLoopback());
+}
+
 TEST(Address, invalidAddress)
 {
   NetAddress address;

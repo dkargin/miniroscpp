@@ -91,7 +91,52 @@ void NetAddress::reset()
 
 bool NetAddress::isLoopback() const
 {
-  return address == "127.0.0.1" || address == "localhost" || address == "::1";
+  auto ipv4Loopback = [](uint32_t addr_network_order) {
+    // 127.0.0.0/8
+    return (ntohl(addr_network_order) >> 24) == 127;
+  };
+  auto ipv6Loopback = [&](const in6_addr& a) {
+    if (IN6_IS_ADDR_LOOPBACK(&a))
+      return true;
+    // ::ffff:127.x.x.x (IPv4-mapped)
+    if (IN6_IS_ADDR_V4MAPPED(&a)) {
+      uint32_t v4 = 0;
+      std::memcpy(&v4, &a.s6_addr[12], sizeof(v4));
+      return ipv4Loopback(v4);
+    }
+    // ::127.x.x.x (deprecated IPv4-compatible) — seen on some stacks as "::127.0.0.1"
+    if (IN6_IS_ADDR_V4COMPAT(&a)) {
+      uint32_t v4 = 0;
+      std::memcpy(&v4, &a.s6_addr[12], sizeof(v4));
+      return ipv4Loopback(v4);
+    }
+    return false;
+  };
+
+  if (rawAddress_) {
+    if (type_ == AddressIPv4) {
+      const auto* a = static_cast<const sockaddr_in*>(rawAddress_);
+      return ipv4Loopback(a->sin_addr.s_addr);
+    }
+    if (type_ == AddressIPv6) {
+      const auto* a = static_cast<const sockaddr_in6*>(rawAddress_);
+      return ipv6Loopback(a->sin6_addr);
+    }
+  }
+
+  // Hostname-only / no sockaddr: keep common names, then parse as IP text.
+  if (address == "localhost" || address == "localhost.")
+    return true;
+
+  in_addr v4{};
+  if (inet_pton(AF_INET, address.c_str(), &v4) == 1)
+    return ipv4Loopback(v4.s_addr);
+
+  in6_addr v6{};
+  if (inet_pton(AF_INET6, address.c_str(), &v6) == 1)
+    return ipv6Loopback(v6);
+
+  return false;
 }
 
 bool NetAddress::isUnspecified() const
