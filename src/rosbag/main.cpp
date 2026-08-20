@@ -11,6 +11,7 @@
 
 #include "minibag/player.h"
 #include "minibag/recorder.h"
+#include "minibag/bag_info.h"
 #include "minibag/view.h"
 
 #include "miniros/console.h"
@@ -609,6 +610,126 @@ int runEncrypt(int argc, char** argv)
     return encrypt(opts);
 }
 
+struct InfoOptions
+{
+    bool yaml = false;
+    bool freq = false;
+    std::string key;
+    std::vector<std::string> bags;
+};
+
+InfoOptions parseInfoOptions(int argc, char** argv)
+{
+    InfoOptions opts;
+
+    po::options_description desc("Allowed options");
+
+    desc.add_options()
+      ("help,h", "produce help message")
+      ("yaml,y", "print information in YAML format")
+      ("key,k", po::value<std::string>(), "print information on the given key")
+      ("freq", "display topic message frequency statistics")
+      ("bags", po::value< std::vector<std::string> >(), "bag files to summarize")
+      ;
+
+    po::positional_options_description p;
+    p.add("bags", -1);
+
+    po::variables_map vm;
+
+    try
+    {
+        po::store(po::command_line_parser(argc, argv).options(desc).positional(p).run(), vm);
+    }
+    catch (po::invalid_command_line_syntax& e)
+    {
+        throw miniros::Exception(e.what());
+    }
+    catch (po::unknown_option& e)
+    {
+        throw miniros::Exception(e.what());
+    }
+
+    if (vm.count("help"))
+    {
+        std::cout << "Summarize the contents of one or more bag files.\n\nUsage: minibag info [options] BAGFILE1 [BAGFILE2 ...]\n\n"
+                  << desc << std::endl;
+        exit(0);
+    }
+
+    if (vm.count("yaml"))
+        opts.yaml = true;
+    if (vm.count("freq"))
+        opts.freq = true;
+    if (vm.count("key"))
+        opts.key = vm["key"].as<std::string>();
+
+    if (vm.count("key") && !opts.yaml)
+        throw miniros::Exception("You can only specify key when printing in YAML format.");
+
+    if (vm.count("bags"))
+    {
+        opts.bags = vm["bags"].as< std::vector<std::string> >();
+    }
+    else
+    {
+        throw miniros::Exception("You must specify at least one bag file.");
+    }
+
+    return opts;
+}
+
+/// Handles command `minibag info ...`
+int runInfo(int argc, char** argv)
+{
+    InfoOptions opts;
+    try
+    {
+        opts = parseInfoOptions(argc, argv);
+    }
+    catch (miniros::Exception const& ex)
+    {
+        MINIROS_ERROR("Error reading options: %s", ex.what());
+        return EXIT_FAILURE;
+    }
+
+    for (size_t i = 0; i < opts.bags.size(); ++i)
+    {
+        try
+        {
+            minibag::Bag bag(opts.bags[i], minibag::bagmode::Read);
+            minibag::BagInfoOptions info_opts;
+            info_opts.yaml = opts.yaml;
+            info_opts.freq = opts.freq;
+            info_opts.key = opts.key;
+            const std::string info = minibag::formatBagInfo(bag, info_opts);
+            if (!info.empty())
+                std::cout << info << std::endl;
+            bag.close();
+        }
+        catch (minibag::BagUnindexedException const&)
+        {
+            std::cerr << "ERROR bag unindexed: " << opts.bags[i] << ".  Run rosbag reindex." << std::endl;
+            return EXIT_FAILURE;
+        }
+        catch (minibag::BagException const& ex)
+        {
+            std::cerr << "ERROR reading " << opts.bags[i] << ": " << ex.what() << std::endl;
+            return EXIT_FAILURE;
+        }
+        catch (std::exception const& ex)
+        {
+            std::cerr << "ERROR reading " << opts.bags[i] << ": " << ex.what() << std::endl;
+            return EXIT_FAILURE;
+        }
+
+        if (i + 1 < opts.bags.size())
+            std::cout << "---" << std::endl;
+    }
+
+    return EXIT_SUCCESS;
+}
+
 int main(int argc, char** argv) {
 
   if (argc < 2) {
@@ -628,5 +749,7 @@ int main(int argc, char** argv) {
     return runRecord(argc-1, argv+1);
   else if (command == "encrypt")
     return runEncrypt(argc-1, argv+1);
+  else if (command == "info")
+    return runInfo(argc-1, argv+1);
   return EXIT_FAILURE;
 }

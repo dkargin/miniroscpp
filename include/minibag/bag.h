@@ -94,10 +94,13 @@ class MessageInstance;
 class View;
 class Query;
 
+class BagInfoFormatter;
+
 class ROSBAG_STORAGE_DECL Bag
 {
     friend class MessageInstance;
     friend class View;
+    friend class BagInfoFormatter;
 
 public:
     Bag();
@@ -204,6 +207,9 @@ public:
     void swap(Bag&);
 
     bool isOpen() const;
+
+    //! Read chunk headers for every chunk in the bag (bag version 2.0).
+    std::vector<ChunkHeader> collectChunkHeaders() const;
 
 private:
     // disable copying
