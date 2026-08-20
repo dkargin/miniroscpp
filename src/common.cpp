@@ -390,8 +390,23 @@ static void writeAll(int fd, const char* msg, size_t len)
 {
   if (fd < 0 || !msg || len == 0)
     return;
-  // Best-effort; ignore short writes in a signal handler.
-  (void)::write(fd, msg, len);
+  // Best-effort in a signal handler: retry EINTR, stop on other errors / EOF.
+  const int savedErrno = errno;
+  const char* p = msg;
+  size_t left = len;
+  while (left > 0) {
+    const ssize_t n = ::write(fd, p, left);
+    if (n < 0) {
+      if (errno == EINTR)
+        continue;
+      break;
+    }
+    if (n == 0)
+      break;
+    p += static_cast<size_t>(n);
+    left -= static_cast<size_t>(n);
+  }
+  errno = savedErrno;
 }
 
 static void fatalSignalHandler(int signal) {

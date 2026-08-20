@@ -416,6 +416,7 @@ target_include_directories(miniroscore PRIVATE ${MINIROS_INCLUDE_ROOT} ${MINIROS
 set(bag_storage_SRC
     rosbag_storage/bag_player.cpp
     rosbag_storage/bag.cpp
+    rosbag_storage/bag_info.cpp
     rosbag_storage/buffer.cpp
     rosbag_storage/chunked_file.cpp
     rosbag_storage/message_instance.cpp

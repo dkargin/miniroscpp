@@ -1232,6 +1232,18 @@ void Bag::write(char const* s, std::streamsize n) { file_.write((char*) s, n);  
 void Bag::read(char* b, std::streamsize n) const  { file_.read(b, n);             }
 void Bag::seek(uint64_t pos, int origin) const    { file_.seek(pos, origin);      }
 
+std::vector<ChunkHeader> Bag::collectChunkHeaders() const {
+    std::vector<ChunkHeader> headers;
+    headers.reserve(chunks_.size());
+    for (ChunkInfo const& chunk_info : chunks_) {
+        seek(chunk_info.pos);
+        ChunkHeader chunk_header;
+        readChunkHeader(chunk_header);
+        headers.push_back(chunk_header);
+    }
+    return headers;
+}
+
 void Bag::swap(Bag& other) {
     using std::swap;
     swap(mode_, other.mode_);
