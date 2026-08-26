@@ -9,6 +9,7 @@
 #include <memory>
 #include <string>
 #include <thread>
+#include <vector>
 
 #include "miniros/network/net_adapter.h"
 #include "miniros/network/net_address.h"
@@ -17,6 +18,7 @@
 
 #ifndef WIN32
 #include <sys/socket.h>
+#include <net/if.h>
 #endif
 
 using Error = miniros::Error;
@@ -171,6 +173,34 @@ TEST(Address, isLoopback)
   EXPECT_TRUE(named.isLoopback());
 }
 
+TEST(Address, isAnyAndBroadcast)
+{
+  EXPECT_TRUE(NetAddress::fromIp4String("0.0.0.0", 11311).isAny());
+  EXPECT_FALSE(NetAddress::fromIp4String("0.0.0.0", 11311).isLimitedBroadcast());
+  EXPECT_TRUE(NetAddress::fromIp4String("255.255.255.255", 11311).isLimitedBroadcast());
+  EXPECT_FALSE(NetAddress::fromIp4String("255.255.255.255", 11311).isAny());
+  EXPECT_TRUE(NetAddress::fromIp4String("239.255.42.42", 11312).isMulticast());
+  EXPECT_FALSE(NetAddress::fromIp4String("192.168.1.10", 0).isAny());
+  EXPECT_FALSE(NetAddress::fromIp4String("192.168.1.10", 0).isMulticast());
+  EXPECT_TRUE(NetAddress::fromIp6String("::", 0).isAny());
+}
+
+TEST(Adapters, ScanHasIfindex)
+{
+  std::vector<NetAdapter> adapters;
+  ASSERT_EQ(scanAdapters(adapters), Error::Ok);
+  bool anyUp = false;
+  for (const auto& a : adapters) {
+    if (!a.isUp())
+      continue;
+    anyUp = true;
+    EXPECT_GT(a.ifindex, 0) << a.name;
+    if (a.isLoopback() && a.isIPv4())
+      EXPECT_TRUE(a.hasUnicastAddress());
+  }
+  EXPECT_TRUE(anyUp);
+}
+
 TEST(Address, invalidAddress)
 {
   NetAddress address;
@@ -257,6 +287,46 @@ TEST(SocketUDP, SimplestBroadcast)
   auto [sent2, err2] = socket.send(msg2, sizeof(msg2), &address);
   ASSERT_EQ(err2, Error::Ok);
   ASSERT_EQ(sent2, 6);
+}
+
+TEST(SocketUDP, SendRecvWithIfindex)
+{
+#ifndef WIN32
+  int lo = static_cast<int>(if_nametoindex("lo"));
+  if (lo <= 0)
+    GTEST_SKIP() << "no loopback ifindex";
+
+  NetSocket rx;
+  constexpr int port = 11821;
+  ASSERT_TRUE(rx.initUDP(false));
+  ASSERT_TRUE(rx.setReuseAddr(true));
+  ASSERT_TRUE(rx.setReusePort(true));
+  ASSERT_TRUE(rx.bind(port));
+  ASSERT_TRUE(rx.setNonBlock());
+
+  NetSocket tx;
+  ASSERT_TRUE(tx.initUDP(false));
+
+  const char msg[] = "ifindex";
+  NetAddress dest = NetAddress::fromIp4String("127.0.0.1", port);
+  auto [sent, err] = tx.send(msg, sizeof(msg), &dest, lo);
+  ASSERT_EQ(err, Error::Ok);
+  ASSERT_EQ(sent, sizeof(msg));
+
+  std::string got;
+  NetAddress sender;
+  bool ok = false;
+  for (int i = 0; i < 100; ++i) {
+    auto [n, rerr] = rx.recv(got, &sender);
+    if (n > 0 && rerr == Error::Ok) {
+      ok = true;
+      break;
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(2));
+  }
+  ASSERT_TRUE(ok);
+  EXPECT_STREQ(got.c_str(), msg);
+#endif
 }
 
 TEST(SocketTCP, Write2SmallPayload)

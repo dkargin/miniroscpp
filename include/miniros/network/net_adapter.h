@@ -22,7 +22,13 @@ struct MINIROS_DECL NetAdapter {
   /// Name of the adapter.
   std::string name;
 
-  /// Address on the adapter.
+  /// Kernel interface index (0 if unknown).
+  int ifindex = 0;
+
+  /// Hardware address as "aa:bb:cc:dd:ee:ff", empty if unknown.
+  std::string mac;
+
+  /// Address on the adapter (may be invalid when the link is up with no IP).
   NetAddress address;
   /// IPv4 netmask.
   NetAddress mask;
@@ -39,6 +45,14 @@ struct MINIROS_DECL NetAdapter {
 
   /// Check if there is valid network address.
   bool isValid() const;
+
+  /// Unicast IPv4/IPv6 assigned (not 0.0.0.0 / ::).
+  bool hasUnicastAddress() const;
+
+  bool hasMulticast() const;
+  void setMulticast(bool multicast);
+  bool hasBroadcast() const;
+  void setBroadcast(bool broadcast);
 
   /// Check if adapter uses IPv4 address.
   bool isIPv4() const;
@@ -62,6 +76,8 @@ protected:
 
       /// Interface is a loopback device.
       unsigned int loop: 1;
+      unsigned int multicast: 1;
+      unsigned int broadcast: 1;
     }f;
     uint16_t raw = 0;
   } flags_;

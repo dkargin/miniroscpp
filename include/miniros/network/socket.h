@@ -124,6 +124,8 @@ public:
   /// Only the IP address is taken from \p group (port is ignored).
   Error joinMulticastGroup(const NetAddress& group, bool loop);
   Error joinMulticastGroup(const NetAddress& group, const NetAddress& iface, bool loop);
+  /// Join on a specific interface index (works even when the NIC has no IPv4 address).
+  Error joinMulticastGroup(const NetAddress& group, int ifindex, bool loop);
 
   int fd() const;
 
@@ -186,8 +188,10 @@ public:
   /// @param rawData - pointer to data buffer.
   /// @param size - size of data in bytes.
   /// @param address - destination address. It is only relevant to datagram sockets.
+  /// @param ifindex - if > 0, pin the outbound NIC (Linux sendmsg IP_PKTINFO).
+  ///   Needed to emit UDP from 0.0.0.0 when that interface has no IPv4 yet.
   /// @returns a tuple with number of bytes actually sent and error code.
-  virtual std::pair<size_t, Error> send(const void* rawData, size_t size, const NetAddress* address);
+  virtual std::pair<size_t, Error> send(const void* rawData, size_t size, const NetAddress* address, int ifindex = 0);
 
   /// Write two separate buffers to a socket.
   /// It is often HTTP header and a payload from a separate buffer.

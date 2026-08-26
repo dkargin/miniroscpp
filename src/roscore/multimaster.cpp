@@ -89,7 +89,7 @@ struct MultimasterManager::Internal {
   std::set<std::string> localOnlyTopics{"/rosout", "/rosout_agg"};
   /// IPv4 addresses of local adapters (to distinguish multicast echo from a cloned GUID).
   std::set<std::string> localIps;
-  /// Interfaces already joined for multicast (adapter IPv4 address strings).
+  /// Interfaces already joined for multicast (adapter name).
   std::set<std::string> joinedMulticastIfaces;
 
   /// Unicast sync (+ broadcast fallback when multicast disabled).
@@ -134,17 +134,18 @@ struct MultimasterManager::Internal {
     h.token_hash = token_hash;
   }
 
-  Error sendRaw(network::NetSocket& sock, const std::vector<uint8_t>& packet, const network::NetAddress& dest)
+  Error sendRaw(network::NetSocket& sock, const std::vector<uint8_t>& packet, const network::NetAddress& dest,
+    int ifindex = 0)
   {
     if (!sock.valid())
       return Error::NotConnected;
-    auto [n, err] = sock.send(packet.data(), packet.size(), &dest);
+    auto [n, err] = sock.send(packet.data(), packet.size(), &dest, ifindex);
     (void)n;
     return err;
   }
 
   Error sendOp(uint8_t op, const std::vector<uint8_t>& payload, const network::NetAddress& dest,
-    bool needsAck, bool viaDiscovery = false, uint32_t* outSeq = nullptr)
+    bool needsAck, bool viaDiscovery = false, uint32_t* outSeq = nullptr, int ifindex = 0)
   {
     mm::Header h;
     uint32_t seq = next_control_seq++;
@@ -153,7 +154,7 @@ struct MultimasterManager::Internal {
     if (Error e = mm::buildPacket(h, payload, packet); !e)
       return e;
     network::NetSocket& sock = (viaDiscovery && discoverySocket.valid()) ? discoverySocket : syncSocket;
-    if (Error e = sendRaw(sock, packet, dest); !e)
+    if (Error e = sendRaw(sock, packet, dest, ifindex); !e)
       return e;
     if (needsAck) {
       PendingSend ps;
@@ -179,8 +180,10 @@ struct MultimasterManager::Internal {
     Peer& p = peers[uuidKey(id)];
     if (!p.info.uuid.valid())
       p.info.uuid = id;
-    if (addr.valid())
+    if (addr.valid() && isUsableSyncAddress(addr)) {
       p.info.lastAddress = addr;
+      p.info.hasUnicastIp = true;
+    }
     p.info.lastSeen = SteadyTime::now();
     return p;
   }
@@ -308,20 +311,26 @@ struct MultimasterManager::Internal {
       return 0;
     int newly = 0;
     for (const auto& adapter : localAdapters()) {
-      if (!adapter.isUp() || adapter.isLoopback() || !adapter.isIPv4())
+      if (!adapter.isUp() || adapter.isLoopback())
         continue;
-      const std::string key = adapter.address.address;
-      if (key.empty() || joinedMulticastIfaces.count(key))
+      if (adapter.name.empty() || joinedMulticastIfaces.count(adapter.name))
         continue;
-      Error e = discoverySocket.joinMulticastGroup(multicastGroup, adapter.address, /*loop=*/true);
+      Error e = Error::InvalidAddress;
+      if (adapter.ifindex > 0)
+        e = discoverySocket.joinMulticastGroup(multicastGroup, adapter.ifindex, /*loop=*/true);
+      else if (adapter.hasUnicastAddress() && adapter.isIPv4())
+        e = discoverySocket.joinMulticastGroup(multicastGroup, adapter.address, /*loop=*/true);
+      else
+        continue;
       if (e) {
-        joinedMulticastIfaces.insert(key);
+        joinedMulticastIfaces.insert(adapter.name);
         ++newly;
-        MINIROS_INFO_NAMED("multimaster", "Joined multicast %s on %s (%s)",
-          multicastGroup.str().c_str(), adapter.name.c_str(), key.c_str());
+        MINIROS_INFO_NAMED("multimaster", "Joined multicast %s on %s (ifindex=%d ip=%s)",
+          multicastGroup.str().c_str(), adapter.name.c_str(), adapter.ifindex,
+          adapter.hasUnicastAddress() ? adapter.address.address.c_str() : "none");
       } else {
-        MINIROS_WARN_NAMED("multimaster", "Multicast join on %s (%s) failed: %s",
-          adapter.name.c_str(), key.c_str(), e.toString());
+        MINIROS_WARN_NAMED("multimaster", "Multicast join on %s (ifindex=%d) failed: %s",
+          adapter.name.c_str(), adapter.ifindex, e.toString());
       }
     }
     return newly;
@@ -332,7 +341,7 @@ struct MultimasterManager::Internal {
     localIps.clear();
     subnetBroadcasts.clear();
     for (const auto& a : localAdapters()) {
-      if (!a.address.address.empty())
+      if (a.hasUnicastAddress())
         localIps.insert(a.address.address);
       if (!a.isUp() || a.isLoopback() || !a.isIPv4())
         continue;
@@ -391,48 +400,63 @@ struct MultimasterManager::Internal {
     }
   }
 
+  Error sendOnLocalLinks(uint8_t op, const std::vector<uint8_t>& payload)
+  {
+    Error last = Error::Ok;
+    int ifaceSends = 0;
+    for (const auto& adapter : localAdapters()) {
+      if (!adapter.isUp() || adapter.isLoopback())
+        continue;
+      const int ifindex = adapter.ifindex;
+      if (ifindex <= 0 && !adapter.hasUnicastAddress())
+        continue;
+      ++ifaceSends;
+      if (broadcastAddr.valid())
+        last = sendOp(op, payload, broadcastAddr, false, false, nullptr, ifindex);
+      if (multicastEnabled && multicastGroup.valid() && discoverySocket.valid())
+        last = sendOp(op, payload, multicastGroup, false, true, nullptr, ifindex);
+      if (adapter.broadcastAddress.valid() && adapter.hasUnicastAddress()) {
+        network::NetAddress bcast = adapter.broadcastAddress;
+        if (boundPort > 0)
+          (void)bcast.setPort(boundPort);
+        last = sendOp(op, payload, bcast, false, false, nullptr, ifindex);
+      }
+    }
+    if (ifaceSends == 0) {
+      if (multicastEnabled && multicastGroup.valid() && discoverySocket.valid())
+        last = sendOp(op, payload, multicastGroup, false, true);
+      if (broadcastAddr.valid())
+        last = sendOp(op, payload, broadcastAddr, false);
+      for (const network::NetAddress& bcast : subnetBroadcasts)
+        last = sendOp(op, payload, bcast, false);
+    }
+    return last;
+  }
+
   Error sendDiscoverUnlocked()
   {
     refreshNetworkUnlocked();
 
-    // No usable IPv4 yet — avoid ENETUNREACH spam on every discover tick.
-    bool haveLan = !subnetBroadcasts.empty();
-    if (!haveLan) {
-      for (const auto& a : localAdapters()) {
-        if (a.isUp() && a.isIPv4() && !a.isLoopback()) {
-          haveLan = true;
-          break;
-        }
+    bool haveLink = false;
+    for (const auto& a : localAdapters()) {
+      if (a.isUp() && !a.isLoopback()) {
+        haveLink = true;
+        break;
       }
     }
-    if (!haveLan && peerProbes.empty()) {
+    if (!haveLink && peerProbes.empty()) {
       MINIROS_DEBUG_NAMED("multimaster",
-        "Skipping DISCOVER: no up IPv4 interface yet");
+        "Skipping DISCOVER: no up network interface yet");
       return Error::Ok;
     }
 
-    // Advertise host + RPC/sync port in DISCOVER so the receiver can list us
-    // in its discovery table without waiting for a later OFFER exchange.
     std::vector<uint8_t> discoverPayload;
     if (Error e = buildLocalOfferPayload(discoverPayload); !e) {
       MINIROS_WARN_NAMED("multimaster", "Failed to serialize DISCOVER offer payload: %s", e.toString());
       discoverPayload.clear();
     }
 
-    Error last = Error::Ok;
-    if (multicastEnabled && multicastGroup.valid() && discoverySocket.valid()) {
-      MINIROS_DEBUG_NAMED("multimaster", "Sending DISCOVER multicast to %s",
-        multicastGroup.str().c_str());
-      last = sendOp(mm::Header::OP_DISCOVER, discoverPayload, multicastGroup, false, true);
-    }
-    if (broadcastAddr.valid()) {
-      MINIROS_DEBUG_NAMED("multimaster", "Sending DISCOVER limited-broadcast on UDP %d", boundPort);
-      last = sendOp(mm::Header::OP_DISCOVER, discoverPayload, broadcastAddr, false);
-    }
-    for (const network::NetAddress& bcast : subnetBroadcasts) {
-      MINIROS_DEBUG_NAMED("multimaster", "Sending DISCOVER subnet-broadcast to %s", bcast.str().c_str());
-      last = sendOp(mm::Header::OP_DISCOVER, discoverPayload, bcast, false);
-    }
+    Error last = sendOnLocalLinks(mm::Header::OP_DISCOVER, discoverPayload);
     for (const network::NetAddress& peer : peerProbes) {
       MINIROS_DEBUG_NAMED("multimaster", "Sending DISCOVER probe to %s", peer.str().c_str());
       last = sendOp(mm::Header::OP_DISCOVER, discoverPayload, peer, false);
@@ -442,15 +466,20 @@ struct MultimasterManager::Internal {
 
   bool senderLooksLocal(const network::NetAddress& sender) const
   {
+    // DISCOVER sent from 0.0.0.0 (no local IPv4) loops back with an unspecified source.
+    if (!sender.valid() || sender.isAny() || sender.isUnspecified() || sender.isLimitedBroadcast())
+      return true;
     if (sender.isLoopback())
       return true;
     return localIps.count(sender.address) != 0;
   }
 
-  /// True when @p addr looks like a usable sync endpoint (not the shared mcast port).
+  /// True when @p addr looks like a usable unicast sync endpoint.
   bool isUsableSyncAddress(const network::NetAddress& addr) const
   {
     if (!addr.valid() || addr.address.empty())
+      return false;
+    if (addr.isAny() || addr.isUnspecified() || addr.isLimitedBroadcast() || addr.isMulticast())
       return false;
     if (multicastEnabled && multicastPort > 0 && addr.port() == multicastPort)
       return false;
@@ -472,21 +501,25 @@ struct MultimasterManager::Internal {
     if (offer)
       syncAddr = syncAddressFromOffer(*offer, sender);
 
-    // Do not overwrite a known sync address with the multicast discovery source port.
-    if (isUsableSyncAddress(syncAddr))
+    // Do not overwrite a known sync address with the multicast discovery source port
+    // or with 0.0.0.0 (peer has no IPv4 yet).
+    if (isUsableSyncAddress(syncAddr)) {
       peer.info.lastAddress = syncAddr;
-    else if (!peer.info.lastAddress.valid() && sender.valid()) {
+      peer.info.hasUnicastIp = true;
+    } else if (!peer.info.hasUnicastIp && sender.valid() &&
+               !sender.isAny() && !sender.isUnspecified() && !sender.isLimitedBroadcast()) {
       // Keep IP for UI even when UDP source port is the shared discovery port.
       network::NetAddress ipOnly = network::NetAddress::fromIp4String(sender.address, 0);
-      if (ipOnly.valid())
+      if (ipOnly.valid() && !ipOnly.isAny())
         peer.info.lastAddress = ipOnly;
-      else
+      else if (!sender.isAny())
         peer.info.lastAddress = sender;
     }
 
     if (offer && !offer->host.empty())
       peer.info.masterUri.host = offer->host;
-    else if (peer.info.masterUri.host.empty() && !sender.address.empty())
+    else if (peer.info.masterUri.host.empty() && !sender.address.empty() &&
+             !sender.isAny() && !sender.isUnspecified() && !sender.isLimitedBroadcast())
       peer.info.masterUri.host = sender.address;
 
     // Prefer explicit offer port; otherwise fill in once we know a usable sync port.
@@ -502,6 +535,7 @@ struct MultimasterManager::Internal {
 
     if (!peer.info.masterUri.host.empty() && peer.info.masterUri.scheme.empty())
       peer.info.masterUri.scheme = "http://";
+    peer.info.hasUnicastIp = isUsableSyncAddress(peer.info.lastAddress);
   }
 
   void onSyncReadable();
@@ -523,7 +557,8 @@ struct MultimasterManager::Internal {
     std::unique_lock<std::mutex>& lock);
   void handleSyncAck(const mm::Header& h, std::unique_lock<std::mutex>& lock);
 
-  Error sendOfferTo(const network::NetAddress& dest, bool viaDiscovery);
+  Error sendOfferTo(const network::NetAddress& dest, bool viaDiscovery, int ifindex = 0);
+  Error sendOfferReply(const network::NetAddress& sender);
   Error sendRequestTo(Peer& peer);
   Error sendAckTo(const network::NetAddress& dest, uint32_t ackSeq);
   Error sendHeartbeatTo(Peer& peer);
@@ -736,8 +771,7 @@ void MultimasterManager::Internal::handleDiscover(const mm::Header& h, const uin
   peer.info.tokenMatch = match;
   applyOfferInfo(peer, offerPtr, sender);
 
-  // Always answer DISCOVER so the probe side learns our MasterOffer.
-  sendOfferTo(sender, /*viaDiscovery=*/discoverySocket.valid());
+  sendOfferReply(sender);
 
   if (peer.info.state == PeerState::Paired)
     return;
@@ -750,12 +784,23 @@ void MultimasterManager::Internal::handleDiscover(const mm::Header& h, const uin
     sendRequestTo(peer);
 }
 
-Error MultimasterManager::Internal::sendOfferTo(const network::NetAddress& dest, bool viaDiscovery)
+Error MultimasterManager::Internal::sendOfferTo(const network::NetAddress& dest, bool viaDiscovery, int ifindex)
 {
   std::vector<uint8_t> payload;
   if (Error e = buildLocalOfferPayload(payload); !e)
     return e;
-  return sendOp(mm::Header::OP_OFFER, payload, dest, false, viaDiscovery);
+  return sendOp(mm::Header::OP_OFFER, payload, dest, false, viaDiscovery, nullptr, ifindex);
+}
+
+Error MultimasterManager::Internal::sendOfferReply(const network::NetAddress& sender)
+{
+  if (isUsableSyncAddress(sender))
+    return sendOfferTo(sender, /*viaDiscovery=*/discoverySocket.valid());
+
+  std::vector<uint8_t> payload;
+  if (Error e = buildLocalOfferPayload(payload); !e)
+    return e;
+  return sendOnLocalLinks(mm::Header::OP_OFFER, payload);
 }
 
 void MultimasterManager::Internal::handleOffer(const mm::Header& h, const uint8_t* payload, size_t len,
@@ -794,7 +839,7 @@ Error MultimasterManager::Internal::sendRequestTo(Peer& peer)
 {
   if (peer.info.state == PeerState::GuidCollision)
     return Error::PermissionDenied;
-  if (!peer.info.lastAddress.valid())
+  if (!isUsableSyncAddress(peer.info.lastAddress))
     return Error::InvalidAddress;
   peer.info.state = PeerState::Requesting;
   return sendOp(mm::Header::OP_REQUEST, {}, peer.info.lastAddress, true);

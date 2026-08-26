@@ -500,6 +500,9 @@ Error NetSocket::joinMulticastGroup(const NetAddress& group, bool loop)
 
 Error NetSocket::joinMulticastGroup(const NetAddress& group, const NetAddress& iface, bool loop)
 {
+  if (!iface.valid() || iface.type() != NetAddress::AddressIPv4)
+    return joinMulticastGroup(group, 0, loop);
+
   if (!internal_)
     return Error::InternalError;
   if (internal_->fd < 0)
@@ -515,12 +518,9 @@ Error NetSocket::joinMulticastGroup(const NetAddress& group, const NetAddress& i
 
     const sockaddr_in* addr = static_cast<const sockaddr_in*>(group.rawAddress());
     mreq.imr_multiaddr.s_addr = addr->sin_addr.s_addr;
-    if (iface.valid() && iface.type() == NetAddress::AddressIPv4) {
-      const sockaddr_in* ifaddr = static_cast<const sockaddr_in*>(iface.rawAddress());
-      mreq.imr_interface.s_addr = ifaddr->sin_addr.s_addr;
-    } else {
-      mreq.imr_interface.s_addr = htonl(INADDR_ANY);
-    }
+    const sockaddr_in* ifaddr = static_cast<const sockaddr_in*>(iface.rawAddress());
+    mreq.imr_interface.s_addr = ifaddr->sin_addr.s_addr;
+
     int fd = internal_->fd;
     if (setsockopt(fd, IPPROTO_IP, IP_ADD_MEMBERSHIP, (char*) &mreq, sizeof(mreq)) < 0) {
 #ifdef EADDRINUSE
@@ -529,7 +529,7 @@ Error NetSocket::joinMulticastGroup(const NetAddress& group, const NetAddress& i
 #endif
       const char* err = last_socket_error_string();
       MINIROS_ERROR_NAMED("socket", "NetSocket[%d]::joinMulticastGroup() failed to join multicast group \"%s\" iface=%s: %s",
-        fd, group.str().c_str(), iface.valid() ? iface.str().c_str() : "any", err);
+        fd, group.str().c_str(), iface.str().c_str(), err);
       return Error::SystemError;
     }
 
@@ -545,6 +545,67 @@ Error NetSocket::joinMulticastGroup(const NetAddress& group, const NetAddress& i
     }
   } else {
     return Error::NotImplemented;
+  }
+  return Error::Ok;
+}
+
+Error NetSocket::joinMulticastGroup(const NetAddress& group, int ifindex, bool loop)
+{
+  if (!internal_)
+    return Error::InternalError;
+  if (internal_->fd < 0)
+    return Error::InvalidHandle;
+
+  if (group.type() != NetAddress::AddressIPv4 || !isDatagram() || !isIpv4())
+    return Error::NotSupported;
+
+  const sockaddr_in* addr = static_cast<const sockaddr_in*>(group.rawAddress());
+  if (!addr)
+    return Error::InvalidAddress;
+
+  int fd = internal_->fd;
+#if defined(__linux__)
+  struct ip_mreqn mreqn;
+  memset(&mreqn, 0, sizeof(mreqn));
+  mreqn.imr_multiaddr.s_addr = addr->sin_addr.s_addr;
+  mreqn.imr_address.s_addr = htonl(INADDR_ANY);
+  mreqn.imr_ifindex = ifindex;
+  if (setsockopt(fd, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreqn, sizeof(mreqn)) < 0) {
+#ifdef EADDRINUSE
+    if (last_socket_error() == EADDRINUSE)
+      return Error::Ok;
+#endif
+    MINIROS_ERROR_NAMED("socket",
+      "NetSocket[%d]::joinMulticastGroup() failed to join \"%s\" ifindex=%d: %s",
+      fd, group.str().c_str(), ifindex, last_socket_error_string());
+    return Error::SystemError;
+  }
+#else
+  struct ip_mreq mreq;
+  memset(&mreq, 0, sizeof(mreq));
+  mreq.imr_multiaddr.s_addr = addr->sin_addr.s_addr;
+  mreq.imr_interface.s_addr = htonl(INADDR_ANY);
+  if (setsockopt(fd, IPPROTO_IP, IP_ADD_MEMBERSHIP, (char*)&mreq, sizeof(mreq)) < 0) {
+#ifdef EADDRINUSE
+    if (last_socket_error() == EADDRINUSE)
+      return Error::Ok;
+#endif
+    MINIROS_ERROR_NAMED("socket", "NetSocket[%d]::joinMulticastGroup() failed to join \"%s\": %s",
+      fd, group.str().c_str(), last_socket_error_string());
+    return Error::SystemError;
+  }
+  (void)ifindex;
+#endif
+
+  int iLoop = loop ? 1 : 0;
+  if (setsockopt(fd, IPPROTO_IP, IP_MULTICAST_LOOP, (char*)&iLoop, sizeof(iLoop)) != 0) {
+    MINIROS_ERROR_NAMED("socket", "NetSocket[%d]::joinMulticastGroup() failed to set loop to %d: %s",
+      fd, iLoop, last_socket_error_string());
+  }
+  int ttl = 1;
+  if (setsockopt(fd, IPPROTO_IP, IP_MULTICAST_TTL, (char*)&ttl, sizeof(ttl)) != 0) {
+    MINIROS_DEBUG_NAMED("socket", "NetSocket[%d]::joinMulticastGroup() failed to set TTL: %s",
+      fd, last_socket_error_string());
   }
   return Error::Ok;
 }
@@ -572,17 +633,17 @@ std::pair<size_t, Error> NetSocket::recv(WriteBuf& s, NetAddress* address)
   bool wouldBlock = false;
 
   while ( !wouldBlock) {
-    sockaddr peerAddress;
+    sockaddr_storage peerAddress{};
     socklen_t peerAddressLength = sizeof(peerAddress);
-    std::memset(&peerAddress, 0, sizeof(peerAddress));
 
-    int n = ::recvfrom(internal_->fd, readBuf, READ_SIZE-1, 0, &peerAddress, &peerAddressLength);
+    int n = ::recvfrom(internal_->fd, readBuf, READ_SIZE-1, 0,
+      reinterpret_cast<sockaddr*>(&peerAddress), &peerAddressLength);
     if (n > 0) {
       readBuf[n] = 0;
       s.append(readBuf, n);
       received += n;
       if (address) {
-        fillAddress(&peerAddress, *address);
+        fillAddress(reinterpret_cast<sockaddr*>(&peerAddress), *address);
       }
       // Receive only one packet with datagram socket.
       if (isDatagram())
@@ -602,7 +663,7 @@ std::pair<size_t, Error> NetSocket::recv(WriteBuf& s, NetAddress* address)
   return {received, wouldBlock ? Error::WouldBlock : Error::Ok};
 }
 
-std::pair<size_t, Error> NetSocket::send(const void* rawData, size_t size, const NetAddress* address)
+std::pair<size_t, Error> NetSocket::send(const void* rawData, size_t size, const NetAddress* address, int ifindex)
 {
   if (!internal_) {
     return {0, Error::InternalError};
@@ -629,7 +690,34 @@ std::pair<size_t, Error> NetSocket::send(const void* rawData, size_t size, const
         return {0, Error::InvalidAddress};
       }
       size_t rawAddrSize = address->rawAddressSize();
-      n = ::sendto(internal_->fd, sp, static_cast<socklen_t>(size), flags, rawAddr, static_cast<socklen_t>(rawAddrSize));
+#if defined(IP_PKTINFO) && !defined(WIN32)
+      if (ifindex > 0 && isIpv4()) {
+        char cmsgbuf[CMSG_SPACE(sizeof(in_pktinfo))];
+        memset(cmsgbuf, 0, sizeof(cmsgbuf));
+        iovec iov{};
+        iov.iov_base = const_cast<char*>(sp);
+        iov.iov_len = size;
+        msghdr msg{};
+        msg.msg_name = const_cast<sockaddr*>(rawAddr);
+        msg.msg_namelen = static_cast<socklen_t>(rawAddrSize);
+        msg.msg_iov = &iov;
+        msg.msg_iovlen = 1;
+        msg.msg_control = cmsgbuf;
+        msg.msg_controllen = sizeof(cmsgbuf);
+        cmsghdr* cmsg = CMSG_FIRSTHDR(&msg);
+        cmsg->cmsg_level = IPPROTO_IP;
+        cmsg->cmsg_type = IP_PKTINFO;
+        cmsg->cmsg_len = CMSG_LEN(sizeof(in_pktinfo));
+        auto* pkt = reinterpret_cast<in_pktinfo*>(CMSG_DATA(cmsg));
+        memset(pkt, 0, sizeof(*pkt));
+        pkt->ipi_ifindex = ifindex;
+        n = static_cast<int>(::sendmsg(internal_->fd, &msg, flags));
+      } else
+#endif
+      {
+        (void)ifindex;
+        n = ::sendto(internal_->fd, sp, static_cast<socklen_t>(size), flags, rawAddr, static_cast<socklen_t>(rawAddrSize));
+      }
     } else {
       n = ::send(internal_->fd, sp, static_cast<socklen_t>(size - written), flags);
     }
@@ -656,7 +744,8 @@ std::pair<size_t, Error> NetSocket::send(const void* rawData, size_t size, const
                || err == EADDRNOTAVAIL
 #endif
                ) {
-      // Common when UDP discovery runs before ethernet has an address/route.
+      // Common when UDP discovery runs before ethernet has an address/route,
+      // or when IBSS peers have no IPv4 yet (send from 0.0.0.0).
       LOCAL_DEBUG("NetSocket[%d]::send() network unreachable: %s", internal_->fd, strerror(errno));
       return {written, Error::NetworkUnreachable};
 #endif

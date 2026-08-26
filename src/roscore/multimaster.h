@@ -59,6 +59,8 @@ struct PeerInfo {
   bool tokenMatch = false;
   /// Remote advertised a non-empty token hash (has a configured token).
   bool remoteHasToken = false;
+  /// lastAddress is a unicast IPv4/IPv6 we can REQUEST/sync toward.
+  bool hasUnicastIp = false;
   size_t foreignPubs = 0;
   size_t foreignSubs = 0;
   size_t foreignSrvs = 0;

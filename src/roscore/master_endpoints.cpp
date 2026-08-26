@@ -246,9 +246,11 @@ Error MultimasterApiEndpoint::handle(const network::ClientInfo& clientInfo, std:
         uri.scheme = "http://";
       p["uri"] = uri.str();
       p["address"] = peer.lastAddress.valid() ? peer.lastAddress.str() : std::string();
+      p["has_unicast_ip"] = peer.hasUnicastIp;
       p["pairable"] = peer.state != PeerState::GuidCollision &&
                       peer.state != PeerState::Paired &&
-                      peer.state != PeerState::Requesting;
+                      peer.state != PeerState::Requesting &&
+                      peer.hasUnicastIp;
       p["remote_token"] = peer.remoteHasToken;
       p["token_match"] = peer.tokenMatch;
       p["pubs"] = static_cast<int>(peer.foreignPubs);
