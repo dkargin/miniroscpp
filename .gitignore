@@ -6,6 +6,8 @@ include/generated/*/*.h
 # Ignore miniroscore caches
 cache.*
 
+build/
+
 build-linux/
 # Android NDK out-of-tree builds
 build-android/
