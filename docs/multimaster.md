@@ -50,6 +50,11 @@ on Linux), RTNETLINK notifies when links/addresses appear and discovery rejoins 
 otherwise NICs are polled every few seconds. Prefer `After=network-online.target` in the unit
 file so the first join usually succeeds.
 
+Ad-hoc Wi‑Fi (IBSS) without a DHCP server is supported for **discovery**: an UP interface is
+enough to send/receive DISCOVER/OFFER, even when some peers have no IPv4 yet (packets go out
+as interface-scoped UDP, source `0.0.0.0`, like DHCP). Peers still show up on the status page
+with hostname/GUID; **pairing and TCPROS need a unicast address** and wait until one appears.
+
 Discovery does **not** require `--token`. Auto-pair requires a shared non-empty token. Manual pairing:
 pass `--token` up front, enter the remote collective’s token in the web UI when joining a
 tokenized mesh, or leave the field empty to pair two open (no-token) masters.
