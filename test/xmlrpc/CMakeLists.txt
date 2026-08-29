@@ -36,6 +36,9 @@ if(NOT WIN32)
 
   # Some tests rely on replacing system calls (like write/read) by a mock versions.
   # But we must include actual sources to make this replacement happen.
+  # XmlRpcUtil::xmlEncode delegates to http::xmlEncode.
+  set(XMLRPC_HTTP_TOOLS ${XMLRPC_SRC_ROOT}/../http/http_tools.cpp)
+
   miniros_add_test(test_client SOURCES test_client.cpp
     ${XMLRPC_SRC_ROOT}/XmlRpcClient.cpp
     ${XMLRPC_SRC_ROOT}/XmlRpcValue.cpp
@@ -43,7 +46,8 @@ if(NOT WIN32)
     ${XMLRPC_SRC_ROOT}/XmlRpcDispatch.cpp
     ${XMLRPC_SRC_ROOT}/XmlRpcSource.cpp
     ${XMLRPC_SRC_ROOT}/../b64/b64decode.cpp
-    ${XMLRPC_SRC_ROOT}/../b64/b64encode.cpp)
+    ${XMLRPC_SRC_ROOT}/../b64/b64encode.cpp
+    ${XMLRPC_HTTP_TOOLS})
 
   target_link_libraries(test_client mock_socket)
 
@@ -52,7 +56,8 @@ if(NOT WIN32)
     ${XMLRPC_SRC_ROOT}/XmlRpcSource.cpp
     ${XMLRPC_SRC_ROOT}/XmlRpcUtil.cpp
     ${XMLRPC_SRC_ROOT}/../b64/b64decode.cpp
-    ${XMLRPC_SRC_ROOT}/../b64/b64encode.cpp)
+    ${XMLRPC_SRC_ROOT}/../b64/b64encode.cpp
+    ${XMLRPC_HTTP_TOOLS})
 
   target_link_libraries(test_dispatch mock_socket)
 
@@ -65,6 +70,7 @@ if(NOT WIN32)
   add_executable(test_socket test_socket.cpp test_system_mocks.c
     ${XMLRPC_SRC_ROOT}/XmlRpcSocket.cpp
     ${XMLRPC_SRC_ROOT}/XmlRpcUtil.cpp
+    ${XMLRPC_HTTP_TOOLS}
   )
 
   if(APPLE)

@@ -11,6 +11,7 @@
 # include <string.h>
 #endif
 
+#include "miniros/http/http_tools.h"
 #include "miniros/xmlrpcpp/XmlRpc.h"
 
 namespace miniros {
@@ -246,27 +247,7 @@ XmlRpcUtil::xmlDecode(const std::string& encoded)
 std::string 
 XmlRpcUtil::xmlEncode(const std::string& raw)
 {
-  std::string::size_type iRep = raw.find_first_of(rawEntity);
-  if (iRep == std::string::npos)
-    return raw;
-
-  std::string encoded(raw, 0, iRep);
-  std::string::size_type iSize = raw.size();
-
-  while (iRep != iSize) {
-    int iEntity;
-    for (iEntity=0; rawEntity[iEntity] != 0; ++iEntity)
-      if (raw[iRep] == rawEntity[iEntity])
-      {
-        encoded += AMP;
-        encoded += xmlEntity[iEntity];
-        break;
-      }
-    if (rawEntity[iEntity] == 0)
-      encoded += raw[iRep];
-    ++iRep;
-  }
-  return encoded;
+  return http::xmlEncode(raw);
 }
 
 } // namespace XmlRpc

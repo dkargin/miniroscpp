@@ -213,6 +213,10 @@ set(transport_SRC
     http/http_server.cpp
     http/http_server_connection.cpp
     http/http_tools.cpp
+    http/parameter_form.cpp
+
+    utility/parameter_collection.cpp
+    utility/yaml.cpp
 
     io/poll_manager.cpp
     io/poll_set.cpp

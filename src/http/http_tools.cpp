@@ -10,7 +10,6 @@
 #include <sstream>
 
 #include "miniros/http/http_tools.h"
-#include "miniros/xmlrpcpp/XmlRpcValue.h"
 
 #if defined(_MSC_VER)
 # define strncasecmp	_strnicmp
@@ -483,6 +482,65 @@ std::string urlDecode(const std::string_view& str)
   }
 
   return result;
+}
+
+std::map<std::string, std::string> parseUrlEncoded(const std::string_view& data)
+{
+  std::map<std::string, std::string> out;
+  size_t start = 0;
+  while (start < data.size()) {
+    size_t amp = data.find('&', start);
+    if (amp == std::string_view::npos)
+      amp = data.size();
+    const std::string_view pair = data.substr(start, amp - start);
+    const size_t eq = pair.find('=');
+    if (eq != std::string_view::npos) {
+      const std::string key = urlDecode(pair.substr(0, eq));
+      const std::string value = urlDecode(pair.substr(eq + 1));
+      if (!key.empty())
+        out[key] = value;
+    } else if (!pair.empty()) {
+      out[urlDecode(pair)] = "";
+    }
+    start = amp + 1;
+  }
+  return out;
+}
+
+std::string xmlEncode(const std::string_view& raw)
+{
+  static const char rawEntity[] = {'<', '>', '&', '\'', '\"', 0};
+  static const char* xmlEntity[] = {"lt;", "gt;", "amp;", "apos;", "quot;", nullptr};
+
+  size_t iRep = std::string_view::npos;
+  for (size_t i = 0; i < raw.size(); ++i) {
+    for (int e = 0; rawEntity[e] != 0; ++e) {
+      if (raw[i] == rawEntity[e]) {
+        iRep = i;
+        break;
+      }
+    }
+    if (iRep != std::string_view::npos)
+      break;
+  }
+  if (iRep == std::string_view::npos)
+    return std::string(raw);
+
+  std::string encoded(raw.substr(0, iRep));
+  encoded.reserve(raw.size() + 8);
+  for (size_t i = iRep; i < raw.size(); ++i) {
+    int e = 0;
+    for (; rawEntity[e] != 0; ++e) {
+      if (raw[i] == rawEntity[e]) {
+        encoded += '&';
+        encoded += xmlEntity[e];
+        break;
+      }
+    }
+    if (rawEntity[e] == 0)
+      encoded += raw[i];
+  }
+  return encoded;
 }
 
 } // namespace http
