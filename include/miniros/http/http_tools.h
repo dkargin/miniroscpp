@@ -276,7 +276,16 @@ MINIROS_DECL std::string urlEncode(const std::string_view& str);
 
 /// URL decode a string (percent decoding).
 /// Decodes percent-encoded characters in the string.
+/// Also maps '+' to space (HTML form / query convention).
 MINIROS_DECL std::string urlDecode(const std::string_view& str);
+
+/// Parse application/x-www-form-urlencoded data (also used for URL query strings).
+/// Format: key=value&key2=value2 with percent-encoding; keys/values are urlDecoded.
+/// Keys without '=' get an empty value. Duplicate keys: last wins.
+MINIROS_DECL std::map<std::string, std::string> parseUrlEncoded(const std::string_view& data);
+
+/// Escape text for HTML/XML text and attribute contexts (&, <, >, ', ").
+MINIROS_DECL std::string xmlEncode(const std::string_view& raw);
 
 } // namespace http
 

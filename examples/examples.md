@@ -8,7 +8,8 @@ These examples follow regular ROS tutorials.
  - listener - miniros-based listener, similar to listener tutorial from regular ROS1.
  - talker - miniros-based talker, similar to talker tutorial from regular ROS1
  - bench_talker - benchmark, based on regular talker. It measures timings for initializing ROS and sending messages.
- - log_demo 
+ - log_demo
+ - param_form_demo - embeddable HTTP parameter form (settings Apply/Cancel)
 
 ## Websocket example
 
@@ -20,3 +21,14 @@ These examples follow regular ROS tutorials.
    - Click "Send" to send the message
    - The server will echo back the message with "Echo: " prefix
    - Check the server console output to see received messages
+
+## Param form example
+
+Demonstrates a custom HTTP page handler that owns most of the HTML and embeds a
+`ParameterForm` over a `ParameterCollection`. Dirty fields show `*`. Apply can be
+rejected with a generic message and per-field errors (demo: 4x4 + 90 FPS).
+
+1. Build with `-DMINIROS_BUILD_EXAMPLES=ON`.
+2. Run: `./build/bin/param_form_demo` (or your build tree's binary path).
+3. Open `http://localhost:8080/` (or the port printed in the terminal).
+4. Change fields (see `*`), Apply to commit, or try 4x4 + 90 FPS for a rejection.

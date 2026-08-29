@@ -82,34 +82,8 @@ void HttpRequest::setQueryParameters(const std::string_view& queryString)
   if (queryString.empty())
     return;
 
-  size_t start = 0;
-  while (start < queryString.size()) {
-    // Find the next '&' or end of string
-    size_t end = queryString.find('&', start);
-    if (end == std::string::npos) {
-      end = queryString.size();
-    }
-
-    // Extract the key=value pair
-    auto pair = queryString.substr(start, end - start);
-    
-    // Find the '=' separator
-    size_t eqPos = pair.find('=');
-    if (eqPos != std::string::npos) {
-      // Extract key and value
-      auto key = pair.substr(0, eqPos);
-      auto value = pair.substr(eqPos + 1);
-      
-      // URL decode both key and value
-      url_parameters_[urlDecode(key)] = urlDecode(value);
-    } else if (!pair.empty()) {
-      // Key without value (treat as empty value)
-      url_parameters_[urlDecode(pair)] = "";
-    }
-
-    // Move to next pair (skip the '&')
-    start = end + 1;
-  }
+  for (auto& [key, value] : parseUrlEncoded(queryString))
+    url_parameters_[std::move(key)] = std::move(value);
 }
 
 /// Get URL parameter value, or empty string if not found
