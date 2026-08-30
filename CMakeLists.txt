@@ -6,7 +6,7 @@ cmake_minimum_required(VERSION 3.13)
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 cmake_policy(SET CMP0077 NEW)
 
-project(miniros VERSION 0.7.1)
+project(miniros VERSION 0.7.2)
 
 set(MINIROS_INTERNAL_API_VERSION 1)
 
@@ -177,7 +177,8 @@ if (MINIROS_USE_CATKIN)
     catkin_package(
       DEPENDS
       INCLUDE_DIRS include include/generated
-      LIBRARIES roscxx bag_storage)
+      LIBRARIES roscxx bag_storage
+      CFG_EXTRAS miniros-extras.cmake)
   else()
     message(STATUS "Catkin was not found")
   endif(catkin_FOUND)
