@@ -47,6 +47,7 @@ class MINIROS_DECL ServiceServer
 public:
   ServiceServer() {}
   ServiceServer(const ServiceServer& rhs);
+  ServiceServer& operator=(const ServiceServer& other);
   ~ServiceServer();
 
   /**

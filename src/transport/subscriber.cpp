@@ -73,6 +73,12 @@ namespace miniros
     impl_ = rhs.impl_;
   }
 
+  Subscriber& Subscriber::operator=(const Subscriber& other)
+  {
+    impl_ = other.impl_;
+    return *this;
+  }
+
   Subscriber::~Subscriber()
   {
   }

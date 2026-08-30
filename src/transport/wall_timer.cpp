@@ -109,6 +109,12 @@ WallTimer::WallTimer(const WallTimer& rhs)
   impl_ = rhs.impl_;
 }
 
+WallTimer& WallTimer::operator=(const WallTimer& other)
+{
+  impl_ = other.impl_;
+  return *this;
+}
+
 WallTimer::~WallTimer()
 {
 }

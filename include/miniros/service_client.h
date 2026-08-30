@@ -45,6 +45,7 @@ public:
   ServiceClient() {}
   ServiceClient(const std::string& service_name, bool persistent, const M_string& header_values, const std::string& service_md5sum);
   ServiceClient(const ServiceClient& rhs);
+  ServiceClient& operator=(const ServiceClient& other);
   ~ServiceClient();
 
   /**

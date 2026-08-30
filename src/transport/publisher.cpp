@@ -85,6 +85,12 @@ Publisher::Publisher(const Publisher& rhs)
   impl_ = rhs.impl_;
 }
 
+Publisher& Publisher::operator=(const Publisher& other)
+{
+  impl_ = other.impl_;
+  return *this;
+}
+
 Publisher::~Publisher()
 {
 }

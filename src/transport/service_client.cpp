@@ -101,6 +101,12 @@ ServiceClient::ServiceClient(const ServiceClient& rhs)
   impl_ = rhs.impl_;
 }
 
+ServiceClient& ServiceClient::operator=(const ServiceClient& other)
+{
+  impl_ = other.impl_;
+  return *this;
+}
+
 ServiceClient::~ServiceClient()
 {
 

@@ -53,6 +53,7 @@ namespace miniros
   public:
     Publisher() {}
     Publisher(const Publisher& rhs);
+    Publisher& operator=(const Publisher& other);
     ~Publisher();
 
     /**

@@ -188,6 +188,12 @@ SteadyTimer::SteadyTimer(const SteadyTimer& rhs)
   impl_ = rhs.impl_;
 }
 
+SteadyTimer& SteadyTimer::operator=(const SteadyTimer& other)
+{
+  impl_ = other.impl_;
+  return *this;
+}
+
 SteadyTimer::~SteadyTimer()
 {
 }
