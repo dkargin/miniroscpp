@@ -47,6 +47,7 @@ class MINIROS_DECL Timer
 public:
   Timer() {}
   Timer(const Timer& rhs);
+  Timer& operator=(const Timer& other);
   ~Timer();
 
   /**

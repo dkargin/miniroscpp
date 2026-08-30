@@ -114,6 +114,12 @@ Timer::Timer(const Timer& rhs)
   impl_ = rhs.impl_;
 }
 
+Timer& Timer::operator=(const Timer& other)
+{
+  impl_ = other.impl_;
+  return *this;
+}
+
 Timer::~Timer()
 {
 }

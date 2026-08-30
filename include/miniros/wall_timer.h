@@ -47,6 +47,7 @@ class MINIROS_DECL WallTimer
 public:
   WallTimer() {}
   WallTimer(const WallTimer& rhs);
+  WallTimer& operator=(const WallTimer& other);
   ~WallTimer();
 
   /**

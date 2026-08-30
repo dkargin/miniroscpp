@@ -48,6 +48,7 @@ class MINIROS_DECL Subscriber
 public:
   Subscriber() {}
   Subscriber(const Subscriber& rhs);
+  Subscriber& operator=(const Subscriber& other);
   ~Subscriber();
 
   /**

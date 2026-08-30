@@ -67,6 +67,12 @@ ServiceServer::ServiceServer(const ServiceServer& rhs)
   impl_ = rhs.impl_;
 }
 
+ServiceServer& ServiceServer::operator=(const ServiceServer& other)
+{
+  impl_ = other.impl_;
+  return *this;
+}
+
 ServiceServer::~ServiceServer()
 {
 }

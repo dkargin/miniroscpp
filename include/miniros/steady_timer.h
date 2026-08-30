@@ -46,6 +46,7 @@ class MINIROS_DECL SteadyTimer
 public:
   SteadyTimer() {}
   SteadyTimer(const SteadyTimer& rhs);
+  SteadyTimer& operator=(const SteadyTimer& other);
   ~SteadyTimer();
 
   /**
