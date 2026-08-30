@@ -139,7 +139,11 @@ else()
 endif()
 
 set(MINIROS_INCLUDE_DIRS ${CMAKE_CURRENT_BINARY_DIR})
-set(MINIROS_INCLUDE_BUILD ${CMAKE_CURRENT_BINARY_DIR})
+# Sibling packages (and CACHE consumers) need this to find generated miniros/version.h
+# without linking roscxx. Keep MINIROS_INCLUDE_DIRS as a single path: it is used
+# inside $<BUILD_INTERFACE:...> generator expressions.
+set(MINIROS_INCLUDE_BUILD ${CMAKE_CURRENT_BINARY_DIR}
+    CACHE INTERNAL "Directory containing generated miniros/version.h")
 
 set(CMAKE_DEBUG_POSTFIX d)
 
@@ -162,9 +166,13 @@ endif()
 
 set(MINIROS_ADDITIONAL_COMPONENTS $<NOT:${MINIROS_SUBMODULE}>)
 
+# Parent catkin workspaces already set catkin_FOUND. Do not treat that as
+# "this package is packaged by catkin" unless MINIROS_USE_CATKIN was requested.
+set(MINIROS_CATKIN FALSE)
 if (MINIROS_USE_CATKIN)
   find_package(catkin QUIET)
   if(catkin_FOUND)
+    set(MINIROS_CATKIN TRUE)
     message(STATUS "Miniros has been used with catkin")
     catkin_package(
       DEPENDS
@@ -205,6 +213,17 @@ configure_file(
   "${CMAKE_CURRENT_SOURCE_DIR}/include/miniros/version.h.in"
   "${CMAKE_CURRENT_BINARY_DIR}/miniros/version.h")
 
+# Catkin consumers get source INCLUDE_DIRS (include/, include/generated/) plus
+# devel/include. version.h lives only in the build tree, so copy it into devel
+# for packages that include miniros headers without linking roscxx.
+if (MINIROS_CATKIN AND CATKIN_DEVEL_PREFIX)
+  file(MAKE_DIRECTORY "${CATKIN_DEVEL_PREFIX}/include/miniros")
+  configure_file(
+    "${CMAKE_CURRENT_BINARY_DIR}/miniros/version.h"
+    "${CATKIN_DEVEL_PREFIX}/include/miniros/version.h"
+    COPYONLY)
+endif()
+
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/scripts/miniroscore.service.in" miniroscore.service @ONLY)
 
 # Processing external modules like bzip2 or lz4
@@ -237,7 +256,7 @@ target_include_directories(roscxx PUBLIC
     $<INSTALL_INTERFACE:include>
 )
 
-if (catkin_FOUND)
+if (MINIROS_CATKIN)
   # Catkin does all the packaging by itself. Also we do not need to install pregenerated messages,
   # since we are able to run gencxx directly here.
   install(DIRECTORY include/
@@ -315,11 +334,17 @@ else()
     NAMESPACE ${PROJECT_NAME}::
     DESTINATION lib/cmake/${PROJECT_NAME}
   )
+endif()
 
-  # Adding manual aliases, which match exported names.
+# Namespaced aliases match the installed cmake package (miniros::roscxx).
+# Required for same-workspace catkin consumers: catkin pkgConfig does not
+# create these targets, and the alias used to live only in the non-catkin path.
+if(NOT TARGET ${PROJECT_NAME}::roscxx)
   add_library(${PROJECT_NAME}::roscxx ALIAS roscxx)
+endif()
+if(NOT TARGET ${PROJECT_NAME}::bag_storage)
   add_library(${PROJECT_NAME}::bag_storage ALIAS bag_storage)
-endif(catkin_FOUND)
+endif()
 
 
 if (MINIROS_BUILD_TESTS)
