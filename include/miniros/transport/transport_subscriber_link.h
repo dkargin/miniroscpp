@@ -54,6 +54,7 @@ public:
   const ConnectionPtr& getConnection() { return connection_; }
 
   virtual void enqueueMessage(const SerializedMessage& m, bool ser, bool nocopy);
+  virtual size_t getOutboxLength() const;
   virtual void drop();
   virtual std::string getTransportType();
   virtual std::string getTransportInfo();
@@ -74,7 +75,7 @@ private:
   std::unique_ptr<DropWatcher> drop_watcher_;
 
   std::queue<SerializedMessage> outbox_;
-  std::mutex outbox_mutex_;
+  mutable std::mutex outbox_mutex_;
   bool queue_full_;
 };
 typedef std::shared_ptr<TransportSubscriberLink> TransportSubscriberLinkPtr;

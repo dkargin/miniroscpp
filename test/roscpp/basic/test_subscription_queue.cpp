@@ -110,24 +110,29 @@ TEST(SubscriptionQueue, queueSize)
   MessageDeserializerPtr des(std::make_shared<MessageDeserializer>(helper, SerializedMessage(), std::shared_ptr<M_string>()));
 
   ASSERT_FALSE(queue->full());
+  ASSERT_EQ(queue->size(), 0u);
 
   queue->push(helper, des, false, VoidConstWPtr(), true);
 
   ASSERT_TRUE(queue->full());
+  ASSERT_EQ(queue->size(), 1u);
 
   ASSERT_EQ(queue->call(), CallbackInterface::Success);
 
   ASSERT_FALSE(queue->full());
+  ASSERT_EQ(queue->size(), 0u);
 
   queue->push(helper, des, false, VoidConstWPtr(), true);
 
   ASSERT_TRUE(queue->full());
+  ASSERT_EQ(queue->size(), 1u);
 
   ASSERT_TRUE(queue->ready());
 
   queue->push(helper, des, false, VoidConstWPtr(), true);
 
   ASSERT_TRUE(queue->full());
+  ASSERT_EQ(queue->size(), 1u);
 
   ASSERT_EQ(queue->call(), CallbackInterface::Success);
   ASSERT_EQ(queue->call(), CallbackInterface::Invalid);
@@ -145,7 +150,9 @@ TEST(SubscriptionQueue, infiniteQueue)
   ASSERT_FALSE(queue->full());
 
   queue->push(helper, des, false, VoidConstWPtr(), true);
+  ASSERT_EQ(queue->size(), 1u);
   ASSERT_EQ(queue->call(), CallbackInterface::Success);
+  ASSERT_EQ(queue->size(), 0u);
 
   ASSERT_FALSE(queue->full());
 
@@ -155,6 +162,7 @@ TEST(SubscriptionQueue, infiniteQueue)
   }
 
   ASSERT_FALSE(queue->full());
+  ASSERT_EQ(queue->size(), 10000u);
 
   for (int i = 0; i < 10000; ++i)
   {

@@ -30,85 +30,90 @@
 #include "miniros/node_handle.h"
 #include "miniros/transport/topic_manager.h"
 
-namespace miniros
-{
+namespace miniros {
 
-  Subscriber::Impl::Impl()
+Subscriber::Impl::Impl()
   : unsubscribed_(false)
-  { }
+{
+}
 
-  Subscriber::Impl::~Impl()
-  {
-    MINIROS_DEBUG("Subscriber on '%s' deregistering callbacks.", topic_.c_str());
-    unsubscribe();
+Subscriber::Impl::~Impl()
+{
+  MINIROS_DEBUG("Subscriber on '%s' deregistering callbacks.", topic_.c_str());
+  unsubscribe();
+}
+
+bool Subscriber::Impl::isValid() const
+{
+  return !unsubscribed_;
+}
+
+void Subscriber::Impl::unsubscribe()
+{
+  if (!unsubscribed_) {
+    unsubscribed_ = true;
+    TopicManager::instance()->unsubscribe(topic_, helper_);
+    node_handle_.reset();
+    helper_.reset();
   }
+}
 
-  bool Subscriber::Impl::isValid() const
-  {
-    return !unsubscribed_;
-  }
-
-  void Subscriber::Impl::unsubscribe()
-  {
-    if (!unsubscribed_)
-      {
-	unsubscribed_ = true;
-	TopicManager::instance()->unsubscribe(topic_, helper_);
-	node_handle_.reset();
-	helper_.reset();
-      }
-  }
-
-  Subscriber::Subscriber(const std::string& topic, const NodeHandle& node_handle, 
-			 const SubscriptionCallbackHelperPtr& helper)
+Subscriber::Subscriber(const std::string& topic, const NodeHandle& node_handle,
+  const SubscriptionCallbackHelperPtr& helper)
   : impl_(std::make_shared<Impl>())
-  {
-    impl_->topic_ = topic;
-    impl_->node_handle_ = std::make_shared<NodeHandle>(node_handle);
-    impl_->helper_ = helper;
+{
+  impl_->topic_ = topic;
+  impl_->node_handle_ = std::make_shared<NodeHandle>(node_handle);
+  impl_->helper_ = helper;
+}
+
+Subscriber::Subscriber(const Subscriber& rhs)
+{
+  impl_ = rhs.impl_;
+}
+
+Subscriber& Subscriber::operator=(const Subscriber& other)
+{
+  impl_ = other.impl_;
+  return *this;
+}
+
+Subscriber::~Subscriber()
+{
+}
+
+void Subscriber::shutdown()
+{
+  if (impl_) {
+    impl_->unsubscribe();
+  }
+}
+
+std::string Subscriber::getTopic() const
+{
+  if (impl_) {
+    return impl_->topic_;
   }
 
-  Subscriber::Subscriber(const Subscriber& rhs)
-  {
-    impl_ = rhs.impl_;
+  return std::string();
+}
+
+uint32_t Subscriber::getNumPublishers() const
+{
+  if (impl_ && impl_->isValid()) {
+    return static_cast<uint32_t>(TopicManager::instance()->getNumPublishers(impl_->topic_));
   }
 
-  Subscriber& Subscriber::operator=(const Subscriber& other)
-  {
-    impl_ = other.impl_;
-    return *this;
+  return 0;
+}
+
+int Subscriber::getQueueLength() const
+{
+  if (impl_ && impl_->isValid() && impl_->helper_) {
+    return TopicManager::instance()->getSubscriptionQueueLength(impl_->topic_, impl_->helper_);
   }
 
-  Subscriber::~Subscriber()
-  {
-  }
-
-  void Subscriber::shutdown()
-  {
-    if (impl_)
-      {
-	impl_->unsubscribe();
-      }
-  }
-
-  std::string Subscriber::getTopic() const
-  {
-    if (impl_)
-      {
-	return impl_->topic_;
-      }
-
-    return std::string();
-  }
-
-  uint32_t Subscriber::getNumPublishers() const
-  {
-    if (impl_ && impl_->isValid())
-      {
-	return static_cast<uint32_t>(TopicManager::instance()->getNumPublishers(impl_->topic_));
-      }
-
-    return 0;
-  }
+  return 0;
+}
 
 } // namespace miniros

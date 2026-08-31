@@ -173,6 +173,18 @@ uint32_t Publisher::getNumSubscribers() const
   return 0;
 }
 
+int Publisher::getQueueLength() const
+{
+  if (impl_ && impl_->isValid())
+  {
+    TopicManagerPtr tm = getTopicManager();
+    if (tm)
+      return tm->getPublicationQueueLength(impl_->topic_);
+  }
+
+  return 0;
+}
+
 bool Publisher::isLatched() const {
   if (impl_ && impl_->isValid()) {
     return impl_->latch_;

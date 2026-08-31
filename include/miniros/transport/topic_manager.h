@@ -128,6 +128,17 @@ public:
    */
   size_t getNumPublishers(const std::string &_topic);
 
+  /**
+   * \brief Pending messages in the advertised topic's send path
+   * (staging queue plus the slowest remote subscriber outbox).
+   */
+  int getPublicationQueueLength(const std::string& topic);
+
+  /**
+   * \brief Pending messages in the SubscriptionQueue for a specific callback.
+   */
+  int getSubscriptionQueueLength(const std::string& topic, const SubscriptionCallbackHelperPtr& helper);
+
   template<typename M>
   void publish(const std::string& topic, const M& message)
   {

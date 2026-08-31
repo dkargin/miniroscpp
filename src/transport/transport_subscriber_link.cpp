@@ -255,6 +255,12 @@ void TransportSubscriberLink::enqueueMessage(const SerializedMessage& m, bool se
   stats_.message_data_sent_ += m.num_bytes;
 }
 
+size_t TransportSubscriberLink::getOutboxLength() const
+{
+  std::scoped_lock<std::mutex> lock(outbox_mutex_);
+  return outbox_.size();
+}
+
 std::string TransportSubscriberLink::getTransportType()
 {
   return connection_->getTransport()->getType();

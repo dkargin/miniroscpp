@@ -92,6 +92,11 @@ public:
    */
   uint32_t getNumSubscribers();
 
+  /**
+   * \brief Staging queue size plus the largest remote subscriber outbox.
+   */
+  int getQueueLength() const;
+
   void getPublishTypes(bool& serialize, bool& nocopy, const std::type_info& ti);
 
   /**
@@ -171,7 +176,7 @@ private:
 
   V_SubscriberLink subscriber_links_ GUARDED_BY(subscriber_links_mutex_);
   // We use a recursive mutex here for the rare case that a publish call causes another one (like in the case of a rosconsole call)
-  std::mutex subscriber_links_mutex_;
+  mutable std::mutex subscriber_links_mutex_;
 
   bool dropped_;
 
@@ -182,7 +187,7 @@ private:
 
   typedef std::vector<SerializedMessage> V_SerializedMessage;
   V_SerializedMessage publish_queue_ GUARDED_BY(publish_queue_mutex_);
-  std::mutex publish_queue_mutex_;
+  mutable std::mutex publish_queue_mutex_;
 };
 
 } // namespace miniros

@@ -912,6 +912,39 @@ size_t TopicManager::getNumPublishers(const std::string& topic)
   return 0;
 }
 
+int TopicManager::getPublicationQueueLength(const std::string& topic)
+{
+  std::scoped_lock<std::recursive_mutex> lock(advertised_topics_mutex_);
+
+  if (isShuttingDown()) {
+    return 0;
+  }
+
+  PublicationPtr p = lookupPublicationWithoutLock(topic);
+  if (p) {
+    return p->getQueueLength();
+  }
+
+  return 0;
+}
+
+int TopicManager::getSubscriptionQueueLength(const std::string& topic, const SubscriptionCallbackHelperPtr& helper)
+{
+  std::scoped_lock<std::mutex> lock(subs_mutex_);
+
+  if (isShuttingDown() || !helper) {
+    return 0;
+  }
+
+  for (SubscriptionPtr t: subscriptions_) {
+    if (!t->isDropped() && t->getName() == topic) {
+      return t->getQueueLength(helper);
+    }
+  }
+
+  return 0;
+}
+
 void TopicManager::getBusStats(XmlRpcValue& stats)
 {
   XmlRpcValue publish_stats, subscribe_stats, service_stats;

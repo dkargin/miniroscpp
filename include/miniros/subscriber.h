@@ -69,6 +69,15 @@ public:
    */
   uint32_t getNumPublishers() const;
 
+  /**
+   * \brief Number of messages waiting in this subscriber's receive queue.
+   *
+   * This is the depth of the per-callback SubscriptionQueue limited by
+   * subscribe() queue_size, not the size of the shared CallbackQueue.
+   * Returns 0 if the handle is invalid or has been shut down.
+   */
+  int getQueueLength() const;
+
   operator void*() const { return (impl_ && impl_->isValid()) ? (void*)1 : (void*)0; }
 
   bool operator<(const Subscriber& rhs) const
