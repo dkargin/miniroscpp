@@ -67,6 +67,11 @@ public:
    */
   virtual void enqueueMessage(const SerializedMessage& m, bool ser, bool nocopy) = 0;
 
+  /**
+   * \brief Messages waiting on this link's outgoing queue. 0 for intraprocess.
+   */
+  virtual size_t getOutboxLength() const { return 0; }
+
   virtual void drop() = 0;
 
   virtual std::string getTransportType() = 0;

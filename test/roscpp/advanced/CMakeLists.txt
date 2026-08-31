@@ -166,6 +166,8 @@ miniros_advanced_test(${TEST_GROUP}-service_callback_types SOURCES service_callb
 
 miniros_advanced_test(${TEST_GROUP}-intraprocess_subscriptions SOURCES intraprocess_subscriptions.cpp WITH_MASTER)
 
+miniros_advanced_test(${TEST_GROUP}-queue_length SOURCES queue_length.cpp WITH_MASTER)
+
 miniros_advanced_test(${TEST_GROUP}-nonconst_subscriptions SOURCES nonconst_subscriptions.cpp WITH_MASTER)
 
 miniros_add_test(${TEST_GROUP}-subscribe_retry_tcp SOURCES subscribe_retry_tcp.cpp WITH_MASTER DISABLED)

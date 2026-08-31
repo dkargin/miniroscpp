@@ -179,6 +179,12 @@ bool SubscriptionQueue::full()
   return fullNoLock();
 }
 
+uint32_t SubscriptionQueue::size() const
+{
+  std::scoped_lock<std::mutex> lock(queue_mutex_);
+  return queue_size_;
+}
+
 bool SubscriptionQueue::fullNoLock()
 {
   return (size_ > 0) && (queue_size_ >= (uint32_t)size_);

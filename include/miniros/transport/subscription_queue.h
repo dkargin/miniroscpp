@@ -74,6 +74,8 @@ public:
   virtual CallbackInterface::CallResult call();
   virtual bool ready();
   bool full();
+  /// Number of messages currently waiting to be delivered to the user callback.
+  uint32_t size() const;
 
 private:
   bool fullNoLock();
@@ -81,7 +83,7 @@ private:
   int32_t size_;
   bool full_;
 
-  std::mutex queue_mutex_;
+  mutable std::mutex queue_mutex_;
   D_Item queue_;
   uint32_t queue_size_;
   bool allow_concurrent_callbacks_;

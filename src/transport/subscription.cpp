@@ -197,6 +197,19 @@ uint32_t Subscription::getNumPublishers() const
     return (uint32_t)publisher_links_.size();
 }
 
+int Subscription::getQueueLength(const SubscriptionCallbackHelperPtr& helper) const
+{
+  std::scoped_lock<std::mutex> lock(callbacks_mutex_);
+  for (const CallbackInfoPtr& info : callbacks_)
+  {
+    if (info->helper_ == helper && info->subscription_queue_)
+    {
+      return static_cast<int>(info->subscription_queue_->size());
+    }
+  }
+  return 0;
+}
+
 void Subscription::drop()
 {
   if (!dropped_)

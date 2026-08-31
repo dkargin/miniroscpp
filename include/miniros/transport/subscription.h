@@ -122,6 +122,8 @@ public:
   const std::string& getName() const;
   uint32_t getNumCallbacks() const;
   uint32_t getNumPublishers() const;
+  /// Pending messages in the SubscriptionQueue for this callback helper.
+  int getQueueLength(const SubscriptionCallbackHelperPtr& helper) const;
 
   // We'll keep a list of these objects, representing in-progress XMLRPC 
   // connections to other nodes.
@@ -162,7 +164,7 @@ private:
   std::mutex md5sum_mutex_;
   std::string md5sum_;
   std::string datatype_;
-  std::mutex callbacks_mutex_;
+  mutable std::mutex callbacks_mutex_;
   V_CallbackInfo callbacks_;
   uint32_t nonconst_callbacks_;
 

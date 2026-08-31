@@ -143,10 +143,19 @@ namespace miniros
      */
     std::string getTopic() const;
 
-    /**
-     * \brief Returns the number of subscribers that are currently connected to this Publisher
-     */
-    uint32_t getNumSubscribers() const;
+  /**
+   * \brief Returns the number of subscribers that are currently connected to this Publisher
+   */
+  uint32_t getNumSubscribers() const;
+
+  /**
+   * \brief Number of messages waiting in this publisher's send path.
+   *
+   * Counts the unbounded staging queue plus the longest remote subscriber
+   * outbox (the queue limited by advertise() queue_size). Intraprocess
+   * links do not use an outbox. Returns 0 if the handle is invalid.
+   */
+  int getQueueLength() const;
 
     /**
      * \brief Returns whether or not this topic is latched

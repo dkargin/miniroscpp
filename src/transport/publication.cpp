@@ -406,6 +406,26 @@ uint32_t Publication::getNumSubscribers()
   return (uint32_t)subscriber_links_.size();
 }
 
+int Publication::getQueueLength() const
+{
+  size_t staging = 0;
+  {
+    std::scoped_lock<std::mutex> lock(publish_queue_mutex_);
+    staging = publish_queue_.size();
+  }
+
+  size_t max_outbox = 0;
+  {
+    std::scoped_lock<std::mutex> lock(subscriber_links_mutex_);
+    for (const SubscriberLinkPtr& sub : subscriber_links_)
+    {
+      max_outbox = std::max(max_outbox, sub->getOutboxLength());
+    }
+  }
+
+  return static_cast<int>(staging + max_outbox);
+}
+
 bool Publication::isLatched()
 {
   std::scoped_lock<std::mutex> lock(callbacks_mutex_);
