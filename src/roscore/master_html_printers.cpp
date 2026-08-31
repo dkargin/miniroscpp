@@ -109,14 +109,20 @@ void Master::Internal::renderMasterStatus(std::string& output) const
 
     if (host->local) {
       // Local host: show interface name + address (not just the IP list).
+      // Include UP links with no IP yet (IBSS / no DHCP).
       resolver.iterateAdapters([&ss](const network::NetAdapter* adapter) {
-        if (!adapter || !adapter->isUp() || !adapter->isValid())
+        if (!adapter || !adapter->isUp())
           return;
         if (adapter->isLoopback())
           return;
-        if (adapter->address.isUnspecified())
-          return;
-        ss << "<dd><code>" << adapter->name << "</code>: " << adapter->address.str() << "</dd>\n";
+        ss << "<dd><code>" << adapter->name << "</code>: ";
+        if (adapter->hasUnicastAddress())
+          ss << adapter->address.str();
+        else
+          ss << "<em>no IP</em>";
+        if (!adapter->mac.empty())
+          ss << " <small>mac " << adapter->mac << "</small>";
+        ss << "</dd>\n";
       });
     } else {
       host->iterate([&ss](const network::NetAddress& address) {
@@ -179,17 +185,21 @@ void Master::Internal::renderMasterStatus(std::string& output) const
           ss << print::Url(uri, uri);
           if (peer.lastAddress.valid() && displayUri.host != peer.lastAddress.address)
             ss << " (" << peer.lastAddress.address << ")";
-        } else if (peer.lastAddress.valid()) {
+        } else if (peer.hasUnicastIp && peer.lastAddress.valid()) {
           ss << peer.lastAddress.str();
+        } else if (!displayUri.host.empty()) {
+          ss << displayUri.host;
         } else {
-          ss << "<em>(no URI yet)</em>";
+          ss << "<em>(no unicast IP yet)</em>";
         }
 
         ss << " <b>" << MultimasterManager::peerStateName(peer.state) << "</b>";
+        if (!peer.hasUnicastIp && peer.state != PeerState::GuidCollision)
+          ss << " <em>no unicast IP</em>";
 
         if (collision) {
           ss << " (pairing forbidden)";
-        } else if (peer.state != PeerState::Paired && peer.state != PeerState::Requesting) {
+        } else if (peer.hasUnicastIp && peer.state != PeerState::Paired && peer.state != PeerState::Requesting) {
           const bool tokenRequired = peer.remoteHasToken && !peer.tokenMatch;
           ss << "<form method=\"GET\" action=\"/api2/multimaster/connect\" style=\"display:inline;margin-left:0.5em;\">";
           ss << "<input type=\"hidden\" name=\"uuid\" value=\"" << peer.uuid.toString() << "\"/>";
@@ -211,8 +221,10 @@ void Master::Internal::renderMasterStatus(std::string& output) const
         ss << "<details style=\"margin:0.25em 0 0.5em 1em;\">";
         ss << "<summary>details</summary>";
         ss << "<p>GUID: <code>" << peer.uuid.toString() << "</code></p>";
-        if (peer.lastAddress.valid())
+        if (peer.hasUnicastIp && peer.lastAddress.valid())
           ss << "<p>from " << peer.lastAddress.str() << "</p>";
+        else
+          ss << "<p>from <em>no unicast IPv4</em> (link-local discovery; pairing waits for an address)</p>";
         ss << "<p>remote_token=" << (peer.remoteHasToken ? "yes" : "no");
         ss << ", match=" << (peer.tokenMatch ? "yes" : "no") << "</p>";
         ss << "<p>pubs=" << peer.foreignPubs << " subs=" << peer.foreignSubs

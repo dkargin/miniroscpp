@@ -56,7 +56,8 @@ Error AddressResolver::scanAdapters()
     assert(it != m_hosts.end());
     if (it != m_hosts.end()) {
       for (const auto& adapter: m_adapters) {
-        it->second->addAddress(adapter.address);
+        if (adapter.hasUnicastAddress())
+          it->second->addAddress(adapter.address);
       }
     }
   }

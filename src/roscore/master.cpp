@@ -1034,7 +1034,7 @@ void Master::Internal::registerPeerMasterNode(const PeerInfo& peer)
     return;
   std::string name = "/master_" + peer.uuid.toString();
   std::string URI = peer.masterUri.str();
-  if (URI.empty() && peer.lastAddress.valid()) {
+  if (URI.empty() && peer.hasUnicastIp && peer.lastAddress.valid()) {
     network::URL u;
     u.scheme = "http://";
     u.host = peer.lastAddress.address;

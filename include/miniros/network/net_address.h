@@ -52,6 +52,15 @@ public:
 
   bool isUnspecified() const;
 
+  /// 0.0.0.0 / :: — not a unicast peer address (DHCP-style source when the NIC has no IP).
+  bool isAny() const;
+
+  /// IPv4 limited broadcast 255.255.255.255.
+  bool isLimitedBroadcast() const;
+
+  /// IPv4 224.0.0.0/4 or IPv6 multicast.
+  bool isMulticast() const;
+
   /// Get network port.
   int port() const;
 

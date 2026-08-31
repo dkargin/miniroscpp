@@ -144,6 +144,47 @@ bool NetAddress::isUnspecified() const
   return unspecified;
 }
 
+bool NetAddress::isAny() const
+{
+  if (type_ == AddressIPv4 && rawAddress_) {
+    const auto* a = static_cast<const sockaddr_in*>(rawAddress_);
+    return a->sin_addr.s_addr == htonl(INADDR_ANY);
+  }
+  if (type_ == AddressIPv6 && rawAddress_) {
+    const auto* a = static_cast<const sockaddr_in6*>(rawAddress_);
+    return IN6_IS_ADDR_UNSPECIFIED(&a->sin6_addr);
+  }
+  return address == "0.0.0.0" || address == "::" || address == "::0" || address == "0:0:0:0:0:0:0:0";
+}
+
+bool NetAddress::isLimitedBroadcast() const
+{
+  if (type_ == AddressIPv4 && rawAddress_) {
+    const auto* a = static_cast<const sockaddr_in*>(rawAddress_);
+    return a->sin_addr.s_addr == htonl(INADDR_BROADCAST);
+  }
+  return address == "255.255.255.255";
+}
+
+bool NetAddress::isMulticast() const
+{
+  if (type_ == AddressIPv4 && rawAddress_) {
+    const auto* a = static_cast<const sockaddr_in*>(rawAddress_);
+    const uint32_t ip = ntohl(a->sin_addr.s_addr);
+    return (ip & 0xF0000000u) == 0xE0000000u;
+  }
+  if (type_ == AddressIPv6 && rawAddress_) {
+    const auto* a = static_cast<const sockaddr_in6*>(rawAddress_);
+    return IN6_IS_ADDR_MULTICAST(&a->sin6_addr);
+  }
+  in_addr v4{};
+  if (inet_pton(AF_INET, address.c_str(), &v4) == 1) {
+    const uint32_t ip = ntohl(v4.s_addr);
+    return (ip & 0xF0000000u) == 0xE0000000u;
+  }
+  return false;
+}
+
 // Wrapper for unique_ptr.
 void freeAddrInfo(addrinfo* ptr)
 {
