@@ -52,6 +52,36 @@ TEST_P(Base64Test, Encode) {
   EXPECT_EQ(expected, os.str());
 }
 
+TEST(Base64, EncodeBlockNoWrapOmitsNewlines) {
+  const std::vector<char> raw(80, 1);
+  std::string wrapped(2 * raw.size() + 16, '\0');
+  std::string unwrapped(2 * raw.size() + 16, '\0');
+
+  base64::base64_encodestate state;
+  base64::base64_init_encodestate(&state);
+  int wrapped_n = base64::base64_encode_block(raw.data(), static_cast<int>(raw.size()), wrapped.data(), &state);
+  wrapped_n += base64::base64_encode_blockend(wrapped.data() + wrapped_n, &state);
+  wrapped.resize(static_cast<size_t>(wrapped_n));
+
+  base64::base64_init_encodestate(&state);
+  int unwrapped_n = base64::base64_encode_block(
+      raw.data(), static_cast<int>(raw.size()), unwrapped.data(), &state, base64::BASE64_NO_WRAP);
+  unwrapped_n += base64::base64_encode_blockend(unwrapped.data() + unwrapped_n, &state);
+  unwrapped.resize(static_cast<size_t>(unwrapped_n));
+
+  EXPECT_NE(wrapped.find('\n'), std::string::npos);
+  EXPECT_EQ(unwrapped.find('\n'), std::string::npos);
+
+  std::string wrapped_stripped;
+  wrapped_stripped.reserve(wrapped.size());
+  for (char c : wrapped)
+  {
+    if (c != '\n')
+      wrapped_stripped.push_back(c);
+  }
+  EXPECT_EQ(unwrapped, wrapped_stripped);
+}
+
 TEST_P(Base64Test, Decode) {
   const std::string& in = GetParam().encoded;
   const int encoded_size = in.length();
