@@ -89,6 +89,34 @@ inline static void allInOne(Stream& stream, T t)
     return stream.getLength(); \
   }
 
+/**
+ * \brief Declare write/read helpers for a key-value serializer that provides allInOne.
+ *
+ * Storage must implement:
+ * \verbatim
+template<typename T>
+void element(const char* name, T t);
+\endverbatim
+ *
+ * JSON / rosbridge also uses `boolean`, `boolArray`, and `binary` for field
+ * types that C++ cannot recover from the member type (ROS `bool` is `uint8_t`,
+ * and `uint8[]` shares that storage with `bool[]`).
+ *
+ * `t` is `const Field&` when writing and `Field&` when reading, matching Serializer.
+ */
+#define MINIROS_DECLARE_ALLINONE_KV_SERIALIZER \
+  template<typename Storage, typename T> \
+  inline static void write(Storage& storage, const T& t) \
+  { \
+    allInOne<Storage, const T&>(storage, t); \
+  } \
+  \
+  template<typename Storage, typename T> \
+  inline static void read(Storage& storage, T& t) \
+  { \
+    allInOne<Storage, T&>(storage, t); \
+  }
+
 namespace miniros
 {
 namespace serialization
@@ -315,6 +343,61 @@ struct Serializer<miniros::Duration>
     return 8;
   }
 };
+
+/**
+ * \brief Key-value serializer used by structured encodings (JSON, and later YAML).
+ *
+ * Generated message types specialize this via gencxx. Storage objects provide
+ * `element(const char* name, T field)` and are invoked once per named field.
+ */
+template<typename T>
+struct KVSerializer
+{
+  template<typename Storage, typename M>
+  inline static void allInOne(Storage&, M)
+  {
+    static_assert(sizeof(T) == 0, "KVSerializer is not specialized for this type. "
+                  "Regenerate message headers with a gencxx that emits KVSerializer.");
+  }
+};
+
+template<>
+struct KVSerializer<miniros::Time>
+{
+  template<typename Storage, typename T>
+  inline static void allInOne(Storage& storage, T m)
+  {
+    storage.element("sec", m.sec);
+    storage.element("nsec", m.nsec);
+  }
+
+  MINIROS_DECLARE_ALLINONE_KV_SERIALIZER
+};
+
+template<>
+struct KVSerializer<miniros::Duration>
+{
+  template<typename Storage, typename T>
+  inline static void allInOne(Storage& storage, T m)
+  {
+    storage.element("sec", m.sec);
+    storage.element("nsec", m.nsec);
+  }
+
+  MINIROS_DECLARE_ALLINONE_KV_SERIALIZER
+};
+
+template<typename Storage, typename T>
+inline void kvWrite(Storage& storage, const T& t)
+{
+  KVSerializer<T>::allInOne(storage, t);
+}
+
+template<typename Storage, typename T>
+inline void kvRead(Storage& storage, T& t)
+{
+  KVSerializer<T>::allInOne(storage, t);
+}
 
 /**
  * \brief Vector serializer.  Default implementation does nothing
