@@ -78,6 +78,7 @@ if (MINIROS_SANITIZE_MEMORY OR MINIROS_SANITIZE_THREADS)
   endif()
   # Better stack traces; do not omit frame pointers under sanitizers.
   add_compile_options(-g -fno-omit-frame-pointer)
+  list(APPEND MINIROS_SANITIZER_COMPILE_OPTIONS -fno-omit-frame-pointer)
 endif()
 
 if (MINIROS_SANITIZE_MEMORY)
