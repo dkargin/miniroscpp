@@ -19,6 +19,10 @@ miniros_add_test(${TEST_GROUP}-test_args SOURCES test_args.cpp)
 miniros_add_test(${TEST_GROUP}-test_observer SOURCES test_observer.cpp)
 miniros_add_test(${TEST_GROUP}-test_http_parser SOURCES test_http_parser.cpp)
 miniros_add_test(${TEST_GROUP}-test_yaml SOURCES test_yaml.cpp)
+miniros_add_test(${TEST_GROUP}-test_json_serialization SOURCES test_json_serialization.cpp)
+target_include_directories(${TEST_GROUP}-test_json_serialization PRIVATE
+  ${MINIROS_INCLUDE_GENERATED_DIRS}
+  ${MINIROS_GENERATED_INCLUDE_DIRS})
 miniros_add_test(${TEST_GROUP}-test_http SOURCES test_http.cpp)
 miniros_add_test(${TEST_GROUP}-test_net SOURCES test_net.cpp)
 if(WIN32)

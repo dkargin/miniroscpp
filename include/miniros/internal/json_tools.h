@@ -15,6 +15,8 @@ struct JsonState {
 
 struct JsonSettings {
   int tabs = 2;
+  /// Encode uint8[] / char[] as base64 strings (rosbridge). If false, use a JSON array of numbers.
+  bool binary_as_base64 = true;
 };
 
 } // namespace miniros

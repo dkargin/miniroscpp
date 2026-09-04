@@ -9,8 +9,6 @@ For details, see http://sourceforge.net/projects/libb64
 
 namespace base64 {
 
-constexpr int CHARS_PER_LINE = 72;
-
 void base64_init_encodestate(base64_encodestate* state_in)
 {
   state_in->step = step_A;
@@ -28,11 +26,17 @@ char base64_encode_value(char value_in)
 
 int base64_encode_block(const char* plaintext_in, int length_in, char* code_out, base64_encodestate* state_in)
 {
+  return base64_encode_block(plaintext_in, length_in, code_out, state_in, BASE64_CHARS_PER_LINE);
+}
+
+int base64_encode_block(const char* plaintext_in, int length_in, char* code_out, base64_encodestate* state_in, int chars_per_line)
+{
   const char* plainchar = plaintext_in;
   const char* const plaintextend = plaintext_in + length_in;
   char* codechar = code_out;
   char result;
   char fragment;
+  const int wrap_every = chars_per_line > 0 ? chars_per_line / 4 : 0;
 
   result = state_in->result;
 
@@ -72,10 +76,12 @@ int base64_encode_block(const char* plaintext_in, int length_in, char* code_out,
       result = (fragment & 0x03f) >> 0;
       *codechar++ = base64_encode_value(result);
 
-      ++(state_in->stepcount);
-      if (state_in->stepcount == CHARS_PER_LINE / 4) {
-        *codechar++ = '\n';
-        state_in->stepcount = 0;
+      if (wrap_every > 0) {
+        ++(state_in->stepcount);
+        if (state_in->stepcount == wrap_every) {
+          *codechar++ = '\n';
+          state_in->stepcount = 0;
+        }
       }
     }
   }
