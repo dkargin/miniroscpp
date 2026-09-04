@@ -10,6 +10,8 @@
 #include "miniros/internal/code_location.h"
 #include "miniros/console.h"
 
+#include <cstdint>
+
 namespace miniros {
 namespace http {
 
@@ -123,12 +125,18 @@ int WebSocket::handleEvents(int flags)
     }
 
     if (err == Error::Ok || err == Error::WouldBlock) {
-      // Try to decode frames
       size_t offset = 0;
-      std::string message;
-      while (offset < buffer_.size() && decodeFrame(buffer_, offset, message)) {
-        handleMessage(message);
-        // Remove processed data from buffer
+      DecodedFrame frame;
+      while (offset < buffer_.size() && decodeFrame(buffer_, offset, frame)) {
+        if (frame.opcode == 0x1) {
+          handleMessage(frame.payload);
+        } else if (frame.opcode == 0x8) {
+          close();
+          return 0;
+        } else if (frame.opcode == 0x9 && socket_ && !closed_) {
+          const std::string pong = encodeControlFrame(0xA, frame.payload);
+          socket_->send(pong.c_str(), pong.size(), nullptr);
+        }
         if (offset < buffer_.size()) {
           buffer_ = buffer_.substr(offset);
           offset = 0;
@@ -156,14 +164,16 @@ void WebSocket::handleMessage(const std::string& message)
 
 std::string WebSocket::encodeTextFrame(const std::string& message)
 {
+  return encodeControlFrame(0x1, message);
+}
+
+std::string WebSocket::encodeControlFrame(uint8_t opcode, const std::string& payload)
+{
   std::string frame;
-  frame.reserve(message.size() + 10);
+  frame.reserve(payload.size() + 10);
+  frame.push_back(static_cast<char>(0x80 | (opcode & 0x0F)));
 
-  // First byte: FIN=1, RSV=0, Opcode=1 (text frame)
-  frame.push_back(0x81);
-
-  // Second byte: MASK=0 (server doesn't mask), payload length
-  size_t len = message.size();
+  const size_t len = payload.size();
   if (len < 126) {
     frame.push_back(static_cast<char>(len));
   } else if (len < 65536) {
@@ -176,34 +186,25 @@ std::string WebSocket::encodeTextFrame(const std::string& message)
       frame.push_back(static_cast<char>((len >> (i * 8)) & 0xFF));
     }
   }
-
-  // Payload
-  frame += message;
-
+  frame += payload;
   return frame;
 }
 
-bool WebSocket::decodeFrame(const std::string& data, size_t& offset, std::string& message)
+bool WebSocket::decodeFrame(const std::string& data, size_t& offset, DecodedFrame& frame)
 {
   if (data.size() < offset + 2) {
-    return false; // Not enough data
-  }
-
-  size_t pos = offset;
-  uint8_t firstByte = static_cast<uint8_t>(data[pos++]);
-  uint8_t secondByte = static_cast<uint8_t>(data[pos++]);
-
-  bool fin = (firstByte & 0x80) != 0;
-  uint8_t opcode = firstByte & 0x0F;
-  bool masked = (secondByte & 0x80) != 0;
-  uint64_t payloadLen = secondByte & 0x7F;
-
-  if (!fin || opcode != 1) {
-    // Only handle simple text frames for this implementation
     return false;
   }
 
-  // Read extended payload length if needed
+  size_t pos = offset;
+  const uint8_t firstByte = static_cast<uint8_t>(data[pos++]);
+  const uint8_t secondByte = static_cast<uint8_t>(data[pos++]);
+
+  frame.fin = (firstByte & 0x80) != 0;
+  frame.opcode = firstByte & 0x0F;
+  const bool masked = (secondByte & 0x80) != 0;
+  uint64_t payloadLen = secondByte & 0x7F;
+
   if (payloadLen == 126) {
     if (data.size() < pos + 2) return false;
     payloadLen = (static_cast<uint8_t>(data[pos]) << 8) | static_cast<uint8_t>(data[pos + 1]);
@@ -217,7 +218,6 @@ bool WebSocket::decodeFrame(const std::string& data, size_t& offset, std::string
     pos += 8;
   }
 
-  // Read masking key if present
   uint8_t maskingKey[4] = {0};
   if (masked) {
     if (data.size() < pos + 4) return false;
@@ -227,19 +227,18 @@ bool WebSocket::decodeFrame(const std::string& data, size_t& offset, std::string
     pos += 4;
   }
 
-  // Read payload
   if (data.size() < pos + payloadLen) return false;
 
-  message.resize(payloadLen);
+  frame.payload.resize(static_cast<size_t>(payloadLen));
   for (size_t i = 0; i < payloadLen; i++) {
     if (masked) {
-      message[i] = data[pos + i] ^ maskingKey[i % 4];
+      frame.payload[i] = data[pos + i] ^ maskingKey[i % 4];
     } else {
-      message[i] = data[pos + i];
+      frame.payload[i] = data[pos + i];
     }
   }
 
-  offset = pos + payloadLen;
+  offset = pos + static_cast<size_t>(payloadLen);
   return true;
 }
 
