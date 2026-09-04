@@ -8,10 +8,11 @@
 #define MINIROS_HTTP_WEBSOCKET_H
 
 #include "miniros/errors.h"
-#include <memory>
-#include <functional>
-#include <string>
 #include <atomic>
+#include <cstdint>
+#include <functional>
+#include <memory>
+#include <string>
 
 namespace miniros {
 
@@ -73,8 +74,17 @@ private:
   /// Encode a text frame.
   static std::string encodeTextFrame(const std::string& message);
 
-  /// Decode a WebSocket frame (simple implementation for text frames).
-  static bool decodeFrame(const std::string& data, size_t& offset, std::string& message);
+  /// Encode an unmasked control frame (ping/pong/close).
+  static std::string encodeControlFrame(uint8_t opcode, const std::string& payload);
+
+  struct DecodedFrame {
+    uint8_t opcode = 0;
+    bool fin = true;
+    std::string payload;
+  };
+
+  /// Decode one complete WebSocket frame (text or control). Leaves @p offset unchanged if incomplete.
+  static bool decodeFrame(const std::string& data, size_t& offset, DecodedFrame& frame);
 
   std::shared_ptr<network::NetSocket> socket_;
   PollSet* pollSet_;
