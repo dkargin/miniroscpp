@@ -3,6 +3,7 @@
 //
 
 #include <cstdlib>
+#include <cstdio>
 #include <csignal>
 #include <atomic>
 #include <filesystem>
@@ -78,8 +79,9 @@ protected:
 };
 
 int main(int argc, const char ** argv) {
-  // Install early so a crash during option parsing / init still dumps a stack.
   handleCrashes();
+  
+  notifyNodeStatus("entered main");
   std::signal(SIGINT, systemSignalHandler);
 
   SteadyTime timeStart = SteadyTime::now();
@@ -143,6 +145,9 @@ int main(int argc, const char ** argv) {
     if (!changeCurrentDirectory(workingDir))
       return EXIT_FAILURE;
   }
+
+  // Early notification goes without ROS/miniros logging.
+  std::cout << "Starting miniroscore..." << std::flush;
 
   bool useRosout = vm.count("rosout") && vm["rosout"].as<bool>();
   if (vm.count("xmlrpc_log")) {
@@ -261,6 +266,16 @@ int main(int argc, const char ** argv) {
     return EXIT_FAILURE;
   }
 
+  // RPC is listening; local nodes can register. Do not wait for rosout or
+  // hostname getaddrinfo (late NICs / NSS) before READY=1.
+  NodeNotifyInfo started;
+  started.rpcPort = master.getPort();
+  started.uri = master.getUri();
+  notifyNodeStarted(started);
+  notifyNodeStatus("rpc listening");
+  double durStartMs = (SteadyTime::now() - timeStart).toSec() * 1000.;
+  MINIROS_INFO("RPC listening after %fms. URL=%s", durStartMs, master.getUri().c_str());
+
   NodeHandle node;
 
   std::unique_ptr<master::Rosout> r;
@@ -278,12 +293,9 @@ int main(int argc, const char ** argv) {
     return EXIT_FAILURE;
   }
 
-  NodeNotifyInfo started;
-  started.rpcPort = master.getPort();
-  started.uri = master.getUri();
-  notifyNodeStarted(started);
-  double durStartMs = (SteadyTime::now() - timeStart).toSec() * 1000.;
-  MINIROS_INFO("All components have started in %fms. URL=%s", durStartMs, master.getUri().c_str());
+  notifyNodeStatus("running");
+  MINIROS_INFO("All components have started in %fms. URL=%s",
+    (SteadyTime::now() - timeStart).toSec() * 1000., master.getUri().c_str());
 
   const WallDuration period(0.02);
   while (!g_sigintReceived && master.ok()) {

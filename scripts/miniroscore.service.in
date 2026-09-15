@@ -1,13 +1,25 @@
 [Unit]
 Description=MiniROS master unit
-After=network.target
+# Loopback is enough to bind XML-RPC. Do not wait for DHCP, VPN, or
+# network-online (late NICs such as eno1 / ham0 retry via netlink).
+After=network-pre.target
+Before=network-online.target
 
 [Service]
 Type=notify
 Environment=ROS_MASTER_URI=http://localhost:11311
-Environment=ROSCONSOLE_FORMAT="[${severity}][${nthread}][${time}]: ${message}"
-ExecStart=@CMAKE_INSTALL_PREFIX@/bin/miniroscore --dir=/var/run/miniroscore
-TimeoutSec=5
+Environment=MINIROS_CRASH_LOG=%L/miniroscore/miniroscore.crash
+RuntimeDirectory=miniroscore
+LogsDirectory=miniroscore
+WorkingDirectory=%L/miniroscore
+ExecStart=@CMAKE_INSTALL_PREFIX@/bin/miniroscore --dir=%/miniroscore
+# Start timeout: abort (SIGABRT) so handleCrashes() writes a stack and the
+# kernel/systemd-coredump stores a core. `coredumpctl dump miniroscore`.
+TimeoutStartSec=10
+TimeoutStopSec=5
+TimeoutStartFailureMode=abort
+# Allow harvesting core dumps
+LimitCORE=infinity
 Slice=miniros-low.slice
 
 [Install]

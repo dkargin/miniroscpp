@@ -320,6 +320,16 @@ Error notifyNodeStarted(const NodeNotifyInfo& info)
   return dispatchNotify(buildNotifyPayload(resolveNotifyInfo(info), true));
 }
 
+Error notifyNodeStatus(const std::string& status)
+{
+  if (status.empty() || status.find('\n') != std::string::npos)
+    return Error::InvalidValue;
+  std::ostringstream oss;
+  oss << "STATUS=" << status << "\n";
+  oss << "MAINPID=" << resolveNotifyInfo({}).pid << "\n";
+  return dispatchNotify(oss.str());
+}
+
 Error notifyNodeExiting()
 {
   return notifyNodeExiting(NodeNotifyInfo{});
