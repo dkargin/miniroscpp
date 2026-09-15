@@ -57,6 +57,7 @@ TEST(Notify, SilentNoopWithoutChannel)
   info.rpcPort = 1234;
   info.uri = "http://x:1234";
   EXPECT_EQ(miniros::notifyNodeStarted(info), miniros::Error::Ok);
+  EXPECT_EQ(miniros::notifyNodeStatus("entered main"), miniros::Error::Ok);
   EXPECT_EQ(miniros::notifyNodeExiting(), miniros::Error::Ok);
 }
 
@@ -83,6 +84,28 @@ TEST(Notify, PipeDeliversPidAndPort)
   const std::string msg(buf, static_cast<size_t>(n));
   EXPECT_NE(msg.find("READY=1"), std::string::npos);
   EXPECT_NE(msg.find("X_MINIROS_RPC_PORT=4242"), std::string::npos);
+  EXPECT_NE(msg.find("MAINPID=" + std::to_string(miniros::Launcher::myPid())), std::string::npos);
+}
+
+TEST(Notify, PipeDeliversStatus)
+{
+  int fds[2] = {-1, -1};
+  ASSERT_EQ(pipe(fds), 0);
+  ASSERT_TRUE(miniros::set_environment_variable("MINIROS_NOTIFY_FD", std::to_string(fds[1]).c_str()));
+  miniros::unset_environment_variable("NOTIFY_SOCKET");
+
+  ASSERT_EQ(miniros::notifyNodeStatus("entered main"), miniros::Error::Ok);
+
+  char buf[512] = {};
+  const ssize_t n = read(fds[0], buf, sizeof(buf) - 1);
+  close(fds[0]);
+  close(fds[1]);
+  miniros::unset_environment_variable("MINIROS_NOTIFY_FD");
+
+  ASSERT_GT(n, 0);
+  const std::string msg(buf, static_cast<size_t>(n));
+  EXPECT_NE(msg.find("STATUS=entered main"), std::string::npos);
+  EXPECT_EQ(msg.find("READY=1"), std::string::npos);
   EXPECT_NE(msg.find("MAINPID=" + std::to_string(miniros::Launcher::myPid())), std::string::npos);
 }
 #endif

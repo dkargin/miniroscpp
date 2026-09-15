@@ -64,8 +64,17 @@ The cache is rewritten when the graph changes and again on clean shutdown.
 
 # Process readiness #
 
-`miniroscore` uses [sd_notify](https://www.freedesktop.org/software/systemd/man/latest/sd_notify.html) protocol to tell SystemD that master has actually started and ready. Its usage is implied in scripts/miniroscore.service unit.
-These notifications do not need any additional external libraries, just the capability of compiler and platform to write into unix socket. 
+`miniroscore` uses [sd_notify](https://www.freedesktop.org/software/systemd/man/latest/sd_notify.html) (`NOTIFY_SOCKET`) without linking libsystemd. The unit is `scripts/miniroscore.service.in` (`Type=notify`).
+
+Order:
+
+1. **`STATUS=entered main`** — first line of `main()` (also printed to stderr). Proves the binary exec'd; `systemctl status` shows this text while still `activating`.
+2. **`READY=1`** — as soon as the XML-RPC/HTTP port is listening. Local nodes may start; do not wait for rosout, multicast join, or `getaddrinfo(hostname)`.
+3. **`STATUS=running`** — after rosout / event setup.
+
+The unit is ordered `After=network-pre.target` / `Before=network-online.target` so DHCP and late NICs (VPN, `ham0`) do not delay the master. Multicast join retries via netlink when those interfaces appear.
+
+On start timeout the unit uses `TimeoutStartFailureMode=abort` (`SIGABRT`): `handleCrashes()` writes `$MINIROS_CRASH_LOG` (`/var/log/miniroscore/miniroscore.crash`), then the default handler produces a core (`coredumpctl dump miniroscore`). 
 
 # Multimaster #
 

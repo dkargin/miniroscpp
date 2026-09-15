@@ -70,6 +70,10 @@ struct MINIROS_DECL NodeNotifyInfo {
 MINIROS_DECL Error notifyNodeStarted();
 MINIROS_DECL Error notifyNodeStarted(const NodeNotifyInfo& info);
 
+/// Notify owner/systemd with a STATUS= line (shown by `systemctl status`).
+/// Silent no-op when no notify channel is configured. `status` must be a single line.
+MINIROS_DECL Error notifyNodeStatus(const std::string& status);
+
 /// Notify owner/systemd that the node is exiting (STOPPING=1 + MAINPID / optional fields).
 MINIROS_DECL Error notifyNodeExiting();
 MINIROS_DECL Error notifyNodeExiting(const NodeNotifyInfo& info);
