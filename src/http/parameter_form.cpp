@@ -193,6 +193,10 @@ void ParameterForm::renderHtml(std::ostream& out) const
             << "</option>";
       }
       out << "</select>";
+    } else if (p.type == ParamType::String) {
+      out << "<input type=\"text\" name=\"" << xmlEncode(p.name) << "\" id=\""
+          << xmlEncode(inputId) << "\" value=\"" << xmlEncode(p.string_value)
+          << "\" data-original=\"" << xmlEncode(orig) << "\" size=\"28\"/>";
     }
 
     if (ferr != report.field_errors.end()) {

@@ -29,6 +29,7 @@ enum class ParamType {
   Int,
   Double,
   Enum,
+  String,
 };
 
 /// Descriptor + current value for one parameter.
@@ -124,6 +125,7 @@ public:
   /// @param selected - enum code; empty → first option.
   ParamSpecRef addEnum(const std::string& name, std::vector<EnumOption> options,
                        const std::string& selected = {});
+  ParamSpecRef addString(const std::string& name, std::string value);
 
   bool has(const std::string& name) const;
   bool getBool(const std::string& name) const;

@@ -104,7 +104,7 @@ std::string ParamSpec::valueAsString() const
     oss << double_value;
     return oss.str();
   }
-  if (type == ParamType::Enum)
+  if (type == ParamType::Enum || type == ParamType::String)
     return string_value;
   return {};
 }
@@ -253,6 +253,17 @@ ParamSpecRef ParameterCollection::addEnum(const std::string& name, std::vector<E
   return ParamSpecRef(this, params_.size() - 1);
 }
 
+ParamSpecRef ParameterCollection::addString(const std::string& name, std::string value)
+{
+  Lock lock{mutex_};
+  ParamSpec spec;
+  spec.name = name;
+  spec.type = ParamType::String;
+  spec.string_value = std::move(value);
+  params_.push_back(std::move(spec));
+  return ParamSpecRef(this, params_.size() - 1);
+}
+
 ParamSpec* ParameterCollection::findLocked(Lock& lock, const std::string& name)
 {
   assert(lock.owns_lock());
@@ -377,7 +388,13 @@ Error ParameterCollection::setString(const std::string& name, const std::string&
 {
   Lock lock{mutex_};
   ParamSpec* p = findLocked(lock, name);
-  if (!p || p->type != ParamType::Enum)
+  if (!p)
+    return Error::ParameterNotFound;
+  if (p->type == ParamType::String) {
+    p->string_value = value;
+    return Error::Ok;
+  }
+  if (p->type != ParamType::Enum)
     return Error::ParameterNotFound;
   if (!enumHasCode(p->enum_options, value))
     return Error::InvalidValue;
@@ -419,6 +436,10 @@ Error ParameterCollection::validateAndAssign(ParamSpec& spec, const std::string&
   if (spec.type == ParamType::Enum) {
     if (!enumHasCode(spec.enum_options, raw))
       return Error::InvalidValue;
+    spec.string_value = raw;
+    return Error::Ok;
+  }
+  if (spec.type == ParamType::String) {
     spec.string_value = raw;
     return Error::Ok;
   }
@@ -483,6 +504,7 @@ std::string ParameterCollection::toYaml(const std::string& fileComment) const
       os << spec.double_value;
       break;
     case ParamType::Enum:
+    case ParamType::String:
       os << yamlQuoteScalar(spec.string_value);
       break;
     }
