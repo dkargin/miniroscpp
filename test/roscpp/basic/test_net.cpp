@@ -150,6 +150,10 @@ TEST(Address, ip4)
   NetAddress address3 = NetAddress::fromIp4String("very wrong address", 10);
   ASSERT_FALSE(address3.valid());
   EXPECT_EQ(address3.type(), NetAddress::AddressInvalid);
+
+  // Numeric-only: hostnames must not call getaddrinfo (unsafe on PollManager).
+  EXPECT_FALSE(NetAddress::fromIp4String("localhost", 11311).valid());
+  EXPECT_FALSE(NetAddress::fromIp4String("orangepi5", 11311).valid());
 }
 
 TEST(Address, isLoopback)

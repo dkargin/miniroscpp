@@ -27,7 +27,7 @@ namespace master {
 
 class MINIROS_DECL AddressResolver {
 public:
-  using Lock = std::unique_lock<AddressResolver>;
+  using Lock = std::unique_lock<std::mutex>;
 
   /// Scan or update existing network adapters.
   Error scanAdapters();
@@ -38,7 +38,14 @@ public:
   /// Find adapter for specific local address.
   const network::NetAdapter* findAdapterForLocalAddress(const network::NetAddress& address) const;
 
-  std::shared_ptr<network::HostInfo> updateHost(const  RequesterInfo& requesterInfo);
+  /// IPv4 address on a local up non-loopback adapter that can reach `peerAddr`.
+  /// Prefers the same subnet; otherwise the first such adapter. Empty if none.
+  std::string pickLanIp(const network::NetAddress& peerAddr) const;
+
+  /// Learn a host from an XML-RPC caller (`--resolve`).
+  /// `clientAddress` is the TCP source; `callerApi` may contain a hostname or IP.
+  /// Never calls getaddrinfo.
+  std::shared_ptr<network::HostInfo> updateHost(const RequesterInfo& requesterInfo);
 
   /// Finds host by its ip address.
   std::shared_ptr<network::HostInfo> findHost(const network::NetAddress& address) const;
@@ -56,7 +63,7 @@ public:
   /// Get local hostname.
   const std::string& getHost() const;
 
-  /// Enable/disable IP resolution.
+  /// Enable/disable IP resolution for local Master API replies (`--resolve`).
   void setResolveIp(bool resolve);
 
   /// Check if specified address is a localhost.
@@ -78,6 +85,10 @@ public:
   }
 
 protected:
+  /// Caller must already own m_mutex (pass the lock as proof).
+  std::shared_ptr<network::HostInfo> findHostLocked(Lock& lock, const network::NetAddress& address) const;
+  bool isLoopbackNameLocked(Lock& lock, const std::string& host) const;
+
   /// Name of the host, as reported by a system.
   std::string m_hostname;
 

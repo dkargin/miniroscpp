@@ -68,6 +68,9 @@ struct Master::Internal {
   /// Multimaster discovery + registration sync over UDP.
   std::unique_ptr<MultimasterManager> multimaster;
 
+  /// When false, Master::start() does not bind multimaster UDP sockets.
+  bool multimasterEnabled = true;
+
   /// Foreign node names imported from each peer UUID string.
   std::map<std::string, std::set<std::string>> foreignNodesByPeer;
 
@@ -123,7 +126,11 @@ struct Master::Internal {
   void shutdownNode(const std::shared_ptr<NodeRef>& node, const std::string& reason);
 
   /// Collect local registrations for multimaster snapshot (excludes local-only topics).
-  std::vector<miniros_msgs::RegistrationRecord> collectMultimasterSnapshot() const;
+  /// URIs are rewritten to literal IPs reachable from @p peerAddr (no DNS).
+  std::vector<miniros_msgs::RegistrationRecord> collectMultimasterSnapshot(const network::NetAddress& peerAddr) const;
+
+  /// Rewrite node/service URIs in a local multimaster delta using learned IPs.
+  void announceMultimasterChange(miniros_msgs::RegistrationRecord rec);
 
   /// Apply inbound multimaster registration records from a peer.
   void applyMultimasterRecords(const UUID& peer, const std::vector<miniros_msgs::RegistrationRecord>& records, bool snapshot);

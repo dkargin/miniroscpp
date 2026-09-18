@@ -69,7 +69,7 @@ class MINIROS_DECL MultimasterManager {
 public:
   using ApplyRecordsFn = std::function<void(const UUID& peer, const std::vector<miniros_msgs::RegistrationRecord>& records, bool snapshot)>;
   using DropPeerFn = std::function<void(const UUID& peer)>;
-  using CollectSnapshotFn = std::function<std::vector<miniros_msgs::RegistrationRecord>()>;
+  using CollectSnapshotFn = std::function<std::vector<miniros_msgs::RegistrationRecord>(const network::NetAddress& peerAddr)>;
 
   MultimasterManager(AddressResolver* resolver, RegistrationManager* regs);
   ~MultimasterManager();

@@ -78,6 +78,10 @@ public:
 
   void setResolveNodeIP(bool resolv);
 
+  /// Enable UDP multimaster (default true). Must be called before start().
+  /// When false, the master does not bind discovery/sync sockets.
+  void setMultimasterEnabled(bool enabled);
+
   /// Shared secret for multimaster pairing. Empty disables auto-pair until a
   /// token is provided (CLI or HTTP form). Manual pairing between open masters
   /// (no token) is still allowed. Discovery still runs.

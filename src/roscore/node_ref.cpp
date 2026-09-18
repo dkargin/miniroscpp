@@ -3,6 +3,7 @@
 //
 
 #include "node_ref.h"
+#include "resolver.h"
 
 #include "miniros/http/xmlrpc_request.h"
 #include "miniros/http/http_client.h"
@@ -154,6 +155,39 @@ std::string NodeRef::getApi() const
 {
   std::unique_lock lock(m_guard);
   return m_api;
+}
+
+std::string NodeRef::uriForPeer(const std::string& uri, const AddressResolver& resolver,
+  const network::NetAddress& peerAddr) const
+{
+  network::URL u;
+  if (!u.fromString(uri, false) || u.host.empty())
+    return uri;
+
+  network::NetAddress parsed = network::NetAddress::fromIp4String(u.host, 0);
+  if (!parsed.valid())
+    parsed = network::NetAddress::fromIp6String(u.host, 0);
+  if (parsed.valid() && !parsed.isLoopback())
+    return uri;
+
+  const bool loopback = parsed.isLoopback() || resolver.isLocalhost(u.host);
+  std::string ip;
+  auto info = hostInfo().lock();
+  const bool localNode = (info && info->local) || loopback;
+  if (localNode) {
+    ip = resolver.pickLanIp(peerAddr);
+  } else if (info) {
+    for (const auto& addr : info->addresses()) {
+      if (!addr.isLoopback() && !addr.address.empty()) {
+        ip = addr.address;
+        break;
+      }
+    }
+  }
+  if (ip.empty())
+    return uri;
+  u.host = ip;
+  return u.str();
 }
 
 std::string NodeRef::getHost() const

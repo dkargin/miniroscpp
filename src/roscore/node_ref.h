@@ -14,6 +14,7 @@
 #include <vector>
 
 #include "miniros/macros.h"
+#include "miniros/network/net_address.h"
 #include "miniros/network/url.h"
 
 #include "miniros/http/http_client.h"
@@ -38,6 +39,8 @@ class XmlRpcRequest;
 class PollSet;
 
 namespace master {
+
+class AddressResolver;
 
 /// NodeRef contains specific data about a node:
 ///  - publishers, subscribers, services, etc.
@@ -139,6 +142,11 @@ public:
 
   /// Get default API address.
   std::string getApi() const;
+
+  /// Rewrite a node/service URI to a literal IP for a remote peer. Never DNS.
+  /// If `peerAddr` is valid, prefers a local adapter on the same subnet.
+  std::string uriForPeer(const std::string& uri, const AddressResolver& resolver,
+    const network::NetAddress& peerAddr = {}) const;
 
   /// Get hostname.
   /// Hostname is often determined by API URL. In some cases hostname is a direct IP address.

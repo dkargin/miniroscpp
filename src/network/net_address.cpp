@@ -328,6 +328,36 @@ NetAddress NetAddress::fromString(Type type, const std::string& address, int por
   return result;
 }
 
+NetAddress NetAddress::fromIp4String(const std::string& address, int port)
+{
+  NetAddress result;
+  if (address.empty() || port < 0 || port > 65535)
+    return result;
+  sockaddr_in addr{};
+  addr.sin_family = AF_INET;
+  if (inet_pton(AF_INET, address.c_str(), &addr.sin_addr) != 1)
+    return result;
+  addr.sin_port = htons(static_cast<uint16_t>(port));
+  result.assignRawAddress(AddressIPv4, &addr, sizeof(addr));
+  result.address = address;
+  return result;
+}
+
+NetAddress NetAddress::fromIp6String(const std::string& address, int port)
+{
+  NetAddress result;
+  if (address.empty() || port < 0 || port > 65535)
+    return result;
+  sockaddr_in6 addr{};
+  addr.sin6_family = AF_INET6;
+  addr.sin6_port = htons(static_cast<uint16_t>(port));
+  if (inet_pton(AF_INET6, address.c_str(), &addr.sin6_addr) != 1)
+    return result;
+  result.assignRawAddress(AddressIPv6, &addr, sizeof(addr));
+  result.address = address;
+  return result;
+}
+
 NetAddress NetAddress::fromURL(const std::string& address, int port)
 {
   URL url;
