@@ -99,19 +99,11 @@ public:
   /// @param port - numeric port.
   MINIROS_NODISCARD static NetAddress fromString(Type type, const std::string& address, int port);
 
-  /// Create network address from string representation of IP4 address.
-  /// This function will not resolve DNS names.
-  MINIROS_NODISCARD static NetAddress fromIp4String(const std::string& address, int port)
-  {
-    return fromString(Type::AddressIPv4, address, port);
-  }
+  /// Create network address from a dotted IPv4 literal. Does not call getaddrinfo.
+  MINIROS_NODISCARD static NetAddress fromIp4String(const std::string& address, int port);
 
-  /// Create network address from string representation of IPv6 address.
-  /// This function will not resolve DNS names.
-  MINIROS_NODISCARD static NetAddress fromIp6String(const std::string& address, int port)
-  {
-    return fromString(Type::AddressIPv6, address, port);
-  }
+  /// Create network address from an IPv6 literal. Does not call getaddrinfo.
+  MINIROS_NODISCARD static NetAddress fromIp6String(const std::string& address, int port);
 
   /// Create network address from URL string.
   /// @param address - URL string to parse (e.g., "http://example.com:8080/path")

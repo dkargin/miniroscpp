@@ -14,6 +14,8 @@
 
 #include "resolver.h"
 
+#include "miniros/network/url.h"
+
 namespace miniros {
 
 namespace master {
@@ -63,6 +65,22 @@ Error AddressResolver::scanAdapters()
   return Error::Ok;
 }
 
+std::string AddressResolver::pickLanIp(const network::NetAddress& peerAddr) const
+{
+  Lock lock(m_mutex);
+  const network::NetAdapter* fallback = nullptr;
+  for (const auto& adapter : m_adapters) {
+    if (!adapter.isUp() || adapter.isLoopback() || !adapter.isIPv4())
+      continue;
+    if (peerAddr.valid() && peerAddr.type() == network::NetAddress::AddressIPv4 &&
+        adapter.matchNetAddress(peerAddr))
+      return adapter.address.address;
+    if (!fallback)
+      fallback = &adapter;
+  }
+  return fallback ? fallback->address.address : std::string{};
+}
+
 network::URL AddressResolver::resolveAddressFor(const std::shared_ptr<NodeRef>& node,
   const network::NetAddress& remoteAddress,
   const network::NetAddress& localAddress) const
@@ -73,7 +91,7 @@ network::URL AddressResolver::resolveAddressFor(const std::shared_ptr<NodeRef>& 
 
   network::URL url = node->getUrl();
 
-  std::scoped_lock lock(m_mutex);
+  Lock lock(m_mutex);
   if (!m_resolveIp)
     return url;
 
@@ -83,7 +101,7 @@ network::URL AddressResolver::resolveAddressFor(const std::shared_ptr<NodeRef>& 
     return url;
   }
 
-  auto requesterHost = findHost(remoteAddress);
+  auto requesterHost = findHostLocked(lock, remoteAddress);
   if (requesterHost && nodeHost == requesterHost) {
     // Both requester and node are on the same host. No additional resolution is needed.
     return url;
@@ -167,31 +185,44 @@ network::URL AddressResolver::resolveAddressFor(const std::shared_ptr<NodeRef>& 
 
 std::shared_ptr<network::HostInfo> AddressResolver::findHost(const network::NetAddress& address) const
 {
+  Lock lock(m_mutex);
+  return findHostLocked(lock, address);
+}
+
+std::shared_ptr<network::HostInfo> AddressResolver::findHostLocked(Lock& lock, const network::NetAddress& address) const
+{
+  assert(lock.owns_lock());
+  assert(lock.mutex() == &m_mutex);
   for (const auto& [name, hostPtr] : m_hosts) {
-    if (!hostPtr) {
+    if (!hostPtr)
       continue;
-    }
-    if (hostPtr->hasAddress(address)) {
+    if (hostPtr->hasAddress(address))
       return hostPtr;
-    }
   }
   return {};
 }
 
 bool AddressResolver::isLocalhost(const std::string& host) const
 {
+  Lock lock(m_mutex);
+  return isLoopbackNameLocked(lock, host);
+}
+
+bool AddressResolver::isLoopbackNameLocked(Lock& lock, const std::string& host) const
+{
+  assert(lock.owns_lock());
+  assert(lock.mutex() == &m_mutex);
   if (host == m_hostname)
     return true;
   if (host == "localhost")
     return true;
   if (host == "127.0.0.1")
     return true;
-  if (host == "0:0:0:0:0:0:0:1"  || host == "::1") // IP v6 address
+  if (host == "0:0:0:0:0:0:0:1" || host == "::1")
     return true;
   auto it = m_hosts.find(host);
-  if (it != m_hosts.end() && it->second->local) {
+  if (it != m_hosts.end() && it->second && it->second->local)
     return true;
-  }
   return false;
 }
 
@@ -209,41 +240,27 @@ std::shared_ptr<network::HostInfo> AddressResolver::updateHost(const RequesterIn
   network::URL url;
   url.fromString(requesterInfo.callerApi, /*defaultPort*/false);
 
-  // Host can contain either hostname or direct IP address.
-  // We should try to make sure that m_hosts[host] points to the same object for both hostname and IP.
+  const bool sameMachine = requesterInfo.clientAddress.isLoopback();
+  Lock lock(m_mutex);
 
-  // check if we got a direct IP address instead of a string hostname.
-  bool isIP = network::NetAddress::checkAddressType(url.host) != network::NetAddress::AddressInvalid;
-  bool isSameMachine = requesterInfo.clientAddress.isLoopback();
-
-  std::scoped_lock lock(m_mutex);
-
-  if (isIP) {
-    if (isSameMachine) {
-      auto it = m_hosts.find("localhost");
-      if (it != m_hosts.end())
-        return it->second;
-    }
-    // TODO: find host which corresponds to client IP.
-    return {};
-  }
-
-  auto it = m_hosts.find(url.host);
-  if (it == m_hosts.end()) {
-    // Avahi or similar DNS services can provide an alias for some host. Suppose we have some host="rpi.robot". Avahi
-    // will provide DNS for "rpi.robot.local" hostname. Some users can force usage of Avahi hostname by specifying
-    // ROS_HOSTNAME=rpi.robot.local. We should make sure this alias is points to the same HostInfo object.
-
-    // In the same time, we should be ready that some hosts can have their DHCP ip addresses reassigned.
-    // TODO: Check if this IP is already used.
-    it = m_hosts.emplace(url.host, std::make_shared<network::HostInfo>(url.host)).first;
-  }
-
-  if (!isSameMachine)
-    it->second->addAddress(requesterInfo.clientAddress);
-  else
+  if (sameMachine) {
+    auto it = m_hosts.find("localhost");
+    if (it == m_hosts.end())
+      return {};
     it->second->local = true;
+    if (!url.host.empty())
+      m_hosts[url.host] = it->second;
+    return it->second;
+  }
 
+  std::string key = url.host.empty() ? requesterInfo.clientAddress.address : url.host;
+  if (key.empty())
+    return {};
+  auto it = m_hosts.find(key);
+  if (it == m_hosts.end())
+    it = m_hosts.emplace(key, std::make_shared<network::HostInfo>(key)).first;
+  if (requesterInfo.clientAddress.valid())
+    it->second->addAddress(requesterInfo.clientAddress);
   return it->second;
 }
 

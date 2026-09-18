@@ -28,6 +28,9 @@
 #include "miniros/common.h"
 #include "miniros/rosconsole/file_log.h"
 #include "miniros/network/network.h"
+#include "miniros/network/url.h"
+#include "miniros/network/net_adapter.h"
+#include "miniros/network/host_info.h"
 
 #include <filesystem>
 
@@ -61,7 +64,7 @@ std::string Master::Internal::localHostname() const
 {
   std::string host = resolver.getHost();
   if (host.empty())
-    host = network::getHost();
+    host = miniros::network::getHost();
   if (host.empty())
     host = "unknown";
   return host;
@@ -155,10 +158,10 @@ bool Master::start(PollSet* poll_set, int port)
     internal_->cache.beginRestore(boundPort > 0 ? boundPort : port, internal_->uuid.toString());
   }
 
-  if (internal_->multimaster) {
+  if (internal_->multimaster && internal_->multimasterEnabled) {
     auto url = internal_->rpcManager->getServerUrl();
-    internal_->multimaster->setCollectSnapshot([this]() {
-      return internal_->collectMultimasterSnapshot();
+    internal_->multimaster->setCollectSnapshot([this](const network::NetAddress& dest) {
+      return internal_->collectMultimasterSnapshot(dest);
     });
     internal_->multimaster->setApplyRecords([this](const UUID& peer, const std::vector<miniros_msgs::RegistrationRecord>& records, bool snapshot) {
       internal_->applyMultimasterRecords(peer, records, snapshot);
@@ -176,6 +179,8 @@ bool Master::start(PollSet* poll_set, int port)
       internal_->cache.restorePeers();
     // Discovery is always active; token only gates pairing.
     internal_->multimaster->sendDiscover();
+  } else if (internal_->multimaster) {
+    MINIROS_INFO("Multimaster UDP disabled");
   }
 
   MINIROS_DEBUG("Master startup is complete.");
@@ -501,7 +506,7 @@ Master::RpcValue Master::registerService(const std::string& caller_id, const std
     rec.node_name = caller_id;
     rec.node_api = caller_api;
     rec.service_api = service_api;
-    internal_->multimaster->announceLocalChange(rec);
+    internal_->announceMultimasterChange(rec);
   }
 
   RpcValue res = RpcValue::Array(3);
@@ -528,7 +533,7 @@ Master::RpcValue Master::unregisterService(const std::string& caller_id, const s
     rec.name = service;
     rec.node_name = caller_id;
     rec.service_api = service_api;
-    internal_->multimaster->announceLocalChange(rec);
+    internal_->announceMultimasterChange(rec);
   }
 
   RpcValue res = RpcValue::Array(3);
@@ -645,7 +650,7 @@ Master::RpcValue Master::registerPublisher(const std::string& caller_id, const s
       rec.type = type;
       rec.node_name = caller_id;
       rec.node_api = caller_api;
-      internal_->multimaster->announceLocalChange(rec);
+      internal_->announceMultimasterChange(rec);
     }
   }
   RpcValue res = RpcValue::Array(3);
@@ -673,7 +678,7 @@ Master::RpcValue Master::unregisterPublisher(
       rec.name = topic;
       rec.node_name = caller_id;
       rec.node_api = caller_api;
-      internal_->multimaster->announceLocalChange(rec);
+      internal_->announceMultimasterChange(rec);
     }
   }
   RpcValue res = RpcValue::Array(3);
@@ -702,7 +707,7 @@ Master::RpcValue Master::registerSubscriber(const std::string& caller_id, const 
       rec.type = type;
       rec.node_name = caller_id;
       rec.node_api = caller_api;
-      internal_->multimaster->announceLocalChange(rec);
+      internal_->announceMultimasterChange(rec);
     }
   }
   RpcValue res = RpcValue::Array(3);
@@ -730,7 +735,7 @@ Master::RpcValue Master::unregisterSubscriber(const std::string& caller_id, cons
       rec.name = topic;
       rec.node_name = caller_id;
       rec.node_api = caller_api;
-      internal_->multimaster->announceLocalChange(rec);
+      internal_->announceMultimasterChange(rec);
     }
   }
   RpcValue res = RpcValue::Array(3);
@@ -922,6 +927,12 @@ void Master::initEvents(NodeHandle& /*nh*/)
 {
 }
 
+void Master::setMultimasterEnabled(bool enabled)
+{
+  if (internal_)
+    internal_->multimasterEnabled = enabled;
+}
+
 void Master::setMultimasterToken(const std::string& token)
 {
   if (!internal_ || !internal_->multimaster)
@@ -953,13 +964,13 @@ Error Master::addMultimasterPeer(const std::string& host, int udpPort)
     return Error::InvalidValue;
   network::NetAddress addr = network::NetAddress::fromIp4String(host, udpPort);
   if (!addr.valid())
-    addr = network::NetAddress::fromString(network::NetAddress::AddressUnspecified, host, udpPort);
+    addr = network::NetAddress::fromIp6String(host, udpPort);
   if (!addr.valid())
     return Error::InvalidAddress;
   return internal_->multimaster->addPeerProbe(addr);
 }
 
-std::vector<miniros_msgs::RegistrationRecord> Master::Internal::collectMultimasterSnapshot() const
+std::vector<miniros_msgs::RegistrationRecord> Master::Internal::collectMultimasterSnapshot(const network::NetAddress& peerAddr) const
 {
   std::vector<miniros_msgs::RegistrationRecord> out;
   // Keep rosout traffic local to each master; never advertise the in-process
@@ -976,7 +987,7 @@ std::vector<miniros_msgs::RegistrationRecord> Master::Internal::collectMultimast
       continue;
 
     const std::string nodeName = node->id();
-    const std::string nodeApi = node->getApi();
+    const std::string nodeApi = node->uriForPeer(node->getApi(), resolver, peerAddr);
     std::set<std::string> pubs, subs, srvs;
     {
       NodeRef::Lock nodeLock(*node);
@@ -1019,11 +1030,23 @@ std::vector<miniros_msgs::RegistrationRecord> Master::Internal::collectMultimast
       r.name = service;
       r.node_name = nodeName;
       r.node_api = nodeApi;
-      r.service_api = regManager.services.get_service_api(service);
+      r.service_api = node->uriForPeer(regManager.services.get_service_api(service), resolver, peerAddr);
       out.push_back(std::move(r));
     }
   }
   return out;
+}
+
+void Master::Internal::announceMultimasterChange(miniros_msgs::RegistrationRecord rec)
+{
+  if (!multimaster)
+    return;
+  if (auto node = regManager.getNodeByName(rec.node_name)) {
+    rec.node_api = node->uriForPeer(rec.node_api, resolver);
+    if (!rec.service_api.empty())
+      rec.service_api = node->uriForPeer(rec.service_api, resolver);
+  }
+  multimaster->announceLocalChange(rec);
 }
 
 void Master::Internal::registerPeerMasterNode(const PeerInfo& peer)
@@ -1033,13 +1056,15 @@ void Master::Internal::registerPeerMasterNode(const PeerInfo& peer)
   if (!peer.uuid.valid())
     return;
   std::string name = "/master_" + peer.uuid.toString();
-  std::string URI = peer.masterUri.str();
-  if (URI.empty() && peer.lastAddress.valid()) {
+  std::string URI;
+  if (peer.lastAddress.valid() && !peer.lastAddress.address.empty()) {
     network::URL u;
     u.scheme = "http://";
     u.host = peer.lastAddress.address;
     u.port = peer.masterUri.port ? peer.masterUri.port : static_cast<uint32_t>(peer.lastAddress.port());
     URI = u.str();
+  } else {
+    URI = peer.masterUri.str();
   }
   if (URI.empty())
     return;

@@ -99,8 +99,9 @@ int main(int argc, const char ** argv) {
     ("dump_parameters", po::value<bool>()->default_value(false), "Dump all ROSParam values on every update")
     ("pidfile", po::value<std::string>(), "Path to a PID file")
     ("discovery", po::value<int>(), "UDP port for multimaster unicast sync (default: master RPC port)")
+    ("no-multimaster", "Disable UDP multimaster (no discovery/sync sockets)")
     ("multicast", po::value<std::string>()->default_value("239.255.42.42:11312"),
-      "Multicast discovery group addr:port (use 'off' to disable)")
+      "Multicast discovery group addr:port (use 'off' to disable multicast only; unicast/broadcast still run)")
     ("token", po::value<std::string>(),
       "Shared secret for multimaster collective (optional; can also be entered in the web UI)")
     ("peer", po::value<std::vector<std::string>>()->composing(),
@@ -191,6 +192,10 @@ int main(int argc, const char ** argv) {
   PidFile pidFile;
   if (vm.count("pidfile")) {
     pidFile.create(vm["pidfile"].as<std::string>().c_str());
+  }
+
+  if (vm.count("no-multimaster")) {
+    master.setMultimasterEnabled(false);
   }
 
   if (vm.count("token")) {

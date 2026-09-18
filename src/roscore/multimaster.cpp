@@ -14,6 +14,7 @@
 #include "resolver.h"
 #include "node_ref.h"
 
+#include "miniros/network/url.h"
 #include "miniros_msgs/MasterOffer.hxx"
 #include "miniros_msgs/MasterSync.hxx"
 
@@ -29,6 +30,26 @@ namespace {
 std::string uuidKey(const UUID& u)
 {
   return u.toString();
+}
+
+bool isLiteralIp(const std::string& host)
+{
+  return network::NetAddress::fromIp4String(host, 0).valid() ||
+         network::NetAddress::fromIp6String(host, 0).valid();
+}
+
+/// If `uri` host is not a literal IP, replace it with `ip`. Never DNS.
+std::string rewriteUriHost(const std::string& uri, const std::string& ip)
+{
+  if (ip.empty() || uri.empty())
+    return uri;
+  network::URL u;
+  if (!u.fromString(uri, false) || u.host.empty())
+    return uri;
+  if (isLiteralIp(u.host))
+    return uri;
+  u.host = ip;
+  return u.str();
 }
 
 /// Peers that reuse our GUID are stored under a host-keyed id so they do not
@@ -462,10 +483,20 @@ struct MultimasterManager::Internal {
     miniros_msgs::MasterOffer offer;
     offer.master_port = static_cast<uint16_t>(rpcUrl.port ? rpcUrl.port : boundPort);
     offer.host = rpcUrl.host;
+    if (!isLiteralIp(offer.host)) {
+      for (const std::string& ip : localIps) {
+        auto addr = network::NetAddress::fromIp4String(ip, 0);
+        if (addr.valid() && !addr.isLoopback()) {
+          offer.host = ip;
+          break;
+        }
+      }
+    }
     return mm::serializePayload(offer, payload);
   }
 
   /// Apply MasterOffer (or UDP sender fallback) into peer URI / sync address.
+  /// Routing always uses the datagram source IP — never a hostname.
   void applyOfferInfo(Peer& peer, const miniros_msgs::MasterOffer* offer, const network::NetAddress& sender)
   {
     network::NetAddress syncAddr = sender;
@@ -476,7 +507,6 @@ struct MultimasterManager::Internal {
     if (isUsableSyncAddress(syncAddr))
       peer.info.lastAddress = syncAddr;
     else if (!peer.info.lastAddress.valid() && sender.valid()) {
-      // Keep IP for UI even when UDP source port is the shared discovery port.
       network::NetAddress ipOnly = network::NetAddress::fromIp4String(sender.address, 0);
       if (ipOnly.valid())
         peer.info.lastAddress = ipOnly;
@@ -484,13 +514,16 @@ struct MultimasterManager::Internal {
         peer.info.lastAddress = sender;
     }
 
-    if (offer && !offer->host.empty())
-      peer.info.masterUri.host = offer->host;
-    else if (peer.info.masterUri.host.empty() && !sender.address.empty())
+    if (sender.valid() && !sender.address.empty())
       peer.info.masterUri.host = sender.address;
+    if (offer && isLiteralIp(offer->host) && !offer->host.empty()) {
+      auto advertised = network::NetAddress::fromIp4String(offer->host, 0);
+      if (!advertised.valid())
+        advertised = network::NetAddress::fromIp6String(offer->host, 0);
+      if (advertised.valid() && !advertised.isLoopback())
+        peer.info.masterUri.host = offer->host;
+    }
 
-    // Prefer explicit offer port; otherwise fill in once we know a usable sync port.
-    // (Early multicast DISCOVER can set host before port is known.)
     if (offer && offer->master_port)
       peer.info.masterUri.port = offer->master_port;
     else if (peer.info.masterUri.port == 0) {
@@ -570,14 +603,15 @@ void MultimasterManager::Internal::onDiscoveryReadable()
 network::NetAddress MultimasterManager::Internal::syncAddressFromOffer(const miniros_msgs::MasterOffer& offer,
   const network::NetAddress& sender) const
 {
-  const std::string host = offer.host.empty() ? sender.address : offer.host;
   const int port = offer.master_port ? offer.master_port : boundPort;
-  network::NetAddress addr = network::NetAddress::fromIp4String(host, port);
-  if (!addr.valid())
-    addr = network::NetAddress::fromString(network::NetAddress::AddressUnspecified, host, port);
-  if (!addr.valid())
-    return sender;
-  return addr;
+  // Always route on the datagram source IP. Offer.host is informational (may be a
+  // hostname on older peers); never getaddrinfo.
+  if (sender.valid() && port > 0) {
+    network::NetAddress fromSender = sender;
+    if (fromSender.setPort(port) == Error::Ok)
+      return fromSender;
+  }
+  return sender;
 }
 
 bool MultimasterManager::Internal::tokenAccepts(const std::array<uint8_t, mm::kTokenHashSize>& remote) const
@@ -694,7 +728,9 @@ void MultimasterManager::Internal::noteGuidCollision(const mm::Header& h, const 
     miniros_msgs::MasterOffer offer;
     if (mm::deserializePayload(payload, payload_len, offer)) {
       peer.info.masterUri.scheme = "http://";
-      peer.info.masterUri.host = offer.host.empty() ? sender.address : offer.host;
+      peer.info.masterUri.host = sender.address;
+      if (!offer.host.empty() && isLiteralIp(offer.host))
+        peer.info.masterUri.host = offer.host;
       peer.info.masterUri.port = offer.master_port ? offer.master_port : sender.port();
     }
   } else if (peer.info.masterUri.empty()) {
@@ -888,6 +924,11 @@ void MultimasterManager::Internal::handleSync(const mm::Header& h, const uint8_t
   for (auto& r : sync.records) {
     if (!topicAllowed(r.name))
       continue;
+    if (peerAddr.valid()) {
+      r.node_api = rewriteUriHost(r.node_api, peerAddr.address);
+      if (!r.service_api.empty())
+        r.service_api = rewriteUriHost(r.service_api, peerAddr.address);
+    }
     filtered.push_back(std::move(r));
   }
 
@@ -1000,7 +1041,7 @@ Error MultimasterManager::Internal::sendSnapshotTo(Peer& peer, std::unique_lock<
   do {
     gen = localRegGen;
     lock.unlock();
-    all = fn();
+    all = fn(dest);
     lock.lock();
   } while (gen != localRegGen);
 
@@ -1420,12 +1461,11 @@ Error MultimasterManager::requestPairByNodeName(const std::string& nodeName, con
     network::URL url = node->getUrl();
     if (url.host == internal_->rpcUrl.host && url.port == internal_->rpcUrl.port)
       return Error::PermissionDenied;
-    network::NetAddress addr = network::NetAddress::fromURL(url);
-    if (!addr.valid()) {
-      addr = network::NetAddress::fromIp4String(url.host, internal_->boundPort);
-    } else {
-      addr.setPort(internal_->boundPort);
-    }
+    network::NetAddress addr = network::NetAddress::fromIp4String(url.host, internal_->boundPort);
+    if (!addr.valid())
+      addr = network::NetAddress::fromIp6String(url.host, internal_->boundPort);
+    if (!addr.valid())
+      return Error::InvalidAddress;
     UUID empty;
     Peer& peer = internal_->ensurePeer(empty, addr);
     peer.info.masterUri = url;
@@ -1506,7 +1546,7 @@ void MultimasterManager::restoreCachedPeers(const std::vector<CachedPeer>& peers
 
     network::NetAddress addr = network::NetAddress::fromIp4String(cp.sync_host, cp.sync_port);
     if (!addr.valid())
-      addr = network::NetAddress::fromString(network::NetAddress::AddressUnspecified, cp.sync_host, cp.sync_port);
+      addr = network::NetAddress::fromIp6String(cp.sync_host, cp.sync_port);
     if (!addr.valid()) {
       MINIROS_WARN_NAMED("multimaster", "Skipping cached peer %s: bad sync address %s:%d",
                          cp.uuid.c_str(), cp.sync_host.c_str(), cp.sync_port);

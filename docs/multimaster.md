@@ -39,10 +39,11 @@ switches to `robot2` (leave robot1, join robot2).
 | Option | Behavior |
 |--------|----------|
 | (default) | Bind **sync** UDP on the master RPC port; join default multicast discovery group `239.255.42.42:11312`. |
+| `--no-multimaster` | Do not bind discovery or sync UDP sockets. Use this to fully disable the subsystem. |
 | `--token <secret>` | Collective membership secret. Matching tokens auto-pair. Empty = discovery only (manual pair still allowed between open masters). |
-| `--multicast addr:port` | Multicast discovery group (default `239.255.42.42:11312`). Empty / `off` disables multicast. |
+| `--multicast addr:port` | Multicast discovery group (default `239.255.42.42:11312`). Empty / `off` disables **multicast only**; unicast/broadcast DISCOVER on the sync port still runs. |
 | `--discovery <port>` | Override **sync** UDP port (defaults to RPC port). |
-| `--peer host:udpPort` | Explicit DISCOVER probe to a peer’s **sync** UDP port (repeatable). Fallback when multicast is blocked. |
+| `--peer host:udpPort` | Explicit DISCOVER probe to a peer’s **sync** UDP port (repeatable). `host` must be a literal IPv4/IPv6 address (no DNS). |
 
 If `miniroscore` starts before ethernet is up (typical with systemd on SBCs), multicast join
 may fail with `No such device` / `Network is unreachable`. With `MINIROS_USE_NETLINK` (default
