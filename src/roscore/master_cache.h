@@ -47,6 +47,7 @@ struct CachedNode {
 struct CachedPeer {
   std::string uuid;
   std::string uri;
+  std::string hostname;
   std::string sync_host;
   int sync_port = 0;
   /// PeerState name at snapshot time (see MultimasterManager::peerStateName).

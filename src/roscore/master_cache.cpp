@@ -611,6 +611,8 @@ Error MasterCache::loadFile(const std::filesystem::path& path, MasterCacheData& 
         peer.uuid = peerJson["uuid"].get<std::string>();
       if (peerJson.contains("uri") && peerJson["uri"].is_string())
         peer.uri = peerJson["uri"].get<std::string>();
+      if (peerJson.contains("hostname") && peerJson["hostname"].is_string())
+        peer.hostname = peerJson["hostname"].get<std::string>();
       if (peerJson.contains("sync_host") && peerJson["sync_host"].is_string())
         peer.sync_host = peerJson["sync_host"].get<std::string>();
       if (peerJson.contains("sync_port") && peerJson["sync_port"].is_number_integer())
@@ -791,6 +793,8 @@ Error MasterCache::saveFile(const std::filesystem::path& path, const MasterCache
     json peerJson;
     peerJson["uuid"] = peer.uuid;
     peerJson["uri"] = peer.uri;
+    if (!peer.hostname.empty())
+      peerJson["hostname"] = peer.hostname;
     peerJson["sync_host"] = peer.sync_host;
     peerJson["sync_port"] = peer.sync_port;
     peerJson["state"] = peer.state;

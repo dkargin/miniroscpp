@@ -167,18 +167,14 @@ void Master::Internal::renderMasterStatus(std::string& output) const
         else
           ss << "<li>";
 
-        // Prefer MasterOffer URI; if port was not filled yet, borrow from last UDP sync address.
-        network::URL displayUri = peer.masterUri;
-        if (!displayUri.host.empty() && displayUri.port == 0 && peer.lastAddress.valid() && peer.lastAddress.port() > 0)
-          displayUri.port = static_cast<uint32_t>(peer.lastAddress.port());
-        if (displayUri.scheme.empty() && !displayUri.host.empty())
-          displayUri.scheme = "http://";
-
-        const std::string uri = displayUri.empty() ? std::string() : displayUri.str();
-        if (!uri.empty()) {
-          ss << print::Url(uri, uri);
-          if (peer.lastAddress.valid() && displayUri.host != peer.lastAddress.address)
-            ss << " (" << peer.lastAddress.address << ")";
+        // Hostname is the visible label; href is the literal-IP Master URI.
+        const network::URL href = peer.httpUri();
+        const std::string hrefStr = href.str();
+        const std::string label = peer.displayLabel();
+        if (!hrefStr.empty()) {
+          ss << print::Url(hrefStr, label.empty() ? hrefStr : label);
+        } else if (!label.empty()) {
+          ss << label;
         } else if (peer.lastAddress.valid()) {
           ss << peer.lastAddress.str();
         } else {
@@ -211,6 +207,8 @@ void Master::Internal::renderMasterStatus(std::string& output) const
         ss << "<details style=\"margin:0.25em 0 0.5em 1em;\">";
         ss << "<summary>details</summary>";
         ss << "<p>GUID: <code>" << peer.uuid.toString() << "</code></p>";
+        if (!hrefStr.empty())
+          ss << "<p>URL: <code>" << hrefStr << "</code></p>";
         if (peer.lastAddress.valid())
           ss << "<p>from " << peer.lastAddress.str() << "</p>";
         ss << "<p>remote_token=" << (peer.remoteHasToken ? "yes" : "no");

@@ -13,6 +13,7 @@ While some additional API calls can be added to **miniroscore** and used by mini
 
 Node is uniquely defined by its name and URI. There should be only one active node with the same name.
 If some new node with the same name arrives, then old node must be closed.
+It is still possible for two nodes with the same name to exist, but one of these nodes is expected to close soon.
 
 # RegistrationManager #
 

@@ -52,9 +52,39 @@ enum class PeerState {
 struct PeerInfo {
   UUID uuid;
   PeerState state = PeerState::Discovered;
+  /// Routing / click-through URI. Host is a literal IP, never a DNS name.
   network::URL masterUri;
+  /// Advertised hostname for UI only. Never used for sockets or getaddrinfo.
+  std::string hostname;
   network::NetAddress lastAddress;
   SteadyTime lastSeen;
+
+  /// Clickable Master HTTP URI (literal IP host, scheme/port filled).
+  network::URL httpUri() const
+  {
+    network::URL u = masterUri;
+    if (!u.host.empty() && u.port == 0 && lastAddress.valid() && lastAddress.port() > 0)
+      u.port = static_cast<uint32_t>(lastAddress.port());
+    if (u.scheme.empty() && !u.host.empty())
+      u.scheme = "http://";
+    return u;
+  }
+
+  /// Human-readable host:port. Prefers advertised hostname, then IP.
+  std::string displayLabel() const
+  {
+    const network::URL u = httpUri();
+    std::string host = hostname;
+    if (host.empty())
+      host = u.host;
+    if (host.empty() && lastAddress.valid())
+      host = lastAddress.address;
+    if (host.empty())
+      return {};
+    if (u.port)
+      return host + ":" + std::to_string(u.port);
+    return host;
+  }
   /// Local token fingerprint matches remote packet fingerprint.
   bool tokenMatch = false;
   /// Remote advertised a non-empty token hash (has a configured token).
