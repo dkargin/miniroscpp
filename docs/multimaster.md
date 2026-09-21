@@ -26,6 +26,11 @@ Parameters are **not** synchronized.
 6. Sync is pairwise **unicast** of **local** pubs/subs/services only; foreign registrations
    are never re-exported; `/rosout` stays local-only; the parameter server is not synced.
 7. An operator joins a robot by setting that robot’s token (CLI `--token` or HTTP pair form).
+8. **Addresses:** multimaster routing is IP-only (UDP source / advertised literal IP). Hostnames
+   and Avahi names are never resolved. Synced node URIs are rewritten to literal IPs before
+   they leave this master. `--resolve` on the XML-RPC Master API is a separate mechanism.
+   Discovery still advertises the peer’s hostname inside `MasterOffer.host` as
+   `ip|hostname` so the Web UI can show `hostname:port` while the link target stays a literal IP.
 
 ### Example
 
@@ -82,13 +87,13 @@ is still taken from CLI / environment and is not written into the cache file.
 ### Web UI / HTTP API
 
 Root page (`GET /`) shows this master's GUID and lists discovered peer masters with state,
-URI, and token flags (HTML for browsers). A peer advertising the same GUID is shown in red
+a `hostname:port` label whose link is the literal-IP Master URI, and token flags (HTML for browsers). A peer advertising the same GUID is shown in red
 and has no pair button. Machine-readable multimaster control uses JSON under
 `/api2/multimaster/...`:
 
 | Path | Behavior |
 |------|----------|
-| `GET /api2/multimaster` or `.../status` | Pairing status: `guid`, `paired_count`, `peers[]` (`uuid`, `state`, `uri`, `pairable`, …) |
+| `GET /api2/multimaster` or `.../status` | Pairing status: `guid`, `paired_count`, `peers[]` (`uuid`, `state`, `uri` (IP), `hostname`, `label`, `pairable`, …) |
 | `GET /api2/multimaster/connect?uuid=...&token=...` | Send pair REQUEST. Token optional for open meshes / when already set; required when joining a remote mesh that has a token. Different token leaves old collective. Rejected with HTTP 409 if the UUID is this master's GUID (cloned identity). |
 | `GET /api2/multimaster/disconnect` | Leave collective (BYE all paired peers) |
 
@@ -137,8 +142,8 @@ the extra 4-byte length prefix used by `serializeMessage`.
 
 | Op | Name | Payload |
 |----|------|---------|
-| 1 | `Discover` | `miniros_msgs/MasterOffer` (optional; empty still accepted) |
-| 2 | `Offer` | `miniros_msgs/MasterOffer` |
+| 1 | `Discover` | `miniros_msgs/MasterOffer` (optional; empty still accepted). `host` is `ip`, a hostname, or `ip\|hostname`. Routing uses the IP (or UDP source); hostname is display-only. |
+| 2 | `Offer` | Same as Discover. |
 | 3 | `Request` | *(empty)* |
 | 4 | `Ack` | *(empty)* |
 | 5 | `Nak` | `miniros_msgs/MasterNak` |
@@ -153,7 +158,8 @@ Message sources live in the standalone `miniros_msgs` package
 under `include/generated/miniros_msgs/`.
 
 Discovery/OFFER may travel on the multicast socket; REQUEST/ACK/sync/heartbeat use **unicast**
-to each peer’s sync UDP port (`MasterOffer.host` + `MasterOffer.master_port`).
+to each peer’s sync UDP port (literal IP from `MasterOffer.host` or the UDP source, plus
+`MasterOffer.master_port`).
 
 ### Regenerating headers
 

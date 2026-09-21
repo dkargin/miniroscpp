@@ -38,6 +38,54 @@ bool isLiteralIp(const std::string& host)
          network::NetAddress::fromIp6String(host, 0).valid();
 }
 
+/// `MasterOffer.host` is `ip`, `hostname`, or `ip|hostname` (display-only name).
+void splitOfferHost(const std::string& host, std::string& ip, std::string& hostname)
+{
+  ip.clear();
+  hostname.clear();
+  std::string left = host;
+  std::string right;
+  if (const auto sep = host.find('|'); sep != std::string::npos) {
+    left = host.substr(0, sep);
+    right = host.substr(sep + 1);
+  }
+  if (isLiteralIp(left))
+    ip = left;
+  else if (!left.empty() && left != "localhost")
+    hostname = left;
+  if (isLiteralIp(right)) {
+    if (ip.empty())
+      ip = right;
+  } else if (!right.empty() && right != "localhost" && hostname.empty()) {
+    hostname = right;
+  }
+}
+
+std::string encodeOfferHost(const std::string& ip, const std::string& hostname)
+{
+  if (!hostname.empty() && hostname != "localhost" && !isLiteralIp(hostname) &&
+      hostname.find('|') == std::string::npos) {
+    if (!ip.empty())
+      return ip + '|' + hostname;
+    return hostname;
+  }
+  return ip;
+}
+
+bool decodeOffer(const uint8_t* data, size_t size, miniros_msgs::MasterOffer& offer, std::string& hostname)
+{
+  hostname.clear();
+  offer = {};
+  if (!data || size == 0)
+    return false;
+  if (!mm::deserializePayload(data, size, offer))
+    return false;
+  std::string ip;
+  splitOfferHost(offer.host, ip, hostname);
+  offer.host = ip;
+  return offer.master_port != 0 || !offer.host.empty() || !hostname.empty();
+}
+
 /// If `uri` host is not a literal IP, replace it with `ip`. Never DNS.
 std::string rewriteUriHost(const std::string& uri, const std::string& ip)
 {
@@ -482,22 +530,30 @@ struct MultimasterManager::Internal {
   {
     miniros_msgs::MasterOffer offer;
     offer.master_port = static_cast<uint16_t>(rpcUrl.port ? rpcUrl.port : boundPort);
-    offer.host = rpcUrl.host;
-    if (!isLiteralIp(offer.host)) {
-      for (const std::string& ip : localIps) {
-        auto addr = network::NetAddress::fromIp4String(ip, 0);
+    std::string ip = rpcUrl.host;
+    if (!isLiteralIp(ip)) {
+      ip.clear();
+      for (const std::string& localIp : localIps) {
+        auto addr = network::NetAddress::fromIp4String(localIp, 0);
         if (addr.valid() && !addr.isLoopback()) {
-          offer.host = ip;
+          ip = localIp;
           break;
         }
       }
     }
+    std::string hostname;
+    if (resolver)
+      hostname = resolver->getHost();
+    if (hostname.empty() && !isLiteralIp(rpcUrl.host))
+      hostname = rpcUrl.host;
+    offer.host = encodeOfferHost(ip, hostname);
     return mm::serializePayload(offer, payload);
   }
 
   /// Apply MasterOffer (or UDP sender fallback) into peer URI / sync address.
   /// Routing always uses the datagram source IP — never a hostname.
-  void applyOfferInfo(Peer& peer, const miniros_msgs::MasterOffer* offer, const network::NetAddress& sender)
+  void applyOfferInfo(Peer& peer, const miniros_msgs::MasterOffer* offer, const network::NetAddress& sender,
+    const std::string& hostname = {})
   {
     network::NetAddress syncAddr = sender;
     if (offer)
@@ -535,6 +591,8 @@ struct MultimasterManager::Internal {
 
     if (!peer.info.masterUri.host.empty() && peer.info.masterUri.scheme.empty())
       peer.info.masterUri.scheme = "http://";
+    if (!hostname.empty())
+      peer.info.hostname = hostname;
   }
 
   void onSyncReadable();
@@ -726,12 +784,15 @@ void MultimasterManager::Internal::noteGuidCollision(const mm::Header& h, const 
 
   if (h.op == mm::Header::OP_OFFER && payload && payload_len) {
     miniros_msgs::MasterOffer offer;
-    if (mm::deserializePayload(payload, payload_len, offer)) {
+    std::string hostname;
+    if (decodeOffer(payload, payload_len, offer, hostname)) {
       peer.info.masterUri.scheme = "http://";
       peer.info.masterUri.host = sender.address;
       if (!offer.host.empty() && isLiteralIp(offer.host))
         peer.info.masterUri.host = offer.host;
       peer.info.masterUri.port = offer.master_port ? offer.master_port : sender.port();
+      if (!hostname.empty())
+        peer.info.hostname = hostname;
     }
   } else if (peer.info.masterUri.empty()) {
     peer.info.masterUri.scheme = "http://";
@@ -758,11 +819,10 @@ void MultimasterManager::Internal::handleDiscover(const mm::Header& h, const uin
   UUID peerUuid = UUID::fromBytes(h.uuid);
 
   miniros_msgs::MasterOffer offer;
+  std::string hostname;
   const miniros_msgs::MasterOffer* offerPtr = nullptr;
-  if (payload && len > 0 && mm::deserializePayload(payload, len, offer) &&
-      (offer.master_port != 0 || !offer.host.empty())) {
+  if (decodeOffer(payload, len, offer, hostname))
     offerPtr = &offer;
-  }
 
   Peer& peer = peers[uuidKey(peerUuid)];
   if (!peer.info.uuid.valid())
@@ -770,7 +830,7 @@ void MultimasterManager::Internal::handleDiscover(const mm::Header& h, const uin
   peer.info.lastSeen = SteadyTime::now();
   peer.info.remoteHasToken = !mm::tokenHashEmpty(h.token_hash);
   peer.info.tokenMatch = match;
-  applyOfferInfo(peer, offerPtr, sender);
+  applyOfferInfo(peer, offerPtr, sender, hostname);
 
   // Always answer DISCOVER so the probe side learns our MasterOffer.
   sendOfferTo(sender, /*viaDiscovery=*/discoverySocket.valid());
@@ -801,11 +861,10 @@ void MultimasterManager::Internal::handleOffer(const mm::Header& h, const uint8_
   UUID peerUuid = UUID::fromBytes(h.uuid);
 
   miniros_msgs::MasterOffer offer;
+  std::string hostname;
   const miniros_msgs::MasterOffer* offerPtr = nullptr;
-  if (payload && len > 0 && mm::deserializePayload(payload, len, offer) &&
-      (offer.master_port != 0 || !offer.host.empty())) {
+  if (decodeOffer(payload, len, offer, hostname))
     offerPtr = &offer;
-  }
 
   Peer& peer = peers[uuidKey(peerUuid)];
   if (!peer.info.uuid.valid())
@@ -813,7 +872,7 @@ void MultimasterManager::Internal::handleOffer(const mm::Header& h, const uint8_
   peer.info.lastSeen = SteadyTime::now();
   peer.info.remoteHasToken = !mm::tokenHashEmpty(h.token_hash);
   peer.info.tokenMatch = match;
-  applyOfferInfo(peer, offerPtr, sender);
+  applyOfferInfo(peer, offerPtr, sender, hostname);
 
   if (peer.info.state == PeerState::Paired)
     return;
@@ -1566,6 +1625,7 @@ void MultimasterManager::restoreCachedPeers(const std::vector<CachedPeer>& peers
     Peer& peer = internal_->ensurePeer(uuid, addr);
     if (!cp.uri.empty())
       peer.info.masterUri.fromString(cp.uri, true);
+    peer.info.hostname = cp.hostname;
     peer.info.lastAddress = addr;
     peer.info.state = PeerState::Requesting;
     MINIROS_INFO_NAMED("multimaster", "Restoring pairing toward %s at %s (uri=%s)",
@@ -1592,6 +1652,7 @@ std::vector<CachedPeer> MultimasterManager::collectCachedPeers() const
     CachedPeer cp;
     cp.uuid = peer.info.uuid.toString();
     cp.uri = peer.info.masterUri.str();
+    cp.hostname = peer.info.hostname;
     cp.sync_host = peer.info.lastAddress.address;
     cp.sync_port = peer.info.lastAddress.port();
     cp.state = peerStateName(peer.info.state);
