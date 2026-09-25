@@ -50,6 +50,10 @@ public:
   /// Finds host by its ip address.
   std::shared_ptr<network::HostInfo> findHost(const network::NetAddress& address) const;
 
+  /// IPs known for this node: HostInfo, local adapters when the node is on this host,
+  /// and the registered URI host when it is already an IP literal.
+  std::vector<network::NetAddress> listNodeAddresses(const std::shared_ptr<NodeRef>& node) const;
+
   /// Determine good URI for a node.
   /// @returns resolved URI of a node.
   network::URL resolveAddressFor(const std::shared_ptr<NodeRef>& node,

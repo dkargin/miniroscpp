@@ -23,6 +23,7 @@ class MasterRootEndpoint;
 class NodeInfoEndpoint;
 class TopicInfoEndpoint;
 class PublishedTopicsEndpoint;
+class NodeUriEndpoint;
 class TopicTypesEndpoint;
 class MultimasterApiEndpoint;
 class DebugApiEndpoint;
@@ -52,6 +53,9 @@ struct Master::Internal {
 
   /// Endpoint for accessing /api2/published_topics
   std::shared_ptr<PublishedTopicsEndpoint> httpPublishedTopicsEndpoint;
+
+  /// Endpoint for accessing /api2/node_uri
+  std::shared_ptr<NodeUriEndpoint> httpNodeUriEndpoint;
 
   /// Endpoint for accessing /api2/topic_types
   std::shared_ptr<TopicTypesEndpoint> httpTopicTypesEndpoint;

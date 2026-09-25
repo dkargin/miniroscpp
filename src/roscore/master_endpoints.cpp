@@ -165,6 +165,77 @@ Error TopicTypesEndpoint::handle(const network::ClientInfo& clientInfo, std::sha
   return Error::Ok;
 }
 
+Error NodeUriEndpoint::handle(const network::ClientInfo& clientInfo, std::shared_ptr<http::HttpRequest> request)
+{
+  if (!internal)
+    return Error::InternalError;
+
+  auto fail = [&](int httpCode, const char* status) {
+    request->setResponseStatus(httpCode, status);
+    request->setResponseBody("", "application/json");
+    return Error::Ok;
+  };
+
+  const std::string nodeName = request->getParameter("node");
+  if (nodeName.empty())
+    return fail(400, "Bad Request");
+
+  // Empty `ip` keeps every known address. Otherwise a comma-separated family list
+  // (`4`, `6`, `4,6`) selects which addresses to return in this one response.
+  const std::string ip = request->getParameter("ip");
+  bool filter = false;
+  bool want4 = false;
+  bool want6 = false;
+  if (!ip.empty()) {
+    filter = true;
+    std::string token;
+    for (size_t i = 0; i <= ip.size(); ++i) {
+      if (i == ip.size() || ip[i] == ',') {
+        if (token == "4" || token == "ip4" || token == "ipv4")
+          want4 = true;
+        else if (token == "6" || token == "ip6" || token == "ipv6")
+          want6 = true;
+        else
+          return fail(400, "Bad Request");
+        token.clear();
+      } else if (ip[i] != ' ') {
+        token.push_back(ip[i]);
+      }
+    }
+  }
+
+  const std::shared_ptr<NodeRef> node = internal->regManager.getNodeByName(nodeName);
+  if (!node)
+    return fail(404, "Not Found");
+
+  using RpcValue = XmlRpc::XmlRpcValue;
+  RpcValue addresses = RpcValue::Array(0);
+  int n = 0;
+  for (const network::NetAddress& addr : internal->resolver.listNodeAddresses(node)) {
+    if (filter) {
+      if (addr.type() == network::NetAddress::AddressIPv4) {
+        if (!want4)
+          continue;
+      } else if (addr.type() == network::NetAddress::AddressIPv6) {
+        if (!want6)
+          continue;
+      } else {
+        continue;
+      }
+    }
+    addresses[n++] = addr.address;
+  }
+  if (n == 0)
+    return fail(404, "Not Found");
+
+  std::ostringstream oss;
+  miniros::JsonState state;
+  addresses.writeJson(oss, state, {});
+  request->setResponseBody(oss.str(), "application/json");
+  request->setResponseStatusOk();
+  return Error::Ok;
+}
+
 Error MultimasterApiEndpoint::handle(const network::ClientInfo& clientInfo, std::shared_ptr<http::HttpRequest> request)
 {
   if (!internal)

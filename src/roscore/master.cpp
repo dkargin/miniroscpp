@@ -258,6 +258,7 @@ void Master::setupBindings(const std::shared_ptr<CallbackQueue>& cb)
     internal_->httpNodeInfoEndpoint.reset(new NodeInfoEndpoint(internal_.get()));
     internal_->httpTopicInfoEndpoint.reset(new TopicInfoEndpoint(internal_.get()));
     internal_->httpPublishedTopicsEndpoint.reset(new PublishedTopicsEndpoint(internal_.get()));
+    internal_->httpNodeUriEndpoint.reset(new NodeUriEndpoint(internal_.get()));
     internal_->httpTopicTypesEndpoint.reset(new TopicTypesEndpoint(internal_.get()));
     internal_->httpMultimasterApiEndpoint.reset(new MultimasterApiEndpoint(internal_.get()));
     internal_->httpLogEndpoint.reset(new MasterLogEndpoint(internal_.get()));
@@ -270,6 +271,8 @@ void Master::setupBindings(const std::shared_ptr<CallbackQueue>& cb)
       internal_->httpTopicInfoEndpoint, cb);
     server->registerEndpoint(std::make_unique<http::SimpleFilter>(http::HttpMethod::Get, "/api2/published_topics"),
       internal_->httpPublishedTopicsEndpoint, cb);
+    server->registerEndpoint(std::make_unique<http::SimpleFilter>(http::HttpMethod::Get, "/api2/node_uri"),
+      internal_->httpNodeUriEndpoint, cb);
     server->registerEndpoint(std::make_unique<http::SimpleFilter>(http::HttpMethod::Get, "/api2/topic_types"),
       internal_->httpTopicTypesEndpoint, cb);
     server->registerEndpoint(
