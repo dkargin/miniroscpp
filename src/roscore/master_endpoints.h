@@ -48,6 +48,17 @@ public:
   Master::Internal* internal = nullptr;
 };
 
+/// GET /api2/node_uri?node=<name>[&ip=4,6]
+/// JSON array of address strings. `ip` selects families in one response.
+class NodeUriEndpoint : public http::EndpointHandler {
+public:
+  NodeUriEndpoint(Master::Internal* internal) : internal(internal) {}
+
+  Error handle(const network::ClientInfo& clientInfo, std::shared_ptr<http::HttpRequest> request) override;
+
+  Master::Internal* internal = nullptr;
+};
+
 class TopicTypesEndpoint : public http::EndpointHandler {
 public:
   TopicTypesEndpoint(Master::Internal* internal) : internal(internal) {}

@@ -81,6 +81,52 @@ std::string AddressResolver::pickLanIp(const network::NetAddress& peerAddr) cons
   return fallback ? fallback->address.address : std::string{};
 }
 
+namespace {
+
+void appendUniqueAddress(std::vector<network::NetAddress>& out, const network::NetAddress& addr)
+{
+  if (!addr.valid() || addr.isUnspecified() || addr.address.empty())
+    return;
+  for (const network::NetAddress& existing : out) {
+    if (existing.type() == addr.type() && existing.address == addr.address)
+      return;
+  }
+  out.push_back(addr);
+}
+
+} // namespace
+
+std::vector<network::NetAddress> AddressResolver::listNodeAddresses(const std::shared_ptr<NodeRef>& node) const
+{
+  std::vector<network::NetAddress> result;
+  if (!node)
+    return result;
+
+  const network::URL url = node->getUrl();
+  const std::shared_ptr<const network::HostInfo> info = node->hostInfo().lock();
+  const bool hostLocal = info && info->local;
+  if (info) {
+    for (const network::NetAddress& addr : info->addresses())
+      appendUniqueAddress(result, addr);
+  }
+
+  {
+    Lock lock(m_mutex);
+    if (hostLocal || isLoopbackNameLocked(lock, url.host)) {
+      for (const network::NetAdapter& adapter : m_adapters) {
+        if (adapter.isUp() && adapter.isValid())
+          appendUniqueAddress(result, adapter.address);
+      }
+    }
+  }
+
+  network::NetAddress literal = network::NetAddress::fromIp4String(url.host, 0);
+  if (!literal.valid())
+    literal = network::NetAddress::fromIp6String(url.host, 0);
+  appendUniqueAddress(result, literal);
+  return result;
+}
+
 network::URL AddressResolver::resolveAddressFor(const std::shared_ptr<NodeRef>& node,
   const network::NetAddress& remoteAddress,
   const network::NetAddress& localAddress) const
