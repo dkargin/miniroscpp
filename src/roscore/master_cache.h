@@ -82,6 +82,16 @@ public:
   void setEnabled(bool enabled);
   bool enabled() const { return enabled_; }
 
+  /// Where `cache.<port>` will be read and written, and whether that path can be used.
+  /// Does not create the file. `writable` is the file when it exists, otherwise the directory.
+  struct FileStatus {
+    std::string path;
+    bool exists = false;
+    bool readable = false;
+    bool writable = false;
+  };
+  FileStatus fileStatus(int port) const;
+
   /// Mark graph dirty so the next idle update() flushes to disk.
   void markDirty();
 

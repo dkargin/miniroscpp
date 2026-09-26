@@ -1259,11 +1259,69 @@ void MultimasterManager::setToken(const std::string& token)
     sendDiscover();
 }
 
-void MultimasterManager::setUdpPort(int port)
+Error MultimasterManager::setUdpPort(int port)
+{
+  if (!internal_)
+    return Error::InternalError;
+  if (port < 0 || port > 65535)
+    return Error::InvalidValue;
+
+  std::unique_lock lock(internal_->guard);
+  internal_->configuredPort = port;
+  if (!internal_->started)
+    return Error::Ok;
+
+  int want = port;
+  if (want <= 0)
+    want = internal_->rpcUrl.port > 0 ? internal_->rpcUrl.port : 11311;
+  if (want == internal_->boundPort)
+    return Error::Ok;
+
+  const int previous = internal_->boundPort;
+  internal_->detachSocket(internal_->syncSocket);
+  if (Error e = internal_->initSyncSocket(want); !e) {
+    MINIROS_ERROR_NAMED("multimaster", "Failed to rebind sync UDP %d: %s", want, e.toString());
+    if (previous > 0)
+      (void)internal_->initSyncSocket(previous);
+    return e;
+  }
+  internal_->nextDiscover = SteadyTime::now();
+  MINIROS_INFO_NAMED("multimaster", "Sync UDP rebound to %d", internal_->boundPort);
+  return Error::Ok;
+}
+
+void MultimasterManager::setDiscoveryEnabled(bool on)
 {
   if (!internal_)
     return;
-  internal_->configuredPort = port;
+  std::lock_guard lock(internal_->guard);
+  internal_->discoveryEnabled = on;
+  if (on && internal_->started)
+    internal_->nextDiscover = SteadyTime::now();
+}
+
+bool MultimasterManager::discoveryEnabled() const
+{
+  if (!internal_)
+    return false;
+  std::lock_guard lock(internal_->guard);
+  return internal_->started && internal_->discoveryEnabled;
+}
+
+bool MultimasterManager::started() const
+{
+  if (!internal_)
+    return false;
+  std::lock_guard lock(internal_->guard);
+  return internal_->started;
+}
+
+int MultimasterManager::configuredUdpPort() const
+{
+  if (!internal_)
+    return 0;
+  std::lock_guard lock(internal_->guard);
+  return internal_->configuredPort;
 }
 
 void MultimasterManager::setMulticast(const std::string& addr, int port)

@@ -5,6 +5,8 @@
 #include "master_internal.h"
 
 #include "miniros/network/host_info.h"
+#include "miniros/network/net_address.h"
+#include "miniros/network/url.h"
 #include "miniros/http/http_printers.h"
 #include "miniros/rostime.h"
 #include "node_ref.h"
@@ -38,15 +40,104 @@ std::string formatUptime(const WallDuration& d)
   return os.str();
 }
 
+struct NodeHref {
+  std::string url;
+  /// True when the link host is still a hostname. The browser would have to resolve it.
+  bool needsDns = false;
+};
+
+bool isIpLiteral(const std::string& host)
+{
+  if (host.empty())
+    return false;
+  if (network::NetAddress::fromIp4String(host, 0).valid())
+    return true;
+  return network::NetAddress::fromIp6String(host, 0).valid();
 }
 
-void Master::Internal::renderMasterStatus(std::string& output) const
+/// Slave API URL for an HTML link. Never calls getaddrinfo.
+/// Prefers a known IP on the same IPv4 subnet as the browser. Otherwise the first
+/// non-loopback address. Falls back to the registered URI when no IP is known.
+NodeHref slaveApiHref(const AddressResolver& resolver, const std::shared_ptr<NodeRef>& node,
+  const network::NetAddress& browserRemote, const network::NetAddress& browserLocal)
+{
+  NodeHref out;
+  const network::URL registered = node->getUrl();
+  const std::vector<network::NetAddress> addrs = resolver.listNodeAddresses(node);
+
+  std::string suitable;
+  std::string loop;
+  for (const network::NetAddress& addr : addrs) {
+    if (!addr.valid() || addr.isUnspecified() || addr.address.empty())
+      continue;
+    if (addr.isLoopback()) {
+      if (loop.empty())
+        loop = addr.address;
+      continue;
+    }
+    if (suitable.empty())
+      suitable = addr.address;
+  }
+
+  std::string sameNet;
+  const bool clientLoopback = !browserRemote.valid() || browserRemote.isLoopback();
+  if (!clientLoopback && browserRemote.type() == network::NetAddress::AddressIPv4) {
+    resolver.iterateAdapters([&](const network::NetAdapter* adapter) {
+      if (!adapter || !adapter->isUp() || adapter->isLoopback() || !adapter->isIPv4())
+        return;
+      if (!adapter->matchNetAddress(browserRemote))
+        return;
+      std::string onNet;
+      for (const network::NetAddress& addr : addrs) {
+        if (addr.type() != network::NetAddress::AddressIPv4 || addr.isLoopback() || addr.isUnspecified())
+          continue;
+        if (!adapter->matchNetAddress(addr))
+          continue;
+        if (browserLocal.valid() && addr.address == browserLocal.address) {
+          onNet = addr.address;
+          break;
+        }
+        if (onNet.empty())
+          onNet = addr.address;
+      }
+      if (onNet.empty())
+        return;
+      if (sameNet.empty() || (browserLocal.valid() && onNet == browserLocal.address))
+        sameNet = std::move(onNet);
+    });
+  }
+
+  std::string host = sameNet;
+  if (host.empty() && clientLoopback)
+    host = loop;
+  if (host.empty())
+    host = suitable;
+
+  if (host.empty()) {
+    out.url = node->getApi();
+    out.needsDns = !isIpLiteral(registered.host);
+    return out;
+  }
+
+  network::URL url = registered;
+  url.host = host;
+  out.url = url.str();
+  out.needsDns = !isIpLiteral(host);
+  return out;
+}
+
+}
+
+void Master::Internal::renderMasterStatus(std::string& output,
+  const network::NetAddress& clientAddress,
+  const network::NetAddress& localAddress) const
 {
   std::stringstream ss;
   const std::string host = localHostname();
   ss << "<h1>MiniROS master at " << host << "</h1>\n";
   ss << "<p>GUID: <code>" << uuid.toString() << "</code>";
   ss << " | uptime: " << formatUptime(SteadyTime::now() - startTime);
+  ss << " | " << print::Url("/settings", "settings");
   ss << " | " << print::Url("/log", "log");
   if (!rosoutLogConfigured())
     ss << " <em>(not configured)</em>";
@@ -56,7 +147,7 @@ void Master::Internal::renderMasterStatus(std::string& output) const
     const bool localHasToken = multimaster->hasToken();
     ss << "<details>\n<summary>Config</summary>\n";
     ss << "<p>UDP sync port: " << multimaster->udpPort();
-    ss << " | discovery: on";
+    ss << " | discovery: " << (multimaster->discoveryEnabled() ? "on" : "off");
     const std::string mc = multimaster->multicastEndpoint();
     ss << " | multicast: " << (mc.empty() ? "off" : mc);
     const std::string mcErr = multimaster->multicastError();
@@ -77,9 +168,17 @@ void Master::Internal::renderMasterStatus(std::string& output) const
     if ((flags & NodeRef::NODE_MASTER) && !(flags & NodeRef::NODE_LOCAL))
       continue;
     const std::string& name = r->id();
-    std::string url = r->getApi();
+    const std::string shown = r->getApi();
+    const NodeHref href = slaveApiHref(resolver, r, clientAddress, localAddress);
     ss << "<li>";
-    ss << print::PrefixUrl("node", name, name) << ": " << print::Url(url, url);
+    ss << print::PrefixUrl("node", name, name) << ": ";
+    if (href.needsDns) {
+      ss << "<a href=\"" << href.url << "\" style=\"color:#c62828;\""
+         << " title=\"No known IP for this host. The browser would need DNS to open it.\">"
+         << shown << "</a>";
+    } else {
+      ss << print::Url(href.url, shown);
+    }
     if (flags & NodeRef::NODE_LOCAL)
       ss << " <em>It's me</em>";
     else if (flags & NodeRef::NODE_FOREIGN)

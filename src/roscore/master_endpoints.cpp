@@ -16,6 +16,7 @@
 
 #include "miniros/console.h"
 
+#include <cstdlib>
 #include <fstream>
 #include <iterator>
 #include <sstream>
@@ -32,7 +33,7 @@ Error MasterRootEndpoint::handle(const network::ClientInfo& clientInfo, std::sha
 
   const std::string title = "MiniROS master at " + internal->localHostname();
   std::string body = "<!doctype html><html><head><meta charset=\"utf-8\"/><title>" + title + "</title></head><body>";
-  internal->renderMasterStatus(body);
+  internal->renderMasterStatus(body, clientInfo.remoteAddress, clientInfo.localAddress);
   body += "</body></html>";
   request->setResponseBody(body, "text/html");
   request->setResponseStatusOk();
@@ -162,6 +163,193 @@ Error TopicTypesEndpoint::handle(const network::ClientInfo& clientInfo, std::sha
   request->setResponseStatusOk();
   request->setResponseBody(oss.str(), "application/json");
 
+  return Error::Ok;
+}
+
+namespace {
+
+bool parseFlag(const std::string& text, bool& out)
+{
+  if (text == "1" || text == "true" || text == "on") {
+    out = true;
+    return true;
+  }
+  if (text == "0" || text == "false" || text == "off") {
+    out = false;
+    return true;
+  }
+  return false;
+}
+
+std::string htmlEscape(const std::string& text)
+{
+  std::string out;
+  out.reserve(text.size());
+  for (char c : text) {
+    switch (c) {
+    case '&': out += "&amp;"; break;
+    case '<': out += "&lt;"; break;
+    case '>': out += "&gt;"; break;
+    case '"': out += "&quot;"; break;
+    default: out += c; break;
+    }
+  }
+  return out;
+}
+
+/// Empty when the cache file can be used. Otherwise a short problem description.
+std::string cacheFileProblem(const MasterCache::FileStatus& file)
+{
+  if (file.path.empty())
+    return "Cache path is not known yet.";
+  if (file.exists && file.readable && file.writable)
+    return {};
+  if (!file.exists && file.writable)
+    return {};
+  if (file.exists && file.readable)
+    return "Permission denied: cache file is not writable.";
+  if (file.exists)
+    return "Permission denied: cache file cannot be read.";
+  return "Cache directory is missing or not writable.";
+}
+
+std::string settingsForm(const Master::Internal& internal)
+{
+  const bool resolveOn = internal.resolver.resolveIp();
+  const bool discoveryOn = internal.multimaster && internal.multimaster->discoveryEnabled();
+  const bool persistenceOn = internal.cache.enabled();
+  const int port = internal.discoveryPort();
+  const int rpcPort = internal.rpcPort();
+  const MasterCache::FileStatus cacheFile = internal.cache.fileStatus(rpcPort);
+  const std::string cacheProblem = cacheFileProblem(cacheFile);
+
+  std::ostringstream ss;
+  ss << "<!doctype html><html><head><meta charset=\"utf-8\"/><title>MiniROS settings</title></head><body>";
+  ss << "<h1>Local settings</h1>";
+  ss << "<form method=\"GET\" action=\"/api2/settings\">";
+  const char* resolveTip = "Rewrites XML-RPC node URIs to a known IP. Same flag as --resolve and /resolve_ip.";
+  const char* discoveryTip = "Turning discovery off stops DISCOVER. Paired sync stays up.";
+  const char* portTip = "UDP port for discovery and sync (--discovery). Changing it rebinds the socket.";
+  ss << "<p><label title=\"" << htmlEscape(resolveTip) << "\">Resolve IP ";
+  ss << "<select name=\"resolve\" title=\"" << htmlEscape(resolveTip) << "\">";
+  ss << "<option value=\"1\"" << (resolveOn ? " selected" : "") << ">on</option>";
+  ss << "<option value=\"0\"" << (resolveOn ? "" : " selected") << ">off</option>";
+  ss << "</select></label></p>";
+  ss << "<p><label title=\"" << htmlEscape(discoveryTip) << "\">Discovery ";
+  ss << "<select name=\"discovery\" title=\"" << htmlEscape(discoveryTip) << "\">";
+  ss << "<option value=\"1\"" << (discoveryOn ? " selected" : "") << ">on</option>";
+  ss << "<option value=\"0\"" << (discoveryOn ? "" : " selected") << ">off</option>";
+  ss << "</select></label></p>";
+  ss << "<p><label title=\"" << htmlEscape(portTip) << "\">Discovery port ";
+  ss << "<input name=\"discovery_port\" title=\"" << htmlEscape(portTip) << "\" value=\"" << port << "\"/>";
+  ss << "</label></p>";
+  ss << "<p><label>Persistence <select name=\"persistence\">";
+  ss << "<option value=\"1\"" << (persistenceOn ? " selected" : "") << ">on</option>";
+  ss << "<option value=\"0\"" << (persistenceOn ? "" : " selected") << ">off</option>";
+  ss << "</select></label></p>";
+  ss << "<p>Cache file: <code>" << htmlEscape(cacheFile.path.empty() ? "(unknown)" : cacheFile.path) << "</code>";
+  if (!cacheProblem.empty())
+    ss << "<br/><span style=\"color:#c62828;\">" << htmlEscape(cacheProblem) << "</span>";
+  ss << "</p>";
+  ss << "<p><button type=\"submit\">Save</button></p>";
+  ss << "</form>";
+  ss << "<p><a href=\"/\">Back to master</a></p>";
+  ss << "</body></html>";
+  return ss.str();
+}
+
+} // namespace
+
+Error SettingsEndpoint::handle(const network::ClientInfo& clientInfo, std::shared_ptr<http::HttpRequest> request)
+{
+  (void)clientInfo;
+  if (!internal)
+    return Error::InternalError;
+
+  if (htmlPage) {
+    request->setResponseBody(settingsForm(*internal), "text/html");
+    request->setResponseStatusOk();
+    return Error::Ok;
+  }
+
+  const std::string resolveText = request->getParameter("resolve");
+  const std::string discoveryText = request->getParameter("discovery");
+  const std::string portText = request->getParameter("discovery_port");
+  const std::string persistenceText = request->getParameter("persistence");
+
+  bool resolve = false;
+  bool discovery = false;
+  bool persistence = false;
+  int port = 0;
+  if (!resolveText.empty() && !parseFlag(resolveText, resolve)) {
+    request->setResponseStatus(400, "Bad Request");
+    request->setResponseBody("", "application/json");
+    return Error::Ok;
+  }
+  if (!discoveryText.empty() && !parseFlag(discoveryText, discovery)) {
+    request->setResponseStatus(400, "Bad Request");
+    request->setResponseBody("", "application/json");
+    return Error::Ok;
+  }
+  if (!persistenceText.empty() && !parseFlag(persistenceText, persistence)) {
+    request->setResponseStatus(400, "Bad Request");
+    request->setResponseBody("", "application/json");
+    return Error::Ok;
+  }
+  if (!portText.empty()) {
+    char* end = nullptr;
+    const long parsed = std::strtol(portText.c_str(), &end, 10);
+    if (!end || *end != '\0' || parsed < 0 || parsed > 65535) {
+      request->setResponseStatus(400, "Bad Request");
+      request->setResponseBody("", "application/json");
+      return Error::Ok;
+    }
+    port = static_cast<int>(parsed);
+  }
+
+  if (Error err = internal->applySettings(
+        !resolveText.empty(), resolve,
+        !discoveryText.empty(), discovery,
+        !portText.empty(), port,
+        !persistenceText.empty(), persistence); !err) {
+    request->setResponseStatus(500, "Internal Server Error");
+    request->setResponseBody("", "application/json");
+    return Error::Ok;
+  }
+
+  auto accept = request->getHeader("Accept");
+  if (accept.empty())
+    accept = request->getHeader("accept");
+  const bool wantsHtml = accept.find("text/html") != std::string::npos;
+  const bool changed = !resolveText.empty() || !discoveryText.empty() || !portText.empty() || !persistenceText.empty();
+  if (wantsHtml && changed) {
+    request->setResponseStatusOk();
+    request->setResponseBody(
+      "<!doctype html><html><head><meta http-equiv=\"refresh\" content=\"0;url=/settings\"/></head>"
+      "<body><p><a href=\"/settings\">Settings</a></p></body></html>",
+      "text/html");
+    return Error::Ok;
+  }
+
+  using RpcValue = XmlRpc::XmlRpcValue;
+  RpcValue root;
+  root["resolve"] = internal->resolver.resolveIp();
+  root["discovery"] = internal->multimaster && internal->multimaster->discoveryEnabled();
+  root["discovery_port"] = internal->discoveryPort();
+  root["persistence"] = internal->cache.enabled();
+  {
+    const int rpcPort = internal->rpcPort();
+    const MasterCache::FileStatus cacheFile = internal->cache.fileStatus(rpcPort);
+    root["persistence_path"] = cacheFile.path;
+    root["persistence_exists"] = cacheFile.exists;
+    root["persistence_readable"] = cacheFile.readable;
+    root["persistence_writable"] = cacheFile.writable;
+  }
+  std::ostringstream oss;
+  miniros::JsonState state;
+  root.writeJson(oss, state, {});
+  request->setResponseBody(oss.str(), "application/json");
+  request->setResponseStatusOk();
   return Error::Ok;
 }
 

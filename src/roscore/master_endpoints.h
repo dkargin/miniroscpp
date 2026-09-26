@@ -48,6 +48,19 @@ public:
   Master::Internal* internal = nullptr;
 };
 
+/// GET /settings renders the local-settings form.
+/// GET /api2/settings reads or applies resolve, discovery, discovery_port, persistence.
+class SettingsEndpoint : public http::EndpointHandler {
+public:
+  SettingsEndpoint(Master::Internal* internal, bool htmlPage)
+    : internal(internal), htmlPage(htmlPage) {}
+
+  Error handle(const network::ClientInfo& clientInfo, std::shared_ptr<http::HttpRequest> request) override;
+
+  Master::Internal* internal = nullptr;
+  bool htmlPage = false;
+};
+
 /// GET /api2/node_uri?node=<name>[&ip=4,6]
 /// JSON array of address strings. `ip` selects families in one response.
 class NodeUriEndpoint : public http::EndpointHandler {

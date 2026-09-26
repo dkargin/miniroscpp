@@ -98,6 +98,51 @@ std::filesystem::path MasterCache::pathForPort(const std::filesystem::path& dir,
   return dir / ("cache." + std::to_string(port));
 }
 
+MasterCache::FileStatus MasterCache::fileStatus(int port) const
+{
+  FileStatus info;
+  if (port <= 0)
+    return info;
+
+  std::error_code ec;
+  std::filesystem::path dir = std::filesystem::current_path(ec);
+  if (ec)
+    dir = ".";
+  std::filesystem::path path = pathForPort(dir, port);
+  std::filesystem::path abs = std::filesystem::absolute(path, ec);
+  info.path = (ec ? path : abs).string();
+
+  const auto st = std::filesystem::status(path, ec);
+  const bool present = !ec && std::filesystem::exists(st);
+  if (present && !std::filesystem::is_regular_file(st)) {
+    info.exists = true;
+    return info;
+  }
+
+#if !defined(_WIN32)
+  if (present) {
+    info.exists = true;
+    info.readable = access(info.path.c_str(), R_OK) == 0;
+    info.writable = access(info.path.c_str(), W_OK) == 0;
+    return info;
+  }
+  const std::filesystem::path parent = path.parent_path().empty() ? std::filesystem::path(".") : path.parent_path();
+  info.writable = access(parent.c_str(), W_OK) == 0;
+#else
+  if (present) {
+    info.exists = true;
+    std::ifstream in(path, std::ios::in | std::ios::binary);
+    info.readable = in.good();
+    std::fstream io(path, std::ios::in | std::ios::out | std::ios::binary);
+    info.writable = io.good();
+    return info;
+  }
+  const std::filesystem::path parent = path.parent_path().empty() ? std::filesystem::path(".") : path.parent_path();
+  info.writable = std::filesystem::is_directory(parent, ec) && !ec;
+#endif
+  return info;
+}
+
 Error MasterCache::load(int port)
 {
   data_ = MasterCacheData{};

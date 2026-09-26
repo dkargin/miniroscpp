@@ -111,7 +111,18 @@ public:
   void setToken(const std::string& token);
 
   /// UDP port for unicast sync. 0 means "use master RPC port" at start().
-  void setUdpPort(int port);
+  /// When already started, a different port rebinds the sync socket.
+  Error setUdpPort(int port);
+
+  /// Send or stop DISCOVER. Paired sync stays up when this is turned off.
+  void setDiscoveryEnabled(bool on);
+  bool discoveryEnabled() const;
+
+  /// True after a successful start() until stop().
+  bool started() const;
+
+  /// Port requested before bind. 0 means "use the master RPC port".
+  int configuredUdpPort() const;
 
   /// Multicast discovery group host:port. Empty host disables multicast.
   /// Changing the endpoint while started leaves the current collective and rejoins.

@@ -159,25 +159,11 @@ bool Master::start(PollSet* poll_set, int port)
   }
 
   if (internal_->multimaster && internal_->multimasterEnabled) {
-    auto url = internal_->rpcManager->getServerUrl();
-    internal_->multimaster->setCollectSnapshot([this](const network::NetAddress& dest) {
-      return internal_->collectMultimasterSnapshot(dest);
-    });
-    internal_->multimaster->setApplyRecords([this](const UUID& peer, const std::vector<miniros_msgs::RegistrationRecord>& records, bool snapshot) {
-      internal_->applyMultimasterRecords(peer, records, snapshot);
-    });
-    internal_->multimaster->setDropPeer([this](const UUID& peer) {
-      internal_->dropMultimasterPeer(peer);
-    });
-    if (Error err = internal_->multimaster->start(poll_set, internal_->uuid, url); !err) {
+    if (Error err = internal_->startMultimaster(poll_set); !err) {
       MINIROS_ERROR("Failed to start multimaster UDP: %s", err.toString());
       stop();
       return false;
     }
-    // Re-pair peers from cache before (or alongside) fresh discovery.
-    if (internal_->cache.enabled())
-      internal_->cache.restorePeers();
-    // Discovery is always active; token only gates pairing.
     internal_->multimaster->sendDiscover();
   } else if (internal_->multimaster) {
     MINIROS_INFO("Multimaster UDP disabled");
@@ -258,6 +244,7 @@ void Master::setupBindings(const std::shared_ptr<CallbackQueue>& cb)
     internal_->httpNodeInfoEndpoint.reset(new NodeInfoEndpoint(internal_.get()));
     internal_->httpTopicInfoEndpoint.reset(new TopicInfoEndpoint(internal_.get()));
     internal_->httpPublishedTopicsEndpoint.reset(new PublishedTopicsEndpoint(internal_.get()));
+    internal_->httpSettingsEndpoint.reset(new SettingsEndpoint(internal_.get(), false));
     internal_->httpNodeUriEndpoint.reset(new NodeUriEndpoint(internal_.get()));
     internal_->httpTopicTypesEndpoint.reset(new TopicTypesEndpoint(internal_.get()));
     internal_->httpMultimasterApiEndpoint.reset(new MultimasterApiEndpoint(internal_.get()));
@@ -271,6 +258,10 @@ void Master::setupBindings(const std::shared_ptr<CallbackQueue>& cb)
       internal_->httpTopicInfoEndpoint, cb);
     server->registerEndpoint(std::make_unique<http::SimpleFilter>(http::HttpMethod::Get, "/api2/published_topics"),
       internal_->httpPublishedTopicsEndpoint, cb);
+    server->registerEndpoint(std::make_unique<http::SimpleFilter>(http::HttpMethod::Get, "/settings"),
+      std::make_shared<SettingsEndpoint>(internal_.get(), true), cb);
+    server->registerEndpoint(std::make_unique<http::SimpleFilter>(http::HttpMethod::Get, "/api2/settings"),
+      internal_->httpSettingsEndpoint, cb);
     server->registerEndpoint(std::make_unique<http::SimpleFilter>(http::HttpMethod::Get, "/api2/node_uri"),
       internal_->httpNodeUriEndpoint, cb);
     server->registerEndpoint(std::make_unique<http::SimpleFilter>(http::HttpMethod::Get, "/api2/topic_types"),
@@ -296,12 +287,102 @@ void Master::setupBindings(const std::shared_ptr<CallbackQueue>& cb)
   }
 }
 
+void Master::Internal::setResolveNodeIp(bool on)
+{
+  resolver.setResolveIp(on);
+  parameterStorage.setParam("master", "/resolve_ip", on);
+}
+
+Error Master::Internal::startMultimaster(PollSet* pollSet)
+{
+  if (!multimaster || !rpcManager)
+    return Error::InternalError;
+  if (!pollSet)
+    pollSet = rpcManager->getPollSet();
+  if (!pollSet)
+    return Error::InternalError;
+
+  const bool wasStarted = multimaster->started();
+  auto url = rpcManager->getServerUrl();
+  multimaster->setCollectSnapshot([this](const network::NetAddress& dest) {
+    return collectMultimasterSnapshot(dest);
+  });
+  multimaster->setApplyRecords([this](const UUID& peer, const std::vector<miniros_msgs::RegistrationRecord>& records, bool snapshot) {
+    applyMultimasterRecords(peer, records, snapshot);
+  });
+  multimaster->setDropPeer([this](const UUID& peer) {
+    dropMultimasterPeer(peer);
+  });
+  if (Error err = multimaster->start(pollSet, uuid, url); !err)
+    return err;
+  multimasterEnabled = true;
+  if (!wasStarted && cache.enabled())
+    cache.restorePeers();
+  return Error::Ok;
+}
+
+int Master::Internal::rpcPort() const
+{
+  return rpcManager ? rpcManager->getServerPort() : 0;
+}
+
+int Master::Internal::discoveryPort() const
+{
+  int port = 0;
+  if (multimaster) {
+    port = multimaster->udpPort();
+    if (port <= 0)
+      port = multimaster->configuredUdpPort();
+  }
+  if (port <= 0 && rpcManager)
+    port = rpcManager->getServerPort();
+  return port;
+}
+
+Error Master::Internal::applySettings(bool changeResolve, bool resolve,
+  bool changeDiscovery, bool discovery,
+  bool changePort, int discoveryPortValue,
+  bool changePersistence, bool persistence)
+{
+  if (changeResolve)
+    setResolveNodeIp(resolve);
+
+  if (changePersistence) {
+    cache.setEnabled(persistence);
+    if (persistence) {
+      const int port = rpcManager ? rpcManager->getServerPort() : 0;
+      cache.flush(port, uuid.toString());
+    }
+  }
+
+  if (changePort) {
+    if (!multimaster)
+      return Error::InternalError;
+    if (Error err = multimaster->setUdpPort(discoveryPortValue); !err)
+      return err;
+  }
+
+  if (changeDiscovery) {
+    if (!multimaster)
+      return Error::InternalError;
+    if (!discovery) {
+      multimasterEnabled = false;
+      multimaster->setDiscoveryEnabled(false);
+    } else {
+      if (Error err = startMultimaster(nullptr); !err)
+        return err;
+      multimaster->setDiscoveryEnabled(true);
+      multimaster->sendDiscover();
+    }
+  }
+  return Error::Ok;
+}
+
 void Master::setResolveNodeIP(bool resolv)
 {
   if (!internal_)
     return;
-  internal_->resolver.setResolveIp(resolv);
-  internal_->parameterStorage.setParam("master", "/resolve_ip", resolv);
+  internal_->setResolveNodeIp(resolv);
 }
 
 void Master::setNodeCheckPeriod(double seconds)
@@ -949,7 +1030,9 @@ void Master::setMultimasterUdpPort(int port)
 {
   if (!internal_ || !internal_->multimaster)
     return;
-  internal_->multimaster->setUdpPort(port);
+  if (Error err = internal_->multimaster->setUdpPort(port); !err) {
+    MINIROS_ERROR("Failed to set multimaster UDP port %d: %s", port, err.toString());
+  }
 }
 
 void Master::setMultimasterMulticast(const std::string& addr, int port)
