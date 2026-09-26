@@ -23,6 +23,7 @@ class MasterRootEndpoint;
 class NodeInfoEndpoint;
 class TopicInfoEndpoint;
 class PublishedTopicsEndpoint;
+class SettingsEndpoint;
 class NodeUriEndpoint;
 class TopicTypesEndpoint;
 class MultimasterApiEndpoint;
@@ -53,6 +54,9 @@ struct Master::Internal {
 
   /// Endpoint for accessing /api2/published_topics
   std::shared_ptr<PublishedTopicsEndpoint> httpPublishedTopicsEndpoint;
+
+  /// Endpoint for GET /settings and GET /api2/settings.
+  std::shared_ptr<SettingsEndpoint> httpSettingsEndpoint;
 
   /// Endpoint for accessing /api2/node_uri
   std::shared_ptr<NodeUriEndpoint> httpNodeUriEndpoint;
@@ -114,7 +118,30 @@ struct Master::Internal {
   bool rosoutLogConfigured() const;
 
   /// Render status of master as HTML page.
-  void renderMasterStatus(std::string& output) const;
+  /// `clientAddress` / `localAddress` are the browser connection. Node links use a
+  /// known IP when one exists; no DNS lookup is performed.
+  void renderMasterStatus(std::string& output,
+    const network::NetAddress& clientAddress,
+    const network::NetAddress& localAddress) const;
+
+  /// Toggle XML-RPC IP resolution and the `/resolve_ip` parameter together.
+  void setResolveNodeIp(bool on);
+
+  /// Bind multimaster UDP if it is not already running. Wires snapshot callbacks.
+  Error startMultimaster(PollSet* pollSet);
+
+  /// Effective discovery UDP port (bound, else configured, else the RPC port).
+  int discoveryPort() const;
+
+  /// Bound XML-RPC port. 0 before the server is listening.
+  int rpcPort() const;
+
+  /// Apply one local setting. Empty `discoveryPortText` leaves the port unchanged.
+  /// `discovery` nullopt-style: pass `changeDiscovery` false to skip that flag.
+  Error applySettings(bool changeResolve, bool resolve,
+    bool changeDiscovery, bool discovery,
+    bool changePort, int discoveryPort,
+    bool changePersistence, bool persistence);
 
   /// Render information about specific topic.
   Error renderTopicInfo(const std::string_view& name, std::string& output) const;

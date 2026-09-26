@@ -70,6 +70,9 @@ public:
   /// Enable/disable IP resolution for local Master API replies (`--resolve`).
   void setResolveIp(bool resolve);
 
+  /// Current `--resolve` flag. Does not perform any lookup.
+  bool resolveIp() const;
+
   /// Check if specified address is a localhost.
   bool isLocalhost(const std::string& hostname) const;
 

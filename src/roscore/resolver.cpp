@@ -278,6 +278,12 @@ void AddressResolver::setResolveIp(bool resolve)
   m_resolveIp = resolve;
 }
 
+bool AddressResolver::resolveIp() const
+{
+  std::scoped_lock<std::mutex> lock(m_mutex);
+  return m_resolveIp;
+}
+
 std::shared_ptr<network::HostInfo> AddressResolver::updateHost(const RequesterInfo& requesterInfo)
 {
   if (requesterInfo.callerApi.empty())
