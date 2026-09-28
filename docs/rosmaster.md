@@ -8,6 +8,58 @@ Most of negotiation protocol can be found at:
 **MiniROS** follows exactly the same protocol to keep compatibility with original ROS1.
 While some additional API calls can be added to **miniroscore** and used by miniros-based nodes, it still must be compatible with any ROS1 client. 
 
+# HTTP endpoints #
+
+These routes are served on the same port as the XML-RPC Master API. Every path below is **GET**. XML-RPC stays at `/RPC2`.
+
+A graph name keeps its leading `/`, so node `/talker` is `/node//talker` and topic `/chatter` is `/topic//chatter`.
+
+## Status pages
+
+| Path | Response |
+|------|----------|
+| `GET /` | HTML status: hostname, GUID, uptime, links to `/settings` and `/log`, registered nodes, topics, known hosts, and (when multimaster is enabled) the peer list with pair / disconnect forms. Remote peer masters appear under Discovery, not under Nodes. Node Slave API links use a known IP on the same IPv4 subnet as the browser when one exists, otherwise the first non-loopback address. The link text stays the registered URI. No DNS lookup is done. A link that is still a hostname is shown in red: the browser has no way to test that name, and opening it would require DNS. |
+| `GET /settings` | HTML form for local settings: resolve IP, discovery on/off, discovery UDP port, multicast group, token, and persistence. Shows the `cache.<port>` path, and a warning when that file, its directory, or multicast cannot be used. |
+| `GET /node/<name>` | HTML page for one node: Slave API URL, flags (`LOCAL`, `FOREIGN`, `MINIROS`, `MASTER`), liveness state, queued requests, subscriptions, publications, and services. A remote peer master also gets a pair form. **404** when the name is unknown. |
+| `GET /topic/<name>` | HTML page for one topic: message type, publishers, and subscribers, each linked to its node page. **404** when the topic has no type and no publishers or subscribers. |
+| `GET /log` | `rosout.log` as `text/plain`. **404** (`log was not configured`) when file logging is off or the file is missing. |
+| `GET /favicon.ico` | Built-in icon. |
+
+The root page links each node and topic into the pages above.
+
+## JSON graph API
+
+`published_topics` and `topic_types` return `application/json` objects of the form `{"/topic": "pkg/Msg", ...}`.
+
+| Path | Contents |
+|------|----------|
+| `GET /api2/published_topics` | Topics that currently have at least one publisher and a recorded type. Same selection as XML-RPC `getPublishedTopics` with an empty subgraph. |
+| `GET /api2/topic_types` | Every topic the master has a type for. The type is stored on the first publisher or subscriber registration and is left unchanged by later registrations. A subscriber-only topic is included here and omitted from `/api2/published_topics`. |
+| `GET /api2/settings` | Local settings as JSON: `resolve`, `discovery`, `discovery_port`, `persistence`, plus `persistence_path`, `persistence_exists`, `persistence_readable`, and `persistence_writable`. Query parameters with the same names apply a change (`1`/`0`). Omitted parameters stay as they are. Browsers that submit the form are redirected to `/settings`. **400** for a bad value. **500** if discovery cannot bind the requested port. |
+| `GET /api2/node_uri?node=<name>` | JSON array of address strings. Example: `["10.0.0.5","fd00::1"]`. An IPv4 address has no `:`. An IPv6 address contains `:`. Any other form is a later address family. |
+
+`ip` limits that single response to the requested families: `4`, `6`, or a comma-separated list such as `4,6` (`ipv4` / `ipv6` accepted). Omitting `ip` returns every known address. Addresses come from the node's host record, local adapters when the node is on this host, and an IP literal already in the registered URI. The body is empty on error: **400** for a missing `node` or a bad `ip` token, **404** when the node is unknown or no address matches.
+
+## Multimaster
+
+`GET /api2/multimaster`, `.../status`, and `.../help` return JSON: this master's GUID, UDP port, multicast endpoint, whether a token is set, `paired_count`, and `peers[]` (`uuid`, `state`, `uri`, `hostname`, `label`, `address`, `pairable`, token flags, and foreign pub/sub/service counts). `help` also lists `commands`.
+
+| Path | Behavior |
+|------|----------|
+| `GET /api2/multimaster/connect?uuid=<guid>&token=<secret>` | Pair with a discovered peer. `node=<name>` selects a peer master by graph name instead of `uuid`. |
+| `GET /api2/multimaster/disconnect` | Leave the collective (disconnect every paired peer). |
+
+`connect` and `disconnect` answer JSON unless the client sends `Accept: text/html` (a browser form). `format=json` forces JSON. The HTML result redirects back to `/` on success. An unknown command is **404**; a disabled multimaster subsystem is **500**. Pairing rules and status codes are in [multimaster.md](multimaster.md).
+
+## Debug API
+
+Registered only when `miniroscore` is started with `--debugAPI`. Responses are HTML.
+
+| Path | Behavior |
+|------|----------|
+| `GET /debugAPI` or `GET /debugAPI/help` | Lists available commands. |
+| `GET /debugAPI/shutdown` | Requests process exit (`Master::ok()` becomes false). |
+| any other command | **404**. |
 
 # Internals #
 
