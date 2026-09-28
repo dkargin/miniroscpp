@@ -143,23 +143,6 @@ void Master::Internal::renderMasterStatus(std::string& output,
     ss << " <em>(not configured)</em>";
   ss << "</p>\n";
 
-  if (multimaster) {
-    const bool localHasToken = multimaster->hasToken();
-    ss << "<details>\n<summary>Config</summary>\n";
-    ss << "<p>UDP sync port: " << multimaster->udpPort();
-    ss << " | discovery: " << (multimaster->discoveryEnabled() ? "on" : "off");
-    const std::string mc = multimaster->multicastEndpoint();
-    ss << " | multicast: " << (mc.empty() ? "off" : mc);
-    const std::string mcErr = multimaster->multicastError();
-    if (mc.empty() && !mcErr.empty())
-      ss << " <small>(" << mcErr << "; LAN discovery uses UDP broadcast on port "
-         << multimaster->udpPort() << ")</small>";
-    ss << " | token: " << (localHasToken ? "set" : "none") << "</p>\n";
-    ss << "<p><small>Token is required only when joining a mesh that already has one. "
-          "Open masters (no token) can pair without entering a token.</small></p>\n";
-    ss << "</details>\n";
-  }
-
   ss << print::HB("Nodes:");
   ss << "<ul>";
   for (const std::shared_ptr<NodeRef>& r : regManager.listAllNodes()) {

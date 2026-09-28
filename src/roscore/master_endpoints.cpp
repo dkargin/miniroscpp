@@ -243,6 +243,18 @@ std::string settingsForm(const Master::Internal& internal)
   ss << "<p><label title=\"" << htmlEscape(portTip) << "\">Discovery port ";
   ss << "<input name=\"discovery_port\" title=\"" << htmlEscape(portTip) << "\" value=\"" << port << "\"/>";
   ss << "</label></p>";
+  if (internal.multimaster) {
+    const std::string mc = internal.multimaster->multicastEndpoint();
+    const std::string mcErr = internal.multimaster->multicastError();
+    const bool tokenSet = internal.multimaster->hasToken();
+    const char* tokenTip = "Token is required only when joining a mesh that already has one. "
+                           "Open masters (no token) can pair without entering a token.";
+    ss << "<p>Multicast: <code>" << htmlEscape(mc.empty() ? "off" : mc) << "</code>";
+    if (mc.empty() && !mcErr.empty())
+      ss << "<br/><span style=\"color:#c62828;\">" << htmlEscape(mcErr) << "</span>";
+    ss << "</p>";
+    ss << "<p title=\"" << htmlEscape(tokenTip) << "\">Token: " << (tokenSet ? "set" : "none") << "</p>";
+  }
   ss << "<p><label>Persistence <select name=\"persistence\">";
   ss << "<option value=\"1\"" << (persistenceOn ? " selected" : "") << ">on</option>";
   ss << "<option value=\"0\"" << (persistenceOn ? "" : " selected") << ">off</option>";
