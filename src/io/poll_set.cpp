@@ -33,6 +33,7 @@
  */
 
 #include <algorithm>
+#include <atomic>
 #include <vector>
 #include <map>
 #include <mutex>
@@ -89,12 +90,31 @@ struct PollSet::Internal {
 
   signal_fd_t signal_pipe_[2] GUARDED_BY(signal_mutex_) = {MINIROS_INVALID_SOCKET, MINIROS_INVALID_SOCKET};
 
+  /// True while poll_sockets()/epoll_wait() is blocked on the poll thread.
+  std::atomic<bool> in_poll_{false};
+
+  /// Set by signal()/signalFd() to request skipping the next blocking poll.
+  /// Cleared by update() when the wake is consumed.
+  std::atomic<bool> signaled_{false};
+
   socket_fd_t epfd_ = MINIROS_INVALID_SOCKET;
 
   Internal()
   {
     ensureNetworkInitialized();
     epfd_ = create_socket_watcher();
+  }
+
+  /// Drain bytes waiting on the signal pipe (non-blocking).
+  void drainSignalPipe(std::vector<socket_fd_t>& notifiedFd)
+  {
+    socket_fd_t eventFd = MINIROS_INVALID_SOCKET;
+    while (read_signal(signal_pipe_[0], (char*)&eventFd, sizeof(eventFd)) > 0)
+    {
+      if (eventFd != MINIROS_INVALID_SOCKET) {
+        notifiedFd.push_back(eventFd);
+      }
+    }
   }
 
   /// Check if specified fd is related to internal signaling.
@@ -120,8 +140,12 @@ struct PollSet::Internal {
 
   bool delSocket(int fd);
 
-  /// Signal all. It can fail if mutex is already locked.
+  /// Wake poll watchers: set skip flag, and write the pipe only if inside poll.
   bool signal();
+
+  /// Wake a blocked poll after poll-set mutations. Does not set the skip flag,
+  /// so the next update() still runs poll with the caller's timeout.
+  bool wakeIfPolling();
 
   /// Send signal to specific fd.
   bool signalFd(int fd);
@@ -205,7 +229,7 @@ bool PollSet::addSocket(int fd, int events, const SocketUpdateFunc& update_func,
     LOCAL_DEBUG("PollSet::addSocket(%d) evt=%s", fd, eventToString(events).c_str());
   }
 
-  (void)signal();
+  (void)internal_->wakeIfPolling();
 
   return true;
 }
@@ -243,7 +267,7 @@ bool PollSet::Internal::delSocket(int fd)
     socket_timers_.erase(it2);
 
   sockets_changed_ = true;
-  signal();
+  wakeIfPolling();
 
   LOCAL_DEBUG("PollSet::delSocket(%d)", fd);
   return true;
@@ -297,7 +321,7 @@ bool PollSet::addEvents(int sock, int events)
   }
 
   internal_->sockets_changed_ = true;
-  (void)signal();
+  (void)internal_->wakeIfPolling();
 
   return true;
 }
@@ -330,7 +354,7 @@ bool PollSet::delEvents(int sock, int events)
   }
 
   internal_->sockets_changed_ = true;
-  (void)signal();
+  (void)internal_->wakeIfPolling();
 
   return true;
 }
@@ -375,7 +399,7 @@ bool PollSet::setEvents(int sock, int events)
     LOCAL_DEBUG("PollSet::setEvents(%d, %s) updated events", sock, eventToString(events).c_str());
   }
   internal_->sockets_changed_ = true;
-  (void)signal();
+  (void)internal_->wakeIfPolling();
 
   return true;
 }
@@ -391,21 +415,35 @@ bool PollSet::setTimerEvent(int sock, int timeoutMs)
     return false;
   }
   internal_->socket_timers_[sock] = SteadyTime::now() + WallDuration(timeoutMs*0.001);
-  (void)signal();
+  (void)internal_->wakeIfPolling();
   LOCAL_DEBUG("PollSet::setTimerEvent(%d) timeout=%d", sock, timeoutMs);
   return true;
 }
 
 bool PollSet::Internal::signal()
 {
-  if (!signal_mutex_.try_lock())
-    return false;
+  // Coalesce: many publishers may signal; only the first needs to wake poll.
+  if (signaled_.exchange(true, std::memory_order_acq_rel)) {
+    return true;
+  }
 
-  std::lock_guard<std::mutex> lock(signal_mutex_, std::adopt_lock);
+  return wakeIfPolling();
+}
+
+bool PollSet::Internal::wakeIfPolling()
+{
+  // Outside poll: caller already applied epoll_ctl / state changes; the next
+  // update() will observe them. Do not set signaled_ — that would skip poll.
+  if (!in_poll_.load(std::memory_order_acquire)) {
+    return true;
+  }
+
+  // Currently blocked in poll/epoll: write to the pipe to wake it.
+  std::lock_guard<std::mutex> lock(signal_mutex_);
   if (signal_pipe_[1] == MINIROS_INVALID_SOCKET)
     return false;
-  socket_fd_t fd = MINIROS_INVALID_SOCKET;
-  if (write_signal(signal_pipe_[1], (const char*)&fd, sizeof(fd)) < 0)
+  socket_fd_t wakeFd = MINIROS_INVALID_SOCKET;
+  if (write_signal(signal_pipe_[1], (const char*)&wakeFd, sizeof(wakeFd)) < 0)
   {
     // do nothing... this prevents warnings on gcc 4.3
   }
@@ -414,6 +452,10 @@ bool PollSet::Internal::signal()
 
 bool PollSet::Internal::signalFd(int fd)
 {
+  // Soft-signal carries a specific fd in the pipe payload, so always write.
+  // Also set signaled_ so update() skips the blocking wait if we are outside poll.
+  signaled_.store(true, std::memory_order_release);
+
   std::lock_guard<std::mutex> lock(signal_mutex_);
   if (signal_pipe_[1] == MINIROS_INVALID_SOCKET)
     return false;
@@ -531,25 +573,48 @@ void PollSet::update(int poll_timeout)
 
   /// Storage for results from poll.
   std::vector<socket_pollfd> ofds;
+  std::vector<socket_fd_t> notifiedFd;
 
   // This function does not lock socket info for most of the time.
   // So it should be expected that configuration of sockets and events can change.
   // delSocket also can be called during poll and its processing.
 
-  const nfds_t numFd = static_cast<nfds_t>(internal_->ufds_.size());
-  {
+  // If signal() ran while outside poll, skip the blocking wait entirely.
+  // Keep the caller's poll_timeout unchanged — never force a zero timeout.
+  bool do_poll = !internal_->signaled_.exchange(false, std::memory_order_acq_rel);
+
+  if (do_poll) {
+    const nfds_t numFd = static_cast<nfds_t>(internal_->ufds_.size());
     MINIROS_PROFILE_SCOPE("poll");
-    Error err = poll_sockets(internal_->epfd_, &internal_->ufds_.front(), numFd, poll_timeout, ofds);
-    if (!err)
-    {
-      LOCAL_ERROR("PollSet::update() poll_sockets failed with error %s", err.toString());
-      return;
+
+    // Publish in_poll_ before the wait so signal() can choose pipe vs flag.
+    internal_->in_poll_.store(true, std::memory_order_release);
+
+    // Close the race where signal() set the flag after our exchange but before
+    // in_poll_ became visible: abandon the wait instead of entering poll.
+    if (internal_->signaled_.exchange(false, std::memory_order_acq_rel)) {
+      internal_->in_poll_.store(false, std::memory_order_release);
+      do_poll = false;
+    } else {
+      Error err = poll_sockets(internal_->epfd_, &internal_->ufds_.front(), numFd, poll_timeout, ofds);
+
+      internal_->in_poll_.store(false, std::memory_order_release);
+
+      if (!err)
+      {
+        LOCAL_ERROR("PollSet::update() poll_sockets failed with error %s", err.toString());
+        return;
+      }
     }
   }
 
-  [[maybe_unused]] std::stringstream ss;
+  // Soft-signal bytes may be queued even when we skipped poll (signalFd, or a
+  // pipe write that raced with abandoning in_poll_).
+  if (!do_poll) {
+    internal_->drainSignalPipe(notifiedFd);
+  }
 
-  std::vector<int> notifiedFd;
+  [[maybe_unused]] std::stringstream ss;
 
   for (const socket_pollfd& spfd: ofds)
   {
@@ -565,13 +630,7 @@ void PollSet::update(int poll_timeout)
 
     // Handle manual signals to specific fd.
     if (internal_->isInternalSignalFd(fd) && (revents & POLLIN)) {
-      socket_fd_t eventFd = MINIROS_INVALID_SOCKET;
-      while(read_signal(internal_->signal_pipe_[0], (char*)&eventFd, sizeof(eventFd)) > 0)
-      {
-        if (eventFd != MINIROS_INVALID_SOCKET) {
-          notifiedFd.push_back(eventFd);
-        }
-      }
+      internal_->drainSignalPipe(notifiedFd);
     } else {
       internal_->processEvent(fd, revents, info, ss);
     }
