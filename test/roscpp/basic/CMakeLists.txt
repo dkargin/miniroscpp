@@ -29,6 +29,12 @@ if(WIN32)
   target_link_libraries(${TEST_GROUP}-test_net ws2_32)
 endif()
 
+miniros_add_test(${TEST_GROUP}-test_master_discovery SOURCES test_master_discovery.cpp)
+target_include_directories(${TEST_GROUP}-test_master_discovery PRIVATE
+  ${CMAKE_SOURCE_DIR}/src/roscore
+  ${MINIROS_INCLUDE_GENERATED_DIRS}
+  ${MINIROS_GENERATED_INCLUDE_DIRS})
+
 add_executable(${TEST_GROUP}-notify_child notify_child.cpp)
 target_link_libraries(${TEST_GROUP}-notify_child roscxx)
 set_target_properties(${TEST_GROUP}-notify_child PROPERTIES FOLDER "Tests")

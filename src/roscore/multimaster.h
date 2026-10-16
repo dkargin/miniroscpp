@@ -35,6 +35,7 @@ class RegistrationManager;
 class MasterHandler;
 
 /// Default multicast discovery group (robots may share; collectives are split by token).
+/// Client listeners use the same group via miniros::MasterDiscovery.
 constexpr const char* kDefaultMulticastAddr = "239.255.42.42";
 constexpr int kDefaultMulticastPort = 11312;
 
