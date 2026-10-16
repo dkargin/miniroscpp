@@ -7,6 +7,15 @@
 
 #include "miniros/macros.h"
 
+// Features present in this release. Older headers do not define these, so a
+// caller can fall back with #ifdef after including any miniros header.
+// Add a MINIROS_HAS_* / MINIBAG_HAS_* line here when a feature lands.
+
+//! Forward bag scan that yields messages in file order.
+#define MINIBAG_HAS_UNORDERED_VIEW 1
+
+#ifdef __cplusplus
+
 namespace miniros {
 
 /**
@@ -41,5 +50,7 @@ struct BuildConfig {
 };
 
 } // namespace miniros
+
+#endif // __cplusplus
 
 #endif

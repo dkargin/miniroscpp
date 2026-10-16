@@ -92,6 +92,7 @@ typedef bagmode::BagMode BagMode;
 
 class MessageInstance;
 class View;
+class UnorderedView;
 class Query;
 
 class BagInfoFormatter;
@@ -100,6 +101,7 @@ class ROSBAG_STORAGE_DECL Bag
 {
     friend class MessageInstance;
     friend class View;
+    friend class UnorderedView;
     friend class BagInfoFormatter;
 
 public:
@@ -130,6 +132,15 @@ public:
      * Can throw BagException
      */
     void open(std::string const& filename, uint32_t mode = bagmode::Read);
+
+    //! Read the per-message index left unread by open().
+    /*!
+     * The result is cached on the bag. View requests it. UnorderedView does not,
+     * and instead reads records in file order.
+     *
+     * Can throw BagException
+     */
+    void buildIndex() const;
 
     //! Close the bag file
     void close();
@@ -259,7 +270,8 @@ private:
     void readConnectionRecord();
     void readChunkHeader(ChunkHeader& chunk_header) const;
     void readChunkInfoRecord();
-    void readConnectionIndexRecord200();
+    void readConnectionIndexRecord200() const;
+    void readChunkIndexes200() const;
 
     void readTopicIndexRecord102();
     void readMessageDefinitionRecord102();
@@ -326,12 +338,14 @@ private:
     uint64_t file_size_;
     uint64_t file_header_pos_;
     uint64_t index_data_pos_;
+    uint64_t chunks_begin_pos_;          //!< first byte after the file header
     uint32_t connection_count_;
     uint32_t chunk_count_;
-    
+    mutable bool index_complete_;        //!< buildIndex() has finished
+
     // Current chunk
     bool      chunk_open_;
-    ChunkInfo curr_chunk_info_;
+    mutable ChunkInfo curr_chunk_info_;
     uint64_t  curr_chunk_data_pos_;
 
     std::map<std::string, uint32_t>                topic_connection_ids_;
@@ -340,7 +354,7 @@ private:
 
     std::vector<ChunkInfo>                         chunks_;
 
-    std::map<uint32_t, std::multiset<IndexEntry> > connection_indexes_;
+    mutable std::map<uint32_t, std::multiset<IndexEntry> > connection_indexes_;
     std::map<uint32_t, std::multiset<IndexEntry> > curr_chunk_connection_indexes_;
 
     mutable Buffer   header_buffer_;           //!< reusable buffer in which to assemble the record header before writing to file

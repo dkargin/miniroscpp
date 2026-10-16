@@ -247,6 +247,8 @@ void View::addQuery(Bag const& bag, miniros::Time const& start_time, miniros::Ti
     if ((bag.getMode() & bagmode::Read) != bagmode::Read)
         throw BagException("Bag not opened for reading");
 
+    bag.buildIndex();
+
     std::function<bool(ConnectionInfo const*)> query = TrueQuery();
 
     queries_.push_back(new BagQuery(&bag, Query(query, start_time, end_time), bag.bag_revision_));
@@ -257,6 +259,8 @@ void View::addQuery(Bag const& bag, miniros::Time const& start_time, miniros::Ti
 void View::addQuery(Bag const& bag, std::function<bool(ConnectionInfo const*)> query, miniros::Time const& start_time, miniros::Time const& end_time) {
     if ((bag.getMode() & bagmode::Read) != bagmode::Read)
         throw BagException("Bag not opened for reading");
+
+    bag.buildIndex();
 
     queries_.push_back(new BagQuery(&bag, Query(query, start_time, end_time), bag.bag_revision_));
 

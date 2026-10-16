@@ -44,6 +44,7 @@
 namespace minibag {
 
 class Bag;
+class UnorderedView;
 
 //! A class pointing into a bag file
 /*!
@@ -57,6 +58,7 @@ class Bag;
 class ROSBAG_STORAGE_DECL MessageInstance
 {
     friend class View;
+    friend class UnorderedView;
   
 public:
     miniros::Time   const& getTime()              const;

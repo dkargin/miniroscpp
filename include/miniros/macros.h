@@ -75,3 +75,5 @@
 #endif
 
 #define MINIROS_NODISCARD [[nodiscard]]
+
+#include "miniros/build_config.h"

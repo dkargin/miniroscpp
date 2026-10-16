@@ -106,8 +106,10 @@ void Bag::init() {
     file_size_ = 0;
     file_header_pos_ = 0;
     index_data_pos_ = 0;
+    chunks_begin_pos_ = 0;
     connection_count_ = 0;
     chunk_count_ = 0;
+    index_complete_ = false;
     chunk_open_ = false;
     curr_chunk_data_pos_ = 0;
     current_buffer_ = 0;
@@ -180,6 +182,7 @@ void Bag::openAppend(string const& filename) {
     }
 
     startReadingVersion200();
+    buildIndex();
 
     // Truncate the file to chop off the index
     file_.truncate(index_data_pos_);
@@ -332,7 +335,38 @@ void Bag::startReadingVersion200() {
     for (uint32_t i = 0; i < chunk_count_; i++)
         readChunkInfoRecord();
 
-    // Read the connection indexes for each chunk
+    // Per-message INDEX_DATA is read later, by buildIndex().
+    index_complete_ = false;
+}
+
+void Bag::buildIndex() const {
+    if (index_complete_)
+        return;
+
+    if ((mode_ & bagmode::Read) == 0 && (mode_ & bagmode::Append) == 0)
+        throw BagException("Bag not opened for reading");
+
+    switch (version_)
+    {
+      case 102:
+        // Version 1.2 loads its topic index while opening.
+        break;
+      case 200:
+        readChunkIndexes200();
+        break;
+      default:
+      {
+        std::stringstream ss;
+        ss << "Unsupported bag file version: " << getMajorVersion() << "." << getMinorVersion();
+        throw BagException(ss.str());
+      }
+    }
+
+    index_complete_ = true;
+}
+
+void Bag::readChunkIndexes200() const {
+    connection_indexes_.clear();
     for (ChunkInfo const& chunk_info : chunks_) {
         curr_chunk_info_ = chunk_info;
 
@@ -384,6 +418,8 @@ void Bag::startReadingVersion102() {
 
         readMessageDefinitionRecord102();
     }
+
+    index_complete_ = true;
 }
 
 // File header record
@@ -465,6 +501,7 @@ void Bag::readFileHeaderRecord() {
 
     // Skip the data section (just padding)
     seek(data_size, std::ios::cur);
+    chunks_begin_pos_ = file_.getOffset();
 }
 
 uint32_t Bag::getChunkOffset() const {
@@ -659,7 +696,7 @@ void Bag::readTopicIndexRecord102() {
     }
 }
 
-void Bag::readConnectionIndexRecord200() {
+void Bag::readConnectionIndexRecord200() const {
     miniros::Header header;
     uint32_t data_size;
     if (!readHeader(header) || !readDataLength(data_size))
@@ -703,7 +740,9 @@ void Bag::readConnectionIndexRecord200() {
 
         if (index_entry.time < miniros::TIME_MIN || index_entry.time > miniros::TIME_MAX)
         {
-            MINIROS_CONSOLE_BRIDGE_logError("Index entry for topic %s contains invalid time.  This message will not be loaded.", connections_[connection_id]->topic.c_str());
+            std::map<uint32_t, ConnectionInfo*>::const_iterator connection = connections_.find(connection_id);
+            char const* topic = connection == connections_.end() ? "(unknown)" : connection->second->topic.c_str();
+            MINIROS_CONSOLE_BRIDGE_logError("Index entry for topic %s contains invalid time.  This message will not be loaded.", topic);
         } else
         {
             connection_index.insert(connection_index.end(), index_entry);
@@ -1255,8 +1294,10 @@ void Bag::swap(Bag& other) {
     swap(file_size_, other.file_size_);
     swap(file_header_pos_, other.file_header_pos_);
     swap(index_data_pos_, other.index_data_pos_);
+    swap(chunks_begin_pos_, other.chunks_begin_pos_);
     swap(connection_count_, other.connection_count_);
     swap(chunk_count_, other.chunk_count_);
+    swap(index_complete_, other.index_complete_);
     swap(chunk_open_, other.chunk_open_);
     swap(curr_chunk_info_, other.curr_chunk_info_);
     swap(curr_chunk_data_pos_, other.curr_chunk_data_pos_);
