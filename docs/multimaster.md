@@ -208,6 +208,20 @@ After pair + snapshot/deltas:
 3. Data plane stays peer-to-peer TCPROS.
 4. Foreign regs are **not** forwarded to other masters (no transitive relay).
 
+## Client listener
+
+`miniros::MasterDiscovery` listens on the same multicast group and does not pair.
+A client (for example a native Android app that does not know `ROS_MASTER_URI`)
+calls `start()`, then `update()` from its main thread. `update()` returns a
+`DiscoveryReport`: masters that appeared (`added`), whose address / port /
+hostname / token flag changed (`updated`), and that went silent (`removed`).
+
+`DiscoveredMaster::uri` is `http://<literal-ip>:<master_port>/`. Pass it as the
+`__master` remapping to `miniros::init`. The hostname is display-only.
+The listener does not answer DISCOVER and does not send one; it waits for the
+master's own advertisements (about every 5s while unpaired, about every 30s
+while paired) and drops a master after 90s of silence.
+
 ## Out of scope (for now)
 
 - Parameter server sync

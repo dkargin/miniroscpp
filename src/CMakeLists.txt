@@ -285,6 +285,7 @@ set(transport_SRC
 set(master_SRC
     roscore/multimaster.cpp
     roscore/multimaster_protocol.cpp
+    roscore/master_discovery.cpp
     roscore/master.cpp
     roscore/master_cache.cpp
     roscore/master_endpoints.cpp
