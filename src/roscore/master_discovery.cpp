@@ -105,6 +105,9 @@ struct MasterDiscovery::Internal {
   bool joinWarned = false;
   std::set<std::string> joinedIfaces;
   SteadyTime nextJoinRefresh;
+  SteadyTime nextProbe;
+  UUID probeId;
+  uint32_t probeSeq = 0;
 
   std::map<std::string, DiscoveredMaster> masters;
 
@@ -146,6 +149,43 @@ struct MasterDiscovery::Internal {
           group.str().c_str(), e.toString());
       }
     }
+  }
+
+  void sendProbe()
+  {
+    if (!socket.valid() || !group.valid())
+      return;
+    if (!probeId.valid())
+      probeId.generate();
+
+    master::mm::Header header;
+    header.op = master::mm::Header::OP_DISCOVER;
+    header.uuid = probeId.toBytes();
+    header.seq = ++probeSeq;
+    std::vector<uint8_t> packet;
+    if (!master::mm::buildPacket(header, {}, packet))
+      return;
+
+    auto sendTo = [&](const network::NetAddress& dest) {
+      if (!dest.valid())
+        return;
+      socket.send(packet.data(), packet.size(), &dest);
+    };
+    sendTo(group);
+
+    std::vector<network::NetAdapter> adapters;
+    if (network::scanAdapters(adapters)) {
+      for (const auto& adapter : adapters) {
+        if (!adapter.isUp() || adapter.isLoopback() || !adapter.isIPv4())
+          continue;
+        if (!adapter.broadcastAddress.valid())
+          continue;
+        network::NetAddress bcast = adapter.broadcastAddress;
+        (void)bcast.setPort(groupPort);
+        sendTo(bcast);
+      }
+    }
+    sendTo(network::NetAddress::fromIp4String("255.255.255.255", groupPort));
   }
 
   void note(const UUID& id, const std::string& routed, uint16_t port, const std::string& hostname,
@@ -201,7 +241,7 @@ struct MasterDiscovery::Internal {
       return;
 
     UUID id = UUID::fromBytes(header.uuid);
-    if (!uuidPresent(id))
+    if (!uuidPresent(id) || id == probeId)
       return;
 
     std::string offerIp;
@@ -285,10 +325,15 @@ Error MasterDiscovery::start()
     return dispose(e);
   if (Error e = internal_->socket.bind(internal_->groupPort); !e)
     return dispose(e);
+  // Broadcast send is how a Wi-Fi client reaches a master when the AP drops multicast.
+  // Keep going if the option is refused; multicast send can still work.
+  (void)internal_->socket.setBroadcast(true);
 
   internal_->started = true;
   internal_->refreshJoins();
   internal_->nextJoinRefresh = SteadyTime::now() + WallDuration(5.0);
+  internal_->sendProbe();
+  internal_->nextProbe = SteadyTime::now() + WallDuration(3.0);
   return Error::Ok;
 }
 
@@ -320,6 +365,10 @@ DiscoveryReport MasterDiscovery::update()
   if (now >= internal_->nextJoinRefresh) {
     internal_->refreshJoins();
     internal_->nextJoinRefresh = now + WallDuration(5.0);
+  }
+  if (now >= internal_->nextProbe) {
+    internal_->sendProbe();
+    internal_->nextProbe = now + WallDuration(3.0);
   }
 
   for (int i = 0; i < kMaxDatagramsPerUpdate; ++i) {

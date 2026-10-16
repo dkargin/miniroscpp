@@ -26,10 +26,13 @@ Parameters are **not** synchronized.
 6. Sync is pairwise **unicast** of **local** pubs/subs/services only; foreign registrations
    are never re-exported; `/rosout` stays local-only; the parameter server is not synced.
 7. An operator joins a robot by setting that robot’s token (CLI `--token` or HTTP pair form).
-8. **Addresses:** multimaster routing is IP-only (UDP source / advertised literal IP). Hostnames
-   and Avahi names are never resolved. Synced node URIs are rewritten to literal IPs before
+8. **Addresses:** a discovery response advertises the local IPv4 the kernel would
+   use to reach that client. A phone on the LAN is answered with the Ethernet
+   address; a phone reached through a VPN is answered with the tunnel address.
+   Multicast advertisements carry no IP, and the receiver keeps the UDP source.
+   Hostnames are never resolved. Synced node URIs are rewritten to literal IPs before
    they leave this master. `--resolve` on the XML-RPC Master API is a separate mechanism.
-   Discovery still advertises the peer’s hostname inside `MasterOffer.host` as
+   Discovery still advertises the hostname inside `MasterOffer.host` as
    `ip|hostname` so the Web UI can show `hostname:port` while the link target stays a literal IP.
 
 ### Example

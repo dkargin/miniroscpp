@@ -22,6 +22,11 @@
 #include <map>
 #include <set>
 
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <unistd.h>
+
 namespace miniros {
 namespace master {
 
@@ -69,6 +74,48 @@ std::string encodeOfferHost(const std::string& ip, const std::string& hostname)
       return ip + '|' + hostname;
     return hostname;
   }
+  return ip;
+}
+
+/// Local IPv4 the kernel would use to send to @p peer. Empty for multicast,
+/// limited broadcast, loopback, or when no route exists. A LAN client and a
+/// VPN client therefore get different answers.
+std::string localAddressToward(const network::NetAddress& peer)
+{
+  if (!peer.valid() || peer.isLoopback() || peer.isUnspecified() ||
+      peer.type() != network::NetAddress::AddressIPv4)
+    return {};
+
+  const auto* raw = static_cast<const sockaddr_in*>(peer.rawAddress());
+  if (!raw)
+    return {};
+  const uint32_t host = ntohl(raw->sin_addr.s_addr);
+  if ((host >> 28) == 0xE || host == 0xFFFFFFFFu)
+    return {};
+
+  network::NetAddress dest = peer;
+  if (dest.port() <= 0)
+    (void)dest.setPort(9);
+
+  const int fd = ::socket(AF_INET, SOCK_DGRAM, 0);
+  if (fd < 0)
+    return {};
+  const int rc = ::connect(fd, static_cast<const sockaddr*>(dest.rawAddress()),
+    static_cast<socklen_t>(dest.rawAddressSize()));
+  sockaddr_in local{};
+  socklen_t len = sizeof(local);
+  if (rc != 0 || ::getsockname(fd, reinterpret_cast<sockaddr*>(&local), &len) != 0) {
+    ::close(fd);
+    return {};
+  }
+  ::close(fd);
+
+  char text[INET_ADDRSTRLEN] = {};
+  if (!inet_ntop(AF_INET, &local.sin_addr, text, sizeof(text)))
+    return {};
+  const std::string ip = text;
+  if (ip == "0.0.0.0" || ip.rfind("127.", 0) == 0)
+    return {};
   return ip;
 }
 
@@ -480,31 +527,35 @@ struct MultimasterManager::Internal {
       return Error::Ok;
     }
 
-    // Advertise host + RPC/sync port in DISCOVER so the receiver can list us
-    // in its discovery table without waiting for a later OFFER exchange.
-    std::vector<uint8_t> discoverPayload;
-    if (Error e = buildLocalOfferPayload(discoverPayload); !e) {
-      MINIROS_WARN_NAMED("multimaster", "Failed to serialize DISCOVER offer payload: %s", e.toString());
-      discoverPayload.clear();
-    }
+    // Each destination gets the local address that routes back to it.
+    // Multicast has no client subnet, so that payload carries no IP and
+    // receivers keep the UDP source address.
+    auto sendAdvert = [&](const network::NetAddress& dest, bool viaDiscovery) {
+      std::vector<uint8_t> payload;
+      if (Error e = buildLocalOfferPayload(payload, dest); !e) {
+        MINIROS_WARN_NAMED("multimaster", "Failed to serialize DISCOVER offer payload: %s", e.toString());
+        return e;
+      }
+      return sendOp(mm::Header::OP_DISCOVER, payload, dest, false, viaDiscovery);
+    };
 
     Error last = Error::Ok;
     if (multicastEnabled && multicastGroup.valid() && discoverySocket.valid()) {
       MINIROS_DEBUG_NAMED("multimaster", "Sending DISCOVER multicast to %s",
         multicastGroup.str().c_str());
-      last = sendOp(mm::Header::OP_DISCOVER, discoverPayload, multicastGroup, false, true);
+      last = sendAdvert(multicastGroup, true);
     }
     if (broadcastAddr.valid()) {
       MINIROS_DEBUG_NAMED("multimaster", "Sending DISCOVER limited-broadcast on UDP %d", boundPort);
-      last = sendOp(mm::Header::OP_DISCOVER, discoverPayload, broadcastAddr, false);
+      last = sendAdvert(broadcastAddr, false);
     }
     for (const network::NetAddress& bcast : subnetBroadcasts) {
       MINIROS_DEBUG_NAMED("multimaster", "Sending DISCOVER subnet-broadcast to %s", bcast.str().c_str());
-      last = sendOp(mm::Header::OP_DISCOVER, discoverPayload, bcast, false);
+      last = sendAdvert(bcast, false);
     }
     for (const network::NetAddress& peer : peerProbes) {
       MINIROS_DEBUG_NAMED("multimaster", "Sending DISCOVER probe to %s", peer.str().c_str());
-      last = sendOp(mm::Header::OP_DISCOVER, discoverPayload, peer, false);
+      last = sendAdvert(peer, false);
     }
     return last;
   }
@@ -526,27 +577,23 @@ struct MultimasterManager::Internal {
     return addr.port() > 0;
   }
 
-  Error buildLocalOfferPayload(std::vector<uint8_t>& payload) const
+  /// @p peer is who this datagram is for. The advertised IP is the local address
+  /// the kernel would use to reach that peer, so a LAN client and a VPN client
+  /// are answered with different interfaces. Multicast carries no IP.
+  Error buildLocalOfferPayload(std::vector<uint8_t>& payload, const network::NetAddress& peer) const
   {
     miniros_msgs::MasterOffer offer;
     offer.master_port = static_cast<uint16_t>(rpcUrl.port ? rpcUrl.port : boundPort);
-    std::string ip = rpcUrl.host;
-    if (!isLiteralIp(ip)) {
-      ip.clear();
-      for (const std::string& localIp : localIps) {
-        auto addr = network::NetAddress::fromIp4String(localIp, 0);
-        if (addr.valid() && !addr.isLoopback()) {
-          ip = localIp;
-          break;
-        }
-      }
-    }
+    const std::string ip = localAddressToward(peer);
     std::string hostname;
     if (resolver)
       hostname = resolver->getHost();
     if (hostname.empty() && !isLiteralIp(rpcUrl.host))
       hostname = rpcUrl.host;
     offer.host = encodeOfferHost(ip, hostname);
+    if (!ip.empty()) {
+      MINIROS_DEBUG_NAMED("multimaster", "Advertising %s to %s", ip.c_str(), peer.str().c_str());
+    }
     return mm::serializePayload(offer, payload);
   }
 
@@ -849,7 +896,7 @@ void MultimasterManager::Internal::handleDiscover(const mm::Header& h, const uin
 Error MultimasterManager::Internal::sendOfferTo(const network::NetAddress& dest, bool viaDiscovery)
 {
   std::vector<uint8_t> payload;
-  if (Error e = buildLocalOfferPayload(payload); !e)
+  if (Error e = buildLocalOfferPayload(payload, dest); !e)
     return e;
   return sendOp(mm::Header::OP_OFFER, payload, dest, false, viaDiscovery);
 }

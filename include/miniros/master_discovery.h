@@ -51,13 +51,16 @@ struct MINIROS_DECL DiscoveryReport {
 
 /// Listens for nearby miniroscore instances on the discovery multicast group.
 ///
-/// This object does not create threads and does not talk to a master. The owner
-/// calls `update()` from its main thread; that call drains pending datagrams and
-/// returns what changed. All methods are used from that same thread.
+/// This object does not create threads. The owner calls `update()` from its main
+/// thread; that call drains pending datagrams and returns what changed. All methods
+/// are used from that same thread.
 ///
 /// The default group is `239.255.42.42:11312`, the same one `miniroscore` joins.
 /// Masters advertise with DISCOVER (about every 5s while unpaired, about every 30s
-/// while paired). This listener does not answer and does not pair.
+/// while paired). `update()` also sends a DISCOVER probe about every 3s, on the
+/// multicast group and on subnet broadcast, so a master can answer with a unicast
+/// OFFER. That reply is what arrives on Wi-Fi when the access point does not
+/// forward multicast. This listener does not answer probes and does not pair.
 ///
 /// On Android, multicast packets are dropped until Java code holds a
 /// `WifiManager.MulticastLock`. Acquire that lock before `start()`.
