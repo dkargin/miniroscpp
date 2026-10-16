@@ -1,7 +1,6 @@
 #include <cassert>
 #include <cmath>
 #include <errno.h>
-#include <sys/timeb.h>
 
 #include "miniros/xmlrpcpp/XmlRpcDispatch.h"
 #include "miniros/xmlrpcpp/XmlRpcSource.h"
