@@ -617,6 +617,11 @@ std::string formatBagInfoYaml(
 
 std::string BagInfoFormatter::format(Bag const& bag, BagInfoOptions const& opts)
 {
+    // Frequency needs every message stamp. Counts and the time span come from
+    // the chunk catalog, which open() already read.
+    if (opts.freq || opts.yaml)
+        bag.buildIndex();
+
     const bool indexed = !bag.connection_indexes_.empty() || !bag.chunks_.empty();
 
     if (!indexed) {

@@ -430,6 +430,7 @@ set(bag_storage_SRC
     rosbag_storage/stream.cpp
     rosbag_storage/uncompressed_stream.cpp
     rosbag_storage/view.cpp
+    rosbag_storage/unordered_view.cpp
 
     ${rosbag_SRC}
     rosbag_storage/no_encryptor.cpp
