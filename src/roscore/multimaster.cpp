@@ -15,17 +15,13 @@
 #include "node_ref.h"
 
 #include "miniros/network/url.h"
+#include "miniros/io/io.h"
 #include "miniros_msgs/MasterOffer.hxx"
 #include "miniros_msgs/MasterSync.hxx"
 
 #include <array>
 #include <map>
 #include <set>
-
-#include <arpa/inet.h>
-#include <netinet/in.h>
-#include <sys/socket.h>
-#include <unistd.h>
 
 namespace miniros {
 namespace master {
@@ -97,18 +93,18 @@ std::string localAddressToward(const network::NetAddress& peer)
   if (dest.port() <= 0)
     (void)dest.setPort(9);
 
-  const int fd = ::socket(AF_INET, SOCK_DGRAM, 0);
-  if (fd < 0)
+  socket_fd_t fd = ::socket(AF_INET, SOCK_DGRAM, 0);
+  if (fd == MINIROS_INVALID_SOCKET)
     return {};
   const int rc = ::connect(fd, static_cast<const sockaddr*>(dest.rawAddress()),
     static_cast<socklen_t>(dest.rawAddressSize()));
   sockaddr_in local{};
   socklen_t len = sizeof(local);
   if (rc != 0 || ::getsockname(fd, reinterpret_cast<sockaddr*>(&local), &len) != 0) {
-    ::close(fd);
+    close_socket(fd);
     return {};
   }
-  ::close(fd);
+  close_socket(fd);
 
   char text[INET_ADDRSTRLEN] = {};
   if (!inet_ntop(AF_INET, &local.sin_addr, text, sizeof(text)))
