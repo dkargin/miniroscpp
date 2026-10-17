@@ -6,7 +6,7 @@
 #include <set>
 #include <string_view>
 
-#include "master.h"
+#include "miniros/roscore/master.h"
 
 #include "registration_manager.h"
 #include "parameter_storage.h"

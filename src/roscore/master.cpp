@@ -4,7 +4,7 @@
 
 #include <cassert>
 
-#include "master.h"
+#include "miniros/roscore/master.h"
 #include "master_internal.h"
 #include "master_endpoints.h"
 

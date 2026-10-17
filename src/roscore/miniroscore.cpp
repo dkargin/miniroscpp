@@ -9,7 +9,7 @@
 #include <filesystem>
 #include <fstream>
 
-#include "master.h"
+#include "miniros/roscore/master.h"
 #include "rosout.h"
 
 #include "miniros/callback_queue.h"
