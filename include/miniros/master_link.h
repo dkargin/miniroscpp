@@ -73,7 +73,7 @@ public:
   using RpcValue = XmlRpc::XmlRpcValue;
 
   /// Init connection to rosmaster.
-  MINIROS_DECL Error initLink(const M_string& remappings, const std::shared_ptr<RPCManager>& rpcManager, bool local);
+  MINIROS_DECL Error initLink(const M_string& remappings, const std::shared_ptr<RPCManager>& rpcManager);
 
   /// Init rosparam part.
   MINIROS_DECL Error initParam(const M_string& remappings);

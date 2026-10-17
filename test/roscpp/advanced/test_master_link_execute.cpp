@@ -183,7 +183,7 @@ protected:
 
     M_string remaps;
     remaps["__master"] = "http://127.0.0.1:" + std::to_string(fake_.port());
-    ASSERT_EQ(link_.initLink(remaps, rpc_, /*local=*/false), Error::Ok);
+    ASSERT_EQ(link_.initLink(remaps, rpc_), Error::Ok);
   }
 
   void TearDown() override
@@ -265,7 +265,7 @@ TEST(MasterLinkExecuteNoPeer, ExecuteNoMaster)
   M_string remaps;
   // Nothing listens here.
   remaps["__master"] = "http://127.0.0.1:1";
-  ASSERT_EQ(link.initLink(remaps, rpc, /*local=*/false), Error::Ok);
+  ASSERT_EQ(link.initLink(remaps, rpc), Error::Ok);
   link.setRetryTimeout(WallDuration(0.5));
 
   RpcValue args, response, payload;

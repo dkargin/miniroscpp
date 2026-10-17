@@ -67,11 +67,10 @@ enum InitOption
    * Don't create the /clock subscriber.
    */
   NoSimTime = 1 << 3,
-
   /**
-   * Local RPC manager is also rosmaster. MasterLink will run only local requests.
+   * \brief Disables logging into a file.
    */
-  LocalMaster = 1 << 16,
+  NoFileLog = 1 << 16,
 };
 
 }
