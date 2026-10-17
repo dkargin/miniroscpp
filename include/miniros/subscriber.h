@@ -110,7 +110,8 @@ private:
     bool isValid() const;
 
     std::string topic_;
-    NodeHandlePtr node_handle_;
+    /// Manager captured at subscribe time. Empty means this handle is inactive.
+    TopicManagerPtr topic_manager_;
     SubscriptionCallbackHelperPtr helper_;
     bool unsubscribed_;
   };

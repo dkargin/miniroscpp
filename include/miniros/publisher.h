@@ -216,7 +216,8 @@ namespace miniros
       std::string topic_;
       std::string md5sum_;
       std::string datatype_;
-      NodeHandlePtr node_handle_;
+      /// Manager captured at advertise time. Empty means this handle is inactive.
+      TopicManagerPtr topic_manager_;
       SubscriberCallbacksPtr callbacks_;
       bool unadvertised_;
       bool latch_;

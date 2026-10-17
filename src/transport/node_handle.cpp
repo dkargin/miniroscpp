@@ -43,7 +43,7 @@
 #include "miniros/init.h"
 #include "miniros/xmlrpcpp/XmlRpc.h"
 
-#include <thread>
+#include <mutex>
 #include <sstream>
 
 namespace miniros
@@ -80,8 +80,12 @@ public:
 
 NodeHandle::NodeHandle(const std::string& ns, const M_string& remappings)
   : namespace_(this_node::getNamespace())
-  , callback_queue_(0)
-  , collection_(0)
+  , callback_queue_(nullptr)
+  , collection_(nullptr)
+  , ok_(false)
+  , topic_manager_(TopicManager::instance())
+  , service_manager_(ServiceManager::instance())
+  , master_link_(miniros::getMasterLink())
 {
   std::string tilde_resolved_ns;
   if (!ns.empty() && ns[0] == '~')// starts with tilde
@@ -95,7 +99,11 @@ NodeHandle::NodeHandle(const std::string& ns, const M_string& remappings)
 }
 
 NodeHandle::NodeHandle(const NodeHandle& parent, const std::string& ns)
-: collection_(0)
+: collection_(nullptr)
+, ok_(false)
+, topic_manager_(parent.topic_manager_)
+, service_manager_(parent.service_manager_)
+, master_link_(parent.master_link_)
 {
   namespace_ = parent.getNamespace();
   callback_queue_ = parent.callback_queue_;
@@ -107,7 +115,11 @@ NodeHandle::NodeHandle(const NodeHandle& parent, const std::string& ns)
 }
 
 NodeHandle::NodeHandle(const NodeHandle& parent, const std::string& ns, const M_string& remappings)
-: collection_(0)
+: collection_(nullptr)
+, ok_(false)
+, topic_manager_(parent.topic_manager_)
+, service_manager_(parent.service_manager_)
+, master_link_(parent.master_link_)
 {
   namespace_ = parent.getNamespace();
   callback_queue_ = parent.callback_queue_;
@@ -121,7 +133,11 @@ NodeHandle::NodeHandle(const NodeHandle& parent, const std::string& ns, const M_
 }
 
 NodeHandle::NodeHandle(const NodeHandle& rhs)
-: collection_(0)
+: collection_(nullptr)
+, ok_(false)
+, topic_manager_(rhs.topic_manager_)
+, service_manager_(rhs.service_manager_)
+, master_link_(rhs.master_link_)
 {
   callback_queue_ = rhs.callback_queue_;
   remappings_ = rhs.remappings_;
@@ -139,11 +155,17 @@ NodeHandle::~NodeHandle()
 
 NodeHandle& NodeHandle::operator=(const NodeHandle& rhs)
 {
+  if (this == &rhs)
+    return *this;
+
   MINIROS_ASSERT(collection_);
   namespace_ = rhs.namespace_;
   callback_queue_ = rhs.callback_queue_;
   remappings_ = rhs.remappings_;
   unresolved_remappings_ = rhs.unresolved_remappings_;
+  topic_manager_ = rhs.topic_manager_;
+  service_manager_ = rhs.service_manager_;
+  master_link_ = rhs.master_link_;
 
   return *this;
 }
@@ -932,16 +954,16 @@ bool NodeHandle::ok() const
 }
 
 TopicManagerPtr NodeHandle::getTopicManager() const {
-  return TopicManager::instance();
+  return topic_manager_;
 }
 
 ServiceManagerPtr NodeHandle::getServiceManager() const {
-  return ServiceManager::instance();
+  return service_manager_;
 }
 
 MasterLinkPtr NodeHandle::getMasterLink() const
 {
-  return TopicManager::instance()->getMasterLink();
+  return master_link_;
 }
 
 } // namespace miniros

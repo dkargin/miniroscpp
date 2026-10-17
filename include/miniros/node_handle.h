@@ -2253,6 +2253,10 @@ private:
   NodeHandleBackingCollection* collection_;
 
   bool ok_;
+
+  TopicManagerPtr topic_manager_;
+  ServiceManagerPtr service_manager_;
+  MasterLinkPtr master_link_;
 };
 
 }
