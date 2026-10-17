@@ -534,12 +534,14 @@ void init(const M_string& remappings, const std::string& name, uint32_t options)
     rpcManager->setPollSet(&pm->getPollSet());
 
     g_master_link.reset(new MasterLink());
-    bool local = options & init_options::LocalMaster;
-    g_master_link->initLink(remappings, rpcManager, local);
+    g_master_link->initLink(remappings, rpcManager);
 
     // names:: namespace is initialized by this_node
     this_node::init(name, remappings, options);
-    file_log::init(remappings);
+    if (!(options & init_options::NoFileLog))
+    {
+      file_log::init(remappings);
+    }
     g_master_link->initParam(remappings);
 
     g_initialized = true;

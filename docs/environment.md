@@ -46,6 +46,8 @@ Some parameters can be set through remappings to `miniros::init(...)`
 
 **__rpc_server_port** - port for XMLRPC API.
 
+**__local_master** - set to `1` so `MasterLink` calls the in-process RPC manager instead of a remote master. `miniroscore` sets this. A normal node leaves it unset and uses `__master`.
+
 # Parameters #
 
 Some rosparam settings can also be used to alter behaviour of ROS/MiniROS nodes:

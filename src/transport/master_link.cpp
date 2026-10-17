@@ -88,11 +88,13 @@ MasterLink::~MasterLink()
   }
 }
 
-Error MasterLink::initLink(const M_string& remappings, const std::shared_ptr<RPCManager>& rpcManager, bool local)
+Error MasterLink::initLink(const M_string& remappings, const std::shared_ptr<RPCManager>& rpcManager)
 {
   if (!internal_)
     return Error::InternalError;
 
+  const auto localIt = remappings.find("__local_master");
+  const bool local = localIt != remappings.end() && localIt->second == "1";
   if (local) {
     internal_->localMaster = true;
     internal_->uri = rpcManager->getServerUrlStr();
