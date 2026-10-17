@@ -44,19 +44,17 @@ Publisher::Impl::~Impl()
 
 bool Publisher::Impl::isValid() const
 {
-  return !unadvertised_;
+  return topic_manager_ && !unadvertised_;
 }
 
 void Publisher::Impl::unadvertise()
 {
-  if (!unadvertised_)
-  {
-    unadvertised_ = true;
-    TopicManagerPtr tm = node_handle_->getTopicManager();
-    if (tm)
-      tm->unadvertise(topic_, callbacks_);
-    node_handle_.reset();
-  }
+  if (unadvertised_)
+    return;
+  unadvertised_ = true;
+  TopicManagerPtr tm = std::move(topic_manager_);
+  if (tm)
+    tm->unadvertise(topic_, callbacks_);
 }
 
 void Publisher::Impl::pushLastMessage(const SubscriberLinkPtr& sub_link)
@@ -76,7 +74,7 @@ Publisher::Publisher(const std::string& topic, const std::string& md5sum, const 
   impl_->md5sum_ = md5sum;
   impl_->datatype_ = datatype;
   impl_->latch_ = latch;
-  impl_->node_handle_ = std::make_shared<NodeHandle>(node_handle);
+  impl_->topic_manager_ = node_handle.getTopicManager();
   impl_->callbacks_ = callbacks;
 }
 
@@ -104,7 +102,7 @@ bool Publisher::isValid() const {
 TopicManagerPtr Publisher::getTopicManager() const {
   if (!impl_)
     return nullptr;
-  return impl_->node_handle_? impl_->node_handle_->getTopicManager() : TopicManager::instance();
+  return impl_->topic_manager_;
 }
 
 void Publisher::publishImpl(const std::function<SerializedMessage(void)>& serfunc, SerializedMessage& m) const

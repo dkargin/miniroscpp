@@ -45,17 +45,18 @@ Subscriber::Impl::~Impl()
 
 bool Subscriber::Impl::isValid() const
 {
-  return !unsubscribed_;
+  return topic_manager_ && !unsubscribed_;
 }
 
 void Subscriber::Impl::unsubscribe()
 {
-  if (!unsubscribed_) {
-    unsubscribed_ = true;
-    TopicManager::instance()->unsubscribe(topic_, helper_);
-    node_handle_.reset();
-    helper_.reset();
-  }
+  if (unsubscribed_)
+    return;
+  unsubscribed_ = true;
+  TopicManagerPtr tm = std::move(topic_manager_);
+  if (tm)
+    tm->unsubscribe(topic_, helper_);
+  helper_.reset();
 }
 
 Subscriber::Subscriber(const std::string& topic, const NodeHandle& node_handle,
@@ -63,7 +64,7 @@ Subscriber::Subscriber(const std::string& topic, const NodeHandle& node_handle,
   : impl_(std::make_shared<Impl>())
 {
   impl_->topic_ = topic;
-  impl_->node_handle_ = std::make_shared<NodeHandle>(node_handle);
+  impl_->topic_manager_ = node_handle.getTopicManager();
   impl_->helper_ = helper;
 }
 
@@ -101,7 +102,7 @@ std::string Subscriber::getTopic() const
 uint32_t Subscriber::getNumPublishers() const
 {
   if (impl_ && impl_->isValid()) {
-    return static_cast<uint32_t>(TopicManager::instance()->getNumPublishers(impl_->topic_));
+    return static_cast<uint32_t>(impl_->topic_manager_->getNumPublishers(impl_->topic_));
   }
 
   return 0;
@@ -110,7 +111,7 @@ uint32_t Subscriber::getNumPublishers() const
 int Subscriber::getQueueLength() const
 {
   if (impl_ && impl_->isValid() && impl_->helper_) {
-    return TopicManager::instance()->getSubscriptionQueueLength(impl_->topic_, impl_->helper_);
+    return impl_->topic_manager_->getSubscriptionQueueLength(impl_->topic_, impl_->helper_);
   }
 
   return 0;
