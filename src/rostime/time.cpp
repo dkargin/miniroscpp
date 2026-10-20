@@ -239,7 +239,9 @@ namespace miniros
     std::this_thread::sleep_for(std::chrono::nanoseconds(static_cast<int64_t>(sec * 1e9 + nsec)));
     return 0;
 #else
-    timespec req = { sec, nsec };
+    timespec req{};
+    req.tv_sec = static_cast<time_t>(sec);
+    req.tv_nsec = static_cast<decltype(req.tv_nsec)>(nsec);
     return nanosleep(&req, NULL);
 #endif
   }
@@ -254,7 +256,9 @@ namespace miniros
 #if defined(_WIN32)
     MINIROS_nanosleep(sec,nsec);
 #else
-    timespec req = { sec, nsec };
+    timespec req{};
+    req.tv_sec = static_cast<time_t>(sec);
+    req.tv_nsec = static_cast<decltype(req.tv_nsec)>(nsec);
     timespec rem = {0, 0};
     while (nanosleep(&req, &rem) && !g_stopped)
       {
