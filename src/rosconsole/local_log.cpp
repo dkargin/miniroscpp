@@ -6,6 +6,8 @@
 
 #include "miniros/rosconsole/local_log.h"
 
+#include "console_impl.h"
+
 #include <cstring>
 
 namespace miniros {
@@ -36,7 +38,11 @@ void InternalLog::print(const console::LogLocation& loc, const char* channel,
 
   buf[written] = 0;
 
-  ::miniros::console::backend::print(0, loc.level_, buf, file, function, line);
+  void* handle = nullptr;
+  if (channel && channel[0]) {
+    handle = ::miniros::console::impl::getHandle(channel);
+  }
+  ::miniros::console::backend::print(handle, loc.level_, buf, file, function, line);
 }
 }
 }

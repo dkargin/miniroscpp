@@ -52,6 +52,10 @@
 #include <map>
 #include <regex>
 
+#ifdef __ANDROID__
+#include <android/log.h>
+#endif
+
 
 /// @cond IGNORE
 
@@ -150,6 +154,19 @@ static const char* LogLevelString[4] = {"Debug:   ", "Info:    ", "Warning: ", "
 
 void miniros_console_bridge::OutputHandlerSTD::log(const std::string &text, LogLevel level, const char *filename, int line)
 {
+#ifdef __ANDROID__
+    android_LogPriority priority = ANDROID_LOG_INFO;
+    switch (level)
+    {
+    case CONSOLE_BRIDGE_LOG_DEBUG: priority = ANDROID_LOG_DEBUG; break;
+    case CONSOLE_BRIDGE_LOG_INFO: priority = ANDROID_LOG_INFO; break;
+    case CONSOLE_BRIDGE_LOG_WARN: priority = ANDROID_LOG_WARN; break;
+    case CONSOLE_BRIDGE_LOG_ERROR: priority = ANDROID_LOG_ERROR; break;
+    default: break;
+    }
+    __android_log_print(priority, "miniros", "%s (%s:%d)", text.c_str(), filename ? filename : "", line);
+    return;
+#else
     if (level >= CONSOLE_BRIDGE_LOG_WARN)
     {
         std::cerr << LogLevelString[level] << text << std::endl;
@@ -161,6 +178,7 @@ void miniros_console_bridge::OutputHandlerSTD::log(const std::string &text, LogL
         std::cout << LogLevelString[level] << text << std::endl;
         std::cout.flush();
     }
+#endif
 }
 
 miniros_console_bridge::OutputHandlerFile::OutputHandlerFile(const char *filename) : OutputHandler()
@@ -562,6 +580,22 @@ void Formatter::init(const char* fmt)
 
 void Formatter::print(void* logger_handle, Level level, const char* str, const char* file, const char* function, int line)
 {
+#ifdef __ANDROID__
+  android_LogPriority priority = ANDROID_LOG_INFO;
+  switch (level)
+  {
+  case Level::Debug: priority = ANDROID_LOG_DEBUG; break;
+  case Level::Info: priority = ANDROID_LOG_INFO; break;
+  case Level::Warn: priority = ANDROID_LOG_WARN; break;
+  case Level::Error: priority = ANDROID_LOG_ERROR; break;
+  case Level::Fatal: priority = ANDROID_LOG_FATAL; break;
+  case Level::Count: break;
+  }
+  const std::string text = getTokenStrings(logger_handle, level, str, file, function, line);
+  const std::string name = logger_handle ? impl::getName(logger_handle) : std::string();
+  __android_log_write(priority, name.empty() ? "miniros" : name.c_str(), text.c_str());
+  return;
+#else
   // print in red to stderr if level doesn't match any of the predefined ones
   const char* color = COLOR_RED;
   FILE* f = stderr;
@@ -611,6 +645,7 @@ void Formatter::print(void* logger_handle, Level level, const char* str, const c
       fprintf(stderr, "Error: failed to perform fflush on stdout, fflush return code is %d\n", flush_result);
     }
   }
+#endif
 }
 
 std::string Formatter::getTokenStrings(void *logger_handle, Level level,

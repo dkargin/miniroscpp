@@ -92,7 +92,7 @@ void initialize()
 
 void print(void* handle, Level level, const char* str, const char* file, const char* function, int line)
 {
-  ::miniros::console::backend::print(0, level, str, file, function, line);
+  ::miniros::console::backend::print(handle, level, str, file, function, line);
   LogAppender* appender = nullptr;
   {
     std::lock_guard<std::mutex> lock(g_loggerConfig.mutex);
