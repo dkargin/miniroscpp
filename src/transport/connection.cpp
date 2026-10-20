@@ -38,6 +38,8 @@
 #include "miniros/transport/transport.h"
 #include "miniros/rosassert.h"
 
+#include <cinttypes>
+
 #include <sstream>
 #include <cstring>
 
@@ -165,7 +167,7 @@ void Connection::readTransport()
 
     MINIROS_ASSERT((int32_t)read_size_ >= 0);
     MINIROS_ASSERT((int32_t)read_filled_ >= 0);
-    MINIROS_ASSERT_MSG(read_filled_ <= read_size_, "read_filled_ = %lu, read_size_ = %lu", read_filled_, read_size_);
+    MINIROS_ASSERT_MSG(read_filled_ <= read_size_, "read_filled_ = %" PRIu64 ", read_size_ = %" PRIu64, read_filled_, read_size_);
 
     if (read_filled_ == read_size_ && !dropped_)
     {
