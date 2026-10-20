@@ -374,7 +374,8 @@ if(MINIROS_TARGET_WINDOWS)
   set(PLATFORM_LIBS wsock32 ws2_32)
 elseif(ANDROID)
   # NDK uses libc++; std::filesystem is in the C++ runtime (no libstdc++fs).
-  set(PLATFORM_LIBS)
+  # liblog is the logcat backend used by miniros::console on Android.
+  set(PLATFORM_LIBS log)
 else()
   set(PLATFORM_LIBS stdc++fs)
 endif()
@@ -387,7 +388,7 @@ target_link_libraries(roscxx PRIVATE
 
 # Winsock must be PUBLIC so dependents that call htons/socket APIs can link.
 # stdc++fs stays PRIVATE (implementation detail).
-if(MINIROS_TARGET_WINDOWS)
+if(MINIROS_TARGET_WINDOWS OR ANDROID)
   target_link_libraries(roscxx PUBLIC ${PLATFORM_LIBS})
 elseif(PLATFORM_LIBS)
   target_link_libraries(roscxx PRIVATE ${PLATFORM_LIBS})
