@@ -13,6 +13,7 @@
 #include "master_handler.h"
 #include "master_cache.h"
 #include "multimaster.h"
+#include "http_proxy.h"
 
 #include "miniros/rostime.h"
 
@@ -75,6 +76,12 @@ struct Master::Internal {
 
   /// Multimaster discovery + registration sync over UDP.
   std::unique_ptr<MultimasterManager> multimaster;
+
+  /// Reverse proxy for `/p/{node}/...`.
+  std::shared_ptr<HttpProxyHub> httpProxy;
+
+  /// When false, `/p/` is closed and rpc2EnableHttpProxy is rejected.
+  bool httpProxyEnabled = false;
 
   /// When false, Master::start() does not bind multimaster UDP sockets.
   bool multimasterEnabled = true;
@@ -162,6 +169,9 @@ struct Master::Internal {
 
   /// Rewrite node/service URIs in a local multimaster delta using learned IPs.
   void announceMultimasterChange(miniros_msgs::RegistrationRecord rec);
+
+  /// Publish or withdraw this node's HTTP proxy prefixes. Local nodes only.
+  void announceHttpProxy(const std::shared_ptr<NodeRef>& node, bool enabled);
 
   /// Apply inbound multimaster registration records from a peer.
   void applyMultimasterRecords(const UUID& peer, const std::vector<miniros_msgs::RegistrationRecord>& records, bool snapshot);

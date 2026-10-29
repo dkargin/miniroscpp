@@ -24,6 +24,9 @@ target_include_directories(${TEST_GROUP}-test_json_serialization PRIVATE
   ${MINIROS_INCLUDE_GENERATED_DIRS}
   ${MINIROS_GENERATED_INCLUDE_DIRS})
 miniros_add_test(${TEST_GROUP}-test_http SOURCES test_http.cpp)
+miniros_add_test(${TEST_GROUP}-test_http_proxy SOURCES test_http_proxy.cpp)
+target_include_directories(${TEST_GROUP}-test_http_proxy PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/../../../src/roscore)
 miniros_add_test(${TEST_GROUP}-test_net SOURCES test_net.cpp)
 if(WIN32)
   target_link_libraries(${TEST_GROUP}-test_net ws2_32)
