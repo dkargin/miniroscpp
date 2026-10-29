@@ -74,14 +74,8 @@ std::string nodeKey(const std::string& id)
 bool headerHasUpgrade(const http::HttpParserFrame& frame)
 {
   for (const auto& field : frame.fields) {
-    if (field.name.size() == 7) {
-      const char* n = field.name.c_str();
-      if ((n[0] == 'U' || n[0] == 'u') && (n[1] == 'P' || n[1] == 'p') &&
-          (n[2] == 'G' || n[2] == 'g') && (n[3] == 'R' || n[3] == 'r') &&
-          (n[4] == 'A' || n[4] == 'a') && (n[5] == 'D' || n[5] == 'd') &&
-          (n[6] == 'E' || n[6] == 'e'))
-        return true;
-    }
+    if (http::HttpParserFrame::nameEquals(field.name, "Upgrade"))
+      return true;
   }
   return false;
 }

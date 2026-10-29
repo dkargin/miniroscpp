@@ -15,7 +15,7 @@
 #include <unistd.h>
 #include <poll.h>
 
-#include "master.h"
+#include "miniros/roscore/master.h"
 
 #include "miniros/common.h"
 #include "miniros/io/io.h"

@@ -143,8 +143,12 @@ struct MINIROS_DECL HttpParserFrame {
   /// Content type of request or response.
   Token contentType;
 
-  /// Contains all unspecialized request fields.
+  /// Every header field, in arrival order. Content-Length, Content-Type, and
+  /// Connection are included here and also mirrored into the members above.
   std::vector<Field> fields;
+
+  /// ASCII case-insensitive equality.
+  static bool nameEquals(std::string_view a, std::string_view b);
 
   /// Get a pointer to HTTP version part.
   std::string_view getProtocolName() const
@@ -212,6 +216,11 @@ struct MINIROS_DECL HttpParserFrame {
 
   /// Get reference to body of request.
   std::string_view body() const;
+
+  /// Bytes already read past the header. Valid once hasHeader() is true.
+  /// Unlike body(), this includes a partial body and bytes that arrived when
+  /// Content-Length is absent.
+  std::string_view pastHeader() const;
 
   bool keepAlive() const;
 
