@@ -73,9 +73,19 @@ public:
   /// Get number of connections.
   size_t getConnectionsCount() const;
 
-  /// `/p/...` requests are handed to @p acceptor once headers are complete.
-  /// The pointer is not owned. Pass nullptr to disable.
-  void setHttpProxyAcceptor(HttpProxyAcceptor* acceptor);
+  /// Hand requests under @p pathPrefix to @p acceptor once their headers are complete.
+  /// @p pathPrefix is copied. It is an absolute path without a trailing slash.
+  ///
+  /// The pointer is not owned. @p acceptor must stay alive while it is installed,
+  /// including during acceptHttpProxy on the poll thread. That call may use this
+  /// HttpServer. Pass nullptr before destroying the acceptor, and clear it before
+  /// this HttpServer is destroyed. stop() does not clear it.
+  /// A null acceptor or an empty prefix disables the handoff.
+  void setHttpProxyAcceptor(HttpProxyAcceptor* acceptor, const std::string& pathPrefix);
+
+  /// True when a request path should be detached for the installed proxy acceptor.
+  /// Takes the server lifetime lock.
+  bool matchesHttpProxy(std::string_view path) const;
 
 protected:
   friend class HttpServerConnection;
@@ -84,8 +94,12 @@ protected:
   void onConnectionClosed(std::unique_lock<std::mutex>& /*lock*/,
     const std::shared_ptr<HttpServerConnection>& connection, bool upgrade, const std::string& reason);
 
-  /// Hand a `/p/...` socket to the installed acceptor. False if nobody took it.
+  /// Hand a proxy-prefix socket to the installed acceptor. False if nobody took it.
+  /// Caller holds the server lifetime lock.
   bool offerHttpProxy(const HttpParserFrame& frame, const std::shared_ptr<network::NetSocket>& client);
+
+  /// Same test as matchesHttpProxy. Caller holds the server lifetime lock.
+  bool proxyPrefixMatches(std::string_view path) const;
 
   /// Creates HTTP connection.
   /// This method is virtual to be able to override it in tests.

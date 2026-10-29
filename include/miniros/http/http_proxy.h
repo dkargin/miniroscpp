@@ -1,6 +1,5 @@
 //
-// Reverse HTTP proxy tunnel. Websocket upgrade is intentionally rejected
-// until a later pass. The splice never blocks the poll thread.
+// Reverse HTTP proxy tunnel. The splice never blocks the poll thread.
 //
 
 #ifndef MINIROS_HTTP_PROXY_H
@@ -25,14 +24,13 @@ namespace http {
 
 struct HttpParserFrame;
 
-/// True for `/p` and `/p/...`. Other paths stay on the normal HTTP server.
-inline bool isHttpProxyPath(std::string_view path)
-{
-  return path == "/p" || (path.size() > 2 && path[0] == '/' && path[1] == 'p' && path[2] == '/');
-}
+/// True when @p path is exactly @p prefix, or continues with another segment.
+/// @p prefix is an absolute path chosen by the application, without a trailing slash.
+/// An empty prefix matches nothing.
+bool isHttpProxyPath(std::string_view path, std::string_view prefix);
 
-/// Installed by the master on its HttpServer. Called on the poll thread once
-/// request headers for `/p/...` are complete, before the body is buffered.
+/// Installed on an HttpServer. Called on the poll thread once request headers
+/// for the configured prefix are complete, before the body is buffered.
 class HttpProxyAcceptor {
 public:
   virtual ~HttpProxyAcceptor() = default;
@@ -43,13 +41,13 @@ public:
     const std::shared_ptr<network::NetSocket>& client) = 0;
 };
 
-/// Where one accepted `/p/{node}` request is forwarded.
+/// Where one accepted proxy request is forwarded.
 struct HttpProxyTarget {
   network::NetAddress address;
   /// Literal host used in Host and in Location rewriting. No DNS.
   std::string host;
   int port = 0;
-  /// `/p/camera/grabber`
+  /// Public path that replaces this node, for example `/p/camera/grabber`.
   std::string publicPrefix;
   /// Path on the node, always starts with `/`.
   std::string path;
@@ -57,6 +55,11 @@ struct HttpProxyTarget {
   std::string query;
   /// Request Content-Length, or -1 when the request has no body.
   int64_t contentLength = -1;
+  /// Keep the connection and splice raw bytes in both directions once the
+  /// upstream switches protocols (HTTP 101 today). Do not force
+  /// `Connection: close`, and forward `Upgrade` and `Connection`.
+  /// WebSocket is the first caller. RTSP interleaved over TCP can use the same relay.
+  bool byteStream = false;
 };
 
 /// One client socket spliced to one upstream socket.

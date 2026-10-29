@@ -127,22 +127,36 @@ network::NetAddress dialAddressForHost(const std::string& host, int port, bool a
   return network::NetAddress::fromString(network::NetAddress::AddressUnspecified, host, port);
 }
 
-HttpProxyHub::HttpProxyHub(RegistrationManager* registrations)
+HttpProxyHub::HttpProxyHub(RegistrationManager* registrations, std::string mount)
   : registrations_(registrations)
+  , mount_(std::move(mount))
 {
+  while (!mount_.empty() && mount_.back() == '/')
+    mount_.pop_back();
+}
+
+std::string HttpProxyHub::publicPrefix(const std::string& nodeId) const
+{
+  std::string key = nodeId;
+  if (!key.empty() && key.front() == '/')
+    key.erase(key.begin());
+  std::string prefix = mount_;
+  prefix.push_back('/');
+  prefix += key;
+  return prefix;
 }
 
 void HttpProxyHub::attach(http::HttpServer* server)
 {
   server_ = server;
   if (server_)
-    server_->setHttpProxyAcceptor(this);
+    server_->setHttpProxyAcceptor(this, mount_);
 }
 
 void HttpProxyHub::detach()
 {
   if (server_)
-    server_->setHttpProxyAcceptor(nullptr);
+    server_->setHttpProxyAcceptor(nullptr, {});
   server_ = nullptr;
   closeAll();
 }
@@ -199,11 +213,17 @@ bool HttpProxyHub::acceptHttpProxy(const http::HttpParserFrame& frame,
   }
 
   const std::string_view path = frame.getPath();
-  if (!http::isHttpProxyPath(path) || path.size() < 4) {
+  if (!http::isHttpProxyPath(path, mount_)) {
     http::writeHttpStatusAndClose(client, 404, "Not Found");
     return true;
   }
-  const std::string_view rest = path.substr(3);
+  std::string_view rest = path.substr(mount_.size());
+  if (!rest.empty() && rest.front() == '/')
+    rest.remove_prefix(1);
+  if (rest.empty()) {
+    http::writeHttpStatusAndClose(client, 404, "Not Found");
+    return true;
+  }
   if (badSegment(rest)) {
     http::writeHttpStatusAndClose(client, 400, "Bad Request");
     return true;
@@ -250,7 +270,7 @@ bool HttpProxyHub::acceptHttpProxy(const http::HttpParserFrame& frame,
   target.address = best->httpProxyDial();
   target.host = target.address.address;
   target.port = target.address.port();
-  target.publicPrefix = "/p/" + nodeKey(best->id());
+  target.publicPrefix = publicPrefix(best->id());
   target.path = remainder;
   target.query = std::string(frame.getQuery());
   target.contentLength = mayHaveBody ? frame.contentLength() : -1;

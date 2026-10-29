@@ -26,6 +26,7 @@ class TopicInfoEndpoint;
 class PublishedTopicsEndpoint;
 class SettingsEndpoint;
 class NodeUriEndpoint;
+class HttpProxyEndpoint;
 class TopicTypesEndpoint;
 class MultimasterApiEndpoint;
 class DebugApiEndpoint;
@@ -61,6 +62,9 @@ struct Master::Internal {
 
   /// Endpoint for accessing /api2/node_uri
   std::shared_ptr<NodeUriEndpoint> httpNodeUriEndpoint;
+
+  /// Temporary GET /api2/http_proxy?node=<name> for proxy prefixes.
+  std::shared_ptr<HttpProxyEndpoint> httpProxyEndpoint;
 
   /// Endpoint for accessing /api2/topic_types
   std::shared_ptr<TopicTypesEndpoint> httpTopicTypesEndpoint;
@@ -169,9 +173,6 @@ struct Master::Internal {
 
   /// Rewrite node/service URIs in a local multimaster delta using learned IPs.
   void announceMultimasterChange(miniros_msgs::RegistrationRecord rec);
-
-  /// Publish or withdraw this node's HTTP proxy prefixes. Local nodes only.
-  void announceHttpProxy(const std::shared_ptr<NodeRef>& node, bool enabled);
 
   /// Apply inbound multimaster registration records from a peer.
   void applyMultimasterRecords(const UUID& peer, const std::vector<miniros_msgs::RegistrationRecord>& records, bool snapshot);

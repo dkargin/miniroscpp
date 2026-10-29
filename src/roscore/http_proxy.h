@@ -1,5 +1,5 @@
 //
-// Master's HTTP reverse-proxy route table and `/p/` acceptor.
+// Master's HTTP reverse-proxy route table. The URL mount is chosen by the caller.
 //
 
 #ifndef MINIROS_ROSCORE_HTTP_PROXY_H
@@ -27,13 +27,21 @@ class RegistrationManager;
 class HttpProxyHub : public http::HttpProxyAcceptor,
                        public std::enable_shared_from_this<HttpProxyHub> {
 public:
-  explicit HttpProxyHub(RegistrationManager* registrations);
+  /// @p mount is an absolute path with no trailing slash, for example `/p`.
+  /// It is fixed for the life of the hub. An empty mount matches nothing.
+  HttpProxyHub(RegistrationManager* registrations, std::string mount);
 
   void attach(http::HttpServer* server);
   void detach();
 
   void setEnabled(bool enabled);
   bool enabled() const;
+
+  /// The mount passed to the constructor, without a trailing slash.
+  const std::string& mount() const { return mount_; }
+
+  /// Public path for one node, for example `/p/camera`. @p nodeId may start with `/`.
+  std::string publicPrefix(const std::string& nodeId) const;
 
   bool acceptHttpProxy(const http::HttpParserFrame& frame,
     const std::shared_ptr<network::NetSocket>& client) override;
@@ -59,6 +67,7 @@ private:
 
   RegistrationManager* registrations_ = nullptr;
   http::HttpServer* server_ = nullptr;
+  std::string mount_;
   bool enabled_ = true;
 
   mutable std::mutex mu_;

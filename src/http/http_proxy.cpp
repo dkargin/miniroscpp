@@ -25,6 +25,22 @@
 
 namespace miniros {
 namespace http {
+
+bool isHttpProxyPath(std::string_view path, std::string_view prefix)
+{
+  if (prefix.empty() || prefix.front() != '/')
+    return false;
+  if (prefix.back() == '/')
+    prefix.remove_suffix(1);
+  if (prefix.empty() || path.empty())
+    return false;
+  if (path == prefix)
+    return true;
+  return path.size() > prefix.size()
+    && path.compare(0, prefix.size(), prefix) == 0
+    && path[prefix.size()] == '/';
+}
+
 namespace {
 
 std::string lowerCopy(std::string_view in)
@@ -81,6 +97,28 @@ bool isHopByHop(std::string_view name)
     || lower == "host" || lower == "content-length";
 }
 
+/// A byte-stream request must deliver Upgrade and Connection. Other hop-by-hop fields still drop.
+bool dropRequestHeader(std::string_view name, bool byteStream)
+{
+  if (byteStream) {
+    const std::string lower = lowerCopy(name);
+    if (lower == "upgrade" || lower == "connection")
+      return false;
+  }
+  return isHopByHop(name);
+}
+
+int responseStatusCode(std::string_view line)
+{
+  const auto sp = line.find(' ');
+  if (sp == std::string_view::npos)
+    return 0;
+  int code = 0;
+  for (size_t i = sp + 1; i < line.size() && line[i] >= '0' && line[i] <= '9'; ++i)
+    code = code * 10 + (line[i] - '0');
+  return code;
+}
+
 /// Rewrite an upstream Location into the public `/p/{node}` prefix.
 std::string rewriteLocation(std::string_view value, const std::string& publicPrefix,
   const std::string& upstreamHost, int upstreamPort)
@@ -115,6 +153,8 @@ struct ResponseHead {
   std::string bytes;
   /// -1: read until EOF. >= 0: that many body bytes remain, including bytes already past the head.
   int64_t bodyLeft = -1;
+  /// Upstream switched protocols. The following bytes are a raw bidirectional stream.
+  bool switching = false;
 };
 
 ResponseHead rewriteResponseHead(std::string_view raw, const HttpProxyTarget& target)
@@ -126,6 +166,7 @@ ResponseHead rewriteResponseHead(std::string_view raw, const HttpProxyTarget& ta
   bool sawConnection = false;
   bool chunked = false;
   bool sawLength = false;
+  bool switching = false;
   int64_t length = -1;
 
   size_t lineStart = 0;
@@ -135,6 +176,7 @@ ResponseHead rewriteResponseHead(std::string_view raw, const HttpProxyTarget& ta
       lineEnd = raw.size();
     const std::string_view line = raw.substr(lineStart, lineEnd - lineStart);
     if (first) {
+      switching = target.byteStream && responseStatusCode(line) == 101;
       rebuilt.append(line);
       rebuilt.append("\r\n");
       first = false;
@@ -145,7 +187,10 @@ ResponseHead rewriteResponseHead(std::string_view raw, const HttpProxyTarget& ta
         rebuilt.append(rewritten);
         rebuilt.append("\r\n");
       } else if (headerNameIs(line, "Connection")) {
-        rebuilt.append("Connection: close\r\n");
+        if (switching)
+          rebuilt.append(line.begin(), line.end()).append("\r\n");
+        else
+          rebuilt.append("Connection: close\r\n");
         sawConnection = true;
       } else if (headerNameIs(line, "Content-Length")) {
         length = std::atoll(std::string(headerValue(line)).c_str());
@@ -167,10 +212,11 @@ ResponseHead rewriteResponseHead(std::string_view raw, const HttpProxyTarget& ta
     lineStart = lineEnd + 2;
   }
   if (!sawConnection)
-    rebuilt.append("Connection: close\r\n");
+    rebuilt.append(switching ? "Connection: Upgrade\r\n" : "Connection: close\r\n");
   rebuilt.append("\r\n");
   out.bytes = std::move(rebuilt);
-  if (chunked || !sawLength)
+  out.switching = switching;
+  if (switching || chunked || !sawLength)
     out.bodyLeft = -1;
   else
     out.bodyLeft = length < 0 ? 0 : length;
@@ -196,7 +242,7 @@ std::string buildRequestHead(const HttpParserFrame& frame, const HttpProxyTarget
   head += "\r\n";
 
   for (const auto& field : frame.fields) {
-    if (isHopByHop(field.name))
+    if (dropRequestHeader(field.name, target.byteStream))
       continue;
     head += field.name;
     head += ": ";
@@ -215,7 +261,10 @@ std::string buildRequestHead(const HttpParserFrame& frame, const HttpProxyTarget
   }
   head += "X-Forwarded-Proto: http\r\nX-Forwarded-Prefix: ";
   head += target.publicPrefix;
-  head += "\r\nConnection: close\r\n\r\n";
+  head += "\r\n";
+  if (!target.byteStream)
+    head += "Connection: close\r\n";
+  head += "\r\n";
   return head;
 }
 

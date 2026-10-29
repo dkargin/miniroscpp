@@ -49,7 +49,7 @@ Master::Internal::Internal(const std::shared_ptr<RPCManager>& manager)
   resolver.scanAdapters();
   cache.bind(&regManager, &handler);
   multimaster = std::make_unique<MultimasterManager>(&resolver, &regManager);
-  httpProxy = std::make_shared<HttpProxyHub>(&regManager);
+  httpProxy = std::make_shared<HttpProxyHub>(&regManager, "/p");
   cache.setPeerPersistence(
     [this]() { return multimaster ? multimaster->collectCachedPeers() : std::vector<CachedPeer>{}; },
     [this](const std::vector<CachedPeer>& peers) {
@@ -256,6 +256,7 @@ void Master::setupBindings(const std::shared_ptr<CallbackQueue>& cb)
     internal_->httpPublishedTopicsEndpoint.reset(new PublishedTopicsEndpoint(internal_.get()));
     internal_->httpSettingsEndpoint.reset(new SettingsEndpoint(internal_.get(), false));
     internal_->httpNodeUriEndpoint.reset(new NodeUriEndpoint(internal_.get()));
+    internal_->httpProxyEndpoint.reset(new HttpProxyEndpoint(internal_.get()));
     internal_->httpTopicTypesEndpoint.reset(new TopicTypesEndpoint(internal_.get()));
     internal_->httpMultimasterApiEndpoint.reset(new MultimasterApiEndpoint(internal_.get()));
     internal_->httpLogEndpoint.reset(new MasterLogEndpoint(internal_.get()));
@@ -274,6 +275,8 @@ void Master::setupBindings(const std::shared_ptr<CallbackQueue>& cb)
       internal_->httpSettingsEndpoint, cb);
     server->registerEndpoint(std::make_unique<http::SimpleFilter>(http::HttpMethod::Get, "/api2/node_uri"),
       internal_->httpNodeUriEndpoint, cb);
+    server->registerEndpoint(std::make_unique<http::SimpleFilter>(http::HttpMethod::Get, "/api2/http_proxy"),
+      internal_->httpProxyEndpoint, cb);
     server->registerEndpoint(std::make_unique<http::SimpleFilter>(http::HttpMethod::Get, "/api2/topic_types"),
       internal_->httpTopicTypesEndpoint, cb);
     server->registerEndpoint(
@@ -472,8 +475,6 @@ void Master::Internal::shutdownNode(const std::shared_ptr<NodeRef>& node, const 
   }
 
   regManager.dropRegistrations(*node);
-  if (!(node->getNodeFlags() & NodeRef::NODE_FOREIGN) && node->hasHttpProxy())
-    announceHttpProxy(node, false);
   node->clear();
 
   // Tell remaining subscribers that publishers for these topics have changed.
@@ -878,33 +879,6 @@ bool validHttpProxyPrefix(const std::string& prefix)
   return true;
 }
 
-std::string joinHttpProxyPrefixes(const std::vector<std::string>& prefixes)
-{
-  std::string out;
-  for (size_t i = 0; i < prefixes.size(); ++i) {
-    if (i)
-      out.push_back('\n');
-    out += prefixes[i];
-  }
-  return out;
-}
-
-std::vector<std::string> splitHttpProxyPrefixes(const std::string& blob)
-{
-  std::vector<std::string> out;
-  size_t start = 0;
-  while (start <= blob.size()) {
-    const size_t nl = blob.find('\n', start);
-    const size_t end = nl == std::string::npos ? blob.size() : nl;
-    if (end > start)
-      out.emplace_back(blob.substr(start, end - start));
-    if (nl == std::string::npos)
-      break;
-    start = nl + 1;
-  }
-  return out;
-}
-
 } // namespace
 
 Master::RpcValue Master::rpc2EnableHttpProxy(const std::string& caller_id, const std::string& caller_api,
@@ -956,7 +930,6 @@ Master::RpcValue Master::rpc2EnableHttpProxy(const std::string& caller_id, const
     return fail("cannot proxy this node");
 
   report.node->setHttpProxy(std::move(stored), dial);
-  internal_->announceHttpProxy(report.node, true);
   res[0] = 1;
   res[1] = "http proxy enabled";
   res[2] = 1;
@@ -976,7 +949,6 @@ Master::RpcValue Master::rpc2DisableHttpProxy(const std::string& caller_id, cons
   auto node = internal_->regManager.getNodeByName(caller_id);
   if (node && node->getApi() == caller_api &&
       !(node->getNodeFlags() & (NodeRef::NODE_FOREIGN | NodeRef::NODE_MASTER))) {
-    internal_->announceHttpProxy(node, false);
     node->clearHttpProxy();
   }
   res[0] = 1;
@@ -1216,7 +1188,6 @@ std::vector<miniros_msgs::RegistrationRecord> Master::Internal::collectMultimast
     const std::string nodeName = node->id();
     const std::string nodeApi = node->uriForPeer(node->getApi(), resolver, peerAddr);
     std::set<std::string> pubs, subs, srvs;
-    const std::vector<std::string> httpPrefixes = node->httpProxyPrefixes();
     {
       NodeRef::Lock nodeLock(*node);
       pubs = node->getPublicationsLocked(nodeLock);
@@ -1261,15 +1232,6 @@ std::vector<miniros_msgs::RegistrationRecord> Master::Internal::collectMultimast
       r.service_api = node->uriForPeer(regManager.services.get_service_api(service), resolver, peerAddr);
       out.push_back(std::move(r));
     }
-    if (httpProxyEnabled && !httpPrefixes.empty()) {
-      miniros_msgs::RegistrationRecord r;
-      r.kind = miniros_msgs::RegistrationRecord::KIND_HTTP_PROXY_SET;
-      r.name = "http_proxy";
-      r.type = joinHttpProxyPrefixes(httpPrefixes);
-      r.node_name = nodeName;
-      r.node_api = nodeApi;
-      out.push_back(std::move(r));
-    }
   }
   return out;
 }
@@ -1284,24 +1246,6 @@ void Master::Internal::announceMultimasterChange(miniros_msgs::RegistrationRecor
       rec.service_api = node->uriForPeer(rec.service_api, resolver);
   }
   multimaster->announceLocalChange(rec);
-}
-
-void Master::Internal::announceHttpProxy(const std::shared_ptr<NodeRef>& node, bool enabled)
-{
-  if (!multimaster || !node || !httpProxyEnabled)
-    return;
-  if (node->getNodeFlags() & (NodeRef::NODE_FOREIGN | NodeRef::NODE_MASTER))
-    return;
-  miniros_msgs::RegistrationRecord rec;
-  rec.kind = enabled
-    ? miniros_msgs::RegistrationRecord::KIND_HTTP_PROXY_SET
-    : miniros_msgs::RegistrationRecord::KIND_HTTP_PROXY_CLEAR;
-  rec.name = "http_proxy";
-  rec.node_name = node->id();
-  rec.node_api = node->getApi();
-  if (enabled)
-    rec.type = joinHttpProxyPrefixes(node->httpProxyPrefixes());
-  announceMultimasterChange(rec);
 }
 
 void Master::Internal::registerPeerMasterNode(const PeerInfo& peer)
@@ -1338,8 +1282,6 @@ void Master::Internal::registerPeerMasterNode(const PeerInfo& peer)
 void Master::Internal::dropMultimasterPeer(const UUID& peer)
 {
   const std::string key = peer.toString();
-  if (httpProxy)
-    httpProxy->closePeer(key);
   auto it = foreignNodesByPeer.find(key);
   if (it == foreignNodesByPeer.end())
     return;
@@ -1415,36 +1357,6 @@ void Master::Internal::applyMultimasterRecords(const UUID& peer, const std::vect
     }
     case miniros_msgs::RegistrationRecord::KIND_SRV_UNREGISTER: {
       regManager.unregister_service(r.name, r.node_name, r.service_api);
-      break;
-    }
-    case miniros_msgs::RegistrationRecord::KIND_HTTP_PROXY_SET: {
-      if (!httpProxyEnabled)
-        break;
-      network::URL apiUrl;
-      if (!apiUrl.fromString(r.node_api, false) || apiUrl.host.empty() || apiUrl.port == 0)
-        break;
-      // Sync runs on the poll thread. Dial only a literal address.
-      const network::NetAddress dial = dialAddressForHost(apiUrl.host, static_cast<int>(apiUrl.port), false);
-      if (!dial.valid())
-        break;
-      const std::vector<std::string> prefixes = splitHttpProxyPrefixes(r.type);
-      if (prefixes.empty())
-        break;
-      auto report = regManager.registerNodeApi(r.node_name, r.node_api, kForeignFlags);
-      if (!report.node)
-        break;
-      if (report.node->getNodeFlags() & (NodeRef::NODE_LOCAL | NodeRef::NODE_MASTER))
-        break;
-      report.node->setHttpProxy(prefixes, dial);
-      report.node->setHttpProxyPeer(peerKey);
-      foreignNodes.insert(r.node_name);
-      break;
-    }
-    case miniros_msgs::RegistrationRecord::KIND_HTTP_PROXY_CLEAR: {
-      auto node = regManager.getNodeByName(r.node_name);
-      if (!node || !(node->getNodeFlags() & NodeRef::NODE_FOREIGN))
-        break;
-      node->clearHttpProxy();
       break;
     }
     }

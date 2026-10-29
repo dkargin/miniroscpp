@@ -72,6 +72,17 @@ public:
   Master::Internal* internal = nullptr;
 };
 
+/// Temporary GET /api2/http_proxy?node=<name>
+/// JSON {"proxy":"/p/<name>/","prefixes":["/ui/"]}. Node URI stays on /api2/node_uri.
+class HttpProxyEndpoint : public http::EndpointHandler {
+public:
+  HttpProxyEndpoint(Master::Internal* internal) : internal(internal) {}
+
+  Error handle(const network::ClientInfo& clientInfo, std::shared_ptr<http::HttpRequest> request) override;
+
+  Master::Internal* internal = nullptr;
+};
+
 class TopicTypesEndpoint : public http::EndpointHandler {
 public:
   TopicTypesEndpoint(Master::Internal* internal) : internal(internal) {}

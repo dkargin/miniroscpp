@@ -436,6 +436,44 @@ Error NodeUriEndpoint::handle(const network::ClientInfo& clientInfo, std::shared
   return Error::Ok;
 }
 
+Error HttpProxyEndpoint::handle(const network::ClientInfo&, std::shared_ptr<http::HttpRequest> request)
+{
+  if (!internal)
+    return Error::InternalError;
+
+  auto fail = [&](int httpCode, const char* status) {
+    request->setResponseStatus(httpCode, status);
+    request->setResponseBody("", "application/json");
+    return Error::Ok;
+  };
+  if (!internal->httpProxyEnabled)
+    return fail(404, "Not Found");
+
+  const std::string nodeName = request->getParameter("node");
+  if (nodeName.empty())
+    return fail(400, "Bad Request");
+
+  const std::shared_ptr<NodeRef> node = internal->regManager.getNodeByName(nodeName);
+  if (!node || !node->hasHttpProxy())
+    return fail(404, "Not Found");
+
+  using RpcValue = XmlRpc::XmlRpcValue;
+  RpcValue body = RpcValue::Dict();
+  body["proxy"] = internal->httpProxy ? internal->httpProxy->publicPrefix(node->id()) + "/" : std::string();
+  RpcValue prefixes = RpcValue::Array(0);
+  int n = 0;
+  for (const std::string& prefix : node->httpProxyPrefixes())
+    prefixes[n++] = prefix;
+  body["prefixes"] = prefixes;
+
+  std::ostringstream oss;
+  miniros::JsonState state;
+  body.writeJson(oss, state, {});
+  request->setResponseBody(oss.str(), "application/json");
+  request->setResponseStatusOk();
+  return Error::Ok;
+}
+
 Error MultimasterApiEndpoint::handle(const network::ClientInfo& clientInfo, std::shared_ptr<http::HttpRequest> request)
 {
   if (!internal)
