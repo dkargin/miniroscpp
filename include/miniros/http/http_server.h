@@ -11,6 +11,7 @@
 
 #include "miniros/http/http_tools.h"
 #include "miniros/http/http_endpoint.h"
+#include "miniros/http/http_proxy.h"
 
 namespace miniros {
 
@@ -72,12 +73,19 @@ public:
   /// Get number of connections.
   size_t getConnectionsCount() const;
 
+  /// `/p/...` requests are handed to @p acceptor once headers are complete.
+  /// The pointer is not owned. Pass nullptr to disable.
+  void setHttpProxyAcceptor(HttpProxyAcceptor* acceptor);
+
 protected:
   friend class HttpServerConnection;
 
   /// It is called by HttpServerConnection when it is closed by any reason.
   void onConnectionClosed(std::unique_lock<std::mutex>& /*lock*/,
     const std::shared_ptr<HttpServerConnection>& connection, bool upgrade, const std::string& reason);
+
+  /// Hand a `/p/...` socket to the installed acceptor. False if nobody took it.
+  bool offerHttpProxy(const HttpParserFrame& frame, const std::shared_ptr<network::NetSocket>& client);
 
   /// Creates HTTP connection.
   /// This method is virtual to be able to override it in tests.

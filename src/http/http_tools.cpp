@@ -423,7 +423,8 @@ void HttpResponseHeader::writeHeader(std::string& output, size_t bodySize) const
     output += "\r\n";
   }
 
-  if (bodySize > 0) {
+  // 101 Switching Protocols has no HTTP body. A length would sit in front of the upgraded stream.
+  if (statusCode != 101) {
     output += "Content-Length: ";
     output += std::to_string(bodySize);
     output += "\r\n";

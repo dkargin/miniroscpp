@@ -49,6 +49,7 @@ Master::Internal::Internal(const std::shared_ptr<RPCManager>& manager)
   resolver.scanAdapters();
   cache.bind(&regManager, &handler);
   multimaster = std::make_unique<MultimasterManager>(&resolver, &regManager);
+  httpProxy = std::make_shared<HttpProxyHub>(&regManager);
   cache.setPeerPersistence(
     [this]() { return multimaster ? multimaster->collectCachedPeers() : std::vector<CachedPeer>{}; },
     [this](const std::vector<CachedPeer>& peers) {
@@ -151,6 +152,11 @@ bool Master::start(PollSet* poll_set, int port)
   if (!internal_->rpcManager->start(cb, port)) {
     return false;
   }
+  if (internal_->httpProxy) {
+    internal_->httpProxy->setEnabled(internal_->httpProxyEnabled);
+    if (http::HttpServer* http = internal_->rpcManager->getHttpServer())
+      internal_->httpProxy->attach(http);
+  }
 
   // Use the already-loaded snapshot; bound port only updates the save path.
   const int boundPort = internal_->rpcManager->getServerPort();
@@ -177,6 +183,8 @@ void Master::stop()
 {
   if (!internal_)
     return;
+  if (internal_->httpProxy)
+    internal_->httpProxy->detach();
   const int port = internal_->rpcManager ? internal_->rpcManager->getServerPort() : 0;
   internal_->cache.flush(port, internal_->uuid.toString());
   if (internal_->multimaster)
@@ -228,6 +236,8 @@ void Master::setupBindings(const std::shared_ptr<CallbackQueue>& cb)
   rpcManager->bindEx3("unregisterService", this, &Master::unregisterService);
   rpcManager->bindEx4("registerService", this, &Master::registerService);
   rpcManager->bindEx2("lookupNode", this, &Master::lookupNode);
+  rpcManager->bindEx3("rpc2EnableHttpProxy", this, &Master::rpc2EnableHttpProxy);
+  rpcManager->bindEx2("rpc2DisableHttpProxy", this, &Master::rpc2DisableHttpProxy);
 
   // Rosparam part.
   rpcManager->bindEx2("hasParam", this, &Master::hasParam);
@@ -404,6 +414,15 @@ void Master::setCacheEnabled(bool enabled)
   internal_->cache.setEnabled(enabled);
 }
 
+void Master::setHttpProxyEnabled(bool enabled)
+{
+  if (!internal_)
+    return;
+  internal_->httpProxyEnabled = enabled;
+  if (internal_->httpProxy)
+    internal_->httpProxy->setEnabled(enabled);
+}
+
 void Master::Internal::checkNodesAlive()
 {
   auto nodes = regManager.listAllNodes();
@@ -453,6 +472,8 @@ void Master::Internal::shutdownNode(const std::shared_ptr<NodeRef>& node, const 
   }
 
   regManager.dropRegistrations(*node);
+  if (!(node->getNodeFlags() & NodeRef::NODE_FOREIGN) && node->hasHttpProxy())
+    announceHttpProxy(node, false);
   node->clear();
 
   // Tell remaining subscribers that publishers for these topics have changed.
@@ -844,6 +865,126 @@ Master::RpcValue Master::lookupNode(const std::string& caller_id, const std::str
   return res;
 }
 
+namespace {
+
+bool validHttpProxyPrefix(const std::string& prefix)
+{
+  if (prefix.empty() || prefix.size() > 256 || prefix.front() != '/')
+    return false;
+  if (prefix.find("..") != std::string::npos)
+    return false;
+  if (prefix.find('\n') != std::string::npos || prefix.find('\r') != std::string::npos)
+    return false;
+  return true;
+}
+
+std::string joinHttpProxyPrefixes(const std::vector<std::string>& prefixes)
+{
+  std::string out;
+  for (size_t i = 0; i < prefixes.size(); ++i) {
+    if (i)
+      out.push_back('\n');
+    out += prefixes[i];
+  }
+  return out;
+}
+
+std::vector<std::string> splitHttpProxyPrefixes(const std::string& blob)
+{
+  std::vector<std::string> out;
+  size_t start = 0;
+  while (start <= blob.size()) {
+    const size_t nl = blob.find('\n', start);
+    const size_t end = nl == std::string::npos ? blob.size() : nl;
+    if (end > start)
+      out.emplace_back(blob.substr(start, end - start));
+    if (nl == std::string::npos)
+      break;
+    start = nl + 1;
+  }
+  return out;
+}
+
+} // namespace
+
+Master::RpcValue Master::rpc2EnableHttpProxy(const std::string& caller_id, const std::string& caller_api,
+  const RpcValue& prefixes, const ClientInfo&)
+{
+  RpcValue res = RpcValue::Array(3);
+  auto fail = [&](const std::string& msg) {
+    res[0] = 0;
+    res[1] = msg;
+    res[2] = 0;
+    return res;
+  };
+  if (!internal_ || !internal_->httpProxyEnabled)
+    return fail("http proxy is disabled");
+  if (caller_id.empty() || caller_id[0] != '/' || caller_api.empty())
+    return fail("invalid caller");
+  if (!prefixes.valid() || prefixes.getType() != RpcValue::TypeArray)
+    return fail("prefixes must be an array");
+  if (prefixes.size() > 32)
+    return fail("too many prefixes");
+
+  std::vector<std::string> stored;
+  stored.reserve(static_cast<size_t>(prefixes.size()));
+  for (int i = 0; i < prefixes.size(); ++i) {
+    if (prefixes[i].getType() != RpcValue::TypeString)
+      return fail("prefix must be a string");
+    const std::string prefix = prefixes[i];
+    if (!validHttpProxyPrefix(prefix))
+      return fail("invalid prefix");
+    stored.push_back(prefix);
+  }
+  if (stored.empty())
+    return rpc2DisableHttpProxy(caller_id, caller_api, ClientInfo{});
+
+  network::URL url;
+  if (!url.fromString(caller_api, false) || url.host.empty() || url.port == 0)
+    return fail("invalid caller_api");
+  // Registration runs on the callback thread, so a single DNS lookup here is
+  // off the poll thread. The stored address is what the tunnel dials.
+  const network::NetAddress dial = dialAddressForHost(url.host, static_cast<int>(url.port), true);
+  if (!dial.valid())
+    return fail("cannot resolve node API");
+
+  auto report = internal_->regManager.registerNodeApi(caller_id, caller_api, 0);
+  if (!report.node)
+    return fail("node name is not available");
+  const int flags = report.node->getNodeFlags();
+  if (flags & (NodeRef::NODE_FOREIGN | NodeRef::NODE_MASTER))
+    return fail("cannot proxy this node");
+
+  report.node->setHttpProxy(std::move(stored), dial);
+  internal_->announceHttpProxy(report.node, true);
+  res[0] = 1;
+  res[1] = "http proxy enabled";
+  res[2] = 1;
+  return res;
+}
+
+Master::RpcValue Master::rpc2DisableHttpProxy(const std::string& caller_id, const std::string& caller_api,
+  const ClientInfo&)
+{
+  RpcValue res = RpcValue::Array(3);
+  if (!internal_) {
+    res[0] = 0;
+    res[1] = "master is not running";
+    res[2] = 0;
+    return res;
+  }
+  auto node = internal_->regManager.getNodeByName(caller_id);
+  if (node && node->getApi() == caller_api &&
+      !(node->getNodeFlags() & (NodeRef::NODE_FOREIGN | NodeRef::NODE_MASTER))) {
+    internal_->announceHttpProxy(node, false);
+    node->clearHttpProxy();
+  }
+  res[0] = 1;
+  res[1] = "http proxy disabled";
+  res[2] = 1;
+  return res;
+}
+
 Master::RpcValue Master::hasParam(const std::string& caller_id, const std::string& key, const ClientInfo& /*conn*/)
 {
   RpcValue res = RpcValue::Array(3);
@@ -1075,6 +1216,7 @@ std::vector<miniros_msgs::RegistrationRecord> Master::Internal::collectMultimast
     const std::string nodeName = node->id();
     const std::string nodeApi = node->uriForPeer(node->getApi(), resolver, peerAddr);
     std::set<std::string> pubs, subs, srvs;
+    const std::vector<std::string> httpPrefixes = node->httpProxyPrefixes();
     {
       NodeRef::Lock nodeLock(*node);
       pubs = node->getPublicationsLocked(nodeLock);
@@ -1119,6 +1261,15 @@ std::vector<miniros_msgs::RegistrationRecord> Master::Internal::collectMultimast
       r.service_api = node->uriForPeer(regManager.services.get_service_api(service), resolver, peerAddr);
       out.push_back(std::move(r));
     }
+    if (httpProxyEnabled && !httpPrefixes.empty()) {
+      miniros_msgs::RegistrationRecord r;
+      r.kind = miniros_msgs::RegistrationRecord::KIND_HTTP_PROXY_SET;
+      r.name = "http_proxy";
+      r.type = joinHttpProxyPrefixes(httpPrefixes);
+      r.node_name = nodeName;
+      r.node_api = nodeApi;
+      out.push_back(std::move(r));
+    }
   }
   return out;
 }
@@ -1133,6 +1284,24 @@ void Master::Internal::announceMultimasterChange(miniros_msgs::RegistrationRecor
       rec.service_api = node->uriForPeer(rec.service_api, resolver);
   }
   multimaster->announceLocalChange(rec);
+}
+
+void Master::Internal::announceHttpProxy(const std::shared_ptr<NodeRef>& node, bool enabled)
+{
+  if (!multimaster || !node || !httpProxyEnabled)
+    return;
+  if (node->getNodeFlags() & (NodeRef::NODE_FOREIGN | NodeRef::NODE_MASTER))
+    return;
+  miniros_msgs::RegistrationRecord rec;
+  rec.kind = enabled
+    ? miniros_msgs::RegistrationRecord::KIND_HTTP_PROXY_SET
+    : miniros_msgs::RegistrationRecord::KIND_HTTP_PROXY_CLEAR;
+  rec.name = "http_proxy";
+  rec.node_name = node->id();
+  rec.node_api = node->getApi();
+  if (enabled)
+    rec.type = joinHttpProxyPrefixes(node->httpProxyPrefixes());
+  announceMultimasterChange(rec);
 }
 
 void Master::Internal::registerPeerMasterNode(const PeerInfo& peer)
@@ -1169,6 +1338,8 @@ void Master::Internal::registerPeerMasterNode(const PeerInfo& peer)
 void Master::Internal::dropMultimasterPeer(const UUID& peer)
 {
   const std::string key = peer.toString();
+  if (httpProxy)
+    httpProxy->closePeer(key);
   auto it = foreignNodesByPeer.find(key);
   if (it == foreignNodesByPeer.end())
     return;
@@ -1244,6 +1415,36 @@ void Master::Internal::applyMultimasterRecords(const UUID& peer, const std::vect
     }
     case miniros_msgs::RegistrationRecord::KIND_SRV_UNREGISTER: {
       regManager.unregister_service(r.name, r.node_name, r.service_api);
+      break;
+    }
+    case miniros_msgs::RegistrationRecord::KIND_HTTP_PROXY_SET: {
+      if (!httpProxyEnabled)
+        break;
+      network::URL apiUrl;
+      if (!apiUrl.fromString(r.node_api, false) || apiUrl.host.empty() || apiUrl.port == 0)
+        break;
+      // Sync runs on the poll thread. Dial only a literal address.
+      const network::NetAddress dial = dialAddressForHost(apiUrl.host, static_cast<int>(apiUrl.port), false);
+      if (!dial.valid())
+        break;
+      const std::vector<std::string> prefixes = splitHttpProxyPrefixes(r.type);
+      if (prefixes.empty())
+        break;
+      auto report = regManager.registerNodeApi(r.node_name, r.node_api, kForeignFlags);
+      if (!report.node)
+        break;
+      if (report.node->getNodeFlags() & (NodeRef::NODE_LOCAL | NodeRef::NODE_MASTER))
+        break;
+      report.node->setHttpProxy(prefixes, dial);
+      report.node->setHttpProxyPeer(peerKey);
+      foreignNodes.insert(r.node_name);
+      break;
+    }
+    case miniros_msgs::RegistrationRecord::KIND_HTTP_PROXY_CLEAR: {
+      auto node = regManager.getNodeByName(r.node_name);
+      if (!node || !(node->getNodeFlags() & NodeRef::NODE_FOREIGN))
+        break;
+      node->clearHttpProxy();
       break;
     }
     }

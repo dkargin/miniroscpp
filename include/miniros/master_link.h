@@ -114,6 +114,15 @@ public:
   /// Check if this link should work with local RPC manager.
   MINIROS_DECL bool isLocalMaster() const;
 
+  /// Ask the master to expose this node's HTTP server at
+  /// `${ROS_MASTER_URI}/p/<node-name>/...`.
+  /// @param prefixes path prefixes on this node that may be forwarded. `/RPC2` is never forwarded.
+  /// An empty list clears the route. The call waits until the master accepts it.
+  MINIROS_DECL Error enableHttpProxy(const std::vector<std::string>& prefixes);
+
+  /// Remove the route registered by enableHttpProxy().
+  MINIROS_DECL Error disableHttpProxy();
+
   /** @brief Check whether the master is up
    *
    * This method tries to contact the master.  You can call it any time

@@ -212,6 +212,7 @@ set(transport_SRC
     http/http_filters.cpp
     http/http_server.cpp
     http/http_server_connection.cpp
+    http/http_proxy.cpp
     http/http_tools.cpp
     http/parameter_form.cpp
 
@@ -287,6 +288,7 @@ set(master_SRC
     roscore/multimaster_protocol.cpp
     roscore/master_discovery.cpp
     roscore/master.cpp
+    roscore/http_proxy.cpp
     roscore/master_cache.cpp
     roscore/master_endpoints.cpp
     roscore/master_handler.cpp

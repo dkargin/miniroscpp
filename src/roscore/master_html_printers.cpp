@@ -396,6 +396,12 @@ Error Master::Internal::renderNodeInfo(const std::string_view& name, std::string
   ss << "<p>" << print::HB(name) << std::endl;
   const std::string url = nodePtr->getUrl().str();
   ss << "URL: " << print::Url(url, url);
+  if (nodePtr->hasHttpProxy()) {
+    std::string key = nodePtr->id();
+    if (!key.empty() && key.front() == '/')
+      key.erase(key.begin());
+    ss << "<br/>HTTP proxy: /p/" << key << "/";
+  }
 
   // Display flags
   int flags = nodePtr->getNodeFlags();

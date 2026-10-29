@@ -29,6 +29,8 @@ struct HttpServer::Internal {
 
   CloseConnectionHandler onCloseConnection;
 
+  HttpProxyAcceptor* proxyAcceptor = nullptr;
+
   /// Thread safe collection of endpoints.
   std::shared_ptr<internal::EndpointCollection> endpoints;
 
@@ -173,6 +175,19 @@ void HttpServer::Internal::onConnectionClosed(Lock& lock, const std::shared_ptr<
 void HttpServer::setCloseConnectionHandler(CloseConnectionHandler&& handler)
 {
   internal_->onCloseConnection = std::move(handler);
+}
+
+void HttpServer::setHttpProxyAcceptor(HttpProxyAcceptor* acceptor)
+{
+  if (internal_)
+    internal_->proxyAcceptor = acceptor;
+}
+
+bool HttpServer::offerHttpProxy(const HttpParserFrame& frame, const std::shared_ptr<network::NetSocket>& client)
+{
+  if (!internal_ || !internal_->proxyAcceptor || !client)
+    return false;
+  return internal_->proxyAcceptor->acceptHttpProxy(frame, client);
 }
 
 void HttpServer::onConnectionClosed(std::unique_lock<std::mutex>& lock,
