@@ -118,6 +118,7 @@ public:
   /// `${ROS_MASTER_URI}/p/<node-name>/...`.
   /// @param prefixes path prefixes on this node that may be forwarded. `/RPC2` is never forwarded.
   /// An empty list clears the route. The call waits until the master accepts it.
+  /// Callers that must build with an older miniros test MINIROS_HAS_HTTP_PROXY.
   MINIROS_DECL Error enableHttpProxy(const std::vector<std::string>& prefixes);
 
   /// Remove the route registered by enableHttpProxy().

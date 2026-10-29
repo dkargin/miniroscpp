@@ -259,6 +259,14 @@ std::string settingsForm(const Master::Internal& internal)
   ss << "<option value=\"1\"" << (persistenceOn ? " selected" : "") << ">on</option>";
   ss << "<option value=\"0\"" << (persistenceOn ? "" : " selected") << ">off</option>";
   ss << "</select></label></p>";
+  const bool proxyOn = internal.httpProxyEnabled;
+  const char* proxyTip = "Serves /p/{node}/... for prefixes a node registered. "
+                         "Turning it off refuses new tunnels. Tunnels already open stay up.";
+  ss << "<p><label title=\"" << htmlEscape(proxyTip) << "\">Reverse proxy ";
+  ss << "<select name=\"http_proxy\" title=\"" << htmlEscape(proxyTip) << "\">";
+  ss << "<option value=\"1\"" << (proxyOn ? " selected" : "") << ">on</option>";
+  ss << "<option value=\"0\"" << (proxyOn ? "" : " selected") << ">off</option>";
+  ss << "</select></label></p>";
   ss << "<p>Cache file: <code>" << htmlEscape(cacheFile.path.empty() ? "(unknown)" : cacheFile.path) << "</code>";
   if (!cacheProblem.empty())
     ss << "<br/><span style=\"color:#c62828;\">" << htmlEscape(cacheProblem) << "</span>";
@@ -288,10 +296,12 @@ Error SettingsEndpoint::handle(const network::ClientInfo& clientInfo, std::share
   const std::string discoveryText = request->getParameter("discovery");
   const std::string portText = request->getParameter("discovery_port");
   const std::string persistenceText = request->getParameter("persistence");
+  const std::string httpProxyText = request->getParameter("http_proxy");
 
   bool resolve = false;
   bool discovery = false;
   bool persistence = false;
+  bool httpProxy = false;
   int port = 0;
   if (!resolveText.empty() && !parseFlag(resolveText, resolve)) {
     request->setResponseStatus(400, "Bad Request");
@@ -308,6 +318,11 @@ Error SettingsEndpoint::handle(const network::ClientInfo& clientInfo, std::share
     request->setResponseBody("", "application/json");
     return Error::Ok;
   }
+  if (!httpProxyText.empty() && !parseFlag(httpProxyText, httpProxy)) {
+    request->setResponseStatus(400, "Bad Request");
+    request->setResponseBody("", "application/json");
+    return Error::Ok;
+  }
   if (!portText.empty()) {
     char* end = nullptr;
     const long parsed = std::strtol(portText.c_str(), &end, 10);
@@ -319,11 +334,18 @@ Error SettingsEndpoint::handle(const network::ClientInfo& clientInfo, std::share
     port = static_cast<int>(parsed);
   }
 
-  if (Error err = internal->applySettings(
-        !resolveText.empty(), resolve,
-        !discoveryText.empty(), discovery,
-        !portText.empty(), port,
-        !persistenceText.empty(), persistence); !err) {
+  Master::Internal::SettingsUpdate update;
+  if (!resolveText.empty())
+    update.resolve = resolve;
+  if (!discoveryText.empty())
+    update.discovery = discovery;
+  if (!portText.empty())
+    update.discoveryPort = port;
+  if (!persistenceText.empty())
+    update.persistence = persistence;
+  if (!httpProxyText.empty())
+    update.httpProxy = httpProxy;
+  if (Error err = internal->applySettings(update); !err) {
     request->setResponseStatus(500, "Internal Server Error");
     request->setResponseBody("", "application/json");
     return Error::Ok;
@@ -333,7 +355,8 @@ Error SettingsEndpoint::handle(const network::ClientInfo& clientInfo, std::share
   if (accept.empty())
     accept = request->getHeader("accept");
   const bool wantsHtml = accept.find("text/html") != std::string::npos;
-  const bool changed = !resolveText.empty() || !discoveryText.empty() || !portText.empty() || !persistenceText.empty();
+  const bool changed = !resolveText.empty() || !discoveryText.empty() || !portText.empty()
+    || !persistenceText.empty() || !httpProxyText.empty();
   if (wantsHtml && changed) {
     request->setResponseStatusOk();
     request->setResponseBody(
@@ -349,6 +372,7 @@ Error SettingsEndpoint::handle(const network::ClientInfo& clientInfo, std::share
   root["discovery"] = internal->multimaster && internal->multimaster->discoveryEnabled();
   root["discovery_port"] = internal->discoveryPort();
   root["persistence"] = internal->cache.enabled();
+  root["http_proxy"] = internal->httpProxyEnabled;
   {
     const int rpcPort = internal->rpcPort();
     const MasterCache::FileStatus cacheFile = internal->cache.fileStatus(rpcPort);
@@ -431,6 +455,44 @@ Error NodeUriEndpoint::handle(const network::ClientInfo& clientInfo, std::shared
   std::ostringstream oss;
   miniros::JsonState state;
   addresses.writeJson(oss, state, {});
+  request->setResponseBody(oss.str(), "application/json");
+  request->setResponseStatusOk();
+  return Error::Ok;
+}
+
+Error HttpProxyEndpoint::handle(const network::ClientInfo&, std::shared_ptr<http::HttpRequest> request)
+{
+  if (!internal)
+    return Error::InternalError;
+
+  auto fail = [&](int httpCode, const char* status) {
+    request->setResponseStatus(httpCode, status);
+    request->setResponseBody("", "application/json");
+    return Error::Ok;
+  };
+  if (!internal->httpProxyEnabled)
+    return fail(404, "Not Found");
+
+  const std::string nodeName = request->getParameter("node");
+  if (nodeName.empty())
+    return fail(400, "Bad Request");
+
+  const std::shared_ptr<NodeRef> node = internal->regManager.getNodeByName(nodeName);
+  if (!node || !node->hasHttpProxy())
+    return fail(404, "Not Found");
+
+  using RpcValue = XmlRpc::XmlRpcValue;
+  RpcValue body = RpcValue::Dict();
+  body["proxy"] = internal->httpProxy ? internal->httpProxy->publicPrefix(node->id()) + "/" : std::string();
+  RpcValue prefixes = RpcValue::Array(0);
+  int n = 0;
+  for (const std::string& prefix : node->httpProxyPrefixes())
+    prefixes[n++] = prefix;
+  body["prefixes"] = prefixes;
+
+  std::ostringstream oss;
+  miniros::JsonState state;
+  body.writeJson(oss, state, {});
   request->setResponseBody(oss.str(), "application/json");
   request->setResponseStatusOk();
   return Error::Ok;

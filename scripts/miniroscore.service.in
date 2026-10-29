@@ -12,7 +12,7 @@ Environment=MINIROS_CRASH_LOG=%L/miniroscore/miniroscore.crash
 RuntimeDirectory=miniroscore
 LogsDirectory=miniroscore
 WorkingDirectory=%L/miniroscore
-ExecStart=@CMAKE_INSTALL_PREFIX@/bin/miniroscore --dir=%/miniroscore
+ExecStart=@CMAKE_INSTALL_PREFIX@/bin/miniroscore --dir=%/miniroscore --http-proxy=on
 # Start timeout: abort (SIGABRT) so handleCrashes() writes a stack and the
 # kernel/systemd-coredump stores a core. `coredumpctl dump miniroscore`.
 TimeoutStartSec=10

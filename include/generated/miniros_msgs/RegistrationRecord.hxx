@@ -70,8 +70,6 @@ struct RegistrationRecord_
     KIND_SUB_UNREGISTER = 4u,
     KIND_SRV_REGISTER = 5u,
     KIND_SRV_UNREGISTER = 6u,
-    KIND_HTTP_PROXY_SET = 7u,
-    KIND_HTTP_PROXY_CLEAR = 8u,
   };
 
 
@@ -188,8 +186,6 @@ uint8 KIND_SUB_REGISTER=3\n\
 uint8 KIND_SUB_UNREGISTER=4\n\
 uint8 KIND_SRV_REGISTER=5\n\
 uint8 KIND_SRV_UNREGISTER=6\n\
-uint8 KIND_HTTP_PROXY_SET=7\n\
-uint8 KIND_HTTP_PROXY_CLEAR=8\n\
 \n\
 string name\n\
 string type\n\

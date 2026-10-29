@@ -3,6 +3,7 @@
 
 #include <atomic>
 #include <map>
+#include <optional>
 #include <set>
 #include <string_view>
 
@@ -26,6 +27,7 @@ class TopicInfoEndpoint;
 class PublishedTopicsEndpoint;
 class SettingsEndpoint;
 class NodeUriEndpoint;
+class HttpProxyEndpoint;
 class TopicTypesEndpoint;
 class MultimasterApiEndpoint;
 class DebugApiEndpoint;
@@ -61,6 +63,9 @@ struct Master::Internal {
 
   /// Endpoint for accessing /api2/node_uri
   std::shared_ptr<NodeUriEndpoint> httpNodeUriEndpoint;
+
+  /// Temporary GET /api2/http_proxy?node=<name> for proxy prefixes.
+  std::shared_ptr<HttpProxyEndpoint> httpProxyEndpoint;
 
   /// Endpoint for accessing /api2/topic_types
   std::shared_ptr<TopicTypesEndpoint> httpTopicTypesEndpoint;
@@ -143,12 +148,16 @@ struct Master::Internal {
   /// Bound XML-RPC port. 0 before the server is listening.
   int rpcPort() const;
 
-  /// Apply one local setting. Empty `discoveryPortText` leaves the port unchanged.
-  /// `discovery` nullopt-style: pass `changeDiscovery` false to skip that flag.
-  Error applySettings(bool changeResolve, bool resolve,
-    bool changeDiscovery, bool discovery,
-    bool changePort, int discoveryPort,
-    bool changePersistence, bool persistence);
+  /// Local settings to apply. A field left unset is not changed.
+  struct SettingsUpdate {
+    std::optional<bool> resolve;
+    std::optional<bool> discovery;
+    std::optional<int> discoveryPort;
+    std::optional<bool> persistence;
+    std::optional<bool> httpProxy;
+  };
+
+  Error applySettings(const SettingsUpdate& update);
 
   /// Render information about specific topic.
   Error renderTopicInfo(const std::string_view& name, std::string& output) const;
@@ -169,9 +178,6 @@ struct Master::Internal {
 
   /// Rewrite node/service URIs in a local multimaster delta using learned IPs.
   void announceMultimasterChange(miniros_msgs::RegistrationRecord rec);
-
-  /// Publish or withdraw this node's HTTP proxy prefixes. Local nodes only.
-  void announceHttpProxy(const std::shared_ptr<NodeRef>& node, bool enabled);
 
   /// Apply inbound multimaster registration records from a peer.
   void applyMultimasterRecords(const UUID& peer, const std::vector<miniros_msgs::RegistrationRecord>& records, bool snapshot);

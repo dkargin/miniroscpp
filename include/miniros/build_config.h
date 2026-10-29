@@ -14,6 +14,9 @@
 //! Forward bag scan that yields messages in file order.
 #define MINIBAG_HAS_UNORDERED_VIEW 1
 
+//! Client API MasterLink::enableHttpProxy() asks the master to reverse-proxy this node.
+#define MINIROS_HAS_HTTP_PROXY 1
+
 #ifdef __cplusplus
 
 namespace miniros {

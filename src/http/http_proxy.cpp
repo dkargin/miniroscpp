@@ -6,16 +6,15 @@
 
 #include "miniros/http/http_proxy.h"
 
-#include <atomic>
-#include <cctype>
 #include <cstdio>
-#include <cstring>
+#include <mutex>
 #include <string>
 #include <utility>
 #include <vector>
 
 #define MINIROS_PACKAGE_NAME "http"
 
+#include "internal/threading.h"
 #include "miniros/http/http_tools.h"
 #include "miniros/io/io.h"
 #include "miniros/io/poll_set.h"
@@ -25,60 +24,62 @@
 
 namespace miniros {
 namespace http {
+
+bool isHttpProxyPath(std::string_view path, std::string_view prefix)
+{
+  if (prefix.empty() || prefix.front() != '/')
+    return false;
+  if (prefix.back() == '/')
+    prefix.remove_suffix(1);
+  if (prefix.empty() || path.empty())
+    return false;
+  if (path == prefix)
+    return true;
+  return path.size() > prefix.size()
+    && path.compare(0, prefix.size(), prefix) == 0
+    && path[prefix.size()] == '/';
+}
+
 namespace {
 
-std::string lowerCopy(std::string_view in)
+bool containsIgnoreCase(std::string_view hay, std::string_view needle)
 {
-  std::string out(in);
-  for (char& c : out)
-    c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-  return out;
-}
-
-bool startsWithIgnoreCase(std::string_view text, std::string_view prefix)
-{
-  if (text.size() < prefix.size())
+  if (needle.empty() || needle.size() > hay.size())
     return false;
-  for (size_t i = 0; i < prefix.size(); ++i) {
-    const auto a = static_cast<unsigned char>(text[i]);
-    const auto b = static_cast<unsigned char>(prefix[i]);
-    if (std::tolower(a) != std::tolower(b))
-      return false;
+  for (size_t i = 0; i + needle.size() <= hay.size(); ++i) {
+    if (HttpParserFrame::nameEquals(hay.substr(i, needle.size()), needle))
+      return true;
   }
-  return true;
-}
-
-bool equalsIgnoreCase(std::string_view a, std::string_view b)
-{
-  return a.size() == b.size() && startsWithIgnoreCase(a, b);
-}
-
-bool headerNameIs(std::string_view line, std::string_view name)
-{
-  if (line.size() < name.size() + 1)
-    return false;
-  if (!startsWithIgnoreCase(line, name))
-    return false;
-  return line[name.size()] == ':';
-}
-
-std::string_view headerValue(std::string_view line)
-{
-  const auto colon = line.find(':');
-  if (colon == std::string_view::npos)
-    return {};
-  size_t i = colon + 1;
-  while (i < line.size() && (line[i] == ' ' || line[i] == '\t'))
-    ++i;
-  return line.substr(i);
+  return false;
 }
 
 bool isHopByHop(std::string_view name)
 {
-  const std::string lower = lowerCopy(name);
-  return lower == "connection" || lower == "keep-alive" || lower == "proxy-connection"
-    || lower == "te" || lower == "trailer" || lower == "upgrade" || lower == "transfer-encoding"
-    || lower == "host" || lower == "content-length";
+  return HttpParserFrame::nameEquals(name, "connection")
+    || HttpParserFrame::nameEquals(name, "keep-alive")
+    || HttpParserFrame::nameEquals(name, "proxy-connection")
+    || HttpParserFrame::nameEquals(name, "te")
+    || HttpParserFrame::nameEquals(name, "trailer")
+    || HttpParserFrame::nameEquals(name, "upgrade")
+    || HttpParserFrame::nameEquals(name, "transfer-encoding")
+    || HttpParserFrame::nameEquals(name, "host")
+    || HttpParserFrame::nameEquals(name, "content-length");
+}
+
+/// A byte-stream request must deliver Upgrade and Connection. Other hop-by-hop fields still drop.
+bool dropRequestHeader(std::string_view name, bool byteStream)
+{
+  if (byteStream && (HttpParserFrame::nameEquals(name, "upgrade") || HttpParserFrame::nameEquals(name, "connection")))
+    return false;
+  return isHopByHop(name);
+}
+
+void appendHeader(std::string& out, std::string_view name, std::string_view value)
+{
+  out.append(name);
+  out.append(": ");
+  out.append(value);
+  out.append("\r\n");
 }
 
 /// Rewrite an upstream Location into the public `/p/{node}` prefix.
@@ -95,11 +96,11 @@ std::string rewriteLocation(std::string_view value, const std::string& publicPre
     return publicPrefix + std::string(value);
 
   network::URL url;
-  if (!url.fromString(std::string(value), false) || !equalsIgnoreCase(url.scheme, "http://"))
+  if (!url.fromString(std::string(value), false) || !HttpParserFrame::nameEquals(url.scheme, "http://"))
     return std::string(value);
   // fromString leaves the port at 0 when the URI omits it. HTTP's default is 80.
   const int port = url.port == 0 ? 80 : static_cast<int>(url.port);
-  if (!equalsIgnoreCase(url.host, upstreamHost) || port != upstreamPort)
+  if (!HttpParserFrame::nameEquals(url.host, upstreamHost) || port != upstreamPort)
     return std::string(value);
 
   std::string rewritten = publicPrefix;
@@ -115,65 +116,49 @@ struct ResponseHead {
   std::string bytes;
   /// -1: read until EOF. >= 0: that many body bytes remain, including bytes already past the head.
   int64_t bodyLeft = -1;
+  /// Upstream switched protocols. The following bytes are a raw bidirectional stream.
+  bool switching = false;
 };
 
-ResponseHead rewriteResponseHead(std::string_view raw, const HttpProxyTarget& target)
+ResponseHead rewriteResponseHead(const HttpParserFrame& frame, const HttpProxyTarget& target)
 {
   ResponseHead out;
+  const bool switching = target.byteStream && frame.responseCode == 101;
+  const std::string_view raw = frame.header();
+  const auto lineEnd = raw.find("\r\n");
   std::string rebuilt;
   rebuilt.reserve(raw.size() + target.publicPrefix.size() + 32);
-  bool first = true;
+  if (lineEnd == std::string_view::npos)
+    rebuilt.append(raw);
+  else
+    rebuilt.append(raw.data(), lineEnd);
+  rebuilt.append("\r\n");
+
   bool sawConnection = false;
   bool chunked = false;
-  bool sawLength = false;
-  int64_t length = -1;
-
-  size_t lineStart = 0;
-  while (lineStart < raw.size()) {
-    size_t lineEnd = raw.find("\r\n", lineStart);
-    if (lineEnd == std::string_view::npos)
-      lineEnd = raw.size();
-    const std::string_view line = raw.substr(lineStart, lineEnd - lineStart);
-    if (first) {
-      rebuilt.append(line);
-      rebuilt.append("\r\n");
-      first = false;
-    } else if (!line.empty()) {
-      if (headerNameIs(line, "Location")) {
-        const std::string rewritten = rewriteLocation(headerValue(line), target.publicPrefix, target.host, target.port);
-        rebuilt.append("Location: ");
-        rebuilt.append(rewritten);
-        rebuilt.append("\r\n");
-      } else if (headerNameIs(line, "Connection")) {
-        rebuilt.append("Connection: close\r\n");
-        sawConnection = true;
-      } else if (headerNameIs(line, "Content-Length")) {
-        length = std::atoll(std::string(headerValue(line)).c_str());
-        sawLength = true;
-        rebuilt.append(line);
-        rebuilt.append("\r\n");
-      } else if (headerNameIs(line, "Transfer-Encoding")) {
-        if (lowerCopy(headerValue(line)).find("chunked") != std::string::npos)
-          chunked = true;
-        rebuilt.append(line);
-        rebuilt.append("\r\n");
-      } else {
-        rebuilt.append(line);
-        rebuilt.append("\r\n");
-      }
+  for (const auto& field : frame.fields) {
+    if (HttpParserFrame::nameEquals(field.name, "Location")) {
+      appendHeader(rebuilt, "Location", rewriteLocation(field.value, target.publicPrefix, target.host, target.port));
+    } else if (HttpParserFrame::nameEquals(field.name, "Connection")) {
+      appendHeader(rebuilt, "Connection", switching ? field.value : "close");
+      sawConnection = true;
+    } else if (HttpParserFrame::nameEquals(field.name, "Transfer-Encoding")) {
+      if (containsIgnoreCase(field.value, "chunked"))
+        chunked = true;
+      appendHeader(rebuilt, field.name, field.value);
+    } else {
+      appendHeader(rebuilt, field.name, field.value);
     }
-    if (lineEnd >= raw.size())
-      break;
-    lineStart = lineEnd + 2;
   }
   if (!sawConnection)
-    rebuilt.append("Connection: close\r\n");
+    appendHeader(rebuilt, "Connection", switching ? "Upgrade" : "close");
   rebuilt.append("\r\n");
   out.bytes = std::move(rebuilt);
-  if (chunked || !sawLength)
+  out.switching = switching;
+  if (switching || chunked || !frame.hasContentLength())
     out.bodyLeft = -1;
   else
-    out.bodyLeft = length < 0 ? 0 : length;
+    out.bodyLeft = frame.contentLength() < 0 ? 0 : frame.contentLength();
   return out;
 }
 
@@ -196,7 +181,7 @@ std::string buildRequestHead(const HttpParserFrame& frame, const HttpProxyTarget
   head += "\r\n";
 
   for (const auto& field : frame.fields) {
-    if (isHopByHop(field.name))
+    if (dropRequestHeader(field.name, target.byteStream))
       continue;
     head += field.name;
     head += ": ";
@@ -215,7 +200,10 @@ std::string buildRequestHead(const HttpParserFrame& frame, const HttpProxyTarget
   }
   head += "X-Forwarded-Proto: http\r\nX-Forwarded-Prefix: ";
   head += target.publicPrefix;
-  head += "\r\nConnection: close\r\n\r\n";
+  head += "\r\n";
+  if (!target.byteStream)
+    head += "Connection: close\r\n";
+  head += "\r\n";
   return head;
 }
 
@@ -235,24 +223,45 @@ void writeHttpStatusAndClose(const std::shared_ptr<network::NetSocket>& socket, 
 }
 
 struct HttpProxyTunnel::Impl {
-  PollSet* poll = nullptr;
+  PollSet* poll GUARDED_BY(mu) = nullptr;
   std::shared_ptr<network::NetSocket> client;
   std::shared_ptr<network::NetSocket> upstream;
   HttpProxyTarget target;
   DoneFn onDone;
 
   bool connecting = true;
-  std::atomic<bool> stop{false};
-  bool finished = false;
+  /// Guards stop, finished, and the fd numbers requestClose() signals.
+  mutable std::mutex mu;
+  bool stop GUARDED_BY(mu) = false;
+  bool finished GUARDED_BY(mu) = false;
+  /// -1 once finish() drops that socket.
+  int clientFd GUARDED_BY(mu) = -1;
+  int upstreamFd GUARDED_BY(mu) = -1;
   bool responseHeadDone = false;
 
-  std::string upPending;
-  size_t upOff = 0;
+  /// Head and body stay apart so one write2() can gather them.
+  struct Pending {
+    std::string head;
+    std::string body;
+    size_t written = 0;
+
+    size_t size() const { return head.size() + body.size(); }
+    size_t unsent() const { return written < size() ? size() - written : 0; }
+    bool pending() const { return unsent() > 0; }
+
+    void reset()
+    {
+      head.clear();
+      body.clear();
+      written = 0;
+    }
+  };
+
+  Pending up;
   int64_t requestLeft = 0;
 
-  std::string downPending;
-  size_t downOff = 0;
-  std::string respAccum;
+  Pending down;
+  HttpParserFrame responseFrame;
   int64_t responseLeft = -1;
   bool responseEof = false;
 
@@ -260,50 +269,51 @@ struct HttpProxyTunnel::Impl {
 
   void armIdle()
   {
-    if (!poll)
+    PollSet* ps = pollSet();
+    if (!ps)
       return;
     if (client && client->valid())
-      poll->setTimerEvent(client->fd(), kIdleTimeoutMs);
+      ps->setTimerEvent(client->fd(), kIdleTimeoutMs);
     if (upstream && upstream->valid())
-      poll->setTimerEvent(upstream->fd(), connecting ? kConnectTimeoutMs : kIdleTimeoutMs);
+      ps->setTimerEvent(upstream->fd(), connecting ? kConnectTimeoutMs : kIdleTimeoutMs);
   }
 
   void refreshInterest()
   {
-    if (!poll)
+    PollSet* ps = pollSet();
+    if (!ps)
       return;
     if (client && client->valid()) {
       int ev = 0;
-      if (downPending.size() > downOff)
+      if (down.pending())
         ev |= PollSet::EventOut;
-      if (requestLeft > 0 && (upPending.size() - upOff) < kBufCap)
+      if (requestLeft > 0 && up.unsent() < kBufCap)
         ev |= PollSet::EventIn;
-      poll->setEvents(client->fd(), ev);
+      ps->setEvents(client->fd(), ev);
     }
     if (upstream && upstream->valid()) {
       int ev = 0;
-      if (connecting || upPending.size() > upOff)
+      if (connecting || up.pending())
         ev |= PollSet::EventOut;
-      const bool wantRead = !responseEof && (responseLeft != 0) && (downPending.size() - downOff) < kBufCap;
+      const bool wantRead = !responseEof && (responseLeft != 0) && down.unsent() < kBufCap;
       if (!connecting && wantRead)
         ev |= PollSet::EventIn;
-      poll->setEvents(upstream->fd(), ev);
+      ps->setEvents(upstream->fd(), ev);
     }
   }
 
-  bool writePending(const std::shared_ptr<network::NetSocket>& sock, std::string& buf, size_t& off)
+  bool writePending(network::NetSocket& sock, Pending& pending)
   {
-    if (!sock || !sock->valid() || off >= buf.size())
+    if (!sock.valid() || !pending.pending())
       return false;
-    const auto [n, err] = sock->send(buf.data() + off, buf.size() - off, nullptr);
+    const auto [n, err] = sock.write2(pending.head.data(), pending.head.size(),
+      pending.body.data(), pending.body.size(), pending.written);
     if (n > 0)
-      off += n;
-    if (off >= buf.size()) {
-      buf.clear();
-      off = 0;
-    }
+      pending.written += n;
+    if (!pending.pending())
+      pending.reset();
     if (err == Error::EndOfFile || err == Error::SystemError)
-      stop = true;
+      requestStop();
     return n > 0;
   }
 
@@ -311,17 +321,17 @@ struct HttpProxyTunnel::Impl {
   {
     if (requestLeft <= 0 || !client || !client->valid())
       return false;
-    if (upPending.size() - upOff >= kBufCap)
+    if (up.unsent() >= kBufCap)
       return false;
     const size_t cap = static_cast<size_t>(std::min<int64_t>(requestLeft, static_cast<int64_t>(kBufCap)));
     const int n = read_socket(static_cast<socket_fd_t>(client->fd()), scratch, cap);
     if (n > 0) {
-      upPending.append(scratch, n);
+      up.body.append(scratch, n);
       requestLeft -= static_cast<int64_t>(n);
       return true;
     }
     if (n == 0 || !last_socket_error_is_would_block())
-      stop = true;
+      requestStop();
     return false;
   }
 
@@ -330,41 +340,45 @@ struct HttpProxyTunnel::Impl {
     if (responseEof || responseLeft == 0 || !upstream || !upstream->valid())
       return false;
     if (!responseHeadDone) {
-      if (respAccum.size() >= kMaxHeader) {
-        stop = true;
+      if (responseFrame.data.size() >= kMaxHeader) {
+        requestStop();
         return false;
       }
-      const size_t cap = std::min(kBufCap, kMaxHeader - respAccum.size());
+      const size_t cap = std::min(kBufCap, kMaxHeader - responseFrame.data.size());
       const int n = read_socket(static_cast<socket_fd_t>(upstream->fd()), scratch, cap);
       if (n > 0) {
-        respAccum.append(scratch, n);
-        const auto mark = respAccum.find("\r\n\r\n");
-        if (mark != std::string::npos) {
-          const size_t headEnd = mark + 4;
-          ResponseHead rewritten = rewriteResponseHead(std::string_view(respAccum.data(), mark), target);
+        responseFrame.data.append(scratch, n);
+        responseFrame.incrementalParse();
+        if (responseFrame.state() == HttpParserFrame::ParseInvalid) {
+          requestStop();
+          return false;
+        }
+        if (responseFrame.hasHeader()) {
+          ResponseHead rewritten = rewriteResponseHead(responseFrame, target);
           responseLeft = rewritten.bodyLeft;
-          downPending.append(rewritten.bytes);
-          if (headEnd < respAccum.size()) {
-            const size_t extra = respAccum.size() - headEnd;
+          down.head = std::move(rewritten.bytes);
+          const std::string_view extra = responseFrame.pastHeader();
+          if (!extra.empty()) {
             if (responseLeft >= 0) {
-              const size_t take = std::min(extra, static_cast<size_t>(responseLeft));
-              downPending.append(respAccum.data() + headEnd, take);
+              const size_t take = std::min(extra.size(), static_cast<size_t>(responseLeft));
+              down.body.append(extra.data(), take);
               responseLeft -= static_cast<int64_t>(take);
             } else {
-              downPending.append(respAccum.data() + headEnd, extra);
+              down.body.append(extra.data(), extra.size());
             }
           }
-          respAccum.clear();
+          responseFrame.data.clear();
+          responseFrame.resetParseState(false);
           responseHeadDone = true;
         }
         return true;
       }
       if (n == 0 || !last_socket_error_is_would_block())
-        stop = true;
+        requestStop();
       return false;
     }
 
-    if (downPending.size() - downOff >= kBufCap)
+    if (down.unsent() >= kBufCap)
       return false;
     size_t cap = kBufCap;
     if (responseLeft >= 0)
@@ -373,7 +387,7 @@ struct HttpProxyTunnel::Impl {
       return false;
     const int n = read_socket(static_cast<socket_fd_t>(upstream->fd()), scratch, cap);
     if (n > 0) {
-      downPending.append(scratch, n);
+      down.body.append(scratch, n);
       if (responseLeft >= 0)
         responseLeft -= static_cast<int64_t>(n);
       return true;
@@ -381,11 +395,11 @@ struct HttpProxyTunnel::Impl {
     if (n == 0) {
       responseEof = true;
       if (responseLeft > 0)
-        stop = true;
+        requestStop();
       return false;
     }
     if (!last_socket_error_is_would_block())
-      stop = true;
+      requestStop();
     return false;
   }
 
@@ -393,7 +407,7 @@ struct HttpProxyTunnel::Impl {
   {
     if (!responseHeadDone)
       return false;
-    if (downPending.size() > downOff)
+    if (down.pending())
       return false;
     if (responseLeft == 0)
       return true;
@@ -402,21 +416,55 @@ struct HttpProxyTunnel::Impl {
 
   bool requestComplete() const
   {
-    return upPending.size() == upOff && requestLeft <= 0;
+    return !up.pending() && requestLeft <= 0;
+  }
+
+  bool isFinished() const
+  {
+    std::lock_guard<std::mutex> lock(mu);
+    return finished;
+  }
+
+  bool stopRequested() const
+  {
+    std::lock_guard<std::mutex> lock(mu);
+    return stop;
+  }
+
+  void requestStop()
+  {
+    std::lock_guard<std::mutex> lock(mu);
+    stop = true;
+  }
+
+  PollSet* pollSet() const
+  {
+    std::lock_guard<std::mutex> lock(mu);
+    return poll;
   }
 
   void finish()
   {
-    if (finished)
-      return;
-    finished = true;
-    DoneFn done = std::move(onDone);
-    const int clientFd = client && client->valid() ? client->fd() : -1;
-    const int upFd = upstream && upstream->valid() ? upstream->fd() : -1;
-    if (poll && clientFd >= 0)
-      poll->delSocket(clientFd);
-    if (poll && upFd >= 0)
-      poll->delSocket(upFd);
+    DoneFn done;
+    int closingClient = -1;
+    int closingUpstream = -1;
+    PollSet* ps = nullptr;
+    {
+      std::lock_guard<std::mutex> lock(mu);
+      if (finished)
+        return;
+      finished = true;
+      closingClient = clientFd;
+      closingUpstream = upstreamFd;
+      clientFd = -1;
+      upstreamFd = -1;
+      ps = poll;
+      done = std::move(onDone);
+    }
+    if (ps && closingClient >= 0)
+      ps->delSocket(closingClient);
+    if (ps && closingUpstream >= 0)
+      ps->delSocket(closingUpstream);
     if (client)
       client->close();
     if (upstream)
@@ -429,11 +477,13 @@ struct HttpProxyTunnel::Impl {
   {
     for (int i = 0; i < kMaxPumps; ++i) {
       bool progress = false;
-      progress = writePending(upstream, upPending, upOff) || progress;
-      progress = writePending(client, downPending, downOff) || progress;
+      if (upstream)
+        progress = writePending(*upstream, up) || progress;
+      if (client)
+        progress = writePending(*client, down) || progress;
       progress = readRequestBody() || progress;
       progress = readResponse() || progress;
-      if (!progress || stop)
+      if (!progress || stopRequested())
         break;
     }
   }
@@ -450,9 +500,9 @@ struct HttpProxyTunnel::Impl {
   int onEvent(int fd, int flags)
   {
     (void)fd;
-    if (finished)
+    if (isFinished())
       return 0;
-    if (stop || (flags & PollSet::EventTimer)) {
+    if (stopRequested() || (flags & PollSet::EventTimer)) {
       if (connecting && client && client->valid())
         writeHttpStatusAndClose(client, 502, "Bad Gateway");
       finish();
@@ -505,18 +555,25 @@ HttpProxyTunnel::~HttpProxyTunnel() = default;
 
 bool HttpProxyTunnel::finished() const
 {
-  return !impl_ || impl_->finished;
+  return !impl_ || impl_->isFinished();
 }
 
 void HttpProxyTunnel::requestClose()
 {
-  if (!impl_ || impl_->finished)
+  if (!impl_)
     return;
-  impl_->stop = true;
-  if (impl_->poll && impl_->client && impl_->client->valid())
-    impl_->poll->signalFd(impl_->client->fd());
-  else if (impl_->poll && impl_->upstream && impl_->upstream->valid())
-    impl_->poll->signalFd(impl_->upstream->fd());
+  int fd = -1;
+  PollSet* poll = nullptr;
+  {
+    std::lock_guard<std::mutex> lock(impl_->mu);
+    impl_->stop = true;
+    if (impl_->finished)
+      return;
+    poll = impl_->poll;
+    fd = impl_->clientFd >= 0 ? impl_->clientFd : impl_->upstreamFd;
+  }
+  if (poll && fd >= 0)
+    poll->signalFd(fd);
 }
 
 std::shared_ptr<HttpProxyTunnel> HttpProxyTunnel::open(PollSet* poll,
@@ -531,23 +588,20 @@ std::shared_ptr<HttpProxyTunnel> HttpProxyTunnel::open(PollSet* poll,
   }
 
   auto impl = std::make_shared<Impl>();
-  impl->poll = poll;
   impl->client = std::move(client);
   impl->target = std::move(target);
   impl->onDone = std::move(onDone);
+  impl->responseFrame.finishResponse();
 
   const std::string clientIp = impl->client->peerAddress().address;
-  impl->upPending = buildRequestHead(inbound, impl->target, clientIp);
+  impl->up.head = buildRequestHead(inbound, impl->target, clientIp);
 
-  const std::string_view header = inbound.header();
-  std::string_view prefetched;
-  if (header.size() < inbound.data.size())
-    prefetched = std::string_view(inbound.data.data() + header.size(), inbound.data.size() - header.size());
+  const std::string_view prefetched = inbound.pastHeader();
   if (impl->target.contentLength < 0) {
     impl->requestLeft = 0;
   } else {
     const size_t take = std::min(prefetched.size(), static_cast<size_t>(impl->target.contentLength));
-    impl->upPending.append(prefetched.data(), take);
+    impl->up.body.append(prefetched.data(), take);
     impl->requestLeft = impl->target.contentLength - static_cast<int64_t>(take);
   }
 
@@ -562,6 +616,12 @@ std::shared_ptr<HttpProxyTunnel> HttpProxyTunnel::open(PollSet* poll,
 
   const int clientFd = impl->client->fd();
   const int upFd = impl->upstream->fd();
+  {
+    std::lock_guard<std::mutex> lock(impl->mu);
+    impl->poll = poll;
+    impl->clientFd = clientFd;
+    impl->upstreamFd = upFd;
+  }
   if (!poll->addSocket(clientFd, 0,
         [impl, clientFd](int flags) { return impl->onEvent(clientFd, flags); }, impl, {})) {
     writeHttpStatusAndClose(impl->client, 502, "Bad Gateway");

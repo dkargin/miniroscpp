@@ -49,7 +49,7 @@ public:
 };
 
 /// GET /settings renders the local-settings form.
-/// GET /api2/settings reads or applies resolve, discovery, discovery_port, persistence.
+/// GET /api2/settings reads or applies resolve, discovery, discovery_port, persistence, http_proxy.
 class SettingsEndpoint : public http::EndpointHandler {
 public:
   SettingsEndpoint(Master::Internal* internal, bool htmlPage)
@@ -66,6 +66,17 @@ public:
 class NodeUriEndpoint : public http::EndpointHandler {
 public:
   NodeUriEndpoint(Master::Internal* internal) : internal(internal) {}
+
+  Error handle(const network::ClientInfo& clientInfo, std::shared_ptr<http::HttpRequest> request) override;
+
+  Master::Internal* internal = nullptr;
+};
+
+/// Temporary GET /api2/http_proxy?node=<name>
+/// JSON {"proxy":"/p/<name>/","prefixes":["/ui/"]}. Node URI stays on /api2/node_uri.
+class HttpProxyEndpoint : public http::EndpointHandler {
+public:
+  HttpProxyEndpoint(Master::Internal* internal) : internal(internal) {}
 
   Error handle(const network::ClientInfo& clientInfo, std::shared_ptr<http::HttpRequest> request) override;
 

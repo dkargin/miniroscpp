@@ -60,7 +60,8 @@ public:
   Master(std::shared_ptr<RPCManager> manager);
   ~Master();
 
-  bool start(PollSet* poll_set, int port);
+  /// @param advertisedHost name placed in this master's RPC URI. Empty uses the resolver hostname.
+  bool start(PollSet* poll_set, int port, const std::string& advertisedHost = {});
   void stop();
   bool ok() const;
 
@@ -105,8 +106,8 @@ public:
   /// Enable or disable persistent state (cache.<port> in the current working directory).
   void setCacheEnabled(bool enabled);
 
-  /// Enable `/p/{node}/` reverse proxy. Default is off. Must be set before start()
-  /// to open the port; later changes still refuse new tunnels.
+  /// Enable `/p/{node}/` reverse proxy. Default is off.
+  /// Can change while running. New tunnels follow the flag; open tunnels stay up.
   void setHttpProxyEnabled(bool enabled);
 
   /// Update queued tasks.

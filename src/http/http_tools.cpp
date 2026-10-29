@@ -153,6 +153,26 @@ std::string_view HttpParserFrame::body() const
   return {};
 }
 
+std::string_view HttpParserFrame::pastHeader() const
+{
+  if (m_bodyPosition <= 0 || static_cast<size_t>(m_bodyPosition) > data.size())
+    return {};
+  return std::string_view(data.data() + m_bodyPosition, data.size() - static_cast<size_t>(m_bodyPosition));
+}
+
+bool HttpParserFrame::nameEquals(std::string_view a, std::string_view b)
+{
+  if (a.size() != b.size())
+    return false;
+  for (size_t i = 0; i < a.size(); ++i) {
+    const auto ca = static_cast<unsigned char>(a[i]);
+    const auto cb = static_cast<unsigned char>(b[i]);
+    if (std::tolower(ca) != std::tolower(cb))
+      return false;
+  }
+  return true;
+}
+
 bool HttpParserFrame::hasContentLength() const
 {
   return m_contentLength >= 0;
@@ -322,27 +342,21 @@ int HttpParserFrame::incrementalParse()
       assert(tokenStart != nullptr);
       if (strncmp(cp, "\r\n", 2) == 0) {
         const char* namePtr = start + m_fieldName.start;
-        if (strncasecmp(namePtr, "Content-length", 14) == 0)  {
+        const std::string_view name(namePtr, static_cast<size_t>(m_fieldName.size()));
+        const std::string_view value(tokenStart, static_cast<size_t>(cp - tokenStart));
+        Field field;
+        field.name.assign(name);
+        field.value.assign(value);
+        fields.push_back(std::move(field));
+        if (nameEquals(name, "Content-Length")) {
           m_contentLength = atoi(tokenStart);
-        } else if (strncasecmp(namePtr, "Connection", 10) == 0) {
-          if (strncasecmp(tokenStart, "keep-alive", 10) == 0) {
+        } else if (nameEquals(name, "Connection")) {
+          if (nameEquals(value, "keep-alive"))
             m_keepAlive = true;
-          } else if (strncasecmp(tokenStart, "close", 5) == 0) {
+          else if (nameEquals(value, "close"))
             m_keepAlive = false;
-          }
-          /// Unspecialized field
-          Field field;
-          field.name = std::string(namePtr, m_fieldName.size());
-          field.value = std::string(tokenStart, cp - tokenStart);
-          fields.push_back(std::move(field));
-        } else if (strncasecmp(namePtr, "Content-Type", 12) == 0) {
+        } else if (nameEquals(name, "Content-Type")) {
           contentType.assign(tokenStart - start, cp - start);
-        } else {
-          /// Unspecialized field
-          Field field;
-          field.name = std::string(namePtr, m_fieldName.size());
-          field.value = std::string(tokenStart, cp - tokenStart);
-          fields.push_back(std::move(field));
         }
         cp += 2;
         tokenStart = cp;

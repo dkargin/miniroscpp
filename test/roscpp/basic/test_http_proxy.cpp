@@ -3,22 +3,18 @@
 //
 
 #include <chrono>
+#include <filesystem>
 #include <map>
 #include <string>
 #include <thread>
 
 #include <gtest/gtest.h>
 
-#include <arpa/inet.h>
-#include <netinet/in.h>
-#include <sys/socket.h>
-#include <unistd.h>
-#include <poll.h>
-
-#include "master.h"
+#include "miniros/roscore/master.h"
 
 #include "miniros/common.h"
 #include "miniros/io/io.h"
+#include "miniros/network/socket.h"
 #include "miniros/http/http_endpoint.h"
 #include "miniros/http/http_filters.h"
 #include "miniros/http/http_request.h"
@@ -87,69 +83,49 @@ std::string lower(std::string s)
   return s;
 }
 
-bool sendAll(int fd, const std::string& data)
-{
-  size_t off = 0;
-  while (off < data.size()) {
-    const ssize_t n = ::send(fd, data.data() + off, data.size() - off, MSG_NOSIGNAL);
-    if (n < 0) {
-      if (errno == EINTR)
-        continue;
-      return false;
-    }
-    off += static_cast<size_t>(n);
-  }
-  return true;
-}
-
 Exchange httpExchange(int port, const std::string& raw, double timeoutSec = 3.0)
 {
   Exchange out;
-  const int fd = ::socket(AF_INET, SOCK_STREAM, 0);
-  if (fd < 0)
+  network::NetSocket sock;
+  const network::NetAddress addr = network::NetAddress::fromIp4String("127.0.0.1", port);
+  if (sock.tcpConnect(addr, false) != Error::Ok)
     return out;
-  sockaddr_in addr{};
-  addr.sin_family = AF_INET;
-  addr.sin_port = htons(static_cast<uint16_t>(port));
-  inet_pton(AF_INET, "127.0.0.1", &addr.sin_addr);
-  if (::connect(fd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) != 0) {
-    ::close(fd);
+  // recv() drains until WouldBlock, so the socket must not block inside one read.
+  if (sock.setNonBlock() != Error::Ok)
     return out;
+
+  const auto deadline = std::chrono::steady_clock::now() + std::chrono::duration<double>(timeoutSec);
+  size_t sent = 0;
+  while (sent < raw.size() && std::chrono::steady_clock::now() < deadline) {
+    const auto [n, err] = sock.send(raw.data() + sent, raw.size() - sent, nullptr);
+    sent += n;
+    if (sent >= raw.size())
+      break;
+    // WouldBlock covers a full send buffer and EINTR. Anything else is a hard failure.
+    if (err != Error::WouldBlock && err != Error::Ok)
+      return out;
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
   }
-  if (!sendAll(fd, raw)) {
-    ::close(fd);
+  if (sent < raw.size())
     return out;
-  }
 
   std::string buf;
-  const auto deadline = std::chrono::steady_clock::now() + std::chrono::duration<double>(timeoutSec);
   bool sawHead = false;
   size_t headEnd = 0;
   int contentLength = -1;
   while (std::chrono::steady_clock::now() < deadline) {
     if (sawHead && contentLength >= 0 && buf.size() >= headEnd + static_cast<size_t>(contentLength))
       break;
-    pollfd pfd{};
-    pfd.fd = fd;
-    pfd.events = POLLIN;
-    const int pr = ::poll(&pfd, 1, 50);
-    if (pr < 0) {
-      if (errno == EINTR)
-        continue;
-      break;
-    }
-    if (pr == 0)
+    std::string chunk;
+    const auto [n, err] = sock.recv(chunk, nullptr);
+    if (n > 0)
+      buf.append(chunk);
+    if (n == 0 && err == Error::WouldBlock) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(50));
       continue;
-    char tmp[4096];
-    const ssize_t n = ::recv(fd, tmp, sizeof(tmp), 0);
-    if (n == 0)
-      break;
-    if (n < 0) {
-      if (errno == EINTR)
-        continue;
-      break;
     }
-    buf.append(tmp, static_cast<size_t>(n));
+    if (err != Error::Ok && err != Error::WouldBlock && err != Error::EndOfFile)
+      break;
     if (!sawHead) {
       headEnd = buf.find("\r\n\r\n");
       if (headEnd != std::string::npos) {
@@ -181,8 +157,9 @@ Exchange httpExchange(int port, const std::string& raw, double timeoutSec = 3.0)
         }
       }
     }
+    if (err == Error::EndOfFile)
+      break;
   }
-  ::close(fd);
   if (sawHead && headEnd <= buf.size())
     out.body = buf.substr(headEnd);
   return out;
@@ -229,7 +206,7 @@ public:
     master_->setMultimasterEnabled(false);
     master_->setNodeCheckPeriod(0);
     master_->setHttpProxyEnabled(true);
-    ASSERT_TRUE(master_->start(&poll_.getPollSet(), 0));
+    ASSERT_TRUE(master_->start(&poll_.getPollSet(), 0, "127.0.0.1"));
 
     handler_ = std::make_shared<NodeHandler>();
     node_ = std::make_unique<http::HttpServer>(&poll_.getPollSet());
@@ -346,6 +323,59 @@ TEST_F(HttpProxyTest, DisabledMasterRefusesRegistration)
   EXPECT_EQ(static_cast<int>(res[0]), 0);
   const Exchange got = httpExchange(master_->getPort(), request("GET", "/p/camera/ui/hello"));
   EXPECT_EQ(got.status, 404);
+}
+
+TEST_F(HttpProxyTest, RestoresRequestedProxyAfterRestart)
+{
+  struct CacheDir {
+    std::filesystem::path previous;
+    std::filesystem::path dir;
+    CacheDir()
+    {
+      previous = std::filesystem::current_path();
+      dir = std::filesystem::temp_directory_path() / "miniros-http-proxy-cache";
+      std::error_code ec;
+      std::filesystem::remove_all(dir, ec);
+      std::filesystem::create_directories(dir);
+      std::filesystem::current_path(dir);
+    }
+    ~CacheDir()
+    {
+      std::error_code ec;
+      std::filesystem::current_path(previous, ec);
+      std::filesystem::remove_all(dir, ec);
+    }
+  } cacheDir;
+
+  // The fixture master has caching off. Replace it with one that writes cache.<port>.
+  master_->stop();
+  master_.reset();
+
+  auto openCached = [&](int port) {
+    master_ = std::make_unique<master::Master>(rpc_);
+    master_->setCacheEnabled(true);
+    master_->setMultimasterEnabled(false);
+    master_->setNodeCheckPeriod(0);
+    master_->setHttpProxyEnabled(true);
+    return master_->start(&poll_.getPollSet(), port, "127.0.0.1");
+  };
+
+  ASSERT_TRUE(openCached(0));
+  enable("/camera", {"/ui/"});
+  const int port = master_->getPort();
+  ASSERT_GT(port, 0);
+  ASSERT_EQ(httpExchange(port, request("GET", "/p/camera/ui/hello")).status, 200);
+
+  master_->stop();
+  master_.reset();
+
+  ASSERT_TRUE(openCached(port));
+  ASSERT_EQ(master_->getPort(), port);
+  const Exchange restored = httpExchange(port, request("GET", "/p/camera/ui/hello"));
+  EXPECT_EQ(restored.status, 200);
+  EXPECT_EQ(restored.body, "/ui/hello");
+  const Exchange blocked = httpExchange(port, request("GET", "/p/camera/secret"));
+  EXPECT_EQ(blocked.status, 404);
 }
 
 TEST_F(HttpProxyTest, WholeOriginExceptRpc)

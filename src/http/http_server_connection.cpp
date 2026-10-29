@@ -128,10 +128,11 @@ Error HttpServerConnection::doReadRequest(Lock& lock)
 
   // A proxy path is detached as soon as the head is in. Reading the body here
   // would buffer it on the master and delay the poll thread.
-  if (!http_frame_.hasHeader() && http_frame_.data.size() > 16 * 1024)
+  constexpr size_t kMaxProxyRequestHeader = 16 * 1024;
+  if (!http_frame_.hasHeader() && http_frame_.data.size() > kMaxProxyRequestHeader)
     return Error::InvalidValue;
-  if (http_frame_.hasHeader() && isHttpProxyPath(http_frame_.getPath())) {
-    if (http_frame_.header().size() > 16 * 1024)
+  if (http_frame_.hasHeader() && requestIsProxied(lock)) {
+    if (http_frame_.header().size() > kMaxProxyRequestHeader)
       return Error::InvalidValue;
     return Error::Ok;
   }
@@ -268,6 +269,22 @@ std::shared_ptr<HttpRequest> HttpServerConnection::makeRequestObject(Lock& lock)
   return requestObject;
 }
 
+bool HttpServerConnection::requestIsProxied(Lock& lock) const
+{
+  if (!server_lifetime_)
+    return false;
+  // Copy before dropping guard_. detachFromServer() takes the server lifetime
+  // lock and then guard_ (via fd()). Taking the lifetime lock while guard_ is
+  // held inverts that order and TSan reports a deadlock cycle.
+  auto life = server_lifetime_;
+  const std::string path(http_frame_.getPath());
+  ScopedUnlock unlock(lock);
+  auto lifeLock = life->getLock();
+  if (!life->valid(lifeLock) || !life->ptr())
+    return false;
+  return life->ptr()->proxyPrefixMatches(path);
+}
+
 HttpServerConnection::EventReport HttpServerConnection::handoffProxy(Lock& lock)
 {
   EventReport report;
@@ -320,7 +337,7 @@ HttpServerConnection::EventReport HttpServerConnection::handleReadRequest(Lock& 
       report.disconnectMsg = "closed by EOF";
       return report;
     }
-    if (http_frame_.hasHeader() && isHttpProxyPath(http_frame_.getPath()))
+    if (http_frame_.hasHeader() && requestIsProxied(lock))
       return handoffProxy(lock);
     if (err != Error::Ok) {
       LOCAL_ERROR("Unexpected error %s", err.toString());

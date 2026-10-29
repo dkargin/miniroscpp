@@ -214,13 +214,13 @@ inline void close_signal_pair(signal_fd_t signal_pair[2]) {
  * Windows sockets need send/recv; Unix sockets and pipes use read/write.
  */
 #ifdef WIN32
-inline int write_socket(socket_fd_t sock, const char* buffer, unsigned int nbyte)
+inline int write_socket(socket_fd_t sock, const char* buffer, size_t nbyte)
 {
-  return ::send(sock, buffer, nbyte, 0);
+  return ::send(sock, buffer, static_cast<int>(nbyte), 0);
 }
-inline int read_socket(socket_fd_t sock, char* buffer, unsigned int nbyte)
+inline int read_socket(socket_fd_t sock, char* buffer, size_t nbyte)
 {
-  return ::recv(sock, buffer, nbyte, 0);
+  return ::recv(sock, buffer, static_cast<int>(nbyte), 0);
 }
 #else
 inline int write_socket(socket_fd_t sock, const void* buffer, size_t nbyte)
