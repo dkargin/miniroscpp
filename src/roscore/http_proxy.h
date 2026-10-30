@@ -16,7 +16,7 @@
 namespace miniros {
 namespace http {
 class HttpServer;
-class HttpParserFrame;
+struct HttpParserFrame;
 class HttpProxyTunnel;
 }
 

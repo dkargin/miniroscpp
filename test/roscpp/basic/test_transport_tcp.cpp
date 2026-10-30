@@ -97,12 +97,12 @@ protected:
 TEST_F(Synchronous, writeThenRead)
 {
   std::string msg = "test";
-  int32_t written = transports_[1]->write((uint8_t*)msg.c_str(), msg.length());
+  int32_t written = transports_[1]->write((uint8_t*)msg.c_str(), static_cast<uint32_t>(msg.length()));
   ASSERT_EQ(written, (int32_t)msg.length());
 
   uint8_t buf[5];
   memset(buf, 0, sizeof(buf));
-  int32_t read = transports_[2]->read(buf, msg.length());
+  int32_t read = transports_[2]->read(buf, static_cast<uint32_t>(msg.length()));
   ASSERT_EQ(read, (int32_t)msg.length());
   ASSERT_STREQ((const char*)buf, msg.c_str());
 }
@@ -110,7 +110,7 @@ TEST_F(Synchronous, writeThenRead)
 TEST_F(Synchronous, writeThenReadPartial)
 {
   std::string msg = "test";
-  int32_t written = transports_[1]->write((uint8_t*)msg.c_str(), msg.length());
+  int32_t written = transports_[1]->write((uint8_t*)msg.c_str(), static_cast<uint32_t>(msg.length()));
   ASSERT_EQ(written, (int32_t)msg.length());
 
   uint8_t buf[5];
@@ -162,7 +162,7 @@ TEST_F(Synchronous, readWhileWriting)
 
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
-    int32_t written = transports_[1]->write((uint8_t*)msg.c_str(), msg.length());
+    int32_t written = transports_[1]->write((uint8_t*)msg.c_str(), static_cast<uint32_t>(msg.length()));
     ASSERT_EQ(written, (int32_t)msg.length());
 
     while (!reader.done_read)
@@ -192,7 +192,7 @@ TEST_F(Synchronous, writeAfterClose)
   transports_[1]->close();
 
   std::string msg = "test";
-  int32_t written = transports_[1]->write((uint8_t*)msg.c_str(), msg.length());
+  int32_t written = transports_[1]->write((uint8_t*)msg.c_str(), static_cast<uint32_t>(msg.length()));
   ASSERT_EQ(written, -1);
 }
 

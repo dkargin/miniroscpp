@@ -242,8 +242,6 @@ Error addressFromString(NetAddress::Type type, const std::string& address, int p
       case EAI_SERVICE:
       case EAI_SOCKTYPE:
         // Invalid call parameters or unsupported combination.
-      case EAI_NONAME:
-        // Invalid host name (or unknown host/service).
         return Error::InvalidValue;
       case EAI_AGAIN:
 #ifndef WIN32
@@ -251,7 +249,9 @@ Error addressFromString(NetAddress::Type type, const std::string& address, int p
       case EAI_NODATA:
 #endif
       case EAI_FAIL:
-        // Name can be valid but is not resolvable right now.
+      case EAI_NONAME:
+        // Name is missing or not resolvable yet. Callers may retry.
+        // glibc reports an unknown host as EAI_NONAME; other resolvers use EAI_FAIL or EAI_AGAIN.
         return Error::AddressIsUnknown;
       default:
         break;
