@@ -269,14 +269,20 @@ std::shared_ptr<HttpRequest> HttpServerConnection::makeRequestObject(Lock& lock)
   return requestObject;
 }
 
-bool HttpServerConnection::requestIsProxied(Lock& /*lock*/) const
+bool HttpServerConnection::requestIsProxied(Lock& lock) const
 {
   if (!server_lifetime_)
     return false;
-  auto lifeLock = server_lifetime_->getLock();
-  if (!server_lifetime_->valid(lifeLock) || !server_lifetime_->ptr())
+  // Copy before dropping guard_. detachFromServer() takes the server lifetime
+  // lock and then guard_ (via fd()). Taking the lifetime lock while guard_ is
+  // held inverts that order and TSan reports a deadlock cycle.
+  auto life = server_lifetime_;
+  const std::string path(http_frame_.getPath());
+  ScopedUnlock unlock(lock);
+  auto lifeLock = life->getLock();
+  if (!life->valid(lifeLock) || !life->ptr())
     return false;
-  return server_lifetime_->ptr()->proxyPrefixMatches(http_frame_.getPath());
+  return life->ptr()->proxyPrefixMatches(path);
 }
 
 HttpServerConnection::EventReport HttpServerConnection::handoffProxy(Lock& lock)

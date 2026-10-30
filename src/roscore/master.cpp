@@ -110,7 +110,7 @@ int Master::getPort() const
   return internal_ && internal_->rpcManager ? internal_->rpcManager->getServerPort() : 0;
 }
 
-bool Master::start(PollSet* poll_set, int port)
+bool Master::start(PollSet* poll_set, int port, const std::string& advertisedHost)
 {
   if (!internal_)
     return false;
@@ -149,7 +149,10 @@ bool Master::start(PollSet* poll_set, int port)
   internal_->rpcManager->setPollSet(poll_set);
   internal_->regManager.setPollSet(poll_set);
 
-  if (!internal_->rpcManager->start(cb, port)) {
+  std::string host = advertisedHost;
+  if (host.empty())
+    host = internal_->resolver.getHost();
+  if (!internal_->rpcManager->start(cb, port, host)) {
     return false;
   }
   if (internal_->httpProxy) {

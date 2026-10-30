@@ -6,14 +6,15 @@
 
 #include "miniros/http/http_proxy.h"
 
-#include <atomic>
 #include <cstdio>
+#include <mutex>
 #include <string>
 #include <utility>
 #include <vector>
 
 #define MINIROS_PACKAGE_NAME "http"
 
+#include "internal/threading.h"
 #include "miniros/http/http_tools.h"
 #include "miniros/io/io.h"
 #include "miniros/io/poll_set.h"
@@ -222,15 +223,20 @@ void writeHttpStatusAndClose(const std::shared_ptr<network::NetSocket>& socket, 
 }
 
 struct HttpProxyTunnel::Impl {
-  PollSet* poll = nullptr;
+  PollSet* poll GUARDED_BY(mu) = nullptr;
   std::shared_ptr<network::NetSocket> client;
   std::shared_ptr<network::NetSocket> upstream;
   HttpProxyTarget target;
   DoneFn onDone;
 
   bool connecting = true;
-  std::atomic<bool> stop{false};
-  bool finished = false;
+  /// Guards stop, finished, and the fd numbers requestClose() signals.
+  mutable std::mutex mu;
+  bool stop GUARDED_BY(mu) = false;
+  bool finished GUARDED_BY(mu) = false;
+  /// -1 once finish() drops that socket.
+  int clientFd GUARDED_BY(mu) = -1;
+  int upstreamFd GUARDED_BY(mu) = -1;
   bool responseHeadDone = false;
 
   /// Head and body stay apart so one write2() can gather them.
@@ -263,17 +269,19 @@ struct HttpProxyTunnel::Impl {
 
   void armIdle()
   {
-    if (!poll)
+    PollSet* ps = pollSet();
+    if (!ps)
       return;
     if (client && client->valid())
-      poll->setTimerEvent(client->fd(), kIdleTimeoutMs);
+      ps->setTimerEvent(client->fd(), kIdleTimeoutMs);
     if (upstream && upstream->valid())
-      poll->setTimerEvent(upstream->fd(), connecting ? kConnectTimeoutMs : kIdleTimeoutMs);
+      ps->setTimerEvent(upstream->fd(), connecting ? kConnectTimeoutMs : kIdleTimeoutMs);
   }
 
   void refreshInterest()
   {
-    if (!poll)
+    PollSet* ps = pollSet();
+    if (!ps)
       return;
     if (client && client->valid()) {
       int ev = 0;
@@ -281,7 +289,7 @@ struct HttpProxyTunnel::Impl {
         ev |= PollSet::EventOut;
       if (requestLeft > 0 && up.unsent() < kBufCap)
         ev |= PollSet::EventIn;
-      poll->setEvents(client->fd(), ev);
+      ps->setEvents(client->fd(), ev);
     }
     if (upstream && upstream->valid()) {
       int ev = 0;
@@ -290,7 +298,7 @@ struct HttpProxyTunnel::Impl {
       const bool wantRead = !responseEof && (responseLeft != 0) && down.unsent() < kBufCap;
       if (!connecting && wantRead)
         ev |= PollSet::EventIn;
-      poll->setEvents(upstream->fd(), ev);
+      ps->setEvents(upstream->fd(), ev);
     }
   }
 
@@ -305,7 +313,7 @@ struct HttpProxyTunnel::Impl {
     if (!pending.pending())
       pending.reset();
     if (err == Error::EndOfFile || err == Error::SystemError)
-      stop = true;
+      requestStop();
     return n > 0;
   }
 
@@ -323,7 +331,7 @@ struct HttpProxyTunnel::Impl {
       return true;
     }
     if (n == 0 || !last_socket_error_is_would_block())
-      stop = true;
+      requestStop();
     return false;
   }
 
@@ -333,7 +341,7 @@ struct HttpProxyTunnel::Impl {
       return false;
     if (!responseHeadDone) {
       if (responseFrame.data.size() >= kMaxHeader) {
-        stop = true;
+        requestStop();
         return false;
       }
       const size_t cap = std::min(kBufCap, kMaxHeader - responseFrame.data.size());
@@ -342,7 +350,7 @@ struct HttpProxyTunnel::Impl {
         responseFrame.data.append(scratch, n);
         responseFrame.incrementalParse();
         if (responseFrame.state() == HttpParserFrame::ParseInvalid) {
-          stop = true;
+          requestStop();
           return false;
         }
         if (responseFrame.hasHeader()) {
@@ -366,7 +374,7 @@ struct HttpProxyTunnel::Impl {
         return true;
       }
       if (n == 0 || !last_socket_error_is_would_block())
-        stop = true;
+        requestStop();
       return false;
     }
 
@@ -387,11 +395,11 @@ struct HttpProxyTunnel::Impl {
     if (n == 0) {
       responseEof = true;
       if (responseLeft > 0)
-        stop = true;
+        requestStop();
       return false;
     }
     if (!last_socket_error_is_would_block())
-      stop = true;
+      requestStop();
     return false;
   }
 
@@ -411,18 +419,52 @@ struct HttpProxyTunnel::Impl {
     return !up.pending() && requestLeft <= 0;
   }
 
+  bool isFinished() const
+  {
+    std::lock_guard<std::mutex> lock(mu);
+    return finished;
+  }
+
+  bool stopRequested() const
+  {
+    std::lock_guard<std::mutex> lock(mu);
+    return stop;
+  }
+
+  void requestStop()
+  {
+    std::lock_guard<std::mutex> lock(mu);
+    stop = true;
+  }
+
+  PollSet* pollSet() const
+  {
+    std::lock_guard<std::mutex> lock(mu);
+    return poll;
+  }
+
   void finish()
   {
-    if (finished)
-      return;
-    finished = true;
-    DoneFn done = std::move(onDone);
-    const int clientFd = client && client->valid() ? client->fd() : -1;
-    const int upFd = upstream && upstream->valid() ? upstream->fd() : -1;
-    if (poll && clientFd >= 0)
-      poll->delSocket(clientFd);
-    if (poll && upFd >= 0)
-      poll->delSocket(upFd);
+    DoneFn done;
+    int closingClient = -1;
+    int closingUpstream = -1;
+    PollSet* ps = nullptr;
+    {
+      std::lock_guard<std::mutex> lock(mu);
+      if (finished)
+        return;
+      finished = true;
+      closingClient = clientFd;
+      closingUpstream = upstreamFd;
+      clientFd = -1;
+      upstreamFd = -1;
+      ps = poll;
+      done = std::move(onDone);
+    }
+    if (ps && closingClient >= 0)
+      ps->delSocket(closingClient);
+    if (ps && closingUpstream >= 0)
+      ps->delSocket(closingUpstream);
     if (client)
       client->close();
     if (upstream)
@@ -441,7 +483,7 @@ struct HttpProxyTunnel::Impl {
         progress = writePending(*client, down) || progress;
       progress = readRequestBody() || progress;
       progress = readResponse() || progress;
-      if (!progress || stop)
+      if (!progress || stopRequested())
         break;
     }
   }
@@ -458,9 +500,9 @@ struct HttpProxyTunnel::Impl {
   int onEvent(int fd, int flags)
   {
     (void)fd;
-    if (finished)
+    if (isFinished())
       return 0;
-    if (stop || (flags & PollSet::EventTimer)) {
+    if (stopRequested() || (flags & PollSet::EventTimer)) {
       if (connecting && client && client->valid())
         writeHttpStatusAndClose(client, 502, "Bad Gateway");
       finish();
@@ -513,18 +555,25 @@ HttpProxyTunnel::~HttpProxyTunnel() = default;
 
 bool HttpProxyTunnel::finished() const
 {
-  return !impl_ || impl_->finished;
+  return !impl_ || impl_->isFinished();
 }
 
 void HttpProxyTunnel::requestClose()
 {
-  if (!impl_ || impl_->finished)
+  if (!impl_)
     return;
-  impl_->stop = true;
-  if (impl_->poll && impl_->client && impl_->client->valid())
-    impl_->poll->signalFd(impl_->client->fd());
-  else if (impl_->poll && impl_->upstream && impl_->upstream->valid())
-    impl_->poll->signalFd(impl_->upstream->fd());
+  int fd = -1;
+  PollSet* poll = nullptr;
+  {
+    std::lock_guard<std::mutex> lock(impl_->mu);
+    impl_->stop = true;
+    if (impl_->finished)
+      return;
+    poll = impl_->poll;
+    fd = impl_->clientFd >= 0 ? impl_->clientFd : impl_->upstreamFd;
+  }
+  if (poll && fd >= 0)
+    poll->signalFd(fd);
 }
 
 std::shared_ptr<HttpProxyTunnel> HttpProxyTunnel::open(PollSet* poll,
@@ -539,7 +588,6 @@ std::shared_ptr<HttpProxyTunnel> HttpProxyTunnel::open(PollSet* poll,
   }
 
   auto impl = std::make_shared<Impl>();
-  impl->poll = poll;
   impl->client = std::move(client);
   impl->target = std::move(target);
   impl->onDone = std::move(onDone);
@@ -568,6 +616,12 @@ std::shared_ptr<HttpProxyTunnel> HttpProxyTunnel::open(PollSet* poll,
 
   const int clientFd = impl->client->fd();
   const int upFd = impl->upstream->fd();
+  {
+    std::lock_guard<std::mutex> lock(impl->mu);
+    impl->poll = poll;
+    impl->clientFd = clientFd;
+    impl->upstreamFd = upFd;
+  }
   if (!poll->addSocket(clientFd, 0,
         [impl, clientFd](int flags) { return impl->onEvent(clientFd, flags); }, impl, {})) {
     writeHttpStatusAndClose(impl->client, 502, "Bad Gateway");

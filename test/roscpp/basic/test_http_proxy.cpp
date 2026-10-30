@@ -229,7 +229,7 @@ public:
     master_->setMultimasterEnabled(false);
     master_->setNodeCheckPeriod(0);
     master_->setHttpProxyEnabled(true);
-    ASSERT_TRUE(master_->start(&poll_.getPollSet(), 0));
+    ASSERT_TRUE(master_->start(&poll_.getPollSet(), 0, "127.0.0.1"));
 
     handler_ = std::make_shared<NodeHandler>();
     node_ = std::make_unique<http::HttpServer>(&poll_.getPollSet());

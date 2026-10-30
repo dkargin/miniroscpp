@@ -60,7 +60,8 @@ public:
   Master(std::shared_ptr<RPCManager> manager);
   ~Master();
 
-  bool start(PollSet* poll_set, int port);
+  /// @param advertisedHost name placed in this master's RPC URI. Empty uses the resolver hostname.
+  bool start(PollSet* poll_set, int port, const std::string& advertisedHost = {});
   void stop();
   bool ok() const;
 

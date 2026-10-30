@@ -36,7 +36,6 @@
 #include <set>
 #include <thread>
 
-#include "miniros/network/network.h"
 #include "miniros/master_link.h"
 #include "miniros/rosassert.h"
 #include "miniros/io/io.h"
@@ -212,7 +211,7 @@ RPCManager::~RPCManager()
   shutdown();
 }
 
-Error RPCManager::start(const CallbackQueuePtr& cb, int port)
+Error RPCManager::start(const CallbackQueuePtr& cb, int port, const std::string& advertisedHost)
 {
   if (!internal_)
     return Error::InternalError;
@@ -260,9 +259,12 @@ Error RPCManager::start(const CallbackQueuePtr& cb, int port)
     }
   }
 
-  std::string host = network::getHost();
-  assert(!host.empty());
-  internal_->assignUrl(host, internal_->http_server_->getPort());
+  if (advertisedHost.empty()) {
+    MINIROS_ERROR("RPCManager::start(%d) - advertised host is empty", port);
+    internal_->http_server_->stop();
+    return Error::InvalidValue;
+  }
+  internal_->assignUrl(advertisedHost, internal_->http_server_->getPort());
 
   if (port == 0) {
     MINIROS_INFO("Started RPC manager at free port %d", internal_->url_.port);
