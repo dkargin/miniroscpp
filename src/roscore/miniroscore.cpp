@@ -109,6 +109,7 @@ int main(int argc, const char ** argv) {
     ("node_check_period", po::value<double>()->default_value(5.0),
       "Period in seconds for checking whether registered nodes are still alive (0 disables)")
     ("debugAPI", "Enable debug HTTP API at /debugAPI/... (e.g. GET /debugAPI/shutdown)")
+    ("http-proxy", po::value<bool>()->default_value(false), "Serve /p/{node}/ reverse HTTP proxy")
     ;
 
   po::variables_map vm;
@@ -189,6 +190,7 @@ int main(int argc, const char ** argv) {
   master.setCacheEnabled(!vm.count("no-cache"));
   if (vm.count("debugAPI"))
     master.setDebugApi(true);
+  master.setHttpProxyEnabled(vm["http-proxy"].as<bool>());
 
   PidFile pidFile;
   if (vm.count("pidfile")) {

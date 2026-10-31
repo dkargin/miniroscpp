@@ -32,7 +32,8 @@ struct CachedService {
 
 /// One registered node identity. Topic registrations are re-queried from the
 /// node on restore; services are restored from this snapshot because the ROS
-/// Slave API has no getServices method.
+/// Slave API has no getServices method. Requested HTTP proxy prefixes are
+/// restored the same way when this node is still alive.
 struct CachedNode {
   std::string name;
   std::string api;
@@ -40,6 +41,9 @@ struct CachedNode {
   /// NodeRef::State name at the time of the snapshot (see State::toString).
   std::string state;
   std::vector<CachedService> services;
+  /// Prefixes passed to rpc2EnableHttpProxy. Empty when the node did not request a proxy.
+  /// The tunnel dials the node API above; the RPC has no separate proxy address.
+  std::vector<std::string> httpProxyPrefixes;
 };
 
 /// One multimaster peer that was paired (or mid-request) when the snapshot was taken.

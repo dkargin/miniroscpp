@@ -504,11 +504,13 @@ Error HttpClient::reconnect(int timeoutMs)
   //  return Error::InvalidAddress;
 
   network::NetAddress newAddress;
-  Error resolveErr = Error::Ok;
+  Error resolveErr;
   {
     std::scoped_lock lock2(internal_->address_guard);
-    network::addressFromString(network::NetAddress::AddressUnspecified,
+    resolveErr = network::addressFromString(network::NetAddress::AddressUnspecified,
       internal_->address.host, internal_->address.port, newAddress);
+    if (resolveErr)
+      internal_->address.resolved = newAddress;
   }
 
   bool needAddress = false;

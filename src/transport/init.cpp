@@ -354,7 +354,9 @@ Error start()
   }
 
   int rpcPort = network::getRPCPort();
-  if (Error err = rpcm->start(internalCallbackQueue, rpcPort); !err) {
+  // Host was chosen by network::init() from remappings / ROS_HOSTNAME / ROS_IP.
+  // RPCManager only stores it in the advertised URI.
+  if (Error err = rpcm->start(internalCallbackQueue, rpcPort, network::getHost()); !err) {
     // We can arrive here only if we are completely unable to host TCP/http server.
     MINIROS_ERROR("Failed to start RPCManager at port %d: %s", rpcPort, err.toString());
     shutdown();

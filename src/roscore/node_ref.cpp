@@ -75,6 +75,9 @@ void NodeRef::clear()
   m_topicPublications.clear();
   m_topicSubscriptions.clear();
   m_services.clear();
+  m_httpProxyPrefixes.clear();
+  m_httpProxyDial = {};
+  m_httpProxyPeer.clear();
 }
 
 NodeRef::State NodeRef::getState() const
@@ -89,7 +92,8 @@ bool NodeRef::isEmpty() const
   /// m_paramSubscriptions are not checked here, since node is not guaranteed to properly unsubscribe from all its
   /// parameters on exit.
   return m_topicSubscriptions.empty() &&
-         m_topicPublications.empty() && m_services.empty() /* && m_paramSubscriptions.empty() */;
+         m_topicPublications.empty() && m_services.empty() &&
+         m_httpProxyPrefixes.empty() /* && m_paramSubscriptions.empty() */;
 }
 
 bool NodeRef::add(Registrations::Type type_, const std::string& key)
@@ -265,6 +269,51 @@ int NodeRef::getNodeFlags() const
 {
   std::unique_lock lock(m_guard);
   return m_flags;
+}
+
+void NodeRef::setHttpProxy(std::vector<std::string> prefixes, const network::NetAddress& dial)
+{
+  std::unique_lock lock(m_guard);
+  m_httpProxyPrefixes = std::move(prefixes);
+  m_httpProxyDial = dial;
+}
+
+void NodeRef::clearHttpProxy()
+{
+  std::unique_lock lock(m_guard);
+  m_httpProxyPrefixes.clear();
+  m_httpProxyDial = {};
+  m_httpProxyPeer.clear();
+}
+
+bool NodeRef::hasHttpProxy() const
+{
+  std::unique_lock lock(m_guard);
+  return !m_httpProxyPrefixes.empty() && m_httpProxyDial.valid();
+}
+
+std::vector<std::string> NodeRef::httpProxyPrefixes() const
+{
+  std::unique_lock lock(m_guard);
+  return m_httpProxyPrefixes;
+}
+
+network::NetAddress NodeRef::httpProxyDial() const
+{
+  std::unique_lock lock(m_guard);
+  return m_httpProxyDial;
+}
+
+void NodeRef::setHttpProxyPeer(std::string peer)
+{
+  std::unique_lock lock(m_guard);
+  m_httpProxyPeer = std::move(peer);
+}
+
+std::string NodeRef::httpProxyPeer() const
+{
+  std::unique_lock lock(m_guard);
+  return m_httpProxyPeer;
 }
 
 std::string NodeRef::debugName() const

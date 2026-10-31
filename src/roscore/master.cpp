@@ -49,6 +49,7 @@ Master::Internal::Internal(const std::shared_ptr<RPCManager>& manager)
   resolver.scanAdapters();
   cache.bind(&regManager, &handler);
   multimaster = std::make_unique<MultimasterManager>(&resolver, &regManager);
+  httpProxy = std::make_shared<HttpProxyHub>(&regManager, "/p");
   cache.setPeerPersistence(
     [this]() { return multimaster ? multimaster->collectCachedPeers() : std::vector<CachedPeer>{}; },
     [this](const std::vector<CachedPeer>& peers) {
@@ -109,7 +110,7 @@ int Master::getPort() const
   return internal_ && internal_->rpcManager ? internal_->rpcManager->getServerPort() : 0;
 }
 
-bool Master::start(PollSet* poll_set, int port)
+bool Master::start(PollSet* poll_set, int port, const std::string& advertisedHost)
 {
   if (!internal_)
     return false;
@@ -148,8 +149,16 @@ bool Master::start(PollSet* poll_set, int port)
   internal_->rpcManager->setPollSet(poll_set);
   internal_->regManager.setPollSet(poll_set);
 
-  if (!internal_->rpcManager->start(cb, port)) {
+  std::string host = advertisedHost;
+  if (host.empty())
+    host = internal_->resolver.getHost();
+  if (!internal_->rpcManager->start(cb, port, host)) {
     return false;
+  }
+  if (internal_->httpProxy) {
+    internal_->httpProxy->setEnabled(internal_->httpProxyEnabled);
+    if (http::HttpServer* http = internal_->rpcManager->getHttpServer())
+      internal_->httpProxy->attach(http);
   }
 
   // Use the already-loaded snapshot; bound port only updates the save path.
@@ -177,6 +186,8 @@ void Master::stop()
 {
   if (!internal_)
     return;
+  if (internal_->httpProxy)
+    internal_->httpProxy->detach();
   const int port = internal_->rpcManager ? internal_->rpcManager->getServerPort() : 0;
   internal_->cache.flush(port, internal_->uuid.toString());
   if (internal_->multimaster)
@@ -228,6 +239,8 @@ void Master::setupBindings(const std::shared_ptr<CallbackQueue>& cb)
   rpcManager->bindEx3("unregisterService", this, &Master::unregisterService);
   rpcManager->bindEx4("registerService", this, &Master::registerService);
   rpcManager->bindEx2("lookupNode", this, &Master::lookupNode);
+  rpcManager->bindEx3("rpc2EnableHttpProxy", this, &Master::rpc2EnableHttpProxy);
+  rpcManager->bindEx2("rpc2DisableHttpProxy", this, &Master::rpc2DisableHttpProxy);
 
   // Rosparam part.
   rpcManager->bindEx2("hasParam", this, &Master::hasParam);
@@ -246,6 +259,7 @@ void Master::setupBindings(const std::shared_ptr<CallbackQueue>& cb)
     internal_->httpPublishedTopicsEndpoint.reset(new PublishedTopicsEndpoint(internal_.get()));
     internal_->httpSettingsEndpoint.reset(new SettingsEndpoint(internal_.get(), false));
     internal_->httpNodeUriEndpoint.reset(new NodeUriEndpoint(internal_.get()));
+    internal_->httpProxyEndpoint.reset(new HttpProxyEndpoint(internal_.get()));
     internal_->httpTopicTypesEndpoint.reset(new TopicTypesEndpoint(internal_.get()));
     internal_->httpMultimasterApiEndpoint.reset(new MultimasterApiEndpoint(internal_.get()));
     internal_->httpLogEndpoint.reset(new MasterLogEndpoint(internal_.get()));
@@ -264,6 +278,8 @@ void Master::setupBindings(const std::shared_ptr<CallbackQueue>& cb)
       internal_->httpSettingsEndpoint, cb);
     server->registerEndpoint(std::make_unique<http::SimpleFilter>(http::HttpMethod::Get, "/api2/node_uri"),
       internal_->httpNodeUriEndpoint, cb);
+    server->registerEndpoint(std::make_unique<http::SimpleFilter>(http::HttpMethod::Get, "/api2/http_proxy"),
+      internal_->httpProxyEndpoint, cb);
     server->registerEndpoint(std::make_unique<http::SimpleFilter>(http::HttpMethod::Get, "/api2/topic_types"),
       internal_->httpTopicTypesEndpoint, cb);
     server->registerEndpoint(
@@ -339,33 +355,36 @@ int Master::Internal::discoveryPort() const
   return port;
 }
 
-Error Master::Internal::applySettings(bool changeResolve, bool resolve,
-  bool changeDiscovery, bool discovery,
-  bool changePort, int discoveryPortValue,
-  bool changePersistence, bool persistence)
+Error Master::Internal::applySettings(const SettingsUpdate& update)
 {
-  if (changeResolve)
-    setResolveNodeIp(resolve);
+  if (update.resolve)
+    setResolveNodeIp(*update.resolve);
 
-  if (changePersistence) {
-    cache.setEnabled(persistence);
-    if (persistence) {
+  if (update.persistence) {
+    cache.setEnabled(*update.persistence);
+    if (*update.persistence) {
       const int port = rpcManager ? rpcManager->getServerPort() : 0;
       cache.flush(port, uuid.toString());
     }
   }
 
-  if (changePort) {
+  if (update.httpProxy) {
+    httpProxyEnabled = *update.httpProxy;
+    if (httpProxy)
+      httpProxy->setEnabled(*update.httpProxy);
+  }
+
+  if (update.discoveryPort) {
     if (!multimaster)
       return Error::InternalError;
-    if (Error err = multimaster->setUdpPort(discoveryPortValue); !err)
+    if (Error err = multimaster->setUdpPort(*update.discoveryPort); !err)
       return err;
   }
 
-  if (changeDiscovery) {
+  if (update.discovery) {
     if (!multimaster)
       return Error::InternalError;
-    if (!discovery) {
+    if (!*update.discovery) {
       multimasterEnabled = false;
       multimaster->setDiscoveryEnabled(false);
     } else {
@@ -402,6 +421,15 @@ void Master::setCacheEnabled(bool enabled)
   if (!internal_)
     return;
   internal_->cache.setEnabled(enabled);
+}
+
+void Master::setHttpProxyEnabled(bool enabled)
+{
+  if (!internal_)
+    return;
+  internal_->httpProxyEnabled = enabled;
+  if (internal_->httpProxy)
+    internal_->httpProxy->setEnabled(enabled);
 }
 
 void Master::Internal::checkNodesAlive()
@@ -841,6 +869,99 @@ Master::RpcValue Master::lookupNode(const std::string& caller_id, const std::str
   res[0] = 1;
   res[1] = "lookupNode";
   res[2] = api;
+  return res;
+}
+
+namespace {
+
+bool validHttpProxyPrefix(const std::string& prefix)
+{
+  if (prefix.empty() || prefix.size() > 256 || prefix.front() != '/')
+    return false;
+  if (prefix.find("..") != std::string::npos)
+    return false;
+  if (prefix.find('\n') != std::string::npos || prefix.find('\r') != std::string::npos)
+    return false;
+  return true;
+}
+
+} // namespace
+
+Master::RpcValue Master::rpc2EnableHttpProxy(const std::string& caller_id, const std::string& caller_api,
+  const RpcValue& prefixes, const ClientInfo&)
+{
+  RpcValue res = RpcValue::Array(3);
+  auto fail = [&](const std::string& msg) {
+    res[0] = 0;
+    res[1] = msg;
+    res[2] = 0;
+    return res;
+  };
+  if (!internal_ || !internal_->httpProxyEnabled)
+    return fail("http proxy is disabled");
+  if (caller_id.empty() || caller_id[0] != '/' || caller_api.empty())
+    return fail("invalid caller");
+  if (!prefixes.valid() || prefixes.getType() != RpcValue::TypeArray)
+    return fail("prefixes must be an array");
+  if (prefixes.size() > 32)
+    return fail("too many prefixes");
+
+  std::vector<std::string> stored;
+  stored.reserve(static_cast<size_t>(prefixes.size()));
+  for (int i = 0; i < prefixes.size(); ++i) {
+    if (prefixes[i].getType() != RpcValue::TypeString)
+      return fail("prefix must be a string");
+    const std::string prefix = prefixes[i];
+    if (!validHttpProxyPrefix(prefix))
+      return fail("invalid prefix");
+    stored.push_back(prefix);
+  }
+  if (stored.empty())
+    return rpc2DisableHttpProxy(caller_id, caller_api, ClientInfo{});
+
+  network::URL url;
+  if (!url.fromString(caller_api, false) || url.host.empty() || url.port == 0)
+    return fail("invalid caller_api");
+  // Registration runs on the callback thread, so a single DNS lookup here is
+  // off the poll thread. The stored address is what the tunnel dials.
+  const network::NetAddress dial = dialAddressForHost(url.host, static_cast<int>(url.port), true);
+  if (!dial.valid())
+    return fail("cannot resolve node API");
+
+  auto report = internal_->regManager.registerNodeApi(caller_id, caller_api, 0);
+  if (!report.node)
+    return fail("node name is not available");
+  const int flags = report.node->getNodeFlags();
+  if (flags & (NodeRef::NODE_FOREIGN | NodeRef::NODE_MASTER))
+    return fail("cannot proxy this node");
+
+  report.node->setHttpProxy(std::move(stored), dial);
+  internal_->cache.markDirty();
+  res[0] = 1;
+  res[1] = "http proxy enabled";
+  res[2] = 1;
+  return res;
+}
+
+Master::RpcValue Master::rpc2DisableHttpProxy(const std::string& caller_id, const std::string& caller_api,
+  const ClientInfo&)
+{
+  RpcValue res = RpcValue::Array(3);
+  if (!internal_) {
+    res[0] = 0;
+    res[1] = "master is not running";
+    res[2] = 0;
+    return res;
+  }
+  auto node = internal_->regManager.getNodeByName(caller_id);
+  if (node && node->getApi() == caller_api &&
+      !(node->getNodeFlags() & (NodeRef::NODE_FOREIGN | NodeRef::NODE_MASTER))) {
+    node->clearHttpProxy();
+    internal_->cache.markDirty();
+  }
+  res[0] = 1;
+  res[1] = "http proxy disabled";
+  res[2] = 1;
   return res;
 }
 
