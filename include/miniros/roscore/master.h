@@ -106,8 +106,8 @@ public:
   /// Enable or disable persistent state (cache.<port> in the current working directory).
   void setCacheEnabled(bool enabled);
 
-  /// Enable `/p/{node}/` reverse proxy. Default is off. Must be set before start()
-  /// to open the port; later changes still refuse new tunnels.
+  /// Enable `/p/{node}/` reverse proxy. Default is off.
+  /// Can change while running. New tunnels follow the flag; open tunnels stay up.
   void setHttpProxyEnabled(bool enabled);
 
   /// Update queued tasks.

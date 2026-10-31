@@ -355,33 +355,36 @@ int Master::Internal::discoveryPort() const
   return port;
 }
 
-Error Master::Internal::applySettings(bool changeResolve, bool resolve,
-  bool changeDiscovery, bool discovery,
-  bool changePort, int discoveryPortValue,
-  bool changePersistence, bool persistence)
+Error Master::Internal::applySettings(const SettingsUpdate& update)
 {
-  if (changeResolve)
-    setResolveNodeIp(resolve);
+  if (update.resolve)
+    setResolveNodeIp(*update.resolve);
 
-  if (changePersistence) {
-    cache.setEnabled(persistence);
-    if (persistence) {
+  if (update.persistence) {
+    cache.setEnabled(*update.persistence);
+    if (*update.persistence) {
       const int port = rpcManager ? rpcManager->getServerPort() : 0;
       cache.flush(port, uuid.toString());
     }
   }
 
-  if (changePort) {
+  if (update.httpProxy) {
+    httpProxyEnabled = *update.httpProxy;
+    if (httpProxy)
+      httpProxy->setEnabled(*update.httpProxy);
+  }
+
+  if (update.discoveryPort) {
     if (!multimaster)
       return Error::InternalError;
-    if (Error err = multimaster->setUdpPort(discoveryPortValue); !err)
+    if (Error err = multimaster->setUdpPort(*update.discoveryPort); !err)
       return err;
   }
 
-  if (changeDiscovery) {
+  if (update.discovery) {
     if (!multimaster)
       return Error::InternalError;
-    if (!discovery) {
+    if (!*update.discovery) {
       multimasterEnabled = false;
       multimaster->setDiscoveryEnabled(false);
     } else {
@@ -933,6 +936,7 @@ Master::RpcValue Master::rpc2EnableHttpProxy(const std::string& caller_id, const
     return fail("cannot proxy this node");
 
   report.node->setHttpProxy(std::move(stored), dial);
+  internal_->cache.markDirty();
   res[0] = 1;
   res[1] = "http proxy enabled";
   res[2] = 1;
@@ -953,6 +957,7 @@ Master::RpcValue Master::rpc2DisableHttpProxy(const std::string& caller_id, cons
   if (node && node->getApi() == caller_api &&
       !(node->getNodeFlags() & (NodeRef::NODE_FOREIGN | NodeRef::NODE_MASTER))) {
     node->clearHttpProxy();
+    internal_->cache.markDirty();
   }
   res[0] = 1;
   res[1] = "http proxy disabled";

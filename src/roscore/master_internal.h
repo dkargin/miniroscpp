@@ -3,6 +3,7 @@
 
 #include <atomic>
 #include <map>
+#include <optional>
 #include <set>
 #include <string_view>
 
@@ -147,12 +148,16 @@ struct Master::Internal {
   /// Bound XML-RPC port. 0 before the server is listening.
   int rpcPort() const;
 
-  /// Apply one local setting. Empty `discoveryPortText` leaves the port unchanged.
-  /// `discovery` nullopt-style: pass `changeDiscovery` false to skip that flag.
-  Error applySettings(bool changeResolve, bool resolve,
-    bool changeDiscovery, bool discovery,
-    bool changePort, int discoveryPort,
-    bool changePersistence, bool persistence);
+  /// Local settings to apply. A field left unset is not changed.
+  struct SettingsUpdate {
+    std::optional<bool> resolve;
+    std::optional<bool> discovery;
+    std::optional<int> discoveryPort;
+    std::optional<bool> persistence;
+    std::optional<bool> httpProxy;
+  };
+
+  Error applySettings(const SettingsUpdate& update);
 
   /// Render information about specific topic.
   Error renderTopicInfo(const std::string_view& name, std::string& output) const;

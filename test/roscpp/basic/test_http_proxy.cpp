@@ -3,6 +3,7 @@
 //
 
 #include <chrono>
+#include <filesystem>
 #include <map>
 #include <string>
 #include <thread>
@@ -322,6 +323,59 @@ TEST_F(HttpProxyTest, DisabledMasterRefusesRegistration)
   EXPECT_EQ(static_cast<int>(res[0]), 0);
   const Exchange got = httpExchange(master_->getPort(), request("GET", "/p/camera/ui/hello"));
   EXPECT_EQ(got.status, 404);
+}
+
+TEST_F(HttpProxyTest, RestoresRequestedProxyAfterRestart)
+{
+  struct CacheDir {
+    std::filesystem::path previous;
+    std::filesystem::path dir;
+    CacheDir()
+    {
+      previous = std::filesystem::current_path();
+      dir = std::filesystem::temp_directory_path() / "miniros-http-proxy-cache";
+      std::error_code ec;
+      std::filesystem::remove_all(dir, ec);
+      std::filesystem::create_directories(dir);
+      std::filesystem::current_path(dir);
+    }
+    ~CacheDir()
+    {
+      std::error_code ec;
+      std::filesystem::current_path(previous, ec);
+      std::filesystem::remove_all(dir, ec);
+    }
+  } cacheDir;
+
+  // The fixture master has caching off. Replace it with one that writes cache.<port>.
+  master_->stop();
+  master_.reset();
+
+  auto openCached = [&](int port) {
+    master_ = std::make_unique<master::Master>(rpc_);
+    master_->setCacheEnabled(true);
+    master_->setMultimasterEnabled(false);
+    master_->setNodeCheckPeriod(0);
+    master_->setHttpProxyEnabled(true);
+    return master_->start(&poll_.getPollSet(), port, "127.0.0.1");
+  };
+
+  ASSERT_TRUE(openCached(0));
+  enable("/camera", {"/ui/"});
+  const int port = master_->getPort();
+  ASSERT_GT(port, 0);
+  ASSERT_EQ(httpExchange(port, request("GET", "/p/camera/ui/hello")).status, 200);
+
+  master_->stop();
+  master_.reset();
+
+  ASSERT_TRUE(openCached(port));
+  ASSERT_EQ(master_->getPort(), port);
+  const Exchange restored = httpExchange(port, request("GET", "/p/camera/ui/hello"));
+  EXPECT_EQ(restored.status, 200);
+  EXPECT_EQ(restored.body, "/ui/hello");
+  const Exchange blocked = httpExchange(port, request("GET", "/p/camera/secret"));
+  EXPECT_EQ(blocked.status, 404);
 }
 
 TEST_F(HttpProxyTest, WholeOriginExceptRpc)

@@ -22,6 +22,22 @@ using namespace http;
 
 namespace {
 
+std::string htmlEscape(const std::string& text)
+{
+  std::string out;
+  out.reserve(text.size());
+  for (char c : text) {
+    switch (c) {
+    case '&': out += "&amp;"; break;
+    case '<': out += "&lt;"; break;
+    case '>': out += "&gt;"; break;
+    case '"': out += "&quot;"; break;
+    default: out += c; break;
+    }
+  }
+  return out;
+}
+
 std::string formatUptime(const WallDuration& d)
 {
   int64_t sec = d.sec;
@@ -396,8 +412,10 @@ Error Master::Internal::renderNodeInfo(const std::string_view& name, std::string
   ss << "<p>" << print::HB(name) << std::endl;
   const std::string url = nodePtr->getUrl().str();
   ss << "URL: " << print::Url(url, url);
-  if (nodePtr->hasHttpProxy() && httpProxy)
-    ss << "<br/>HTTP proxy: " << httpProxy->publicPrefix(nodePtr->id()) << "/";
+  if (httpProxyEnabled && httpProxy && nodePtr->hasHttpProxy()) {
+    const std::string mount = httpProxy->publicPrefix(nodePtr->id()) + "/";
+    ss << "<br/>Proxy: " << print::Url(mount, mount);
+  }
 
   // Display flags
   int flags = nodePtr->getNodeFlags();
@@ -473,10 +491,20 @@ Error Master::Internal::renderNodeInfo(const std::string_view& name, std::string
   }
   const auto topicTypes = regManager.getTopicTypes("root");
 
+  // A <ul> inside a <p> is invalid: the browser closes the paragraph before the
+  // list, so the title and the list each take a full paragraph margin. A section
+  // keeps them together. The list margin stays smaller than the section gap.
+  auto openSection = [&ss](const char* title) {
+    ss << "<section style=\"margin:1em 0 0\">" << print::HB(title);
+  };
+  auto openList = [&ss]() {
+    ss << "<ul style=\"margin:0.25em 0 0\">";
+  };
+
   // 2. Subscriptions: a list of subscribed topics with types and hrefs
-  ss << "<p>" << print::HB("Subscriptions: ") << std::endl;
+  openSection("Subscriptions: ");
   if (!subscriptions.empty()) {
-    ss << "<ul>";
+    openList();
     for (const std::string& topic: subscriptions) {
       auto it = topicTypes.find(topic);
       ss << "<li>" << print::PrefixUrl("/topic", topic, topic);
@@ -485,16 +513,16 @@ Error Master::Internal::renderNodeInfo(const std::string_view& name, std::string
       }
       ss << "</li>";
     }
-    ss << "</ul>" << std::endl;
+    ss << "</ul>";
   } else {
-    ss << "none" << std::endl;
+    ss << "none";
   }
-  ss << "</p>" << std::endl;
+  ss << "</section>" << std::endl;
 
   // 3. Publications: a list of published topics with hrefs.
-  ss << "<p>" << print::HB("Publications: ") << std::endl;
+  openSection("Publications: ");
   if (!publications.empty()) {
-    ss << "<ul>";
+    openList();
     for (const std::string& topic: publications) {
       auto it = topicTypes.find(topic);
       ss << "<li>" << print::PrefixUrl("/topic", topic, topic);
@@ -503,24 +531,32 @@ Error Master::Internal::renderNodeInfo(const std::string_view& name, std::string
       }
       ss << "</li>";
     }
-    ss << "</ul>" << std::endl;
-  } else {
-    ss << "none" << std::endl;
-  }
-  ss << "</p>" << std::endl;
-
-  // 4. Services.
-  ss << "<p>" << print::HB("Services: ") << std::endl;
-  if (!services.empty()) {
-    ss << "<ul>";
-    for (const std::string& service: services) {
-      ss << "<li>" << service << "</li>";
-    }
     ss << "</ul>";
   } else {
     ss << "none";
   }
-  ss << "</p>" << std::endl;
+  ss << "</section>" << std::endl;
+
+  // 4. Services.
+  openSection("Services: ");
+  if (!services.empty()) {
+    openList();
+    for (const std::string& service: services)
+      ss << "<li>" << service << "</li>";
+    ss << "</ul>";
+  } else {
+    ss << "none";
+  }
+  ss << "</section>" << std::endl;
+
+  const std::vector<std::string> prefixes = nodePtr->httpProxyPrefixes();
+  if (!prefixes.empty()) {
+    openSection("Requested proxies: ");
+    openList();
+    for (const std::string& prefix : prefixes)
+      ss << "<li><code>" << htmlEscape(prefix) << "</code></li>";
+    ss << "</ul></section>" << std::endl;
+  }
 
   ss << "<p>" << print::Url("/", "BACK") << "</p>" << std::endl;
 

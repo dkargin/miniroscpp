@@ -49,7 +49,7 @@ public:
 };
 
 /// GET /settings renders the local-settings form.
-/// GET /api2/settings reads or applies resolve, discovery, discovery_port, persistence.
+/// GET /api2/settings reads or applies resolve, discovery, discovery_port, persistence, http_proxy.
 class SettingsEndpoint : public http::EndpointHandler {
 public:
   SettingsEndpoint(Master::Internal* internal, bool htmlPage)
