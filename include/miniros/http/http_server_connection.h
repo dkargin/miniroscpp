@@ -142,6 +142,12 @@ protected:
   /// @param evtFlags event flags from poll.
   EventReport handleSocketEvents(Lock& lock, int evtFlags);
 
+  /// Detach this socket and give it to the HTTP proxy acceptor.
+  EventReport handoffProxy(Lock& lock);
+
+  /// True when the server's proxy prefix matches the current request path.
+  bool requestIsProxied(Lock& lock) const;
+
   /// Handles State::ReadRequest.
   /// Expected transitions:
   ///  - ProcessRequest if got full HTTP request.

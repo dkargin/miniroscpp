@@ -264,6 +264,23 @@ public:
   /// Mark node as dead and tear down its HTTP client.
   void markDead();
 
+  /// Public HTTP prefixes for `/p/{node}/...`. Empty means the node is not proxied.
+  /// @p dial is the literal address the master connects to. No DNS on the poll thread.
+  void setHttpProxy(std::vector<std::string> prefixes, const network::NetAddress& dial);
+
+  void clearHttpProxy();
+
+  bool hasHttpProxy() const;
+
+  std::vector<std::string> httpProxyPrefixes() const;
+
+  network::NetAddress httpProxyDial() const;
+
+  /// Peer UUID that imported this route. Empty for a local registration.
+  void setHttpProxyPeer(std::string peer);
+
+  std::string httpProxyPeer() const;
+
 protected:
   using GuardLock = std::unique_lock<std::mutex>;
   using ClientLock = std::unique_lock<std::mutex>;
@@ -334,6 +351,10 @@ protected:
 
   /// In-flight getPublications / getSubscriptions during Recovering.
   int m_restoreQueriesLeft GUARDED_BY(m_guard) = 0;
+
+  std::vector<std::string> m_httpProxyPrefixes GUARDED_BY(m_guard);
+  network::NetAddress m_httpProxyDial GUARDED_BY(m_guard);
+  std::string m_httpProxyPeer GUARDED_BY(m_guard);
 };
 
 using NodeRefPtr = std::shared_ptr<NodeRef>;

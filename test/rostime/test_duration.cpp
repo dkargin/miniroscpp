@@ -92,7 +92,7 @@ TEST(Duration, arithmeticExceptions)
     Duration d2(2147483647, 999999999);
     EXPECT_THROW(d1 + d2, std::runtime_error);
 
-    Duration d3(-2147483648, 0);
+    Duration d3(-2147483647 - 1, 0);
     Duration d4(2147483647, 0);
     EXPECT_THROW(d3 - d4, std::runtime_error);
     EXPECT_THROW(d4 - d3, std::runtime_error);
@@ -117,8 +117,8 @@ TEST(Duration, negativeSignExceptions)
     EXPECT_EQ(-2147483647999999999, d3.toNSec());
 
     Duration d4(-2147483647, 0);
-    Duration d5(-2147483648, 999999999);
-    Duration d6(-2147483648, 2);
+    Duration d5(-2147483647 - 1, 999999999);
+    Duration d6(-2147483647 - 1, 2);
     Duration d7;
     EXPECT_NO_THROW(d7 = -d4);
     EXPECT_EQ(2147483647000000000, d7.toNSec());

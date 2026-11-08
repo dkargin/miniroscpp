@@ -29,6 +29,10 @@ struct HttpServer::Internal {
 
   CloseConnectionHandler onCloseConnection;
 
+  HttpProxyAcceptor* proxyAcceptor = nullptr;
+  /// Absolute path without a trailing slash. Empty disables the handoff.
+  std::string proxyPrefix;
+
   /// Thread safe collection of endpoints.
   std::shared_ptr<internal::EndpointCollection> endpoints;
 
@@ -173,6 +177,41 @@ void HttpServer::Internal::onConnectionClosed(Lock& lock, const std::shared_ptr<
 void HttpServer::setCloseConnectionHandler(CloseConnectionHandler&& handler)
 {
   internal_->onCloseConnection = std::move(handler);
+}
+
+void HttpServer::setHttpProxyAcceptor(HttpProxyAcceptor* acceptor, const std::string& pathPrefix)
+{
+  if (!internal_)
+    return;
+  auto lock = internal_->lifetime->getLock();
+  internal_->proxyAcceptor = acceptor;
+  internal_->proxyPrefix = pathPrefix;
+  if (!internal_->proxyPrefix.empty() && internal_->proxyPrefix.back() == '/')
+    internal_->proxyPrefix.pop_back();
+  if (!acceptor)
+    internal_->proxyPrefix.clear();
+}
+
+bool HttpServer::proxyPrefixMatches(std::string_view path) const
+{
+  if (!internal_ || !internal_->proxyAcceptor || internal_->proxyPrefix.empty())
+    return false;
+  return isHttpProxyPath(path, internal_->proxyPrefix);
+}
+
+bool HttpServer::matchesHttpProxy(std::string_view path) const
+{
+  if (!internal_)
+    return false;
+  auto lock = internal_->lifetime->getLock();
+  return proxyPrefixMatches(path);
+}
+
+bool HttpServer::offerHttpProxy(const HttpParserFrame& frame, const std::shared_ptr<network::NetSocket>& client)
+{
+  if (!internal_ || !internal_->proxyAcceptor || !client)
+    return false;
+  return internal_->proxyAcceptor->acceptHttpProxy(frame, client);
 }
 
 void HttpServer::onConnectionClosed(std::unique_lock<std::mutex>& lock,

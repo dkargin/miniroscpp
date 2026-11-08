@@ -4,6 +4,7 @@
 
 #include "master_cache.h"
 
+#include "http_proxy.h"
 #include "master_handler.h"
 #include "node_ref.h"
 #include "registration_manager.h"
@@ -45,6 +46,32 @@ bool hostnamesEqual(const std::string& a, const std::string& b)
       return false;
   }
   return true;
+}
+
+bool usableProxyPrefix(const std::string& prefix)
+{
+  return !prefix.empty() && prefix.size() <= 256 && prefix.front() == '/'
+    && prefix.find("..") == std::string::npos
+    && prefix.find('\n') == std::string::npos
+    && prefix.find('\r') == std::string::npos;
+}
+
+void readProxyPrefixes(const json& value, std::vector<std::string>& out)
+{
+  const json* prefixes = nullptr;
+  if (value.is_array())
+    prefixes = &value;
+  else if (value.is_object() && value.contains("prefixes") && value["prefixes"].is_array())
+    prefixes = &value["prefixes"];
+  if (!prefixes)
+    return;
+  for (const auto& prefixJson : *prefixes) {
+    if (!prefixJson.is_string())
+      continue;
+    std::string prefix = prefixJson.get<std::string>();
+    if (usableProxyPrefix(prefix))
+      out.push_back(std::move(prefix));
+  }
 }
 
 bool looksLikeLoopbackHost(const std::string& host)
@@ -227,6 +254,20 @@ void MasterCache::beginRestore(int port, const std::string& runtimeGuid)
     for (const CachedService& svc : cn.services)
       services.emplace_back(svc.name, svc.service_api);
     report.node->beginRestore(std::move(services));
+    if (!cn.httpProxyPrefixes.empty()) {
+      network::URL url;
+      const network::NetAddress dial = url.fromString(cn.api, false)
+        ? dialAddressForHost(url.host, static_cast<int>(url.port), true)
+        : network::NetAddress{};
+      if (dial.valid()) {
+        report.node->setHttpProxy(cn.httpProxyPrefixes, dial);
+        MINIROS_INFO("MasterCache: restored http proxy for %s (%zu prefix(es)) at %s",
+                     cn.name.c_str(), cn.httpProxyPrefixes.size(), dial.str().c_str());
+      } else {
+        MINIROS_WARN("MasterCache: dropping http proxy for %s (cannot resolve node API \"%s\")",
+                     cn.name.c_str(), cn.api.c_str());
+      }
+    }
     ++started;
     MINIROS_INFO("MasterCache: restoring node %s at %s (pid=%d cached_state=%s)",
                  cn.name.c_str(), cn.api.c_str(), cn.pid,
@@ -469,6 +510,7 @@ MasterCacheData MasterCache::collect(int port, const std::string& guid) const
     // m_guard races with register/unregister and can yield torn UTF-8 strings
     // that abort nlohmann::json::dump().
     std::vector<std::string> serviceNames;
+    const std::vector<std::string> proxyPrefixes = node->httpProxyPrefixes();
     {
       NodeRef::Lock nodeLock(*node);
       const auto& services = node->getServicesLocked(nodeLock);
@@ -484,6 +526,9 @@ MasterCacheData MasterCache::collect(int port, const std::string& guid) const
           cn.services.push_back(std::move(svc));
       }
     }
+
+    if (!proxyPrefixes.empty())
+      cn.httpProxyPrefixes = proxyPrefixes;
 
     data.nodes.push_back(std::move(cn));
   }
@@ -642,6 +687,8 @@ Error MasterCache::loadFile(const std::filesystem::path& path, MasterCacheData& 
             node.services.push_back(std::move(svc));
         }
       }
+      if (nodeJson.contains("http_proxy"))
+        readProxyPrefixes(nodeJson["http_proxy"], node.httpProxyPrefixes);
       if (!node.name.empty() && !node.api.empty())
         out.nodes.push_back(std::move(node));
     }
@@ -830,6 +877,8 @@ Error MasterCache::saveFile(const std::filesystem::path& path, const MasterCache
       svcJson["api"] = svc.service_api;
       nodeJson["services"].push_back(std::move(svcJson));
     }
+    if (!node.httpProxyPrefixes.empty())
+      nodeJson["http_proxy"] = node.httpProxyPrefixes;
     root["nodes"].push_back(std::move(nodeJson));
   }
 

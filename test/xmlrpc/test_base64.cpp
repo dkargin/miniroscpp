@@ -84,7 +84,7 @@ TEST(Base64, EncodeBlockNoWrapOmitsNewlines) {
 
 TEST_P(Base64Test, Decode) {
   const std::string& in = GetParam().encoded;
-  const int encoded_size = in.length();
+  const int encoded_size = static_cast<int>(in.length());
 
   // oversize our output vector (same method used by XmlRpcValue)
   std::vector<char> out;
@@ -147,7 +147,7 @@ class Base64ErrorTest : public ::testing::TestWithParam<Base64ErrorData> {};
 
 TEST_P(Base64ErrorTest, DecodeErrors) {
   const std::string& in = GetParam().encoded;
-  const int encoded_size = in.length();
+  const int encoded_size = static_cast<int>(in.length());
 
   // oversize our output vector (same method used by XmlRpcValue)
   std::vector<char> out;

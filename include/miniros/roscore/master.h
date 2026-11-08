@@ -60,7 +60,8 @@ public:
   Master(std::shared_ptr<RPCManager> manager);
   ~Master();
 
-  bool start(PollSet* poll_set, int port);
+  /// @param advertisedHost name placed in this master's RPC URI. Empty uses the resolver hostname.
+  bool start(PollSet* poll_set, int port, const std::string& advertisedHost = {});
   void stop();
   bool ok() const;
 
@@ -104,6 +105,10 @@ public:
 
   /// Enable or disable persistent state (cache.<port> in the current working directory).
   void setCacheEnabled(bool enabled);
+
+  /// Enable `/p/{node}/` reverse proxy. Default is off.
+  /// Can change while running. New tunnels follow the flag; open tunnels stay up.
+  void setHttpProxyEnabled(bool enabled);
 
   /// Update queued tasks.
   void update();
@@ -187,6 +192,15 @@ public: /// Request handlers
   ///  - node (str) - Name of node to lookup
   /// Returns (int, str, str) (code, statusMessage, URI)
   RpcValue lookupNode(const std::string& caller_id, const std::string& node, const ClientInfo& conn);
+
+  /// Opt this node into `${ROS_MASTER_URI}/p/{caller_id}/...`.
+  /// prefixes is an XML-RPC array of path prefixes on the node. `/RPC2` is never forwarded.
+  /// An empty array clears the route. XML-RPC name: rpc2EnableHttpProxy.
+  RpcValue rpc2EnableHttpProxy(const std::string& caller_id, const std::string& caller_api,
+    const RpcValue& prefixes, const ClientInfo& conn);
+
+  /// XML-RPC name: rpc2DisableHttpProxy.
+  RpcValue rpc2DisableHttpProxy(const std::string& caller_id, const std::string& caller_api, const ClientInfo& conn);
 
   /// Parameter API
 

@@ -12,6 +12,7 @@
 #include "miniros/callback_queue.h"
 #include "miniros/console.h"
 #include "miniros/http/endpoint_collection.h"
+#include "miniros/http/http_proxy.h"
 #include "miniros/http/http_server.h"
 #include "miniros/http/http_server_connection.h"
 #include "miniros/io/poll_set.h"
@@ -124,6 +125,17 @@ Error HttpServerConnection::doReadRequest(Lock& lock)
 
   const int fd = socket_->fd();
   const int parsed = http_frame_.incrementalParse();
+
+  // A proxy path is detached as soon as the head is in. Reading the body here
+  // would buffer it on the master and delay the poll thread.
+  constexpr size_t kMaxProxyRequestHeader = 16 * 1024;
+  if (!http_frame_.hasHeader() && http_frame_.data.size() > kMaxProxyRequestHeader)
+    return Error::InvalidValue;
+  if (http_frame_.hasHeader() && requestIsProxied(lock)) {
+    if (http_frame_.header().size() > kMaxProxyRequestHeader)
+      return Error::InvalidValue;
+    return Error::Ok;
+  }
 
   std::string peer = socket_->peerAddress().str();
   double dur = (SteadyTime::now() - request_start_).toSec() * 1000;
@@ -257,6 +269,46 @@ std::shared_ptr<HttpRequest> HttpServerConnection::makeRequestObject(Lock& lock)
   return requestObject;
 }
 
+bool HttpServerConnection::requestIsProxied(Lock& lock) const
+{
+  if (!server_lifetime_)
+    return false;
+  // Copy before dropping guard_. detachFromServer() takes the server lifetime
+  // lock and then guard_ (via fd()). Taking the lifetime lock while guard_ is
+  // held inverts that order and TSan reports a deadlock cycle.
+  auto life = server_lifetime_;
+  const std::string path(http_frame_.getPath());
+  ScopedUnlock unlock(lock);
+  auto lifeLock = life->getLock();
+  if (!life->valid(lifeLock) || !life->ptr())
+    return false;
+  return life->ptr()->proxyPrefixMatches(path);
+}
+
+HttpServerConnection::EventReport HttpServerConnection::handoffProxy(Lock& lock)
+{
+  EventReport report;
+  report.cmd = EventReport::Upgrade;
+  report.disconnectMsg = "http proxy";
+  report.evtFlags = 0;
+
+  auto socket = socket_;
+  detachPollSet(lock);
+  socket_ = nullptr;
+
+  bool taken = false;
+  if (server_lifetime_) {
+    auto life = server_lifetime_;
+    ScopedUnlock unlock(lock);
+    auto lifeLock = life->getLock();
+    if (life->valid(lifeLock) && life->ptr())
+      taken = life->ptr()->offerHttpProxy(http_frame_, socket);
+  }
+  if (!taken)
+    writeHttpStatusAndClose(socket, 404, "Not Found");
+  return report;
+}
+
 HttpServerConnection::EventReport HttpServerConnection::handleReadRequest(Lock& lock, int evtFlags)
 {
   EventReport report;
@@ -284,7 +336,10 @@ HttpServerConnection::EventReport HttpServerConnection::handleReadRequest(Lock& 
       report.cmd = EventReport::Disconnect;
       report.disconnectMsg = "closed by EOF";
       return report;
-    } if (err != Error::Ok) {
+    }
+    if (http_frame_.hasHeader() && requestIsProxied(lock))
+      return handoffProxy(lock);
+    if (err != Error::Ok) {
       LOCAL_ERROR("Unexpected error %s", err.toString());
       report.cmd = EventReport::Disconnect;
       report.disconnectMsg = std::string("closed by unexpected error: ") + err.toString();
@@ -510,7 +565,7 @@ HttpServerConnection::EventReport HttpServerConnection::handleSocketEvents(Lock&
     EventReport report = handleReadRequest(lock, evtFlags);
     assert(report.cmd != EventReport::Invalid);
     evtFlags = report.evtFlags;
-    if (report.cmd == EventReport::Disconnect) {
+    if (report.cmd == EventReport::Disconnect || report.cmd == EventReport::Upgrade) {
       updateState(lock, State::Disconnected);
       return report;
     } else if (report.cmd == EventReport::Continue) {

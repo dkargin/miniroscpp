@@ -86,19 +86,19 @@ void generate_rand_durations(uint32_t range, uint64_t runs, std::vector<miniros:
     EXPECT_GE(values2.back(), Duration(0,0));
 
     // negative durations
-    values1.push_back(Duration( -(rand() * range / RAND_MAX), -(rand() * 1000000000ULL/RAND_MAX)));
-    values2.push_back(Duration( -(rand() * range / RAND_MAX), -(rand() * 1000000000ULL/RAND_MAX)));
+    values1.push_back(Duration(-static_cast<int32_t>(rand() * range / RAND_MAX), -static_cast<int32_t>(rand() * 1000000000ULL / RAND_MAX)));
+    values2.push_back(Duration(-static_cast<int32_t>(rand() * range / RAND_MAX), -static_cast<int32_t>(rand() * 1000000000ULL / RAND_MAX)));
     EXPECT_LE(values1.back(), Duration(0,0));
     EXPECT_LE(values2.back(), Duration(0,0));
 
     // positive and negative durations
     values1.push_back(Duration(  (rand() * range / RAND_MAX),  (rand() * 1000000000ULL/RAND_MAX)));
-    values2.push_back(Duration( -(rand() * range / RAND_MAX), -(rand() * 1000000000ULL/RAND_MAX)));
+    values2.push_back(Duration(-static_cast<int32_t>(rand() * range / RAND_MAX), -static_cast<int32_t>(rand() * 1000000000ULL / RAND_MAX)));
     EXPECT_GE(values1.back(), Duration(0,0));
     EXPECT_LE(values2.back(), Duration(0,0));
 
     // negative and positive durations
-    values1.push_back(Duration( -(rand() * range / RAND_MAX), -(rand() * 1000000000ULL/RAND_MAX)));
+    values1.push_back(Duration(-static_cast<int32_t>(rand() * range / RAND_MAX), -static_cast<int32_t>(rand() * 1000000000ULL / RAND_MAX)));
     values2.push_back(Duration(  (rand() * range / RAND_MAX),  (rand() * 1000000000ULL/RAND_MAX)));
     EXPECT_LE(values1.back(), Duration(0,0));
     EXPECT_GE(values2.back(), Duration(0,0));
@@ -323,8 +323,8 @@ TEST(Time, OperatorMinusExceptions)
     Time t6(0, 1);
 
     Duration d1(2147483647, 999999999);
-    Duration d2(-2147483648, 0);
-    Duration d3(-2147483648, 1);
+    Duration d2(-2147483647 - 1, 0);
+    Duration d3(-2147483647 - 1, 1);
     Duration d4(0, 1);
 
     EXPECT_NO_THROW(t1 - t2);
@@ -352,7 +352,7 @@ TEST(Time, OperatorPlusExceptions)
     Time t5(4294967295, 999999998);
 
     Duration d1(2147483647, 999999999);
-    Duration d2(-2147483648, 1);
+    Duration d2(-2147483647 - 1, 1);
     Duration d3(0, 2);
     Duration d4(0, 1);
 

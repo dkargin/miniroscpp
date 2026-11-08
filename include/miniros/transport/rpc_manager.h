@@ -220,8 +220,10 @@ public:
 
   /// Start RPC server.
   /// @param cb - callback queue for serving XMLRPC requests.
-  /// @param port - TCP port to start XMLRPC server.
-  MINIROS_NODISCARD Error start(const std::shared_ptr<CallbackQueue>& cb, int port);
+  /// @param port - TCP port to listen on. 0 picks a free port.
+  /// @param advertisedHost - hostname placed in this server's URI (`http://host:port/`).
+  ///        The listen socket does not use it. Empty is rejected.
+  MINIROS_NODISCARD Error start(const std::shared_ptr<CallbackQueue>& cb, int port, const std::string& advertisedHost);
   void shutdown();
 
   bool isShuttingDown() const;

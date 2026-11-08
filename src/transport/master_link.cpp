@@ -70,6 +70,9 @@ struct MasterLink::Internal {
   std::set<std::string> subscribed_params;
 
   bool localMaster = false;
+
+  /// Last prefixes accepted by enableHttpProxy. Kept so a later call can see them.
+  std::vector<std::string> httpProxyPrefixes;
 #if defined(__APPLE__)
   std::mutex xmlrpc_call_mutex;
 #endif
@@ -1206,6 +1209,50 @@ bool MasterLink::isLocalMaster() const
   if (!internal_)
     return false;
   return internal_->localMaster;
+}
+
+Error MasterLink::enableHttpProxy(const std::vector<std::string>& prefixes)
+{
+  if (!internal_)
+    return Error::InternalError;
+  RPCManagerPtr rpc = internal_->rpcManager.lock();
+  if (!rpc)
+    return Error::NoMaster;
+
+  RpcValue args;
+  args[0] = this_node::getName();
+  args[1] = rpc->getServerUrlStr();
+  args[2] = RpcValue::Array(prefixes.size());
+  for (int i = 0; i < static_cast<int>(prefixes.size()); ++i)
+    args[2][i] = prefixes[static_cast<size_t>(i)];
+
+  RpcValue response;
+  RpcValue payload;
+  const Error err = execute("rpc2EnableHttpProxy", args, response, payload, true);
+  if (!err)
+    return err;
+  internal_->httpProxyPrefixes = prefixes;
+  return Error::Ok;
+}
+
+Error MasterLink::disableHttpProxy()
+{
+  if (!internal_)
+    return Error::InternalError;
+  RPCManagerPtr rpc = internal_->rpcManager.lock();
+  if (!rpc)
+    return Error::NoMaster;
+
+  RpcValue args;
+  args[0] = this_node::getName();
+  args[1] = rpc->getServerUrlStr();
+  RpcValue response;
+  RpcValue payload;
+  const Error err = execute("rpc2DisableHttpProxy", args, response, payload, true);
+  if (!err)
+    return err;
+  internal_->httpProxyPrefixes.clear();
+  return Error::Ok;
 }
 
 } // namespace miniros

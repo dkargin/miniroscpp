@@ -19,7 +19,7 @@ namespace XmlRpc
 
   XmlRpcValue base64Value(std::string const & data)
   {
-    return XmlRpcValue(const_cast<char *>(&data[0]), data.size());
+    return XmlRpcValue(const_cast<char *>(&data[0]), static_cast<int>(data.size()));
   }
 
   XmlRpcValue fromXml(std::string const & data)

@@ -3,6 +3,7 @@
 
 #include <atomic>
 #include <map>
+#include <optional>
 #include <set>
 #include <string_view>
 
@@ -13,6 +14,7 @@
 #include "master_handler.h"
 #include "master_cache.h"
 #include "multimaster.h"
+#include "http_proxy.h"
 
 #include "miniros/rostime.h"
 
@@ -25,6 +27,7 @@ class TopicInfoEndpoint;
 class PublishedTopicsEndpoint;
 class SettingsEndpoint;
 class NodeUriEndpoint;
+class HttpProxyEndpoint;
 class TopicTypesEndpoint;
 class MultimasterApiEndpoint;
 class DebugApiEndpoint;
@@ -61,6 +64,9 @@ struct Master::Internal {
   /// Endpoint for accessing /api2/node_uri
   std::shared_ptr<NodeUriEndpoint> httpNodeUriEndpoint;
 
+  /// Temporary GET /api2/http_proxy?node=<name> for proxy prefixes.
+  std::shared_ptr<HttpProxyEndpoint> httpProxyEndpoint;
+
   /// Endpoint for accessing /api2/topic_types
   std::shared_ptr<TopicTypesEndpoint> httpTopicTypesEndpoint;
 
@@ -75,6 +81,12 @@ struct Master::Internal {
 
   /// Multimaster discovery + registration sync over UDP.
   std::unique_ptr<MultimasterManager> multimaster;
+
+  /// Reverse proxy for `/p/{node}/...`.
+  std::shared_ptr<HttpProxyHub> httpProxy;
+
+  /// When false, `/p/` is closed and rpc2EnableHttpProxy is rejected.
+  bool httpProxyEnabled = false;
 
   /// When false, Master::start() does not bind multimaster UDP sockets.
   bool multimasterEnabled = true;
@@ -136,12 +148,16 @@ struct Master::Internal {
   /// Bound XML-RPC port. 0 before the server is listening.
   int rpcPort() const;
 
-  /// Apply one local setting. Empty `discoveryPortText` leaves the port unchanged.
-  /// `discovery` nullopt-style: pass `changeDiscovery` false to skip that flag.
-  Error applySettings(bool changeResolve, bool resolve,
-    bool changeDiscovery, bool discovery,
-    bool changePort, int discoveryPort,
-    bool changePersistence, bool persistence);
+  /// Local settings to apply. A field left unset is not changed.
+  struct SettingsUpdate {
+    std::optional<bool> resolve;
+    std::optional<bool> discovery;
+    std::optional<int> discoveryPort;
+    std::optional<bool> persistence;
+    std::optional<bool> httpProxy;
+  };
+
+  Error applySettings(const SettingsUpdate& update);
 
   /// Render information about specific topic.
   Error renderTopicInfo(const std::string_view& name, std::string& output) const;
