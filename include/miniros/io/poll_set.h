@@ -168,6 +168,11 @@ public:
   /**
    * \brief Signal our poll() call to finish if it's blocked waiting (see the poll_timeout
    * option for update()).
+   *
+   * Cheap when called outside of poll(): sets a flag so the next update() skips the
+   * blocking wait entirely (poll_timeout is left untouched). Only writes to the wake
+   * pipe when update() is currently inside poll/epoll. Multiple rapid signals are
+   * coalesced. Prefer this for waking poll watchers (e.g. publish queues).
    */
   bool signal() const;
 
